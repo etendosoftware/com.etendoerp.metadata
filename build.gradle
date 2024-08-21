@@ -10,7 +10,7 @@ group          = "com.etendo"
 version        = "1.0.0"
 description    = "A module that provides API endpoints for loading windows metadata and other information"
 ext.artifact   = "metadata"
-ext.repository = "com.etendo.metadata"
+ext.repository = "https://maven.pkg.github.com/etendosoftware/com.etendo.metadata"
 
 configurations {
     moduleDependencyContainer
@@ -27,7 +27,7 @@ publishing {
     }
     repositories {
         maven {
-            url "com.etendo.metadata"
+            url "https://maven.pkg.github.com/etendosoftware/com.etendo.metadata"
         }
     }
 }
@@ -35,7 +35,7 @@ publishing {
 repositories {
     mavenCentral()
     maven {
-        url "com.etendo.metadata"
+        url "https://maven.pkg.github.com/etendosoftware/com.etendo.metadata"
     }
     maven {
         url "https://repo.futit.cloud/repository/maven-releases"
@@ -53,6 +53,6 @@ repositories {
 * Ex: implementation "com.sun.mail:javax.mail:1.6.2"
 */
 dependencies {
-   implementation('com.etendoerp.platform:etendo-core:[22.1.0, x.y.z)') 
+   implementation('com.etendoerp.platform:etendo-core:[22.1.0, 24.0.0)') 
 
 }
