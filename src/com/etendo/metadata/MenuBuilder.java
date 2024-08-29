@@ -12,7 +12,6 @@ import org.openbravo.model.ad.ui.Menu;
 import org.openbravo.model.ad.ui.Tab;
 import org.openbravo.model.ad.ui.Window;
 
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -26,10 +25,6 @@ public class MenuBuilder {
         this.menu = manager.getMenu();
     }
 
-    public JSONArray toJSON() {
-        return new JSONArray(this.menu.getChildren().stream().map(MenuBuilder::toJSON).collect(Collectors.toList()));
-    }
-
     private static JSONObject toJSON(MenuOption entry) {
         JSONObject menuItem = new JSONObject();
 
@@ -39,7 +34,7 @@ public class MenuBuilder {
             Window window = menu != null ? menu.getWindow() : null;
 
             menuItem.put("type", entry.getType());
-            menuItem.put("readOnly", entry.getReadOnlyStringValue());;
+            menuItem.put("readOnly", entry.getReadOnlyStringValue());
             menuItem.put("tabId", tab != null ? tab.getId() : null);
             menuItem.put("isVisible", entry.isVisible());
             menuItem.put("isProcess", entry.isProcess());
@@ -70,5 +65,9 @@ public class MenuBuilder {
         }
 
         return menuItem;
+    }
+
+    public JSONArray toJSON() {
+        return new JSONArray(this.menu.getChildren().stream().map(MenuBuilder::toJSON).collect(Collectors.toList()));
     }
 }
