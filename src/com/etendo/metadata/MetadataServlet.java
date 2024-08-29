@@ -4,6 +4,7 @@ import com.auth0.jwt.interfaces.DecodedJWT;
 import com.smf.securewebservices.utils.SecureWebServicesUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.hibernate.criterion.Restrictions;
@@ -12,11 +13,13 @@ import org.openbravo.base.HttpBaseServlet;
 import org.openbravo.base.exception.OBException;
 import org.openbravo.base.secureApp.AllowedCrossDomainsHandler;
 import org.openbravo.base.session.OBPropertiesProvider;
+import org.openbravo.client.application.GlobalMenu;
+import org.openbravo.client.application.MenuManager;
+import org.openbravo.client.application.MenuManager.MenuOption;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBCriteria;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.database.SessionInfo;
-import org.openbravo.model.ad.access.Role;
 import org.openbravo.model.ad.access.WindowAccess;
 import org.openbravo.model.ad.ui.Menu;
 import org.openbravo.model.ad.ui.Window;
@@ -28,20 +31,67 @@ import javax.servlet.http.HttpSession;
 import java.io.IOException;
 import java.io.Writer;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
- *
  * @author luuchorocha
  */
 public class MetadataServlet extends HttpBaseServlet {
     private static final String APPLICATION_JSON = "application/json";
     private static final Logger log = LogManager.getLogger();
-    private static Integer wsInactiveInterval = null;
     private static final int DEFAULT_WS_INACTIVE_INTERVAL = 60;
+    private static Integer wsInactiveInterval = null;
+
+    private static JSONObject buildMenu(MenuOption entry) {
+        JSONObject menuItem = new JSONObject();
+
+        try {
+            Menu menu = entry.getMenu();
+
+            if (null != menu) {
+                menuItem.put("id", menu.getId());
+                menuItem.put("name", menu.getName());
+                menuItem.put("entity", menu.getEntityName());
+                menuItem.put("identifier", menu.getIdentifier());
+                menuItem.put("process", menu.getProcess());
+                menuItem.put("action", menu.getAction());
+                menuItem.put("url", menu.getURL());
+                menuItem.put("description", menu.getDescription());
+
+                Window window = menu.getWindow();
+
+                if (window != null) {
+                    menuItem.put("windowId", window.getId());
+                }
+            }
+
+            List<MenuOption> items = entry.getChildren();
+
+            if (!items.isEmpty()) {
+                menuItem.put("children", items.stream().map(MetadataServlet::buildMenu).collect(Collectors.toList()));
+            }
+        } catch (JSONException e) {
+            log.warn(e.getMessage());
+        }
+
+        return menuItem;
+    }
+
+    public static boolean hasWindowAccess(Menu menu) {
+        if (null == menu.getWindow()) {
+            return true;
+        }
+
+        String windowId = menu.getWindow().getId();
+        OBCriteria<WindowAccess> windowAccessCriteria = OBDal.getInstance().createCriteria(WindowAccess.class);
+        windowAccessCriteria.add(Restrictions.eq(WindowAccess.PROPERTY_ROLE, OBContext.getOBContext().getRole()));
+        windowAccessCriteria.add(Restrictions.eq(WindowAccess.PROPERTY_WINDOW, OBDal.getInstance().get(Window.class, windowId)));
+
+        return !windowAccessCriteria.list().isEmpty();
+    }
 
     @Override
-    public final void service(HttpServletRequest request, HttpServletResponse response)
-            throws ServletException, IOException {
+    public final void service(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         final boolean sessionExists = request.getSession(false) != null;
 
         AllowedCrossDomainsHandler.getInstance().setCORSHeaders(request, response);
@@ -70,13 +120,10 @@ public class MetadataServlet extends HttpBaseServlet {
                 String orgId = decodedToken.getClaim("organization").asString();
                 String warehouseId = decodedToken.getClaim("warehouse").asString();
                 String clientId = decodedToken.getClaim("client").asString();
-                if (userId == null || userId.isEmpty() || roleId == null || roleId.isEmpty() || orgId == null
-                        || orgId.isEmpty() || warehouseId == null || warehouseId.isEmpty() || clientId == null || clientId.isEmpty()) {
+                if (userId == null || userId.isEmpty() || roleId == null || roleId.isEmpty() || orgId == null || orgId.isEmpty() || warehouseId == null || warehouseId.isEmpty() || clientId == null || clientId.isEmpty()) {
                     throw new OBException("SWS - Token is not valid");
                 }
-                log.debug("SWS accessed by userId " + userId);
-                OBContext.setOBContext(
-                        SecureWebServicesUtils.createContext(userId, roleId, orgId, warehouseId, clientId));
+                OBContext.setOBContext(SecureWebServicesUtils.createContext(userId, roleId, orgId, warehouseId, clientId));
                 OBContext.setOBContextInSession(request, OBContext.getOBContext());
                 SessionInfo.setUserId(userId);
                 SessionInfo.setProcessType("WS");
@@ -86,8 +133,7 @@ public class MetadataServlet extends HttpBaseServlet {
                 } finally {
                     final boolean sessionCreated = !sessionExists && null != request.getSession(false);
                     if (sessionCreated && AuthenticationManager.isStatelessRequest(request)) {
-                        log.warn("Stateless request, still a session was created " + request.getRequestURL() + " "
-                                + request.getQueryString());
+                        log.warn("Stateless request, still a session was created " + request.getRequestURL() + " " + request.getQueryString());
                     }
 
                     HttpSession session = request.getSession(false);
@@ -111,6 +157,7 @@ public class MetadataServlet extends HttpBaseServlet {
             Writer writer = response.getWriter();
             try {
                 result.put("ok", false);
+                result.put("error", e.getMessage());
             } catch (JSONException ex) {
                 throw new RuntimeException(ex);
             }
@@ -121,13 +168,11 @@ public class MetadataServlet extends HttpBaseServlet {
     private int getWSInactiveInterval() {
         if (wsInactiveInterval == null) {
             try {
-                wsInactiveInterval = Integer.parseInt(OBPropertiesProvider.getInstance().getOpenbravoProperties()
-                        .getProperty("ws.maxInactiveInterval", Integer.toString(DEFAULT_WS_INACTIVE_INTERVAL)));
+                wsInactiveInterval = Integer.parseInt(OBPropertiesProvider.getInstance().getOpenbravoProperties().getProperty("ws.maxInactiveInterval", Integer.toString(DEFAULT_WS_INACTIVE_INTERVAL)));
             } catch (Exception e) {
                 wsInactiveInterval = DEFAULT_WS_INACTIVE_INTERVAL;
             }
-            log.info("Sessions for WS calls expire after " + wsInactiveInterval
-                    + " seconds. This can be configured with ws.maxInactiveInterval property.");
+            log.info("Sessions for WS calls expire after " + wsInactiveInterval + " seconds. This can be configured with ws.maxInactiveInterval property.");
         }
 
         return wsInactiveInterval;
@@ -145,55 +190,27 @@ public class MetadataServlet extends HttpBaseServlet {
         }
     }
 
-    private void fetchTranslations(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        JSONObject result = new JSONObject();
-        Writer writer = response.getWriter();
-        response.setContentType(APPLICATION_JSON);
-
-        try {
-            result.put("ok", true);
-        } catch (JSONException e) {
-            response.setStatus(500);
-        }
-
-        writer.write(result.toString());
-        writer.close();
+    private void fetchTranslations(HttpServletRequest request, HttpServletResponse response) {
+        response.setStatus(200);
     }
 
     private void fetchWindow(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        JSONObject result = new JSONObject();
-        Writer writer = response.getWriter();
-        response.setContentType(APPLICATION_JSON);
-
-        OBContext obContext = OBContext.getOBContext();
-        String currentUser = obContext.getUser().getName();
-        String currentOrganization = obContext.getCurrentOrganization().getName();
-        Role currentRole = obContext.getRole();
-
-        OBContext.setAdminMode();
-        OBCriteria<Menu> criteria = OBDal.getInstance().createCriteria(Menu.class);
-
         try {
-            List<Menu> results = criteria.list();
+            OBContext.setAdminMode();
+            MenuManager manager = new MenuManager();
+            manager.setGlobalMenuOptions(new GlobalMenu());
+            MenuOption globalMenu = manager.getMenu();
+            Writer writer = response.getWriter();
 
-            result.put("menu", results);
-            result.put("ok", true);
-        } catch (JSONException e) {
-            response.setStatus(500);
+            response.setContentType(APPLICATION_JSON);
+
+            JSONArray result = new JSONArray(globalMenu.getChildren().stream().map(MetadataServlet::buildMenu).collect(Collectors.toList()));
+
+            writer.write(result.toString());
+            writer.close();
+        } finally {
+            OBContext.restorePreviousMode();
         }
-
-        OBContext.restorePreviousMode();
-
-        writer.write(result.toString());
-        writer.close();
-    }
-
-    public static boolean hasWindowAccess(String windowId) {
-        OBCriteria<WindowAccess> windowAccessCriteria = OBDal.getInstance().createCriteria(WindowAccess.class);
-        windowAccessCriteria.add(Restrictions.eq(WindowAccess.PROPERTY_ROLE, OBContext.getOBContext().getRole()));
-        windowAccessCriteria.add(Restrictions.eq(WindowAccess.PROPERTY_WINDOW, OBDal.getInstance().get(Window.class, windowId)));
-
-        return windowAccessCriteria.list().size() > 0;
     }
 
     private void notFound(HttpServletRequest request, HttpServletResponse response) {
