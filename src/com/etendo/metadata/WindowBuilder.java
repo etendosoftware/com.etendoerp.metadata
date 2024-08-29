@@ -11,6 +11,7 @@ import org.openbravo.client.application.MenuManager.MenuOption;
 import org.openbravo.model.ad.ui.Menu;
 import org.openbravo.model.ad.ui.Window;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -27,6 +28,13 @@ public class WindowBuilder {
 
         try {
             result.put("id", this.window.getId());
+            Arrays.stream(Window.class.getDeclaredFields()).forEach(field -> {
+                try {
+                    result.put(field.getName(), window.get(field.getName()));
+                } catch (JSONException e) {
+                    throw new RuntimeException(e);
+                }
+            });
         } catch (JSONException e) {
             log.warn(e.getMessage());
         }
