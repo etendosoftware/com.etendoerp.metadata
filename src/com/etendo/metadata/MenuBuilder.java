@@ -9,8 +9,10 @@ import org.openbravo.client.application.GlobalMenu;
 import org.openbravo.client.application.MenuManager;
 import org.openbravo.client.application.MenuManager.MenuOption;
 import org.openbravo.model.ad.ui.Menu;
+import org.openbravo.model.ad.ui.Tab;
 import org.openbravo.model.ad.ui.Window;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -33,8 +35,12 @@ public class MenuBuilder {
 
         try {
             Menu menu = entry.getMenu();
+            Tab tab = entry.getTab();
+            Window window = menu != null ? menu.getWindow() : null;
 
             menuItem.put("type", entry.getType());
+            menuItem.put("readOnly", entry.getReadOnlyStringValue());;
+            menuItem.put("tabId", tab != null ? tab.getId() : null);
             menuItem.put("isVisible", entry.isVisible());
             menuItem.put("isProcess", entry.isProcess());
             menuItem.put("label", entry.getLabel());
@@ -43,7 +49,6 @@ public class MenuBuilder {
             if (null != menu) {
                 menuItem.put("id", menu.getId());
                 menuItem.put("name", menu.getName());
-                menuItem.put("icon", menu.getETMETAIcon());
                 menuItem.put("form", menu.getSpecialForm());
                 menuItem.put("view", menu.getObuiappView());
                 menuItem.put("identifier", menu.getIdentifier());
@@ -51,12 +56,8 @@ public class MenuBuilder {
                 menuItem.put("action", menu.getAction());
                 menuItem.put("url", menu.getURL());
                 menuItem.put("description", menu.getDescription());
-
-                Window window = menu.getWindow();
-
-                if (window != null) {
-                    menuItem.put("windowId", window.getId());
-                }
+                menuItem.put("windowId", window != null ? window.getId() : null);
+                menuItem.put("icon", menu.getETMETAIcon());
             }
 
             List<MenuOption> items = entry.getChildren();

@@ -130,6 +130,9 @@ public class MetadataServlet extends HttpBaseServlet {
     public void doPost(HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
         String path = request.getPathInfo() != null ? request.getPathInfo() : "";
 
+        response.setContentType(APPLICATION_JSON);
+        response.setCharacterEncoding("UTF-8");
+
         if (path.startsWith("/window/")) {
             this.fetchWindow(request, response);
         } else if (path.startsWith("/translations")) {
@@ -151,8 +154,6 @@ public class MetadataServlet extends HttpBaseServlet {
             String path = request.getPathInfo() != null ? request.getPathInfo() : "";
             String id = path.substring(8);
             Writer writer = response.getWriter();
-            response.setContentType(APPLICATION_JSON);
-            response.setCharacterEncoding("utf-8");
             Window window = OBDal.getInstance().get(Window.class, id);
             writer.write(new WindowBuilder(window).toJSON().toString());
             writer.close();
@@ -168,7 +169,6 @@ public class MetadataServlet extends HttpBaseServlet {
         try {
             OBContext.setAdminMode();
             Writer writer = response.getWriter();
-            response.setContentType(APPLICATION_JSON);
             writer.write(new MenuBuilder().toJSON().toString());
             writer.close();
         } catch (Exception e) {
