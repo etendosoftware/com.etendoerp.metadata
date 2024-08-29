@@ -43,6 +43,7 @@ public class MenuBuilder {
             if (null != menu) {
                 menuItem.put("id", menu.getId());
                 menuItem.put("name", menu.getName());
+                menuItem.put("icon", menu.getETMETAIcon());
                 menuItem.put("form", menu.getSpecialForm());
                 menuItem.put("view", menu.getObuiappView());
                 menuItem.put("identifier", menu.getIdentifier());

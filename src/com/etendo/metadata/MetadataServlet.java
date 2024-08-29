@@ -152,6 +152,7 @@ public class MetadataServlet extends HttpBaseServlet {
             String id = path.substring(8);
             Writer writer = response.getWriter();
             response.setContentType(APPLICATION_JSON);
+            response.setCharacterEncoding("utf-8");
             Window window = OBDal.getInstance().get(Window.class, id);
             writer.write(new WindowBuilder(window).toJSON().toString());
             writer.close();
