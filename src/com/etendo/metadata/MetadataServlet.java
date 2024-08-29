@@ -45,7 +45,6 @@ public class MetadataServlet extends HttpBaseServlet {
         if (request.getMethod().equals("GET")) {
             response.setStatus(405);
 
-
             return;
         }
 

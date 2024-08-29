@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+  <database name="MODIFIED TABLE AD_MENU">
+    <table name="AD_MENU" primaryKey="AD_MENU_KEY">
+      <column name="EM_ETMETA_ICON" primaryKey="false" required="false" type="VARCHAR" size="10" autoIncrement="false">
+        <default/>
+        <onCreateDefault/>
+      </column>
+    </table>
+  </database>
