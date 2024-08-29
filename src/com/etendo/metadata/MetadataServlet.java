@@ -51,7 +51,8 @@ public class MetadataServlet extends HttpBaseServlet {
             if (null != menu) {
                 menuItem.put("id", menu.getId());
                 menuItem.put("name", menu.getName());
-                menuItem.put("entity", menu.getEntityName());
+                menuItem.put("form", menu.getSpecialForm());
+                menuItem.put("view", menu.getObuiappView());
                 menuItem.put("identifier", menu.getIdentifier());
                 menuItem.put("process", menu.getProcess());
                 menuItem.put("action", menu.getAction());
@@ -181,10 +182,12 @@ public class MetadataServlet extends HttpBaseServlet {
     public void doPost(HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
         String path = request.getPathInfo() != null ? request.getPathInfo() : "";
 
-        if (path.startsWith("/window")) {
+        if (path.startsWith("/window/")) {
             this.fetchWindow(request, response);
         } else if (path.startsWith("/translations")) {
             this.fetchTranslations(request, response);
+        } else if (path.equals("/menu")) {
+            this.fetchMenu(request, response);
         } else {
             this.notFound(request, response);
         }
@@ -195,6 +198,23 @@ public class MetadataServlet extends HttpBaseServlet {
     }
 
     private void fetchWindow(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        String path = request.getPathInfo() != null ? request.getPathInfo() : "";
+        String id = path.split("/window/")[1];
+        Writer writer = response.getWriter();
+        JSONObject result = new JSONObject();
+
+        try {
+            result.put("windowId", id);
+        } catch (JSONException e) {
+            throw new RuntimeException(e);
+        }
+
+        response.setStatus(200);
+        writer.write(result.toString());
+        writer.close();
+    }
+
+    private void fetchMenu(HttpServletRequest request, HttpServletResponse response) throws IOException {
         try {
             OBContext.setAdminMode();
             MenuManager manager = new MenuManager();
