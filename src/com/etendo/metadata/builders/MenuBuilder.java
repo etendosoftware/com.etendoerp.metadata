@@ -1,4 +1,4 @@
-package com.etendo.metadata;
+package com.etendo.metadata.builders;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
