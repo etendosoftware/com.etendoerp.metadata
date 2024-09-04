@@ -14,7 +14,6 @@ import org.openbravo.base.secureApp.AllowedCrossDomainsHandler;
 import org.openbravo.base.session.OBPropertiesProvider;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.database.SessionInfo;
-import org.openbravo.service.json.DataToJsonConverter;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
@@ -32,6 +31,24 @@ public abstract class BaseServlet extends HttpBaseServlet {
     public static final String APPLICATION_JSON = "application/json";
     private static final int DEFAULT_WS_INACTIVE_INTERVAL = 60;
     private static Integer wsInactiveInterval = null;
+
+    private static void setContext(HttpServletRequest request, DecodedJWT decodedToken) {
+        String userId = decodedToken.getClaim("user").asString();
+        String roleId = decodedToken.getClaim("role").asString();
+        String orgId = decodedToken.getClaim("organization").asString();
+        String warehouseId = decodedToken.getClaim("warehouse").asString();
+        String clientId = decodedToken.getClaim("client").asString();
+
+        if (userId == null || userId.isEmpty() || roleId == null || roleId.isEmpty() || orgId == null || orgId.isEmpty() || warehouseId == null || warehouseId.isEmpty() || clientId == null || clientId.isEmpty()) {
+            throw new OBException("SWS - Token is not valid");
+        }
+
+        OBContext.setOBContext(SecureWebServicesUtils.createContext(userId, roleId, orgId, warehouseId, clientId));
+        OBContext.setOBContextInSession(request, OBContext.getOBContext());
+        SessionInfo.setUserId(userId);
+        SessionInfo.setProcessType("WS");
+        SessionInfo.setProcessId("DAL");
+    }
 
     @Override
     public final void service(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
@@ -64,24 +81,6 @@ public abstract class BaseServlet extends HttpBaseServlet {
         } catch (Exception e) {
             handleInternalServerError(e, response);
         }
-    }
-
-    private static void setContext(HttpServletRequest request, DecodedJWT decodedToken) {
-        String userId = decodedToken.getClaim("user").asString();
-        String roleId = decodedToken.getClaim("role").asString();
-        String orgId = decodedToken.getClaim("organization").asString();
-        String warehouseId = decodedToken.getClaim("warehouse").asString();
-        String clientId = decodedToken.getClaim("client").asString();
-
-        if (userId == null || userId.isEmpty() || roleId == null || roleId.isEmpty() || orgId == null || orgId.isEmpty() || warehouseId == null || warehouseId.isEmpty() || clientId == null || clientId.isEmpty()) {
-            throw new OBException("SWS - Token is not valid");
-        }
-
-        OBContext.setOBContext(SecureWebServicesUtils.createContext(userId, roleId, orgId, warehouseId, clientId));
-        OBContext.setOBContextInSession(request, OBContext.getOBContext());
-        SessionInfo.setUserId(userId);
-        SessionInfo.setProcessType("WS");
-        SessionInfo.setProcessId("DAL");
     }
 
     private void handleInternalServerError(Exception e, HttpServletResponse response) {
@@ -147,16 +146,22 @@ public abstract class BaseServlet extends HttpBaseServlet {
         return wsInactiveInterval;
     }
 
-    public JSONObject getBody(HttpServletRequest request) throws JSONException, IOException {
-        StringBuilder sb = new StringBuilder();
-        String line;
-        BufferedReader reader = request.getReader();
+    public JSONObject getBody(HttpServletRequest request) {
+        try {
+            StringBuilder sb = new StringBuilder();
+            String line;
+            BufferedReader reader = request.getReader();
 
-        while ((line = reader.readLine()) != null) {
-            sb.append(line);
+            while ((line = reader.readLine()) != null) {
+                sb.append(line);
+            }
+
+            return new JSONObject(sb.toString());
+        } catch (JSONException | IOException e) {
+            logger.warn(e.getMessage());
+
+            return new JSONObject();
         }
-
-        return new JSONObject(sb.toString());
     }
 
     public abstract void process(HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException, JSONException;

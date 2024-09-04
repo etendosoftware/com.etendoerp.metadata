@@ -30,7 +30,6 @@ import org.openbravo.model.ad.access.WindowAccess;
 import org.openbravo.model.ad.datamodel.Column;
 import org.openbravo.model.ad.domain.Reference;
 import org.openbravo.model.ad.domain.ReferencedTree;
-import org.openbravo.model.ad.system.Language;
 import org.openbravo.model.ad.ui.Field;
 import org.openbravo.model.ad.ui.Tab;
 import org.openbravo.service.datasource.DataSource;
@@ -66,11 +65,9 @@ public class WindowBuilder {
     private static final String DISPLAY_FIELD_PROPERTY = "displayField";
     private static final String VALUE_FIELD_PROPERTY = "valueField";
     private final String id;
-    private final String language;
 
-    public WindowBuilder(String id, String language) {
+    public WindowBuilder(String id) {
         this.id = id;
-        this.language = language;
     }
 
     private static JSONArray getListInfo(Reference refList) throws JSONException {
@@ -103,7 +100,7 @@ public class WindowBuilder {
 
     private static DomainType getDomainType(String referenceId) {
         final org.openbravo.base.model.Reference reference = ModelProvider.getInstance().getReference(referenceId);
-        Check.isNotNull(reference, "No reference found for referenceid " + referenceId);
+        Check.isNotNull(reference, "No reference found for reference " + referenceId);
         return reference.getDomainType();
     }
 
@@ -116,7 +113,7 @@ public class WindowBuilder {
         } else if (selectorField.getObserdsDatasourceField() != null) {
             result = selectorField.getObserdsDatasourceField().getName();
         } else {
-            throw new IllegalStateException("Selectorfield " + selectorField + " has a null datasource and a null property");
+            throw new IllegalStateException("Selector field " + selectorField + " has a null datasource and a null property");
         }
         return result.replace(DalUtil.DOT, DalUtil.FIELDSEPARATOR);
     }
@@ -135,15 +132,6 @@ public class WindowBuilder {
         windowAccessCriteria.add(Restrictions.eq(WindowAccess.PROPERTY_ROLE, role));
         windowAccessCriteria.add(Restrictions.eq(WindowAccess.PROPERTY_ACTIVE, true));
 
-        OBCriteria<Language> languageCriteria = OBDal.getInstance().createCriteria(Language.class);
-        languageCriteria.add(Restrictions.eq(Language.PROPERTY_LANGUAGE, this.language));
-        Language currentLanguage = (Language) languageCriteria.uniqueResult();
-
-        if (currentLanguage.isSystemLanguage()) {
-            OBContext.getOBContext().setLanguage(currentLanguage);
-        } else {
-            throw new RuntimeException("The provided language is not a system language");
-        }
 
         if (adWindow != null) {
             // Specific window present. Check if role has access to it:
@@ -361,7 +349,7 @@ public class WindowBuilder {
     private boolean shouldDisplayField(Field field) {
         boolean isScanProcess = field.getColumn() != null && field.getColumn().getOBUIAPPProcess() != null && field.getColumn().getOBUIAPPProcess().isSmfmuScan() != null && field.getColumn().getOBUIAPPProcess().isSmfmuScan();
         // Hides fields with logic until mobile app implements behavior
-        boolean isProcessAndHasLogic = field.getColumn() != null && field.getColumn().getOBUIAPPProcess() != null && !(field.getDisplayLogic() == null || field.getDisplayLogic().trim().isEmpty());
+        // boolean isProcessAndHasLogic = field.getColumn() != null && field.getColumn().getOBUIAPPProcess() != null && !(field.getDisplayLogic() == null || field.getDisplayLogic().trim().isEmpty());
 
         return field.getColumn() != null && (field.isDisplayed() || isScanProcess || field.getColumn().isStoredInSession() || field.getColumn().isLinkToParentColumn() || ALWAYS_DISPLAYED_COLUMNS.contains(field.getColumn().getDBColumnName()));
     }
@@ -445,7 +433,7 @@ public class WindowBuilder {
         String displayFieldProperty = displayField != null ? getDisplayField(displayField.getObuiselSelector()) : JsonConstants.IDENTIFIER;
 
         String selectedProperties = JsonConstants.ID;
-        String derivedProperties = "";
+        StringBuilder derivedProperties = new StringBuilder();
         StringBuilder extraProperties = new StringBuilder(valueFieldProperty);
 
         // get extra properties
@@ -461,13 +449,13 @@ public class WindowBuilder {
                 continue;
             }
             if (fieldName.contains(JsonConstants.FIELD_SEPARATOR)) {
-                if (derivedProperties.isEmpty()) {
-                    derivedProperties = fieldName;
+                if (derivedProperties.length() == 0) {
+                    derivedProperties = new StringBuilder(fieldName);
                 } else {
-                    derivedProperties += ',' + fieldName;
+                    derivedProperties.append(',').append(fieldName);
                 }
             } else {
-                // Include following line when supporting for selector pop-ups: selectedProperties += "," + fieldName;
+                // TODO: Include following line when supporting for selector pop-ups: selectedProperties += "," + fieldName;
             }
 
             // get extra properties

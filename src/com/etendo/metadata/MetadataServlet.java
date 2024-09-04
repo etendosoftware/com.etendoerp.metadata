@@ -5,42 +5,30 @@ import com.etendo.metadata.builders.WindowBuilder;
 import com.etendo.metadata.exceptions.MethodNotAllowedException;
 import com.etendo.metadata.exceptions.NotFoundException;
 import com.etendo.metadata.exceptions.UnauthorizedException;
+import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
+import org.hibernate.criterion.Restrictions;
 import org.openbravo.dal.core.OBContext;
-import org.openbravo.service.json.DataToJsonConverter;
+import org.openbravo.dal.service.OBCriteria;
+import org.openbravo.dal.service.OBDal;
+import org.openbravo.model.ad.system.Language;
 import org.openbravo.service.json.JsonUtils;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.io.Writer;
 
 /**
  * @author luuchorocha
  */
 public class MetadataServlet extends BaseServlet {
-    private static final DataToJsonConverter converter = new DataToJsonConverter();
-
     @Override
     public void process(HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException, JSONException {
         try {
-            OBContext.setAdminMode();
-            String path = request.getPathInfo() != null ? request.getPathInfo() : "";
-
-            response.setContentType(APPLICATION_JSON);
-            response.setCharacterEncoding("UTF-8");
-
-            if (path.startsWith("/window/")) {
-                this.fetchWindow(request, response);
-            } else if (path.equals("/translations")) {
-                this.fetchTranslations(response);
-            } else if (path.equals("/menu")) {
-                this.fetchMenu(response);
-            } else {
-                throw new NotFoundException("Not found");
-            }
+            setContext(request);
+            handleRequest(request, response);
         } catch (UnauthorizedException e) {
             logger.warn(e.getMessage());
             response.setStatus(401);
@@ -58,22 +46,48 @@ public class MetadataServlet extends BaseServlet {
         }
     }
 
-    private void fetchTranslations(HttpServletResponse response) {
-        response.setStatus(200);
+    private void handleRequest(HttpServletRequest request, HttpServletResponse response) throws IOException, JSONException {
+        String path = request.getPathInfo();
+        JSONObject json = new JSONObject();
+
+        if (path.startsWith("/window/")) {
+            json.put("data", this.fetchWindow(request.getPathInfo().substring(8)));
+        } else if (path.equals("/menu")) {
+            json.put("data", this.fetchMenu());
+        } else {
+            throw new NotFoundException("Not found");
+        }
+
+        json.put("ok", true);
+        response.setContentType(APPLICATION_JSON);
+        response.setCharacterEncoding("UTF-8");
+        response.getWriter().write(json.toString());
     }
 
-    private void fetchWindow(HttpServletRequest request, HttpServletResponse response) throws IOException, JSONException {
-        JSONObject payload = getBody(request);
-        String id = request.getPathInfo().substring(8);
-        String language = payload.getString("language") != null ? payload.getString("language") : "en_US";
-        Writer writer = response.getWriter();
-        writer.write(new WindowBuilder(id, language).toJSON().toString());
-        writer.close();
+    private void setContext(HttpServletRequest request) {
+        try {
+            OBContext.setAdminMode();
+            JSONObject payload = getBody(request);
+            String language = payload.getString("language") != null ? payload.getString("language") : "";
+            OBCriteria<Language> languageCriteria = OBDal.getInstance().createCriteria(Language.class);
+            languageCriteria.add(Restrictions.eq(Language.PROPERTY_LANGUAGE, language));
+            Language currentLanguage = (Language) languageCriteria.uniqueResult();
+
+            if (currentLanguage.isSystemLanguage()) {
+                OBContext.getOBContext().setLanguage(currentLanguage);
+            } else {
+                logger.warn("The provided language is not a valid system language");
+            }
+        } catch (JSONException e) {
+            logger.warn(e.getMessage());
+        }
     }
 
-    private void fetchMenu(HttpServletResponse response) throws IOException {
-        Writer writer = response.getWriter();
-        writer.write(new MenuBuilder().toJSON().toString());
-        writer.close();
+    private JSONObject fetchWindow(String id) throws JSONException {
+        return new WindowBuilder(id).toJSON();
+    }
+
+    private JSONArray fetchMenu() {
+        return new MenuBuilder().toJSON();
     }
 }
