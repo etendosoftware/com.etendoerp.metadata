@@ -18,8 +18,9 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 public class MenuBuilder {
-    private final static String[] menuProperties = new String[]{Menu.ID, Menu.PROPERTY_NAME, Menu.PROPERTY_ACTION, Menu.PROPERTY_ETMETAICON, Menu.PROPERTY_WINDOW, Menu.PROPERTY_PROCESS, Menu.PROPERTY_SUMMARYLEVEL, Menu.PROPERTY_SPECIALFORM, Menu.PROPERTY_OPENLINKINBROWSER, Menu.PROPERTY_URL, Menu.PROPERTY_OBUIAPPVIEW, Menu.PROPERTY_OBUIAPPPROCESSDEFINITION, Menu.PROPERTY_OBUIAPPMENUPARAMETERSLIST};
-    private static final DataToJsonConverter converter = new DataToJsonConverter();
+    private final static String[] MENU_PROPERTIES = new String[]{Menu.PROPERTY_ID, Menu.PROPERTY_NAME, Menu.PROPERTY_ETMETAICON, Menu.PROPERTY_ACTION, Menu.PROPERTY_WINDOW, Menu.PROPERTY_PROCESS, Menu.PROPERTY_SUMMARYLEVEL, Menu.PROPERTY_SPECIALFORM, Menu.PROPERTY_OPENLINKINBROWSER, Menu.PROPERTY_URL, Menu.PROPERTY_OBUIAPPVIEW, Menu.PROPERTY_OBUIAPPPROCESSDEFINITION, Menu.PROPERTY_OBUIAPPMENUPARAMETERSLIST, Menu.PROPERTY_NAME};
+    private final static String[] WINDOW_PROPERTIES = new String[]{Window.PROPERTY_ID, Window.PROPERTY_NAME, Window.PROPERTY_WINDOWTYPE};
+    private static final DataToJsonConverter menuConverter = new DataToJsonConverter();
     private static final DataToJsonConverter windowConverter = new DataToJsonConverter();
     private static final Logger logger = LogManager.getLogger();
     private final MenuOption menu;
@@ -28,18 +29,22 @@ public class MenuBuilder {
         MenuManager manager = new MenuManager();
         manager.setGlobalMenuOptions(new GlobalMenu());
         menu = manager.getMenu();
-        converter.setSelectedProperties(String.join(",", menuProperties));
+        menuConverter.setSelectedProperties(String.join(",", MENU_PROPERTIES));
+        windowConverter.setSelectedProperties(String.join(",", WINDOW_PROPERTIES));
     }
 
     private static JSONObject toJSON(MenuOption entry) {
         try {
-            JSONObject menuItem = converter.toJsonObject(entry.getMenu(), DataResolvingMode.FULL_TRANSLATABLE);
             Menu menu = entry.getMenu();
-            Window window = menu != null ? menu.getWindow() : null;
+            JSONObject menuItem = menuConverter.toJsonObject(menu, DataResolvingMode.SHORT);
+            Window window = menu.getWindow();
             List<MenuOption> items = entry.getChildren();
 
+            menuItem.put("label", entry.getLabel());
+            menuItem.put("label", entry.getLabel());
+
             if (null != window) {
-                menuItem.put("window", windowConverter.toJsonObject(window, DataResolvingMode.FULL_TRANSLATABLE));
+                menuItem.put("window", windowConverter.toJsonObject(window, DataResolvingMode.SHORT));
             }
 
             if (!items.isEmpty()) {

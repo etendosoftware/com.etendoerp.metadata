@@ -2,6 +2,7 @@ package com.etendo.metadata;
 
 import com.etendo.metadata.builders.MenuBuilder;
 import com.etendo.metadata.builders.WindowBuilder;
+import com.etendo.metadata.exceptions.InternalServerException;
 import com.etendo.metadata.exceptions.MethodNotAllowedException;
 import com.etendo.metadata.exceptions.NotFoundException;
 import com.etendo.metadata.exceptions.UnauthorizedException;
@@ -38,7 +39,7 @@ public class MetadataServlet extends BaseServlet {
             logger.warn(e.getMessage());
             response.setStatus(405);
             response.getWriter().write(new JSONObject(JsonUtils.convertExceptionToJson(e)).toString());
-        } catch (Exception e) {
+        } catch (InternalServerException e) {
             logger.warn(e.getMessage());
             response.setStatus(500);
             response.getWriter().write(new JSONObject(JsonUtils.convertExceptionToJson(e)).toString());
