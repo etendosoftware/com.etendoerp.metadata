@@ -38,7 +38,7 @@ public class WindowBuilder {
                 throw new OBSecurityException();
             }
         } else {
-            throw new NotFoundException("Not found");
+            throw new NotFoundException();
         }
     }
 }
