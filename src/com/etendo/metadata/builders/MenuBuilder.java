@@ -9,9 +9,7 @@ import org.openbravo.client.application.GlobalMenu;
 import org.openbravo.client.application.MenuManager;
 import org.openbravo.client.application.MenuManager.MenuOption;
 import org.openbravo.model.ad.ui.Menu;
-import org.openbravo.model.ad.ui.Tab;
 import org.openbravo.model.ad.ui.Window;
-import org.openbravo.model.ad.utility.TreeNode;
 import org.openbravo.service.json.DataResolvingMode;
 import org.openbravo.service.json.DataToJsonConverter;
 
@@ -30,29 +28,15 @@ public class MenuBuilder {
     }
 
     private static JSONObject toJSON(MenuOption entry) {
-        JSONObject menuItem = new JSONObject();
+        JSONObject menuItem = converter.toJsonObject(entry.getMenu(), DataResolvingMode.FULL_TRANSLATABLE);
 
         try {
             Menu menu = entry.getMenu();
-            Tab tab = entry.getTab();
-            TreeNode treeNode = entry.getTreeNode();
             Window window = menu != null ? menu.getWindow() : null;
             List<MenuOption> items = entry.getChildren();
 
-            if (null != treeNode) {
-                menuItem.put("treeNode", converter.toJsonObject(treeNode, DataResolvingMode.FULL_TRANSLATABLE));
-            }
-
-            if (null != menu) {
-                menuItem.put("menu", converter.toJsonObject(menu, DataResolvingMode.FULL_TRANSLATABLE));
-            }
-
             if (null != window) {
                 menuItem.put("window", converter.toJsonObject(window, DataResolvingMode.FULL_TRANSLATABLE));
-            }
-
-            if (null != tab) {
-                menuItem.put("tab", converter.toJsonObject(tab, DataResolvingMode.FULL_TRANSLATABLE));
             }
 
             if (!items.isEmpty()) {

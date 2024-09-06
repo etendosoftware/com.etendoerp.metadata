@@ -9,6 +9,7 @@ import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.hibernate.criterion.Restrictions;
+import org.openbravo.base.exception.OBSecurityException;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBCriteria;
 import org.openbravo.dal.service.OBDal;
@@ -29,7 +30,7 @@ public class MetadataServlet extends BaseServlet {
         try {
             setContext(request);
             handleRequest(request, response);
-        } catch (UnauthorizedException e) {
+        } catch (UnauthorizedException | OBSecurityException e) {
             logger.warn(e.getMessage());
             response.setStatus(401);
             response.getWriter().write(new JSONObject(JsonUtils.convertExceptionToJson(e)).toString());
@@ -59,9 +60,11 @@ public class MetadataServlet extends BaseServlet {
         }
 
         json.put("ok", true);
+
         response.setContentType(APPLICATION_JSON);
         response.setCharacterEncoding("UTF-8");
         response.getWriter().write(json.toString());
+        response.getWriter().close();
     }
 
     private void setContext(HttpServletRequest request) {
@@ -83,7 +86,7 @@ public class MetadataServlet extends BaseServlet {
         }
     }
 
-    private JSONObject fetchWindow(String id) throws JSONException {
+    private JSONObject fetchWindow(String id) {
         return new WindowBuilder(id).toJSON();
     }
 
