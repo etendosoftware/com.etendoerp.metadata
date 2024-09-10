@@ -1,4 +1,4 @@
-package com.etendo.metadata.exceptions;
+package com.etendoerp.metadata.exceptions;
 
 public class MethodNotAllowedException extends RuntimeException {
     public MethodNotAllowedException(String message) {

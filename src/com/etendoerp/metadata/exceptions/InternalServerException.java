@@ -1,4 +1,4 @@
-package com.etendo.metadata.exceptions;
+package com.etendoerp.metadata.exceptions;
 
 public class InternalServerException extends RuntimeException {
     public InternalServerException(String message) {

@@ -1,4 +1,4 @@
-package com.etendo.metadata.exceptions;
+package com.etendoerp.metadata.exceptions;
 
 public class NotFoundException extends RuntimeException {
     public NotFoundException(String message) {

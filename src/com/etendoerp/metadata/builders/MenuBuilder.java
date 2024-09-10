@@ -1,6 +1,6 @@
-package com.etendo.metadata.builders;
+package com.etendoerp.metadata.builders;
 
-import com.etendo.metadata.exceptions.InternalServerException;
+import com.etendoerp.metadata.exceptions.InternalServerException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.codehaus.jettison.json.JSONArray;

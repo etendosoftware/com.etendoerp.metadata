@@ -1,7 +1,10 @@
-package com.etendo.metadata;
+package com.etendoerp.metadata;
 
+import com.auth0.jwt.exceptions.SignatureVerificationException;
 import com.auth0.jwt.interfaces.DecodedJWT;
-import com.etendo.metadata.exceptions.MethodNotAllowedException;
+import com.etendoerp.metadata.exceptions.InternalServerException;
+import com.etendoerp.metadata.exceptions.MethodNotAllowedException;
+import com.etendoerp.metadata.exceptions.UnauthorizedException;
 import com.smf.securewebservices.utils.SecureWebServicesUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -10,10 +13,12 @@ import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.authentication.AuthenticationManager;
 import org.openbravo.base.HttpBaseServlet;
 import org.openbravo.base.exception.OBException;
+import org.openbravo.base.exception.OBSecurityException;
 import org.openbravo.base.secureApp.AllowedCrossDomainsHandler;
 import org.openbravo.base.session.OBPropertiesProvider;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.database.SessionInfo;
+import org.openbravo.service.json.JsonUtils;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
@@ -78,6 +83,19 @@ public abstract class BaseServlet extends HttpBaseServlet {
             } else {
                 throw new OBException("SWS - Token is not valid");
             }
+
+        } catch (SignatureVerificationException | UnauthorizedException | OBSecurityException e) {
+            logger.warn(e.getMessage());
+            response.setStatus(401);
+            response.getWriter().write(buildErrorJson(e));
+        } catch (MethodNotAllowedException e) {
+            logger.warn(e.getMessage());
+            response.setStatus(405);
+            response.getWriter().write(buildErrorJson(e));
+        } catch (InternalServerException e) {
+            logger.warn(e.getMessage());
+            response.setStatus(500);
+            response.getWriter().write(buildErrorJson(e));
         } catch (Exception e) {
             handleInternalServerError(e, response);
         }
@@ -161,6 +179,16 @@ public abstract class BaseServlet extends HttpBaseServlet {
             logger.warn(e.getMessage());
 
             return new JSONObject();
+        }
+    }
+
+    private String buildErrorJson(Exception e) {
+        try {
+            return new JSONObject(JsonUtils.convertExceptionToJson(e)).toString();
+        } catch (Exception err) {
+            logger.warn(err.getMessage());
+
+            return "";
         }
     }
 

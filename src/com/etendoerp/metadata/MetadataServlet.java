@@ -1,11 +1,11 @@
-package com.etendo.metadata;
+package com.etendoerp.metadata;
 
-import com.etendo.metadata.builders.MenuBuilder;
-import com.etendo.metadata.builders.WindowBuilder;
-import com.etendo.metadata.exceptions.InternalServerException;
-import com.etendo.metadata.exceptions.MethodNotAllowedException;
-import com.etendo.metadata.exceptions.NotFoundException;
-import com.etendo.metadata.exceptions.UnauthorizedException;
+import com.etendoerp.metadata.builders.MenuBuilder;
+import com.etendoerp.metadata.builders.WindowBuilder;
+import com.etendoerp.metadata.exceptions.InternalServerException;
+import com.etendoerp.metadata.exceptions.MethodNotAllowedException;
+import com.etendoerp.metadata.exceptions.NotFoundException;
+import com.etendoerp.metadata.exceptions.UnauthorizedException;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
@@ -31,18 +31,6 @@ public class MetadataServlet extends BaseServlet {
         try {
             setContext(request);
             handleRequest(request, response);
-        } catch (UnauthorizedException | OBSecurityException e) {
-            logger.warn(e.getMessage());
-            response.setStatus(401);
-            response.getWriter().write(new JSONObject(JsonUtils.convertExceptionToJson(e)).toString());
-        } catch (MethodNotAllowedException e) {
-            logger.warn(e.getMessage());
-            response.setStatus(405);
-            response.getWriter().write(new JSONObject(JsonUtils.convertExceptionToJson(e)).toString());
-        } catch (InternalServerException e) {
-            logger.warn(e.getMessage());
-            response.setStatus(500);
-            response.getWriter().write(new JSONObject(JsonUtils.convertExceptionToJson(e)).toString());
         } finally {
             OBContext.restorePreviousMode();
         }
@@ -87,7 +75,7 @@ public class MetadataServlet extends BaseServlet {
         }
     }
 
-    private JSONObject fetchWindow(String id) {
+    private JSONObject fetchWindow(String id) throws JSONException {
         return new WindowBuilder(id).toJSON();
     }
 
