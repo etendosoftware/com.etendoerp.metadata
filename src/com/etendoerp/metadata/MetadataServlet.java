@@ -2,20 +2,15 @@ package com.etendoerp.metadata;
 
 import com.etendoerp.metadata.builders.MenuBuilder;
 import com.etendoerp.metadata.builders.WindowBuilder;
-import com.etendoerp.metadata.exceptions.InternalServerException;
-import com.etendoerp.metadata.exceptions.MethodNotAllowedException;
 import com.etendoerp.metadata.exceptions.NotFoundException;
-import com.etendoerp.metadata.exceptions.UnauthorizedException;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.hibernate.criterion.Restrictions;
-import org.openbravo.base.exception.OBSecurityException;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBCriteria;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.system.Language;
-import org.openbravo.service.json.JsonUtils;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
