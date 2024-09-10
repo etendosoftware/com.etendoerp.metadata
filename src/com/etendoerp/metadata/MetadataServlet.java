@@ -33,22 +33,17 @@ public class MetadataServlet extends BaseServlet {
 
     private void handleRequest(HttpServletRequest request, HttpServletResponse response) throws IOException, JSONException {
         String path = request.getPathInfo();
-        JSONObject json = new JSONObject();
-
-        if (path.startsWith("/window/")) {
-            json.put("data", this.fetchWindow(request.getPathInfo().substring(8)));
-        } else if (path.equals("/menu")) {
-            json.put("data", this.fetchMenu());
-        } else {
-            throw new NotFoundException("Not found");
-        }
-
-        json.put("ok", true);
 
         response.setContentType(APPLICATION_JSON);
         response.setCharacterEncoding("UTF-8");
-        response.getWriter().write(json.toString());
-        response.getWriter().close();
+
+        if (path.startsWith("/window/")) {
+            response.getWriter().write(this.fetchWindow(request.getPathInfo().substring(8)).toString());
+        } else if (path.equals("/menu")) {
+            response.getWriter().write(this.fetchMenu().toString());
+        } else {
+            throw new NotFoundException("Not found");
+        }
     }
 
     private void setContext(HttpServletRequest request) {
