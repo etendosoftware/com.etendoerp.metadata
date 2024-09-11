@@ -33,6 +33,7 @@ import org.openbravo.model.ad.domain.Reference;
 import org.openbravo.model.ad.domain.ReferencedTree;
 import org.openbravo.model.ad.ui.Field;
 import org.openbravo.model.ad.ui.Tab;
+import org.openbravo.model.ad.ui.Window;
 import org.openbravo.service.datasource.DataSource;
 import org.openbravo.service.datasource.DatasourceField;
 import org.openbravo.service.json.DataResolvingMode;
@@ -48,6 +49,9 @@ import java.util.List;
 
 public class WindowBuilder {
     private static final DataToJsonConverter converter = new DataToJsonConverter();
+    private static final DataToJsonConverter tabConverter = new DataToJsonConverter();
+    private final static String[] WINDOW_PROPERTIES = new String[]{Window.PROPERTY_ID, Window.PROPERTY_NAME, Window.PROPERTY_WINDOWTYPE, Window.PROPERTY_DESCRIPTION};
+    private final static String[] TAB_PROPERTIES = new String[]{Tab.PROPERTY_ID, Tab.PROPERTY_NAME, Tab.PROPERTY_TABLEVEL, Tab.PROPERTY_TABLE};
     private static final List<String> ALWAYS_DISPLAYED_COLUMNS = Collections.singletonList("AD_Org_ID");
     private static final String LIST_REFERENCE_ID = "17";
     private static final String SELECTOR_REFERENCE_ID = "95E2A8B50A254B2AAE6774B8C2F28120";
@@ -68,6 +72,8 @@ public class WindowBuilder {
 
     public WindowBuilder(String id) {
         this.id = id;
+        converter.setSelectedProperties(String.join(",", WINDOW_PROPERTIES));
+        tabConverter.setSelectedProperties(String.join(",", TAB_PROPERTIES));
     }
 
     private static JSONArray getListInfo(Reference refList) throws JSONException {
@@ -133,7 +139,7 @@ public class WindowBuilder {
 
             if (windowAccess != null) {
                 JSONObject window = converter.toJsonObject(windowAccess.getWindow(), DataResolvingMode.FULL_TRANSLATABLE);
-                window.put("tabs", getTabsAndFields(windowAccess.getADTabAccessList(), adWindow));
+                window.put("tabs", getTabsAndFields(windowAccess.getADTabAccessList(), windowAccess.getWindow()));
 
                 return window;
             } else {
@@ -148,41 +154,33 @@ public class WindowBuilder {
         JSONArray tabs = new JSONArray();
 
         if (tabAccesses.isEmpty()) {
-            // All tabs
             for (Tab tab : window.getADTabList().stream().filter(Tab::isActive).toList()) {
                 if (isTabAllowed(tab)) {
-                    JSONObject jsonTab;
-
-                    // TODO: Use our own converter that returns only the fields we need
-                    jsonTab = converter.toJsonObject(tab, DataResolvingMode.FULL_TRANSLATABLE);
-                    jsonTab.put("editableField", true);
-                    jsonTab.put("fields", getFields(tab, null));
-                    jsonTab.put("entityName", getTabEntityName(tab));
-                    jsonTab.put("parentColumns", WindowUtils.getParentColumns(tab));
-                    jsonTab.put("identifiers", WindowUtils.getTabIdentifiers(tab));
-
-                    tabs.put(jsonTab);
+                    tabs.put(buildTabJSON(tab));
                 }
             }
         } else {
-            // certain tabs
             for (TabAccess tabAccess : tabAccesses.stream().filter(tabAccess -> tabAccess.isActive() && tabAccess.isAllowRead() && tabAccess.getTab().isActive() && tabAccess.getTab().isAllowRead()).toList()) {
                 if (isTabAllowed(tabAccess.getTab())) {
-                    // TODO: Use our own converter that returns only the fields we need
-                    JSONObject jsonTab = converter.toJsonObject(tabAccess.getTab(), DataResolvingMode.FULL_TRANSLATABLE);
-
-                    jsonTab.put("editableField", tabAccess.isEditableField());
-                    jsonTab.put("fields", getFields(tabAccess.getTab(), tabAccess.getADFieldAccessList()));
-                    jsonTab.put("entityName", getTabEntityName(tabAccess.getTab()));
-                    jsonTab.put("parentColumns", WindowUtils.getParentColumns(tabAccess.getTab()));
-                    jsonTab.put("identifiers", WindowUtils.getTabIdentifiers(tabAccess.getTab()));
-
-                    tabs.put(jsonTab);
+                    tabs.put(buildTabJSON(tabAccess.getTab()));
                 }
             }
         }
 
         return tabs;
+    }
+
+    private JSONObject buildTabJSON(Tab tab) throws JSONException {
+        JSONObject jsonTab;
+
+        // TODO: Use our own converter that returns only the fields we need
+        jsonTab = tabConverter.toJsonObject(tab, DataResolvingMode.FULL_TRANSLATABLE);
+        jsonTab.put("editableField", true);
+        jsonTab.put("fields", getFields(tab, null));
+        jsonTab.put("entityName", getTabEntityName(tab));
+        jsonTab.put("parentColumns", WindowUtils.getParentColumns(tab));
+        jsonTab.put("identifiers", WindowUtils.getTabIdentifiers(tab));
+        return jsonTab;
     }
 
     private boolean isTabAllowed(Tab tab) {
