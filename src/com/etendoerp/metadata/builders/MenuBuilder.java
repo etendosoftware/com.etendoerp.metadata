@@ -36,7 +36,7 @@ public class MenuBuilder {
     private static JSONObject toJSON(MenuOption entry) {
         try {
             Menu menu = entry.getMenu();
-            JSONObject menuItem = menuConverter.toJsonObject(menu, DataResolvingMode.SHORT);
+            JSONObject menuItem = menuConverter.toJsonObject(menu, DataResolvingMode.FULL_TRANSLATABLE);
             Window window = menu.getWindow();
             List<MenuOption> items = entry.getChildren();
 
@@ -44,7 +44,7 @@ public class MenuBuilder {
             menuItem.put("label", entry.getLabel());
 
             if (null != window) {
-                menuItem.put("window", windowConverter.toJsonObject(window, DataResolvingMode.SHORT));
+                menuItem.put("window", windowConverter.toJsonObject(window, DataResolvingMode.FULL_TRANSLATABLE));
             }
 
             if (!items.isEmpty()) {
