@@ -49,6 +49,7 @@ import java.util.List;
 
 public class WindowBuilder {
     private static final DataToJsonConverter converter = new DataToJsonConverter();
+    private static final DataToJsonConverter windowConverter = new DataToJsonConverter();
     private static final DataToJsonConverter tabConverter = new DataToJsonConverter();
     private final static String[] WINDOW_PROPERTIES = new String[]{Window.PROPERTY_ID, Window.PROPERTY_NAME, Window.PROPERTY_WINDOWTYPE, Window.PROPERTY_DESCRIPTION};
     private final static String[] TAB_PROPERTIES = new String[]{Tab.PROPERTY_ID, Tab.PROPERTY_NAME, Tab.PROPERTY_TABLEVEL, Tab.PROPERTY_TABLE};
@@ -72,7 +73,7 @@ public class WindowBuilder {
 
     public WindowBuilder(String id) {
         this.id = id;
-        converter.setSelectedProperties(String.join(",", WINDOW_PROPERTIES));
+        windowConverter.setSelectedProperties(String.join(",", WINDOW_PROPERTIES));
         tabConverter.setSelectedProperties(String.join(",", TAB_PROPERTIES));
     }
 
@@ -138,7 +139,7 @@ public class WindowBuilder {
             WindowAccess windowAccess = (WindowAccess) windowAccessCriteria.uniqueResult();
 
             if (windowAccess != null) {
-                JSONObject window = converter.toJsonObject(windowAccess.getWindow(), DataResolvingMode.FULL_TRANSLATABLE);
+                JSONObject window = windowConverter.toJsonObject(windowAccess.getWindow(), DataResolvingMode.FULL_TRANSLATABLE);
                 window.put("tabs", getTabsAndFields(windowAccess.getADTabAccessList(), windowAccess.getWindow()));
 
                 return window;
