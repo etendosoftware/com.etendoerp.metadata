@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 public class MenuBuilder {
-    private final static String[] MENU_PROPERTIES = new String[]{Menu.PROPERTY_ID, Menu.PROPERTY_NAME, Menu.PROPERTY_ETMETAICON, Menu.PROPERTY_ACTION, Menu.PROPERTY_WINDOW, Menu.PROPERTY_PROCESS, Menu.PROPERTY_SUMMARYLEVEL, Menu.PROPERTY_SPECIALFORM, Menu.PROPERTY_OPENLINKINBROWSER, Menu.PROPERTY_URL, Menu.PROPERTY_OBUIAPPVIEW, Menu.PROPERTY_OBUIAPPPROCESSDEFINITION, Menu.PROPERTY_OBUIAPPMENUPARAMETERSLIST, Menu.PROPERTY_NAME};
+    private final static String[] MENU_PROPERTIES = new String[]{Menu.PROPERTY_ID, Menu.PROPERTY_NAME, Menu.PROPERTY_ACTION};
     private final static String[] WINDOW_PROPERTIES = new String[]{Window.PROPERTY_ID, Window.PROPERTY_NAME, Window.PROPERTY_WINDOWTYPE};
     private static final DataToJsonConverter menuConverter = new DataToJsonConverter();
     private static final DataToJsonConverter windowConverter = new DataToJsonConverter();
@@ -40,8 +40,7 @@ public class MenuBuilder {
             Window window = menu.getWindow();
             List<MenuOption> items = entry.getChildren();
 
-            menuItem.put("label", entry.getLabel());
-            menuItem.put("label", entry.getLabel());
+            menuItem.put("icon", menu.getETMETAIcon());
 
             if (null != window) {
                 menuItem.put("window", windowConverter.toJsonObject(window, DataResolvingMode.FULL_TRANSLATABLE));
