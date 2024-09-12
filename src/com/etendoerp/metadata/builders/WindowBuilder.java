@@ -69,6 +69,8 @@ public class WindowBuilder {
     private static final String FIELD_ID_PROPERTY = "fieldId";
     private static final String DISPLAY_FIELD_PROPERTY = "displayField";
     private static final String VALUE_FIELD_PROPERTY = "valueField";
+    private static final boolean DEFAULT_CHECKON_SAVE = true;
+    private static final boolean DEFAULT_EDITABLE_FIELD = true;
     private final String id;
 
     public WindowBuilder(String id) {
@@ -157,13 +159,13 @@ public class WindowBuilder {
         if (tabAccesses.isEmpty()) {
             for (Tab tab : window.getADTabList().stream().filter(Tab::isActive).toList()) {
                 if (isTabAllowed(tab)) {
-                    tabs.put(buildTabJSON(tab));
+                    tabs.put(buildTabJSON(tab, null));
                 }
             }
         } else {
             for (TabAccess tabAccess : tabAccesses.stream().filter(tabAccess -> tabAccess.isActive() && tabAccess.isAllowRead() && tabAccess.getTab().isActive() && tabAccess.getTab().isAllowRead()).toList()) {
                 if (isTabAllowed(tabAccess.getTab())) {
-                    tabs.put(buildTabJSON(tabAccess.getTab()));
+                    tabs.put(buildTabJSON(tabAccess.getTab(), tabAccess));
                 }
             }
         }
@@ -171,16 +173,15 @@ public class WindowBuilder {
         return tabs;
     }
 
-    private JSONObject buildTabJSON(Tab tab) throws JSONException {
-        JSONObject jsonTab;
+    private JSONObject buildTabJSON(Tab tab, TabAccess tabAccess) throws JSONException {
+        JSONObject jsonTab = tabConverter.toJsonObject(tab, DataResolvingMode.FULL_TRANSLATABLE);
 
-        // TODO: Use our own converter that returns only the fields we need
-        jsonTab = tabConverter.toJsonObject(tab, DataResolvingMode.FULL_TRANSLATABLE);
         jsonTab.put("editableField", true);
-        jsonTab.put("fields", getFields(tab, null));
+        jsonTab.put("fields", getFields(tab, tabAccess.getADFieldAccessList()));
         jsonTab.put("entityName", getTabEntityName(tab));
         jsonTab.put("parentColumns", WindowUtils.getParentColumns(tab));
         jsonTab.put("identifiers", WindowUtils.getTabIdentifiers(tab));
+
         return jsonTab;
     }
 
@@ -226,53 +227,16 @@ public class WindowBuilder {
     }
 
     private JSONObject getJSONField(Field field, FieldAccess access) throws JSONException {
-        JSONObject jsonField;
+        JSONObject jsonField = converter.toJsonObject(field, DataResolvingMode.FULL_TRANSLATABLE);
 
-        // TODO: Use our own converter that returns only the fields we need
-        jsonField = converter.toJsonObject(field, DataResolvingMode.FULL_TRANSLATABLE);
-        jsonField.put("checkonsave", access != null ? access.isCheckonsave() : true);
-        jsonField.put("editableField", access != null ? access.isEditableField() : true);
-        jsonField.put("columnName", getEntityColumnName(field.getColumn()));
-        jsonField.put("column", converter.toJsonObject(field.getColumn(), DataResolvingMode.FULL_TRANSLATABLE));
-        jsonField.put("inpName", Sqlc.TransformaNombreColumna(field.getColumn().getDBColumnName()));
-        jsonField.put("isParentRecordProperty", isParentRecordProperty(field, field.getTab()));
-
-        if (access != null && !access.isEditableField() && field.isReadOnly()) {
-            jsonField.put("readOnly", true);
-        }
-        jsonField.put("isMandatory", field.getColumn().isMandatory());
+        addBasicProperties(jsonField, field, access);
 
         if (isProcessField(field)) {
-            // TODO: Use our own converter that returns only the fields we need
-            Process obuiappProcess = field.getColumn().getOBUIAPPProcess();
-            JSONObject process = converter.toJsonObject(obuiappProcess, DataResolvingMode.FULL_TRANSLATABLE);
-            JSONArray parameters = new JSONArray();
-
-            for (Parameter param : obuiappProcess.getOBUIAPPParameterList()) {
-                JSONObject jsonParam = converter.toJsonObject(param, DataResolvingMode.FULL_TRANSLATABLE);
-
-                if (isSelectorParameter(param)) {
-                    jsonParam.put("selector", getSelectorInfo(param.getId(), param.getReferenceSearchKey()));
-                }
-                if (isListParameter(param)) {
-                    Reference refList = param.getReferenceSearchKey();
-
-                    JSONArray refListValues = getListInfo(refList);
-                    jsonParam.put("refList", refListValues);
-                }
-
-                parameters.put(jsonParam);
-            }
-            process.put("parameters", parameters);
-
-            jsonField.put("process", process);
+            jsonField.put("process", createProcessJSON(field.getColumn().getOBUIAPPProcess()));
         }
 
         if (isRefListField(field)) {
-            Reference refList = field.getColumn().getReferenceSearchKey();
-
-            JSONArray refListValues = getListInfo(refList);
-            jsonField.put("refList", refListValues);
+            jsonField.put("refList", getListInfo(field.getColumn().getReferenceSearchKey()));
         }
 
         if (isSelectorField(field)) {
@@ -282,10 +246,44 @@ public class WindowBuilder {
         return jsonField;
     }
 
+    private void addBasicProperties(JSONObject jsonField, Field field, FieldAccess access) throws JSONException {
+        jsonField.put("checkonsave", access != null ? access.isCheckonsave() : DEFAULT_CHECKON_SAVE);
+        jsonField.put("editableField", access != null ? access.isEditableField() : DEFAULT_EDITABLE_FIELD);
+        jsonField.put("columnName", getEntityColumnName(field.getColumn()));
+        jsonField.put("column", converter.toJsonObject(field.getColumn(), DataResolvingMode.FULL_TRANSLATABLE));
+        jsonField.put("inpName", Sqlc.TransformaNombreColumna(field.getColumn().getDBColumnName()));
+        jsonField.put("isParentRecordProperty", isParentRecordProperty(field, field.getTab()));
+        jsonField.put("isMandatory", field.getColumn().isMandatory());
+
+        if (access != null && !access.isEditableField() && field.isReadOnly()) {
+            jsonField.put("readOnly", true);
+        }
+    }
+
+    private JSONObject createProcessJSON(Process process) throws JSONException {
+        JSONObject processJSON = converter.toJsonObject(process, DataResolvingMode.FULL_TRANSLATABLE);
+        JSONArray parameters = new JSONArray();
+
+        for (Parameter param : process.getOBUIAPPParameterList()) {
+            JSONObject paramJSON = converter.toJsonObject(param, DataResolvingMode.FULL_TRANSLATABLE);
+
+            if (isSelectorParameter(param)) {
+                paramJSON.put("selector", getSelectorInfo(param.getId(), param.getReferenceSearchKey()));
+            }
+            if (isListParameter(param)) {
+                paramJSON.put("refList", getListInfo(param.getReferenceSearchKey()));
+            }
+
+            parameters.put(paramJSON);
+        }
+
+        processJSON.put("parameters", parameters);
+
+        return processJSON;
+    }
+
     private boolean isProcessField(Field field) {
         Column column = field.getColumn();
-
-        // Add getProcess() when adding support for old processes
 
         return column != null && column.getOBUIAPPProcess() != null;
     }
@@ -337,13 +335,12 @@ public class WindowBuilder {
             params.put("windowId", windowId);
             return BaseProcessActionHandler.hasAccess(process, params);
         }
-        // is not a process
+
         return true;
     }
 
     private boolean shouldDisplayField(Field field) {
         boolean isScanProcess = field.getColumn() != null && field.getColumn().getOBUIAPPProcess() != null && field.getColumn().getOBUIAPPProcess().isSmfmuScan() != null && field.getColumn().getOBUIAPPProcess().isSmfmuScan();
-        // Hides fields with logic until mobile app implements behavior
 
         return field.getColumn() != null && (field.isDisplayed() || isScanProcess || field.getColumn().isStoredInSession() || field.getColumn().isLinkToParentColumn() || ALWAYS_DISPLAYED_COLUMNS.contains(field.getColumn().getDBColumnName()));
     }
