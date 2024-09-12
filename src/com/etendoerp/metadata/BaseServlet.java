@@ -45,11 +45,12 @@ public abstract class BaseServlet extends HttpBaseServlet {
         String clientId = decodedToken.getClaim("client").asString();
 
         if (userId == null || userId.isEmpty() || roleId == null || roleId.isEmpty() || orgId == null || orgId.isEmpty() || warehouseId == null || warehouseId.isEmpty() || clientId == null || clientId.isEmpty()) {
-            throw new OBException("SWS - Token is not valid");
+            throw new UnauthorizedException();
         }
 
         OBContext.setOBContext(SecureWebServicesUtils.createContext(userId, roleId, orgId, warehouseId, clientId));
         OBContext.setOBContextInSession(request, OBContext.getOBContext());
+
         SessionInfo.setUserId(userId);
         SessionInfo.setProcessType("WS");
         SessionInfo.setProcessId("DAL");
@@ -85,38 +86,20 @@ public abstract class BaseServlet extends HttpBaseServlet {
             }
 
         } catch (SignatureVerificationException | UnauthorizedException | OBSecurityException e) {
-            logger.warn(e.getMessage());
+            logger.error(e.getMessage());
             response.setStatus(401);
             response.getWriter().write(buildErrorJson(e));
         } catch (MethodNotAllowedException e) {
-            logger.warn(e.getMessage());
+            logger.error(e.getMessage());
             response.setStatus(405);
             response.getWriter().write(buildErrorJson(e));
         } catch (InternalServerException e) {
-            logger.warn(e.getMessage());
+            logger.error(e.getMessage());
             response.setStatus(500);
             response.getWriter().write(buildErrorJson(e));
         } catch (Exception e) {
-            handleInternalServerError(e, response);
-        }
-    }
-
-    private void handleInternalServerError(Exception e, HttpServletResponse response) {
-        try {
-            logger.warn(e.getMessage());
-
-            JSONObject result = new JSONObject();
-            Writer writer = response.getWriter();
-
-            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-
-            result.put("ok", false);
-            result.put("error", e.getMessage());
-
-            writer.write(result.toString());
-            writer.close();
-        } catch (Exception ex) {
-            throw new RuntimeException(ex);
+            logger.error(e.getMessage());
+            response.setStatus(500);
         }
     }
 
