@@ -132,8 +132,12 @@ public class TabBuilder {
             json.put("parentColumns", WindowUtils.getParentColumns(tab));
             json.put("identifiers", WindowUtils.getTabIdentifiers(tab));
             json.put("fields", getFields());
+            json.put("level", tab.getTabLevel());
 
             return json;
+
+
+
         } catch (JSONException e) {
             logger.warn(e.getMessage());
 
