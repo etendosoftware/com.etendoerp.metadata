@@ -9,48 +9,53 @@ import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.client.application.GlobalMenu;
 import org.openbravo.client.application.MenuManager;
 import org.openbravo.client.application.MenuManager.MenuOption;
+import org.openbravo.dal.core.OBContext;
 import org.openbravo.model.ad.ui.Menu;
 import org.openbravo.model.ad.ui.Window;
-import org.openbravo.service.json.DataResolvingMode;
-import org.openbravo.service.json.DataToJsonConverter;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 public class MenuBuilder {
-    private final static String[] MENU_PROPERTIES = new String[]{Menu.PROPERTY_ID, Menu.PROPERTY_NAME, Menu.PROPERTY_ACTION};
-    private final static String[] WINDOW_PROPERTIES = new String[]{Window.PROPERTY_ID, Window.PROPERTY_NAME, Window.PROPERTY_WINDOWTYPE};
-    private static final DataToJsonConverter menuConverter = new DataToJsonConverter();
-    private static final DataToJsonConverter windowConverter = new DataToJsonConverter();
-    private static final Logger logger = LogManager.getLogger();
+    private static final Logger logger = LogManager.getLogger(MenuBuilder.class);
     private final MenuOption menu;
 
     public MenuBuilder() {
         MenuManager manager = new MenuManager();
         manager.setGlobalMenuOptions(new GlobalMenu());
         menu = manager.getMenu();
-        menuConverter.setSelectedProperties(String.join(",", MENU_PROPERTIES));
-        windowConverter.setSelectedProperties(String.join(",", WINDOW_PROPERTIES));
     }
 
-    private static JSONObject toJSON(MenuOption entry) {
+    private JSONObject toJSON(MenuOption entry) {
         try {
+            JSONObject json = new JSONObject();
             Menu menu = entry.getMenu();
-            JSONObject menuItem = menuConverter.toJsonObject(menu, DataResolvingMode.FULL_TRANSLATABLE);
             Window window = menu.getWindow();
-            List<MenuOption> items = entry.getChildren();
+            List<MenuOption> children = entry.getChildren();
 
-            menuItem.put("icon", menu.getETMETAIcon());
+            json.put("id", menu.getId());
+            json.put("name", menu.get(Menu.PROPERTY_NAME, OBContext.getOBContext().getLanguage(), menu.getId()));
+            json.put("icon", menu.getETMETAIcon());
+            json.put("action", menu.getAction());
+            json.put("type", entry.getType());
+            json.put("label", entry.getLabel());
 
             if (null != window) {
-                menuItem.put("window", windowConverter.toJsonObject(window, DataResolvingMode.FULL_TRANSLATABLE));
+                json.put("windowId", window.getId());
             }
 
-            if (!items.isEmpty()) {
-                menuItem.put("children", items.stream().map(MenuBuilder::toJSON).collect(Collectors.toList()));
+            if (!children.isEmpty()) {
+                List<JSONObject> list = new ArrayList<>();
+
+                for (MenuOption item : children) {
+                    JSONObject child = toJSON(item);
+                    list.add(child);
+                }
+
+                json.put("children", list);
             }
 
-            return menuItem;
+            return json;
         } catch (JSONException e) {
             logger.warn(e.getMessage());
 
@@ -59,6 +64,13 @@ public class MenuBuilder {
     }
 
     public JSONArray toJSON() {
-        return new JSONArray(this.menu.getChildren().stream().map(MenuBuilder::toJSON).collect(Collectors.toList()));
+        List<JSONObject> list = new ArrayList<>();
+
+        for (MenuOption menuOption : this.menu.getChildren()) {
+            JSONObject json = toJSON(menuOption);
+            list.add(json);
+        }
+
+        return new JSONArray(list);
     }
 }

@@ -26,13 +26,12 @@ import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.Writer;
 
 /**
  * @author luuchorocha
  */
 public abstract class BaseServlet extends HttpBaseServlet {
-    public static final Logger logger = LogManager.getLogger();
+    public static final Logger logger = LogManager.getLogger(BaseServlet.class);
     public static final String APPLICATION_JSON = "application/json";
     private static final int DEFAULT_WS_INACTIVE_INTERVAL = 60;
     private static Integer wsInactiveInterval = null;

@@ -49,6 +49,7 @@ public class MetadataServlet extends BaseServlet {
     private void setContext(HttpServletRequest request) {
         try {
             OBContext.setAdminMode();
+
             JSONObject payload = getBody(request);
             String language = payload.getString("language") != null ? payload.getString("language") : "";
             OBCriteria<Language> languageCriteria = OBDal.getInstance().createCriteria(Language.class);

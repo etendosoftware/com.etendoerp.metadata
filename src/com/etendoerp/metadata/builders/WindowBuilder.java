@@ -61,19 +61,12 @@ public class WindowBuilder {
     private JSONArray getTabsAndFields(List<TabAccess> tabAccesses, org.openbravo.model.ad.ui.Window window) {
         JSONArray tabs = new JSONArray();
 
-        if (tabAccesses.isEmpty()) {
-            for (Tab tab : window.getADTabList().stream().filter(Tab::isActive).toList()) {
-                if (isTabAllowed(tab)) {
-                    tabs.put(new TabBuilder(tab, null).toJSON());
-                }
-            }
-        } else {
-            for (TabAccess tabAccess : tabAccesses.stream().filter(tabAccess -> tabAccess.isActive() && tabAccess.isAllowRead() && tabAccess.getTab().isActive() && tabAccess.getTab().isAllowRead()).toList()) {
-                if (isTabAllowed(tabAccess.getTab())) {
-                    tabs.put(new TabBuilder(tabAccess.getTab(), tabAccess).toJSON());
-                }
-            }
-        }
+        if (tabAccesses.isEmpty()) for (Tab tab : window.getADTabList().stream().filter(Tab::isActive).toList())
+            if (isTabAllowed(tab)) tabs.put(new TabBuilder(tab, null).toJSON());
+            else
+                for (TabAccess tabAccess : tabAccesses.stream().filter(tabAccess -> tabAccess.isActive() && tabAccess.isAllowRead() && tabAccess.getTab().isActive() && tabAccess.getTab().isAllowRead()).toList())
+                    if (isTabAllowed(tabAccess.getTab()))
+                        tabs.put(new TabBuilder(tabAccess.getTab(), tabAccess).toJSON());
 
         return tabs;
     }
