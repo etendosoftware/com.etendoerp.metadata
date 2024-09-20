@@ -9,32 +9,29 @@ import com.smf.securewebservices.utils.SecureWebServicesUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.codehaus.jettison.json.JSONException;
-import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.authentication.AuthenticationManager;
 import org.openbravo.base.HttpBaseServlet;
 import org.openbravo.base.exception.OBException;
 import org.openbravo.base.exception.OBSecurityException;
 import org.openbravo.base.secureApp.AllowedCrossDomainsHandler;
-import org.openbravo.base.session.OBPropertiesProvider;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.database.SessionInfo;
-import org.openbravo.service.json.JsonUtils;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
-import java.io.BufferedReader;
 import java.io.IOException;
+
+import static com.etendoerp.metadata.Utils.buildErrorJson;
+import static com.etendoerp.metadata.Utils.getWSInactiveInterval;
 
 /**
  * @author luuchorocha
  */
 public abstract class BaseServlet extends HttpBaseServlet {
-    public static final Logger logger = LogManager.getLogger(BaseServlet.class);
     public static final String APPLICATION_JSON = "application/json";
-    private static final int DEFAULT_WS_INACTIVE_INTERVAL = 60;
-    private static Integer wsInactiveInterval = null;
+    public final Logger logger = LogManager.getLogger(this.getClass());
 
     private static void setContext(HttpServletRequest request, DecodedJWT decodedToken) {
         String userId = decodedToken.getClaim("user").asString();
@@ -71,7 +68,7 @@ public abstract class BaseServlet extends HttpBaseServlet {
             throw new MethodNotAllowedException("Method not allowed");
         }
 
-        String token = getToken(request);
+        String token = Utils.getToken(request);
 
         try {
             DecodedJWT decodedToken = SecureWebServicesUtils.decodeToken(token);
@@ -126,57 +123,6 @@ public abstract class BaseServlet extends HttpBaseServlet {
         }
     }
 
-    private String getToken(HttpServletRequest request) {
-        String authStr = request.getHeader("Authorization");
-        String token = null;
-
-        if (authStr != null && authStr.startsWith("Bearer ")) {
-            token = authStr.substring(7);
-        }
-
-        return token;
-    }
-
-    private int getWSInactiveInterval() {
-        if (wsInactiveInterval == null) {
-            try {
-                wsInactiveInterval = Integer.parseInt(OBPropertiesProvider.getInstance().getOpenbravoProperties().getProperty("ws.maxInactiveInterval", Integer.toString(DEFAULT_WS_INACTIVE_INTERVAL)));
-            } catch (Exception e) {
-                wsInactiveInterval = DEFAULT_WS_INACTIVE_INTERVAL;
-            }
-            logger.info("Sessions for WS calls expire after ".concat(wsInactiveInterval.toString()).concat(" seconds. This can be configured with ws.maxInactiveInterval property."));
-        }
-
-        return wsInactiveInterval;
-    }
-
-    public JSONObject getBody(HttpServletRequest request) {
-        try {
-            StringBuilder sb = new StringBuilder();
-            String line;
-            BufferedReader reader = request.getReader();
-
-            while ((line = reader.readLine()) != null) {
-                sb.append(line);
-            }
-
-            return new JSONObject(sb.toString());
-        } catch (JSONException | IOException e) {
-            logger.warn(e.getMessage());
-
-            return new JSONObject();
-        }
-    }
-
-    private String buildErrorJson(Exception e) {
-        try {
-            return new JSONObject(JsonUtils.convertExceptionToJson(e)).toString();
-        } catch (Exception err) {
-            logger.warn(err.getMessage());
-
-            return "";
-        }
-    }
 
     public abstract void process(HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException, JSONException;
 }
