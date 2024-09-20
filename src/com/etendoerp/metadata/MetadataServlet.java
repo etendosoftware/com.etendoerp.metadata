@@ -6,11 +6,7 @@ import com.etendoerp.metadata.exceptions.NotFoundException;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
-import org.hibernate.criterion.Restrictions;
 import org.openbravo.dal.core.OBContext;
-import org.openbravo.dal.service.OBCriteria;
-import org.openbravo.dal.service.OBDal;
-import org.openbravo.model.ad.system.Language;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
@@ -24,9 +20,7 @@ public class MetadataServlet extends BaseServlet {
     @Override
     public void process(HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException, JSONException {
         try {
-            logger.info(request.getRequestURL());
             OBContext.setAdminMode();
-            setContext(request);
             handleRequest(request, response);
         } finally {
             OBContext.restorePreviousMode();
@@ -45,24 +39,6 @@ public class MetadataServlet extends BaseServlet {
             response.getWriter().write(this.fetchMenu().toString());
         } else {
             throw new NotFoundException("Not found");
-        }
-    }
-
-    private void setContext(HttpServletRequest request) {
-        try {
-            JSONObject payload = getBody(request);
-            String language = payload.getString("language") != null ? payload.getString("language") : "";
-            OBCriteria<Language> languageCriteria = OBDal.getInstance().createCriteria(Language.class);
-            languageCriteria.add(Restrictions.eq(Language.PROPERTY_LANGUAGE, language));
-            Language currentLanguage = (Language) languageCriteria.uniqueResult();
-
-            if (currentLanguage.isSystemLanguage()) {
-                OBContext.getOBContext().setLanguage(currentLanguage);
-            } else {
-                logger.error("The provided language is not a valid system language");
-            }
-        } catch (JSONException e) {
-            logger.error(e.getMessage());
         }
     }
 

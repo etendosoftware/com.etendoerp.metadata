@@ -5,7 +5,6 @@ import com.auth0.jwt.interfaces.DecodedJWT;
 import com.etendoerp.metadata.exceptions.InternalServerException;
 import com.etendoerp.metadata.exceptions.MethodNotAllowedException;
 import com.etendoerp.metadata.exceptions.UnauthorizedException;
-import com.smf.securewebservices.utils.SecureWebServicesUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.codehaus.jettison.json.JSONException;
@@ -23,8 +22,8 @@ import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 import java.io.IOException;
 
-import static com.etendoerp.metadata.Utils.buildErrorJson;
-import static com.etendoerp.metadata.Utils.getWSInactiveInterval;
+import static com.etendoerp.metadata.Utils.*;
+import static com.smf.securewebservices.utils.SecureWebServicesUtils.decodeToken;
 
 /**
  * @author luuchorocha
@@ -39,10 +38,11 @@ public abstract class BaseServlet extends HttpBaseServlet {
         String orgId = decodedToken.getClaim("organization").asString();
         String warehouseId = decodedToken.getClaim("warehouse").asString();
         String clientId = decodedToken.getClaim("client").asString();
+        String language = getLanguage(request);
 
         validate(userId, roleId, orgId, warehouseId, clientId);
 
-        OBContext.setOBContext(userId, roleId, clientId, orgId, null, warehouseId);
+        OBContext.setOBContext(userId, roleId, clientId, orgId, language, warehouseId);
         OBContext.setOBContextInSession(request, OBContext.getOBContext());
 
         SessionInfo.setUserId(userId);
@@ -68,10 +68,10 @@ public abstract class BaseServlet extends HttpBaseServlet {
             throw new MethodNotAllowedException("Method not allowed");
         }
 
-        String token = Utils.getToken(request);
+        String token = getToken(request);
 
         try {
-            DecodedJWT decodedToken = SecureWebServicesUtils.decodeToken(token);
+            DecodedJWT decodedToken = decodeToken(token);
 
             if (decodedToken != null) {
                 setContext(request, decodedToken);
@@ -106,6 +106,7 @@ public abstract class BaseServlet extends HttpBaseServlet {
     private void clearSession(HttpServletRequest request) {
         final boolean sessionExists = request.getSession(false) != null;
         final boolean sessionCreated = !sessionExists && null != request.getSession(false);
+
         if (sessionCreated && AuthenticationManager.isStatelessRequest(request)) {
             logger.warn("Stateless request, still a session was created ".concat(request.getRequestURL().toString()).concat(" ").concat(request.getQueryString()));
         }
@@ -122,7 +123,6 @@ public abstract class BaseServlet extends HttpBaseServlet {
             }
         }
     }
-
 
     public abstract void process(HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException, JSONException;
 }
