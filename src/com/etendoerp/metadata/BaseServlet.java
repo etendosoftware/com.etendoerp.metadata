@@ -84,7 +84,6 @@ public abstract class BaseServlet extends HttpBaseServlet {
             } else {
                 throw new OBException("SWS - Token is not valid");
             }
-
         } catch (SignatureVerificationException | UnauthorizedException | OBSecurityException e) {
             logger.error(e.getMessage());
             response.setStatus(401);
