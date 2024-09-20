@@ -24,6 +24,8 @@ public class MetadataServlet extends BaseServlet {
     @Override
     public void process(HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException, JSONException {
         try {
+            logger.info(request.getRequestURL());
+            OBContext.setAdminMode();
             setContext(request);
             handleRequest(request, response);
         } finally {
@@ -31,7 +33,7 @@ public class MetadataServlet extends BaseServlet {
         }
     }
 
-    private void handleRequest(HttpServletRequest request, HttpServletResponse response) throws IOException, JSONException {
+    private void handleRequest(HttpServletRequest request, HttpServletResponse response) throws IOException {
         String path = request.getPathInfo();
 
         response.setContentType(APPLICATION_JSON);
@@ -48,8 +50,6 @@ public class MetadataServlet extends BaseServlet {
 
     private void setContext(HttpServletRequest request) {
         try {
-            OBContext.setAdminMode();
-
             JSONObject payload = getBody(request);
             String language = payload.getString("language") != null ? payload.getString("language") : "";
             OBCriteria<Language> languageCriteria = OBDal.getInstance().createCriteria(Language.class);
@@ -59,14 +59,14 @@ public class MetadataServlet extends BaseServlet {
             if (currentLanguage.isSystemLanguage()) {
                 OBContext.getOBContext().setLanguage(currentLanguage);
             } else {
-                logger.warn("The provided language is not a valid system language");
+                logger.error("The provided language is not a valid system language");
             }
         } catch (JSONException e) {
-            logger.warn(e.getMessage());
+            logger.error(e.getMessage());
         }
     }
 
-    private JSONObject fetchWindow(String id) throws JSONException {
+    private JSONObject fetchWindow(String id) {
         return new WindowBuilder(id).toJSON();
     }
 

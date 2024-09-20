@@ -43,16 +43,20 @@ public abstract class BaseServlet extends HttpBaseServlet {
         String warehouseId = decodedToken.getClaim("warehouse").asString();
         String clientId = decodedToken.getClaim("client").asString();
 
-        if (userId == null || userId.isEmpty() || roleId == null || roleId.isEmpty() || orgId == null || orgId.isEmpty() || warehouseId == null || warehouseId.isEmpty() || clientId == null || clientId.isEmpty()) {
-            throw new UnauthorizedException();
-        }
+        validate(userId, roleId, orgId, warehouseId, clientId);
 
-        OBContext.setOBContext(SecureWebServicesUtils.createContext(userId, roleId, orgId, warehouseId, clientId));
+        OBContext.setOBContext(userId, roleId, clientId, orgId, null, warehouseId);
         OBContext.setOBContextInSession(request, OBContext.getOBContext());
 
         SessionInfo.setUserId(userId);
         SessionInfo.setProcessType("WS");
         SessionInfo.setProcessId("DAL");
+    }
+
+    private static void validate(String userId, String roleId, String orgId, String warehouseId, String clientId) {
+        if (userId == null || userId.isEmpty() || roleId == null || roleId.isEmpty() || orgId == null || orgId.isEmpty() || warehouseId == null || warehouseId.isEmpty() || clientId == null || clientId.isEmpty()) {
+            throw new UnauthorizedException();
+        }
     }
 
     @Override

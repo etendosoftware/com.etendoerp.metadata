@@ -1,6 +1,8 @@
 package com.etendoerp.metadata.builders;
 
 import com.etendoerp.metadata.exceptions.NotFoundException;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
@@ -20,6 +22,7 @@ import org.openbravo.service.json.DataToJsonConverter;
 import java.util.List;
 
 public class WindowBuilder {
+    private static final Logger logger = LogManager.getLogger(WindowBuilder.class);
     private static final DataToJsonConverter windowConverter = new DataToJsonConverter();
     private static final DataToJsonConverter tabConverter = new DataToJsonConverter();
     private final static String[] WINDOW_PROPERTIES = new String[]{Window.PROPERTY_ID, Window.PROPERTY_NAME, Window.PROPERTY_WINDOWTYPE, Window.PROPERTY_DESCRIPTION};
@@ -33,7 +36,7 @@ public class WindowBuilder {
         tabConverter.setSelectedProperties(String.join(",", TAB_PROPERTIES));
     }
 
-    public JSONObject toJSON() throws JSONException {
+    public JSONObject toJSON() {
         Role role = OBContext.getOBContext().getRole();
         org.openbravo.model.ad.ui.Window adWindow = OBDal.getInstance().get(org.openbravo.model.ad.ui.Window.class, this.id);
         OBCriteria<WindowAccess> windowAccessCriteria = OBDal.getInstance().createCriteria(WindowAccess.class);
@@ -47,7 +50,11 @@ public class WindowBuilder {
 
             if (windowAccess != null) {
                 JSONObject window = windowConverter.toJsonObject(windowAccess.getWindow(), DataResolvingMode.FULL_TRANSLATABLE);
-                window.put("tabs", getTabsAndFields(windowAccess.getADTabAccessList(), windowAccess.getWindow()));
+                try {
+                    window.put("tabs", getTabsAndFields(windowAccess.getADTabAccessList(), windowAccess.getWindow()));
+                } catch (JSONException e) {
+                    logger.error(e.getMessage());
+                }
 
                 return window;
             } else {
