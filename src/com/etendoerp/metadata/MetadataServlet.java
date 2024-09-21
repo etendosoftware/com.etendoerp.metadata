@@ -3,6 +3,7 @@ package com.etendoerp.metadata;
 import com.etendoerp.metadata.builders.MenuBuilder;
 import com.etendoerp.metadata.builders.WindowBuilder;
 import com.etendoerp.metadata.exceptions.NotFoundException;
+import org.apache.http.entity.ContentType;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
@@ -12,6 +13,7 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 
 /**
  * @author luuchorocha
@@ -20,7 +22,7 @@ public class MetadataServlet extends BaseServlet {
     @Override
     public void process(HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException, JSONException {
         try {
-            OBContext.setAdminMode();
+            OBContext.setAdminMode(true);
             handleRequest(request, response);
         } finally {
             OBContext.restorePreviousMode();
@@ -30,8 +32,8 @@ public class MetadataServlet extends BaseServlet {
     private void handleRequest(HttpServletRequest request, HttpServletResponse response) throws IOException {
         String path = request.getPathInfo();
 
-        response.setContentType(APPLICATION_JSON);
-        response.setCharacterEncoding("UTF-8");
+        response.setContentType(ContentType.APPLICATION_JSON.getMimeType());
+        response.setCharacterEncoding(StandardCharsets.UTF_8.toString());
 
         if (path.startsWith("/window/")) {
             response.getWriter().write(this.fetchWindow(request.getPathInfo().substring(8)).toString());

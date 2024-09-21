@@ -29,7 +29,6 @@ import static com.smf.securewebservices.utils.SecureWebServicesUtils.decodeToken
  * @author luuchorocha
  */
 public abstract class BaseServlet extends HttpBaseServlet {
-    public static final String APPLICATION_JSON = "application/json";
     public final Logger logger = LogManager.getLogger(this.getClass());
 
     private static void setContext(HttpServletRequest request, DecodedJWT decodedToken) {
@@ -60,24 +59,16 @@ public abstract class BaseServlet extends HttpBaseServlet {
     public final void service(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         AllowedCrossDomainsHandler.getInstance().setCORSHeaders(request, response);
 
-        if (request.getMethod().equals("OPTIONS")) {
-            return;
-        }
-
-        if (!request.getMethod().equals("POST")) {
-            throw new MethodNotAllowedException("Method not allowed");
-        }
-
-        String token = getToken(request);
+        if (request.getMethod().equals("OPTIONS")) return;
+        if (!request.getMethod().equals("POST")) throw new MethodNotAllowedException();
 
         try {
-            DecodedJWT decodedToken = decodeToken(token);
+            DecodedJWT decodedToken = decodeToken(getToken(request));
 
             if (decodedToken != null) {
-                setContext(request, decodedToken);
-
                 try {
-                    this.process(request, response);
+                    setContext(request, decodedToken);
+                    process(request, response);
                 } finally {
                     clearSession(request);
                 }
