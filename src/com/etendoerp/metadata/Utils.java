@@ -19,17 +19,16 @@ public class Utils {
 
     public static JSONObject getBody(HttpServletRequest request) {
         try {
-            if (!request.getContentType().equals(ContentType.APPLICATION_JSON.getMimeType())) {
+            String contentType = request.getContentType();
+
+            if (null == contentType || !contentType.equals(ContentType.APPLICATION_JSON.getMimeType()))
                 return new JSONObject();
-            }
 
             StringBuilder sb = new StringBuilder();
-            String line;
             BufferedReader reader = request.getReader();
+            String line = reader.readLine();
 
-            while ((line = reader.readLine()) != null) {
-                sb.append(line);
-            }
+            do sb.append(line); while ((line = reader.readLine()) != null);
 
             return new JSONObject(sb.toString());
         } catch (JSONException | IOException e) {
@@ -43,9 +42,7 @@ public class Utils {
         String authStr = request.getHeader("Authorization");
         String token = null;
 
-        if (authStr != null && authStr.startsWith("Bearer ")) {
-            token = authStr.substring(7);
-        }
+        if (authStr != null && authStr.startsWith("Bearer ")) token = authStr.substring(7);
 
         return token;
     }
