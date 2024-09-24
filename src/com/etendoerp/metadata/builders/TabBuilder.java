@@ -211,6 +211,7 @@ public class TabBuilder {
         jsonField.put("inpName", Sqlc.TransformaNombreColumna(field.getColumn().getDBColumnName()));
         jsonField.put("isParentRecordProperty", isParentRecordProperty(field, field.getTab()));
         jsonField.put("isMandatory", field.getColumn().isMandatory());
+        jsonField.put("entity", field.getColumn().getTable().getName());
 
         if (access != null && !access.isEditableField() && field.isReadOnly()) {
             jsonField.put("readOnly", true);
