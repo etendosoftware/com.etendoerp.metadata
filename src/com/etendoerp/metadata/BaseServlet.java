@@ -63,7 +63,11 @@ public abstract class BaseServlet extends HttpBaseServlet {
         if (!request.getMethod().equals("POST")) throw new MethodNotAllowedException();
 
         try {
-            DecodedJWT decodedToken = decodeToken(getToken(request));
+            String token = getToken(request);
+
+            if (token == null) throw new UnauthorizedException();
+
+            DecodedJWT decodedToken = decodeToken(token);
 
             if (decodedToken != null) {
                 try {
