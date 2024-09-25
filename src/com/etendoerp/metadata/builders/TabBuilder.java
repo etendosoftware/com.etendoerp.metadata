@@ -137,7 +137,6 @@ public class TabBuilder {
             return json;
 
 
-
         } catch (JSONException e) {
             logger.warn(e.getMessage());
 
@@ -204,22 +203,27 @@ public class TabBuilder {
     }
 
     private void addBasicProperties(JSONObject jsonField, Field field, FieldAccess access) throws JSONException {
-        jsonField.put("checkonsave", access != null ? access.isCheckonsave() : DEFAULT_CHECKON_SAVE);
-        jsonField.put("editableField", access != null ? access.isEditableField() : DEFAULT_EDITABLE_FIELD);
+        boolean checkOnSave = access != null ? access.isCheckonsave() : DEFAULT_CHECKON_SAVE;
+        boolean editableField = access != null ? access.isEditableField() : DEFAULT_EDITABLE_FIELD;
+        boolean readOnly = access != null && !access.isEditableField() && field.isReadOnly();
+
+        jsonField.put("checkonsave", checkOnSave);
+        jsonField.put("editableField", editableField);
         jsonField.put("columnName", getEntityColumnName(field.getColumn()));
         jsonField.put("column", converter.toJsonObject(field.getColumn(), DataResolvingMode.FULL_TRANSLATABLE));
         jsonField.put("inpName", Sqlc.TransformaNombreColumna(field.getColumn().getDBColumnName()));
         jsonField.put("isParentRecordProperty", isParentRecordProperty(field, field.getTab()));
         jsonField.put("isMandatory", field.getColumn().isMandatory());
+        jsonField.put("readOnly", readOnly);
 
+        addReferencedProperty(jsonField, field);
+    }
+
+    private void addReferencedProperty(JSONObject jsonField, Field field) throws JSONException {
         Property referenced = KernelUtils.getProperty(field).getReferencedProperty();
 
-        if (null != referenced) {
+        if (referenced != null) {
             jsonField.put("entity", referenced.getEntity().getName());
-        }
-
-        if (access != null && !access.isEditableField() && field.isReadOnly()) {
-            jsonField.put("readOnly", true);
         }
     }
 

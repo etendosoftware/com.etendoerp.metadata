@@ -20,6 +20,7 @@ import org.openbravo.service.json.DataResolvingMode;
 import org.openbravo.service.json.DataToJsonConverter;
 
 import java.util.List;
+import java.util.Optional;
 
 public class WindowBuilder {
     private static final Logger logger = LogManager.getLogger(WindowBuilder.class);
@@ -38,42 +39,39 @@ public class WindowBuilder {
 
     public JSONObject toJSON() {
         Role role = OBContext.getOBContext().getRole();
-        org.openbravo.model.ad.ui.Window adWindow = OBDal.getInstance().get(org.openbravo.model.ad.ui.Window.class, this.id);
+        Optional<org.openbravo.model.ad.ui.Window> adWindowOptional = Optional.ofNullable(OBDal.getInstance().get(org.openbravo.model.ad.ui.Window.class, this.id));
+
+        org.openbravo.model.ad.ui.Window adWindow = adWindowOptional.orElseThrow(NotFoundException::new);
+
         OBCriteria<WindowAccess> windowAccessCriteria = OBDal.getInstance().createCriteria(WindowAccess.class);
         windowAccessCriteria.add(Restrictions.eq(WindowAccess.PROPERTY_ROLE, role));
         windowAccessCriteria.add(Restrictions.eq(WindowAccess.PROPERTY_ACTIVE, true));
+        windowAccessCriteria.add(Restrictions.eq(WindowAccess.PROPERTY_WINDOW, adWindow));
+        windowAccessCriteria.setMaxResults(1);
 
-        if (adWindow != null) {
-            windowAccessCriteria.add(Restrictions.eq(WindowAccess.PROPERTY_WINDOW, adWindow));
-            windowAccessCriteria.setMaxResults(1);
-            WindowAccess windowAccess = (WindowAccess) windowAccessCriteria.uniqueResult();
+        Optional<WindowAccess> windowAccessOptional = Optional.ofNullable((WindowAccess) windowAccessCriteria.uniqueResult());
 
-            if (windowAccess != null) {
-                JSONObject window = windowConverter.toJsonObject(windowAccess.getWindow(), DataResolvingMode.FULL_TRANSLATABLE);
-                try {
-                    window.put("tabs", getTabsAndFields(windowAccess.getADTabAccessList(), windowAccess.getWindow()));
-                } catch (JSONException e) {
-                    logger.error(e.getMessage());
-                }
+        WindowAccess windowAccess = windowAccessOptional.orElseThrow(OBSecurityException::new);
 
-                return window;
-            } else {
-                throw new OBSecurityException();
-            }
-        } else {
-            throw new NotFoundException();
+        JSONObject window = windowConverter.toJsonObject(windowAccess.getWindow(), DataResolvingMode.FULL_TRANSLATABLE);
+
+        try {
+            window.put("tabs", getTabsAndFields(windowAccess.getADTabAccessList(), windowAccess.getWindow()));
+        } catch (JSONException e) {
+            logger.error(e.getMessage(), e);
         }
+
+        return window;
     }
 
     private JSONArray getTabsAndFields(List<TabAccess> tabAccesses, org.openbravo.model.ad.ui.Window window) {
         JSONArray tabs = new JSONArray();
 
-        if (tabAccesses.isEmpty()) for (Tab tab : window.getADTabList().stream().filter(Tab::isActive).toList())
-            if (isTabAllowed(tab)) tabs.put(new TabBuilder(tab, null).toJSON());
-            else
-                for (TabAccess tabAccess : tabAccesses.stream().filter(tabAccess -> tabAccess.isActive() && tabAccess.isAllowRead() && tabAccess.getTab().isActive() && tabAccess.getTab().isAllowRead()).toList())
-                    if (isTabAllowed(tabAccess.getTab()))
-                        tabs.put(new TabBuilder(tabAccess.getTab(), tabAccess).toJSON());
+        if (tabAccesses.isEmpty()) {
+            window.getADTabList().stream().filter(Tab::isActive).filter(this::isTabAllowed).map(tab -> new TabBuilder(tab, null).toJSON()).forEach(tabs::put);
+        } else {
+            tabAccesses.stream().filter(TabAccess::isActive).filter(TabAccess::isAllowRead).filter(tabAccess -> tabAccess.getTab().isActive()).filter(tabAccess -> tabAccess.getTab().isAllowRead()).filter(tabAccess -> isTabAllowed(tabAccess.getTab())).map(tabAccess -> new TabBuilder(tabAccess.getTab(), tabAccess).toJSON()).forEach(tabs::put);
+        }
 
         return tabs;
     }
