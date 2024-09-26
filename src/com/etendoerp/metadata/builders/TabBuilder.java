@@ -1,7 +1,6 @@
 package com.etendoerp.metadata.builders;
 
 import com.etendoerp.metadata.exceptions.InternalServerException;
-import com.smf.mobile.utils.webservices.WindowUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.codehaus.jettison.json.JSONArray;
@@ -20,14 +19,15 @@ import org.openbravo.client.application.Process;
 import org.openbravo.client.application.process.BaseProcessActionHandler;
 import org.openbravo.client.kernel.KernelUtils;
 import org.openbravo.dal.core.DalUtil;
+import org.openbravo.dal.core.OBContext;
 import org.openbravo.data.Sqlc;
 import org.openbravo.model.ad.access.FieldAccess;
 import org.openbravo.model.ad.access.TabAccess;
 import org.openbravo.model.ad.datamodel.Column;
 import org.openbravo.model.ad.domain.Reference;
 import org.openbravo.model.ad.domain.ReferencedTree;
+import org.openbravo.model.ad.system.Language;
 import org.openbravo.model.ad.ui.Field;
-import org.openbravo.model.ad.ui.Menu;
 import org.openbravo.model.ad.ui.Tab;
 import org.openbravo.service.datasource.DataSource;
 import org.openbravo.service.datasource.DatasourceField;
@@ -61,7 +61,6 @@ public class TabBuilder {
     private static final String VALUE_FIELD_PROPERTY = "valueField";
     private static final boolean DEFAULT_CHECKON_SAVE = true;
     private static final boolean DEFAULT_EDITABLE_FIELD = true;
-    private static final String[] TAB_PROPERTIES = new String[]{Menu.PROPERTY_ID};
     private static final DataToJsonConverter converter = new DataToJsonConverter();
     private static final DataToJsonConverter tabConverter = new DataToJsonConverter();
     private static final Logger logger = LogManager.getLogger();
@@ -71,7 +70,6 @@ public class TabBuilder {
     public TabBuilder(Tab tab, TabAccess tabAccess) {
         this.tab = tab;
         this.tabAccess = tabAccess;
-        tabConverter.setSelectedProperties(String.join(",", TAB_PROPERTIES));
     }
 
     private static JSONArray getListInfo(Reference refList) throws JSONException {
@@ -125,23 +123,34 @@ public class TabBuilder {
 
     public JSONObject toJSON() {
         try {
-            JSONObject json = tabConverter.toJsonObject(tab, DataResolvingMode.FULL_TRANSLATABLE);
+            JSONObject json = new JSONObject();
+            Language language = OBContext.getOBContext().getLanguage();
 
-            json.put("editableField", true);
-            json.put("entityName", getTabEntityName(tab));
-            json.put("parentColumns", WindowUtils.getParentColumns(tab));
-            json.put("identifiers", WindowUtils.getTabIdentifiers(tab));
-            json.put("fields", getFields());
+            json.put("id", tab.getId());
             json.put("level", tab.getTabLevel());
+            json.put("filter", tab.getFilterClause());
+            json.put("displayLogic", tab.getDisplayLogic());
+            json.put("windowId", tab.getWindow().getId());
+            json.put("entityName", tab.getTable().getName());
+            json.put("name", tab.get(Tab.PROPERTY_NAME, language, tab.getId()));
+            json.put("description", tab.get(Tab.PROPERTY_DESCRIPTION, language, tab.getId()));
+            json.put("parentColumns", getParentColumns());
+            json.put("fields", getFields());
 
             return json;
-
-
         } catch (JSONException e) {
-            logger.warn(e.getMessage());
+            logger.warn(e.getMessage(), e);
 
             throw new InternalServerException();
         }
+    }
+
+    private JSONArray getParentColumns() {
+        JSONArray jsonColumns = new JSONArray();
+
+        tab.getTable().getADColumnList().stream().filter(column -> tab.getTabLevel() > 0 && column.isLinkToParentColumn()).forEach(column -> jsonColumns.put(getEntityColumnName(column)));
+
+        return jsonColumns;
     }
 
     private JSONObject getFields() throws JSONException {
@@ -169,10 +178,6 @@ public class TabBuilder {
         }
 
         return fields;
-    }
-
-    private String getTabEntityName(Tab tab) {
-        return tab.getTable().getName();
     }
 
     private String getEntityColumnName(Column column) {
