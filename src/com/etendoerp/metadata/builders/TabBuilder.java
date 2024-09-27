@@ -6,6 +6,7 @@ import org.apache.logging.log4j.Logger;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
+import org.hibernate.criterion.Restrictions;
 import org.openbravo.base.model.Entity;
 import org.openbravo.base.model.ModelProvider;
 import org.openbravo.base.model.Property;
@@ -20,15 +21,18 @@ import org.openbravo.client.application.process.BaseProcessActionHandler;
 import org.openbravo.client.kernel.KernelUtils;
 import org.openbravo.dal.core.DalUtil;
 import org.openbravo.dal.core.OBContext;
+import org.openbravo.dal.service.OBDal;
 import org.openbravo.data.Sqlc;
 import org.openbravo.model.ad.access.FieldAccess;
 import org.openbravo.model.ad.access.TabAccess;
 import org.openbravo.model.ad.datamodel.Column;
+import org.openbravo.model.ad.datamodel.Table;
 import org.openbravo.model.ad.domain.Reference;
 import org.openbravo.model.ad.domain.ReferencedTree;
 import org.openbravo.model.ad.system.Language;
 import org.openbravo.model.ad.ui.Field;
 import org.openbravo.model.ad.ui.Tab;
+import org.openbravo.model.ad.ui.Window;
 import org.openbravo.service.datasource.DataSource;
 import org.openbravo.service.datasource.DatasourceField;
 import org.openbravo.service.json.DataResolvingMode;
@@ -62,7 +66,6 @@ public class TabBuilder {
     private static final boolean DEFAULT_CHECKON_SAVE = true;
     private static final boolean DEFAULT_EDITABLE_FIELD = true;
     private static final DataToJsonConverter converter = new DataToJsonConverter();
-    private static final DataToJsonConverter tabConverter = new DataToJsonConverter();
     private static final Logger logger = LogManager.getLogger();
     private final Tab tab;
     private final TabAccess tabAccess;
@@ -74,7 +77,6 @@ public class TabBuilder {
 
     private static JSONArray getListInfo(Reference refList) throws JSONException {
         JSONArray refListValues = new JSONArray();
-
 
         for (org.openbravo.model.ad.domain.List listValue : refList.getADListList()) {
             JSONObject jsonListValue = new JSONObject();
@@ -133,6 +135,7 @@ public class TabBuilder {
             json.put("windowId", tab.getWindow().getId());
             json.put("entityName", tab.getTable().getName());
             json.put("name", tab.get(Tab.PROPERTY_NAME, language, tab.getId()));
+            json.put("title", tab.getWindow().get(Window.PROPERTY_NAME, language, tab.getWindow().getId()));
             json.put("description", tab.get(Tab.PROPERTY_DESCRIPTION, language, tab.getId()));
             json.put("parentColumns", getParentColumns());
             json.put("fields", getFields());
@@ -190,7 +193,9 @@ public class TabBuilder {
     private JSONObject getJSONField(Field field, FieldAccess access) throws JSONException {
         JSONObject jsonField = converter.toJsonObject(field, DataResolvingMode.FULL_TRANSLATABLE);
 
-        addBasicProperties(jsonField, field, access);
+        addAccessProperties(jsonField, access);
+        addBasicProperties(jsonField, field);
+        addReferencedProperty(jsonField, field);
 
         if (isProcessField(field)) {
             jsonField.put("process", createProcessJSON(field.getColumn().getOBUIAPPProcess()));
@@ -207,28 +212,42 @@ public class TabBuilder {
         return jsonField;
     }
 
-    private void addBasicProperties(JSONObject jsonField, Field field, FieldAccess access) throws JSONException {
+    private void addAccessProperties(JSONObject jsonField, FieldAccess access) throws JSONException {
         boolean checkOnSave = access != null ? access.isCheckonsave() : DEFAULT_CHECKON_SAVE;
         boolean editableField = access != null ? access.isEditableField() : DEFAULT_EDITABLE_FIELD;
-        boolean readOnly = access != null && !access.isEditableField() && field.isReadOnly();
+        boolean readOnly = access != null && !access.isEditableField() && access.getField().isReadOnly();
 
         jsonField.put("checkonsave", checkOnSave);
         jsonField.put("editableField", editableField);
-        jsonField.put("columnName", getEntityColumnName(field.getColumn()));
-        jsonField.put("column", converter.toJsonObject(field.getColumn(), DataResolvingMode.FULL_TRANSLATABLE));
-        jsonField.put("inpName", Sqlc.TransformaNombreColumna(field.getColumn().getDBColumnName()));
-        jsonField.put("isParentRecordProperty", isParentRecordProperty(field, field.getTab()));
-        jsonField.put("isMandatory", field.getColumn().isMandatory());
         jsonField.put("readOnly", readOnly);
+    }
 
-        addReferencedProperty(jsonField, field);
+    private void addBasicProperties(JSONObject jsonField, Field field) throws JSONException {
+        boolean mandatory = field.getColumn().isMandatory();
+        boolean isParentRecordProperty = isParentRecordProperty(field, field.getTab());
+        JSONObject column = converter.toJsonObject(field.getColumn(), DataResolvingMode.FULL_TRANSLATABLE);
+        String inputName = Sqlc.TransformaNombreColumna(field.getColumn().getDBColumnName());
+        String columnName = getEntityColumnName(field.getColumn());
+
+        jsonField.put("columnName", columnName);
+        jsonField.put("column", column);
+        jsonField.put("isMandatory", mandatory);
+        jsonField.put("inpName", inputName);
+        jsonField.put("isParentRecordProperty", isParentRecordProperty);
     }
 
     private void addReferencedProperty(JSONObject jsonField, Field field) throws JSONException {
         Property referenced = KernelUtils.getProperty(field).getReferencedProperty();
 
         if (referenced != null) {
+            String tableId = referenced.getEntity().getTableId();
+            Table table = OBDal.getInstance().get(Table.class, tableId);
+            Tab referencedTab = (Tab) OBDal.getInstance().createCriteria(Tab.class).add(Restrictions.eq(Tab.PROPERTY_TABLE, table)).setMaxResults(1).uniqueResult();
+            Window referencedWindow = referencedTab != null ? referencedTab.getWindow() : null;
+            String windowId = referencedWindow != null ? referencedWindow.getId() : null;
+
             jsonField.put("entity", referenced.getEntity().getName());
+            jsonField.put("windowId", windowId);
         }
     }
 
