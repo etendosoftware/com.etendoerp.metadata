@@ -244,10 +244,12 @@ public class TabBuilder {
             Table table = OBDal.getInstance().get(Table.class, tableId);
             Tab referencedTab = (Tab) OBDal.getInstance().createCriteria(Tab.class).add(Restrictions.eq(Tab.PROPERTY_TABLE, table)).setMaxResults(1).uniqueResult();
             Window referencedWindow = referencedTab != null ? referencedTab.getWindow() : null;
+            String tabId = referencedTab != null ? referencedTab.getId() : null;
             String windowId = referencedWindow != null ? referencedWindow.getId() : null;
 
-            jsonField.put("entity", referenced.getEntity().getName());
-            jsonField.put("windowId", windowId);
+            jsonField.put("referencedEntity", referenced.getEntity().getName());
+            jsonField.put("referencedWindowId", windowId);
+            jsonField.put("referencedTabId", tabId);
         }
     }
 
