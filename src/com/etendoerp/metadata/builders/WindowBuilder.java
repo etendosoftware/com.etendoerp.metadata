@@ -14,9 +14,10 @@ import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.access.Role;
 import org.openbravo.model.ad.access.TabAccess;
 import org.openbravo.model.ad.access.WindowAccess;
-import org.openbravo.model.ad.system.Language;
 import org.openbravo.model.ad.ui.Tab;
 import org.openbravo.model.ad.ui.Window;
+import org.openbravo.service.json.DataResolvingMode;
+import org.openbravo.service.json.DataToJsonConverter;
 
 import java.util.List;
 import java.util.Optional;
@@ -24,23 +25,19 @@ import java.util.Optional;
 public class WindowBuilder {
     private final Logger logger = LogManager.getLogger(this.getClass());
     private final String id;
+    private final DataToJsonConverter converter = new DataToJsonConverter();
 
     public WindowBuilder(String id) {
         this.id = id;
     }
 
     public JSONObject toJSON() {
-        JSONObject windowJson = new JSONObject();
         WindowAccess windowAccess = getWindowAccess();
         Window window = windowAccess.getWindow();
-        Language language = OBContext.getOBContext().getLanguage();
+        JSONObject windowJson = converter.toJsonObject(window, DataResolvingMode.FULL_TRANSLATABLE);
 
         try {
-            windowJson.put("id", id);
-            windowJson.put("name", window.get(Window.PROPERTY_NAME, language, id));
-            windowJson.put("description", window.get(Window.PROPERTY_DESCRIPTION, language, id));
-            windowJson.put("image", window.get(Window.PROPERTY_IMAGE, language, id));
-            windowJson.put("type", window.get(Window.PROPERTY_WINDOWTYPE, language, id));
+
             windowJson.put("tabs", getTabsAndFields(windowAccess.getADTabAccessList(), windowAccess.getWindow()));
         } catch (JSONException e) {
             logger.error(e.getMessage(), e);
