@@ -118,14 +118,14 @@ public class TabBuilder {
         } else if (selectorField.getObserdsDatasourceField() != null) {
             result = selectorField.getObserdsDatasourceField().getName();
         } else {
-            throw new IllegalStateException("Selectorfield " + selectorField + " has a null datasource and a null property");
+            throw new IllegalStateException("Selector field " + selectorField + " has a null datasource and a null property");
         }
         return result.replace(DalUtil.DOT, DalUtil.FIELDSEPARATOR);
     }
 
     public JSONObject toJSON() {
         try {
-            JSONObject json = new JSONObject();
+            JSONObject json = converter.toJsonObject(tab, DataResolvingMode.FULL_TRANSLATABLE);
             Language language = OBContext.getOBContext().getLanguage();
 
             json.put("id", tab.getId());
@@ -416,22 +416,24 @@ public class TabBuilder {
         String valueFieldProperty = valueField != null ? getValueField(valueField.getObuiselSelector()) : JsonConstants.IDENTIFIER;
         String displayFieldProperty = displayField != null ? getDisplayField(displayField.getObuiselSelector()) : JsonConstants.IDENTIFIER;
 
-        String selectedProperties = JsonConstants.ID;
+        StringBuilder selectedProperties = new StringBuilder(JsonConstants.ID);
         StringBuilder derivedProperties = new StringBuilder();
         StringBuilder extraProperties = new StringBuilder(valueFieldProperty);
 
         // get extra properties
         if (displayField != null && !JsonConstants.IDENTIFIER.equals(displayFieldProperty)) {
             extraProperties.append(",").append(displayFieldProperty);
-            selectedProperties += "," + displayFieldProperty;
+            selectedProperties.append(",").append(displayFieldProperty);
         }
 
         // get selected and derived properties
         for (SelectorField field : fields) {
             String fieldName = getPropertyOrDataSourceField(field);
+
             if (fieldName.equals(JsonConstants.ID) || fieldName.equals(JsonConstants.IDENTIFIER)) {
                 continue;
             }
+
             if (fieldName.contains(JsonConstants.FIELD_SEPARATOR)) {
                 if (derivedProperties.isEmpty()) {
                     derivedProperties = new StringBuilder(fieldName);
@@ -439,18 +441,17 @@ public class TabBuilder {
                     derivedProperties.append(',').append(fieldName);
                 }
             } else {
-                // Include following line when supporting for selector pop ups: selectedProperties += "," + fieldName;
+                selectedProperties.append(",").append(fieldName);
             }
 
-            // get extra properties
-            if (field.isOutfield() && (displayField != null && !fieldName.equals(displayFieldProperty)) || (valueField != null && !fieldName.equals(valueFieldProperty))) {
-                continue;
-            } else if (field.isOutfield()) {
-                extraProperties.append(",").append(fieldName);
+            if ((!field.isOutfield() || (displayField == null || fieldName.equals(displayFieldProperty))) && (valueField == null || fieldName.equals(valueFieldProperty))) {
+                if (field.isOutfield()) {
+                    extraProperties.append(",").append(fieldName);
+                }
             }
         }
 
-        selectorInfo.put(JsonConstants.SELECTEDPROPERTIES_PARAMETER, selectedProperties);
+        selectorInfo.put(JsonConstants.SELECTEDPROPERTIES_PARAMETER, selectedProperties.toString());
         selectorInfo.put(JsonConstants.ADDITIONAL_PROPERTIES_PARAMETER, extraProperties + "," + derivedProperties);
     }
 
