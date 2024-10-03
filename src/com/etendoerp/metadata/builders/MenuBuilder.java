@@ -17,6 +17,7 @@ import org.openbravo.model.ad.ui.Menu;
 import org.openbravo.model.ad.ui.Window;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class MenuBuilder {
     private final Logger logger;
@@ -55,7 +56,7 @@ public class MenuBuilder {
             if (null != processDefinition) json.put("processDefinitionId", processDefinition.getId());
             if (null != form) json.put("formId", form.getId());
 
-            if (!children.isEmpty()) json.put("children", children.stream().map(this::toJSON).toList());
+            if (!children.isEmpty()) json.put("children", children.stream().map(this::toJSON).collect(Collectors.toList()));
 
             return json;
         } catch (JSONException e) {
@@ -66,6 +67,6 @@ public class MenuBuilder {
     }
 
     public JSONArray toJSON() {
-        return new JSONArray(this.menu.getChildren().stream().map(this::toJSON).toList());
+        return new JSONArray(this.menu.getChildren().stream().map(this::toJSON).collect(Collectors.toList()));
     }
 }

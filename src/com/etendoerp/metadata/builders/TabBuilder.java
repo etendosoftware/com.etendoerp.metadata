@@ -45,6 +45,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class TabBuilder {
     private static final String SELECTOR_REFERENCE_ID = "95E2A8B50A254B2AAE6774B8C2F28120";
@@ -162,7 +163,7 @@ public class TabBuilder {
 
         if (adFieldAccessList == null || adFieldAccessList.isEmpty()) {
             // All tabs
-            for (Field field : tab.getADFieldList().stream().filter(field -> field.isActive() && shouldDisplayField(field) && hasAccessToProcess(field, tab.getWindow().getId())).toList()) {
+            for (Field field : tab.getADFieldList().stream().filter(field -> field.isActive() && shouldDisplayField(field) && hasAccessToProcess(field, tab.getWindow().getId())).collect(Collectors.toList())) {
 
                 String columnName = getEntityColumnName(field.getColumn());
 
@@ -170,7 +171,7 @@ public class TabBuilder {
             }
         } else {
             // certain tabs
-            for (FieldAccess fieldAccess : adFieldAccessList.stream().filter(fieldAccess -> fieldAccess.isActive() && fieldAccess.getField().isActive() && shouldDisplayField(fieldAccess.getField()) && hasAccessToProcess(fieldAccess.getField(), tab.getWindow().getId())).toList()) {
+            for (FieldAccess fieldAccess : adFieldAccessList.stream().filter(fieldAccess -> fieldAccess.isActive() && fieldAccess.getField().isActive() && shouldDisplayField(fieldAccess.getField()) && hasAccessToProcess(fieldAccess.getField(), tab.getWindow().getId())).collect(Collectors.toList())) {
 
                 Field field = fieldAccess.getField();
 
@@ -435,7 +436,7 @@ public class TabBuilder {
             }
 
             if (fieldName.contains(JsonConstants.FIELD_SEPARATOR)) {
-                if (derivedProperties.isEmpty()) {
+                if (derivedProperties.length() == 0) {
                     derivedProperties = new StringBuilder(fieldName);
                 } else {
                     derivedProperties.append(',').append(fieldName);
@@ -458,7 +459,7 @@ public class TabBuilder {
     public String getExtraSearchFields(Selector selector) {
         final String displayField = getDisplayField(selector);
         final StringBuilder sb = new StringBuilder();
-        for (SelectorField selectorField : selector.getOBUISELSelectorFieldList().stream().filter(SelectorField::isActive).toList()) {
+        for (SelectorField selectorField : selector.getOBUISELSelectorFieldList().stream().filter(SelectorField::isActive).collect(Collectors.toList())) {
             String fieldName = getPropertyOrDataSourceField(selectorField);
             if (fieldName.equals(displayField)) {
                 continue;
@@ -473,7 +474,7 @@ public class TabBuilder {
                     fieldName = fieldName + DalUtil.FIELDSEPARATOR + JsonConstants.IDENTIFIER;
                 }
 
-                if (!sb.isEmpty()) {
+                if (!(sb.length() == 0)) {
                     sb.append(",");
                 }
                 sb.append(fieldName);
@@ -529,7 +530,8 @@ public class TabBuilder {
 
     private boolean isBoolean(SelectorField selectorField) {
         final DomainType domainType = getDomainType(selectorField);
-        if (domainType instanceof PrimitiveDomainType primitiveDomainType) {
+        if (domainType instanceof PrimitiveDomainType) {
+            PrimitiveDomainType primitiveDomainType = (PrimitiveDomainType) domainType;
             return boolean.class == primitiveDomainType.getPrimitiveType() || Boolean.class == primitiveDomainType.getPrimitiveType();
         }
         return false;
