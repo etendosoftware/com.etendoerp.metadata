@@ -48,8 +48,11 @@ public abstract class BaseServlet extends HttpBaseServlet {
             String token = getToken(request);
             DecodedJWT decodedToken = decodeToken(token);
 
-            if (decodedToken != null) return decodedToken;
-            else throw new UnauthorizedException();
+            if (decodedToken != null) {
+                return decodedToken;
+            } else {
+                throw new UnauthorizedException();
+            }
         } catch (Exception e) {
             logger.error(e.toString(), e);
             throw new UnauthorizedException();
