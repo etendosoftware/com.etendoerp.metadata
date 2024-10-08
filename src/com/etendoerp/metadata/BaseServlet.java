@@ -43,12 +43,20 @@ public abstract class BaseServlet extends HttpBaseServlet {
         }
     }
 
-    protected DecodedJWT getDecodedToken(HttpServletRequest request) throws Exception {
-        String token = getToken(request);
-        DecodedJWT decodedToken = decodeToken(token);
+    protected DecodedJWT getDecodedToken(HttpServletRequest request) {
+        try {
+            String token = getToken(request);
+            DecodedJWT decodedToken = decodeToken(token);
 
-        if (decodedToken != null) return decodedToken;
-        else throw new UnauthorizedException();
+            if (decodedToken != null) {
+                return decodedToken;
+            } else {
+                throw new UnauthorizedException();
+            }
+        } catch (Exception e) {
+            logger.error(e.toString(), e);
+            throw new UnauthorizedException();
+        }
     }
 
     protected void setContext(HttpServletRequest request, DecodedJWT decodedToken) {
