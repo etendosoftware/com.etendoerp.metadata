@@ -1,6 +1,7 @@
 package com.etendoerp.metadata;
 
 import com.etendoerp.metadata.builders.MenuBuilder;
+import com.etendoerp.metadata.builders.SessionBuilder;
 import com.etendoerp.metadata.builders.WindowBuilder;
 import com.etendoerp.metadata.exceptions.NotFoundException;
 import org.apache.http.entity.ContentType;
@@ -39,6 +40,8 @@ public class MetadataServlet extends BaseServlet {
             response.getWriter().write(this.fetchWindow(request.getPathInfo().substring(8)).toString());
         } else if (path.equals("/menu")) {
             response.getWriter().write(this.fetchMenu().toString());
+        } else if (path.equals("/session")) {
+            response.getWriter().write(this.fetchSession().toString());
         } else {
             throw new NotFoundException("Not found");
         }
@@ -50,5 +53,9 @@ public class MetadataServlet extends BaseServlet {
 
     private JSONArray fetchMenu() {
         return new MenuBuilder().toJSON();
+    }
+
+    private JSONObject fetchSession() {
+        return new SessionBuilder().toJSON();
     }
 }
