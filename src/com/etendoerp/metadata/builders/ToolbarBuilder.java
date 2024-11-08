@@ -6,7 +6,7 @@ import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.database.ConnectionProvider;
-import org.openbravo.base.provider.OBProvider;
+import org.openbravo.base.ConnectionProviderContextListener;
 import org.openbravo.model.ad.ui.Window;
 import org.openbravo.erpCommon.utility.Utility;
 
@@ -25,7 +25,7 @@ public class ToolbarBuilder {
         this.language = language != null ? language : "en_US";
         this.windowId = windowId;
         this.isNew = isNew;
-        this.connectionProvider = OBProvider.getInstance().get(ConnectionProvider.class);
+        this.connectionProvider = ConnectionProviderContextListener.getPool();
     }
 
     public JSONObject toJSON() {
