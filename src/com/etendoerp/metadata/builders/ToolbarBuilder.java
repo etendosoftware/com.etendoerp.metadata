@@ -40,6 +40,7 @@ public class ToolbarBuilder {
 
     private JSONObject buildToolbarJSON(Window window) throws Exception {
         JSONObject json = new JSONObject();
+        JSONObject response = new JSONObject();
         JSONArray buttons = new JSONArray();
 
         Map<String, ButtonConfig> standardButtons = getStandardButtons();
@@ -47,10 +48,11 @@ public class ToolbarBuilder {
             buttons.put(createButtonJSON(config));
         }
 
-        json.put("buttons", buttons);
-        json.put("windowId", windowId);
-        json.put("isNew", isNew);
+        response.put("buttons", buttons);
+        response.put("windowId", windowId);
+        response.put("isNew", isNew);
 
+        json.put("response", response);
         return json;
     }
 
@@ -82,13 +84,74 @@ public class ToolbarBuilder {
     }
 
     private Map<String, ButtonConfig> getStandardButtons() {
+        // Base buttons used among all the windows
         Map<String, ButtonConfig> buttons = new HashMap<>();
-        buttons.put("NEW", new ButtonConfig("NEW", "New", "NEW", true, "plus"));
-        buttons.put("SAVE", new ButtonConfig("SAVE", "Save", "SAVE", true, "save"));
-        buttons.put("DELETE", new ButtonConfig("DELETE", "Delete", "DELETE", !isNew, "trash"));
-        buttons.put("REFRESH", new ButtonConfig("REFRESH", "Refresh", "REFRESH", true, "refresh-cw"));
-        buttons.put("FIND", new ButtonConfig("FIND", "Find", "FIND", true, "search"));
-        buttons.put("GRID_VIEW", new ButtonConfig("GRID_VIEW", "Grid View", "GRID_VIEW", true, "grid"));
+        // NEW_DOC button
+        buttons.put("NEW", new ButtonConfig(
+                "NEW",
+                "OBUIAPP_NewDoc",
+                "NEW",
+                true,
+                "plus"
+        ));
+        // SAVE button
+        buttons.put("SAVE", new ButtonConfig(
+                "SAVE",
+                "OBUIAPP_SaveRow",
+                "SAVE",
+                true,
+                "save"
+        ));
+        // DELETE button
+        buttons.put("DELETE", new ButtonConfig(
+                "DELETE",
+                "OBUIAPP_DeleteRow",
+                "DELETE",
+                !isNew,
+                "trash"
+        ));
+
+        // REFRESH button
+        buttons.put("REFRESH", new ButtonConfig(
+                "REFRESH",
+                "OBUIAPP_RefreshData",
+                "REFRESH",
+                true,
+                "refresh-cw"
+        ));
+        // FIND button
+        buttons.put("FIND", new ButtonConfig(
+                "FIND",
+                "OBUIAPP_Find",
+                "FIND",
+                true,
+                "search"
+        ));
+        // EXPORT button
+        buttons.put("EXPORT", new ButtonConfig(
+                "EXPORT",
+                "OBUIAPP_ExportGrid",
+                "EXPORT",
+                true,
+                "download"
+        ));
+        // ATTACHMENTS button
+        buttons.put("ATTACHMENTS", new ButtonConfig(
+                "ATTACHMENTS",
+                "OBUIAPP_Attachments",
+                "ATTACHMENTS",
+                true,
+                "paperclip"
+        ));
+        // GRID_VIEW button
+        buttons.put("GRID_VIEW", new ButtonConfig(
+                "GRID_VIEW",
+                "OBUIAPP_GridView",
+                "GRID_VIEW",
+                true,
+                "grid"
+        ));
+
         return buttons;
     }
 }
