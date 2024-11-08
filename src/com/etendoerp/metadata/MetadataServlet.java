@@ -37,40 +37,32 @@ public class MetadataServlet extends BaseServlet {
         response.setContentType(ContentType.APPLICATION_JSON.getMimeType());
         response.setCharacterEncoding(StandardCharsets.UTF_8.toString());
 
-        try {
-            if (path.startsWith("/window/")) {
-                JSONObject window = this.fetchWindow(request.getPathInfo().substring(8));
-                sendSuccessResponse(response, window);
+        if (path.startsWith("/window/")) {
+            response.getWriter().write(this.fetchWindow(request.getPathInfo().substring(8)).toString());
+        } else if (path.equals("/menu")) {
+            response.getWriter().write(this.fetchMenu().toString());
+        } else if (path.equals("/session")) {
+            response.getWriter().write(this.fetchSession().toString());
+        } else if (path.startsWith("/toolbar")) {
+            String[] pathParts = path.split("/");
+            if (pathParts.length < 3) {
+                sendErrorResponse(response, HttpServletResponse.SC_BAD_REQUEST, "Invalid toolbar path");
+                return;
             }
-            else if (path.startsWith("/toolbar/")) {
-                String[] pathParts = path.split("/");
-                if (pathParts.length < 3) {
-                    sendErrorResponse(response, HttpServletResponse.SC_BAD_REQUEST, "Invalid toolbar path");
-                    return;
-                }
-                try {
-                    String windowId = pathParts[2];
-                    String tabId = (pathParts.length >= 4 && !"undefined".equals(pathParts[3])) ? pathParts[3] : null;
-                    JSONObject toolbar = fetchToolbar(windowId, tabId);
-                    sendSuccessResponse(response, toolbar);
-                } catch (IllegalArgumentException e) {
-                    sendErrorResponse(response, HttpServletResponse.SC_NOT_FOUND, e.getMessage());
-                } catch (Exception e) {
-                    sendErrorResponse(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Error processing request");
-                }
-            } else if (path.equals("/menu")) {
-                JSONArray menu = this.fetchMenu();
-                sendSuccessResponse(response, menu);
-            } else if (path.equals("/session")) {
-                JSONObject session = this.fetchSession();
-                sendSuccessResponse(response, session);
-            } else {
-                sendErrorResponse(response, HttpServletResponse.SC_NOT_FOUND, "Not found");
+            try {
+                String windowId = pathParts[2];
+                String tabId = (pathParts.length >= 4 && !"undefined".equals(pathParts[3])) ? pathParts[3] : null;
+                JSONObject toolbar = fetchToolbar(windowId, tabId);
+                sendSuccessResponse(response, toolbar);
+            } catch (IllegalArgumentException e) {
+                sendErrorResponse(response, HttpServletResponse.SC_NOT_FOUND, e.getMessage());
+            } catch (Exception e) {
+                sendErrorResponse(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Error processing request");
             }
-        } catch (Exception e) {
-            logger.error("Error handling request: {}", path, e);
-            sendErrorResponse(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Internal server error");
+        } else {
+            throw new NotFoundException("Not found");
         }
+
     }
 
     private void sendSuccessResponse(HttpServletResponse response, JSONObject data) throws IOException {
