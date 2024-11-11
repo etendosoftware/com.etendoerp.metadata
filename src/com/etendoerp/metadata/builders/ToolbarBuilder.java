@@ -39,7 +39,6 @@ public class ToolbarBuilder {
     }
 
     private JSONObject buildToolbarJSON(Window window) throws Exception {
-        JSONObject json = new JSONObject();
         JSONObject response = new JSONObject();
         JSONArray buttons = new JSONArray();
 
@@ -52,8 +51,7 @@ public class ToolbarBuilder {
         response.put("windowId", windowId);
         response.put("isNew", isNew);
 
-        json.put("response", response);
-        return json;
+        return response;
     }
 
     private JSONObject createButtonJSON(ButtonConfig config) throws Exception {
