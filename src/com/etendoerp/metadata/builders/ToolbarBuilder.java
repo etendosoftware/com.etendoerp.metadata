@@ -56,12 +56,14 @@ public class ToolbarBuilder {
 
     private JSONObject createButtonJSON(ButtonConfig config) throws Exception {
         JSONObject button = new JSONObject();
+
         button.put("id", config.id);
         button.put("name", Utility.messageBD(connectionProvider, config.name, language));
         button.put("action", config.action);
         button.put("enabled", config.enabled);
         button.put("visible", true);
         button.put("icon", config.icon);
+
         return button;
     }
 
