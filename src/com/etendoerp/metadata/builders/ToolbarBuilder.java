@@ -82,9 +82,8 @@ public class ToolbarBuilder {
     }
 
     private Map<String, ButtonConfig> getStandardButtons() {
-        // Base buttons used among all the windows
         Map<String, ButtonConfig> buttons = new HashMap<>();
-        // NEW_DOC button
+
         buttons.put("NEW", new ButtonConfig(
                 "NEW",
                 "OBUIAPP_NewDoc",
@@ -92,7 +91,6 @@ public class ToolbarBuilder {
                 true,
                 "plus"
         ));
-        // SAVE button
         buttons.put("SAVE", new ButtonConfig(
                 "SAVE",
                 "OBUIAPP_SaveRow",
@@ -100,7 +98,6 @@ public class ToolbarBuilder {
                 true,
                 "save"
         ));
-        // DELETE button
         buttons.put("DELETE", new ButtonConfig(
                 "DELETE",
                 "OBUIAPP_DeleteRow",
@@ -108,8 +105,6 @@ public class ToolbarBuilder {
                 !isNew,
                 "trash"
         ));
-
-        // REFRESH button
         buttons.put("REFRESH", new ButtonConfig(
                 "REFRESH",
                 "OBUIAPP_RefreshData",
@@ -117,7 +112,6 @@ public class ToolbarBuilder {
                 true,
                 "refresh-cw"
         ));
-        // FIND button
         buttons.put("FIND", new ButtonConfig(
                 "FIND",
                 "OBUIAPP_Find",
@@ -125,7 +119,6 @@ public class ToolbarBuilder {
                 true,
                 "search"
         ));
-        // EXPORT button
         buttons.put("EXPORT", new ButtonConfig(
                 "EXPORT",
                 "OBUIAPP_ExportGrid",
@@ -133,7 +126,6 @@ public class ToolbarBuilder {
                 true,
                 "download"
         ));
-        // ATTACHMENTS button
         buttons.put("ATTACHMENTS", new ButtonConfig(
                 "ATTACHMENTS",
                 "OBUIAPP_Attachments",
@@ -141,7 +133,6 @@ public class ToolbarBuilder {
                 true,
                 "paperclip"
         ));
-        // GRID_VIEW button
         buttons.put("GRID_VIEW", new ButtonConfig(
                 "GRID_VIEW",
                 "OBUIAPP_GridView",
