@@ -4,7 +4,9 @@ import com.etendoerp.metadata.builders.MenuBuilder;
 import com.etendoerp.metadata.builders.SessionBuilder;
 import com.etendoerp.metadata.builders.ToolbarBuilder;
 import com.etendoerp.metadata.builders.WindowBuilder;
+import com.etendoerp.metadata.exceptions.InternalServerException;
 import com.etendoerp.metadata.exceptions.NotFoundException;
+import com.etendoerp.metadata.exceptions.UnprocessableContentException;
 import org.apache.http.entity.ContentType;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
@@ -46,8 +48,7 @@ public class MetadataServlet extends BaseServlet {
         } else if (path.startsWith("/toolbar")) {
             String[] pathParts = path.split("/");
             if (pathParts.length < 3) {
-                sendErrorResponse(response, HttpServletResponse.SC_BAD_REQUEST, "Invalid toolbar path");
-                return;
+                throw new UnprocessableContentException("Invalid toolbar path");
             }
             try {
                 String windowId = pathParts[2];
@@ -55,14 +56,13 @@ public class MetadataServlet extends BaseServlet {
                 JSONObject toolbar = fetchToolbar(windowId, tabId);
                 sendSuccessResponse(response, toolbar);
             } catch (IllegalArgumentException e) {
-                sendErrorResponse(response, HttpServletResponse.SC_NOT_FOUND, e.getMessage());
+                throw new UnprocessableContentException(e.getMessage());
             } catch (Exception e) {
-                sendErrorResponse(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Error processing request");
+                throw new InternalServerException();
             }
         } else {
             throw new NotFoundException("Not found");
         }
-
     }
 
     private void sendSuccessResponse(HttpServletResponse response, JSONObject data) throws IOException {
