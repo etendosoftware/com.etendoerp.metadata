@@ -3,6 +3,7 @@ package com.etendoerp.metadata;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.etendoerp.metadata.exceptions.MethodNotAllowedException;
 import com.etendoerp.metadata.exceptions.UnauthorizedException;
+import com.etendoerp.metadata.exceptions.UnprocessableContentException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.codehaus.jettison.json.JSONException;
@@ -78,6 +79,7 @@ public abstract class BaseServlet extends HttpBaseServlet {
 
         if (clazz.equals(OBSecurityException.class) || clazz.equals(UnauthorizedException.class)) return 401;
         else if (clazz.equals(MethodNotAllowedException.class)) return 405;
+        else if (clazz.equals(UnprocessableContentException.class)) return 422;
         else return 500;
     }
 
