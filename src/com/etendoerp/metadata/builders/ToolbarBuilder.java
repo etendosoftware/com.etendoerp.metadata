@@ -1,5 +1,6 @@
 package com.etendoerp.metadata.builders;
 
+import com.etendoerp.metadata.ProcessUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.codehaus.jettison.json.JSONArray;
@@ -8,10 +9,15 @@ import org.openbravo.dal.service.OBDal;
 import org.openbravo.database.ConnectionProvider;
 import org.openbravo.base.ConnectionProviderContextListener;
 import org.openbravo.model.ad.ui.Window;
+import org.openbravo.model.ad.ui.Field;
+import org.openbravo.model.ad.ui.Tab;
+import org.openbravo.client.application.Process;
 import org.openbravo.erpCommon.utility.Utility;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.List;
+import java.util.stream.Collectors;
 
 public class ToolbarBuilder {
     private static final Logger logger = LogManager.getLogger(ToolbarBuilder.class);
@@ -20,12 +26,17 @@ public class ToolbarBuilder {
     private final String windowId;
     private final boolean isNew;
     private final ConnectionProvider connectionProvider;
+    private final TabBuilder tabBuilder;
 
     public ToolbarBuilder(String language, String windowId, boolean isNew) {
         this.language = language != null ? language : "en_US";
         this.windowId = windowId;
         this.isNew = isNew;
         this.connectionProvider = ConnectionProviderContextListener.getPool();
+
+        Window window = OBDal.getInstance().get(Window.class, windowId);
+        Tab mainTab = window.getADTabList().get(0);
+        this.tabBuilder = new TabBuilder(mainTab, null);
     }
 
     public JSONObject toJSON() {
@@ -47,11 +58,51 @@ public class ToolbarBuilder {
             buttons.put(createButtonJSON(config));
         }
 
+        for (Tab tab : window.getADTabList()) {
+            JSONArray processButtons = getProcessButtons(tab);
+            for (int i = 0; i < processButtons.length(); i++) {
+                buttons.put(processButtons.get(i));
+            }
+        }
+
         response.put("buttons", buttons);
         response.put("windowId", windowId);
         response.put("isNew", isNew);
 
         return response;
+    }
+
+    private JSONArray getProcessButtons(Tab tab) throws Exception {
+        JSONArray buttons = new JSONArray();
+
+        List<Field> processFields = tab.getADFieldList()
+                .stream()
+                .filter(field ->
+                        field.isActive() &&
+                                tabBuilder.shouldDisplayField(field) &&
+                                tabBuilder.hasAccessToProcess(field, windowId) &&
+                                tabBuilder.isProcessField(field))
+                .collect(Collectors.toList());
+
+        for (Field field : processFields) {
+            Process process = field.getColumn().getOBUIAPPProcess();
+            if (process != null) {
+                JSONObject button = new JSONObject();
+                JSONObject processInfo = ProcessUtils.createProcessJSON(process);
+
+                button.put("id", field.getName());
+                button.put("name", Utility.messageBD(connectionProvider, field.getName(), language));
+                button.put("action", "PROCESS");
+                button.put("processId", process.getId());
+                button.put("processInfo", processInfo);
+                button.put("displayLogic", field.getDisplayLogic());
+                button.put("buttonText", field.getColumn().getName());
+
+                buttons.put(button);
+            }
+        }
+
+        return buttons;
     }
 
     private JSONObject createButtonJSON(ButtonConfig config) throws Exception {
