@@ -199,7 +199,17 @@ public class TabBuilder {
         addReferencedProperty(jsonField, field);
 
         if (isProcessField(field)) {
-            jsonField.put("process", createProcessJSON(field.getColumn().getOBUIAPPProcess()));
+            Process process = field.getColumn().getOBUIAPPProcess();
+            JSONObject processJson = createProcessJSON(process);
+
+            processJson.put("fieldId", field.getId());
+            processJson.put("columnId", field.getColumn().getId());
+            processJson.put("displayLogic", field.getDisplayLogic());
+            processJson.put("buttonText", field.getColumn().getName());
+            processJson.put("fieldName", field.getName());
+            processJson.put("reference", field.getColumn().getReference().getId());
+
+            jsonField.put("process", processJson);
         }
 
         if (isRefListField(field)) {
@@ -279,8 +289,10 @@ public class TabBuilder {
     private boolean isProcessField(Field field) {
         Column column = field.getColumn();
 
-        return column != null && column.getOBUIAPPProcess() != null;
-    }
+        return column != null &&
+                column.getReference() != null &&
+                "28".equals(column.getReference().getId()) &&
+                column.getOBUIAPPProcess() != null;    }
 
     private boolean isRefListField(Field field) {
         Column column = field.getColumn();
@@ -536,4 +548,5 @@ public class TabBuilder {
         }
         return false;
     }
+
 }

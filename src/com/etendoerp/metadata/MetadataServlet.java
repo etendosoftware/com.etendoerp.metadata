@@ -76,16 +76,6 @@ public class MetadataServlet extends BaseServlet {
         }
     }
 
-    private void sendSuccessResponse(HttpServletResponse response, JSONArray data) throws IOException {
-        try {
-            JSONObject wrapper = new JSONObject();
-            wrapper.put("response", data);
-            response.getWriter().write(wrapper.toString());
-        } catch (JSONException e) {
-            logger.error("Error creating success response", e);
-            sendErrorResponse(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Error processing response");
-        }
-    }
 
     private void sendErrorResponse(HttpServletResponse response, int status, String message) throws IOException {
         try {
