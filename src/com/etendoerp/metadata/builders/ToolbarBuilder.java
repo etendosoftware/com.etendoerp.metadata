@@ -29,7 +29,7 @@ public class ToolbarBuilder {
     private final ConnectionProvider connectionProvider;
     private final TabBuilder tabBuilder;
 
-    public ToolbarBuilder(String language, String windowId, String tabId,boolean isNew) {
+    public ToolbarBuilder(String language, String windowId, String tabId, boolean isNew) {
         this.language = language != null ? language : "en_US";
         this.windowId = windowId;
         this.isNew = isNew;
