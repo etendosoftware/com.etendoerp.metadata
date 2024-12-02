@@ -24,18 +24,22 @@ public class ToolbarBuilder {
 
     private final String language;
     private final String windowId;
+    private final String tabId;
     private final boolean isNew;
     private final ConnectionProvider connectionProvider;
     private final TabBuilder tabBuilder;
 
-    public ToolbarBuilder(String language, String windowId, boolean isNew) {
+    public ToolbarBuilder(String language, String windowId, String tabId, boolean isNew) {
         this.language = language != null ? language : "en_US";
         this.windowId = windowId;
         this.isNew = isNew;
+        this.tabId = tabId;
         this.connectionProvider = ConnectionProviderContextListener.getPool();
 
         Window window = OBDal.getInstance().get(Window.class, windowId);
-        Tab mainTab = window.getADTabList().get(0);
+        Tab mainTab = (tabId != null)
+                ? OBDal.getInstance().get(Tab.class, tabId)
+                :  window.getADTabList().get(0);
         this.tabBuilder = new TabBuilder(mainTab, null);
     }
 
@@ -58,18 +62,32 @@ public class ToolbarBuilder {
             buttons.put(createButtonJSON(config));
         }
 
-        for (Tab tab : window.getADTabList()) {
-            JSONArray processButtons = getProcessButtons(tab);
-            for (int i = 0; i < processButtons.length(); i++) {
-                buttons.put(processButtons.get(i));
+        if (tabId != null) {
+            Tab tab = OBDal.getInstance().get(Tab.class, tabId);
+            if (tab != null) {
+                addProcessButtons(buttons, tab);
+            }
+        } else {
+            for (Tab tab : window.getADTabList()) {
+                if (tab.isActive()) {
+                    addProcessButtons(buttons, tab);
+                }
             }
         }
 
         response.put("buttons", buttons);
         response.put("windowId", windowId);
+        response.put("tabId", tabId);
         response.put("isNew", isNew);
 
         return response;
+    }
+
+    private void addProcessButtons(JSONArray buttons, Tab tab) throws Exception {
+        JSONArray processButtons = getProcessButtons(tab);
+        for (int i = 0; i < processButtons.length(); i++) {
+            buttons.put(processButtons.get(i));
+        }
     }
 
     private JSONArray getProcessButtons(Tab tab) throws Exception {
@@ -97,6 +115,8 @@ public class ToolbarBuilder {
                 button.put("processInfo", processInfo);
                 button.put("displayLogic", field.getDisplayLogic());
                 button.put("buttonText", field.getColumn().getName());
+                button.put("tabId", tab.getId());
+
 
                 buttons.put(button);
             }
