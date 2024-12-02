@@ -105,7 +105,7 @@ public class MetadataServlet extends BaseServlet {
         try {
             String language = OBContext.getOBContext().getLanguage().getLanguage();
             boolean isNew = false;
-            ToolbarBuilder toolbarBuilder = new ToolbarBuilder(language, windowId, isNew);
+            ToolbarBuilder toolbarBuilder = new ToolbarBuilder(language, windowId, tabId, isNew);
             return toolbarBuilder.toJSON();
         } catch (Exception e) {
             logger.error("Error creating toolbar for window: {}", windowId, e);
