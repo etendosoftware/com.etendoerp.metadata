@@ -65,18 +65,12 @@ public class ToolbarBuilder {
         if (tabId != null) {
             Tab tab = OBDal.getInstance().get(Tab.class, tabId);
             if (tab != null) {
-                JSONArray processButtons = getProcessButtons(tab);
-                for (int i = 0; i < processButtons.length(); i++) { // Fixed loop condition
-                    buttons.put(processButtons.get(i));
-                }
+                addProcessButtons(buttons, tab);
             }
         } else {
             for (Tab tab : window.getADTabList()) {
                 if (tab.isActive()) {
-                    JSONArray processButtons = getProcessButtons(tab);
-                    for (int i = 0; i < processButtons.length(); i++) {
-                        buttons.put(processButtons.get(i));
-                    }
+                    addProcessButtons(buttons, tab);
                 }
             }
         }
@@ -87,6 +81,13 @@ public class ToolbarBuilder {
         response.put("isNew", isNew);
 
         return response;
+    }
+
+    private void addProcessButtons(JSONArray buttons, Tab tab) throws JSONException {
+        JSONArray processButtons = getProcessButtons(tab);
+        for (int i = 0; i < processButtons.length(); i++) {
+            buttons.put(processButtons.get(i));
+        }
     }
 
     private JSONArray getProcessButtons(Tab tab) throws Exception {
