@@ -64,6 +64,7 @@ public class TabBuilder {
     private static final String FIELD_ID_PROPERTY = "fieldId";
     private static final String DISPLAY_FIELD_PROPERTY = "displayField";
     private static final String VALUE_FIELD_PROPERTY = "valueField";
+    private static final String PROCESS_REFERENCE_VALUE = "28";
     private static final boolean DEFAULT_CHECKON_SAVE = true;
     private static final boolean DEFAULT_EDITABLE_FIELD = true;
     private static final DataToJsonConverter converter = new DataToJsonConverter();
@@ -199,7 +200,17 @@ public class TabBuilder {
         addReferencedProperty(jsonField, field);
 
         if (isProcessField(field)) {
-            jsonField.put("process", createProcessJSON(field.getColumn().getOBUIAPPProcess()));
+            Process process = field.getColumn().getOBUIAPPProcess();
+            JSONObject processJson = createProcessJSON(process);
+
+            processJson.put("fieldId", field.getId());
+            processJson.put("columnId", field.getColumn().getId());
+            processJson.put("displayLogic", field.getDisplayLogic());
+            processJson.put("buttonText", field.getColumn().getName());
+            processJson.put("fieldName", field.getName());
+            processJson.put("reference", field.getColumn().getReference().getId());
+
+            jsonField.put("process", processJson);
         }
 
         if (isRefListField(field)) {
@@ -276,11 +287,13 @@ public class TabBuilder {
         return processJSON;
     }
 
-    private boolean isProcessField(Field field) {
+    protected boolean isProcessField(Field field) {
         Column column = field.getColumn();
 
-        return column != null && column.getOBUIAPPProcess() != null;
-    }
+        return column != null &&
+                column.getReference() != null &&
+                PROCESS_REFERENCE_VALUE.equals(column.getReference().getId()) &&
+                column.getOBUIAPPProcess() != null;    }
 
     private boolean isRefListField(Field field) {
         Column column = field.getColumn();
@@ -322,7 +335,7 @@ public class TabBuilder {
         return LIST_REFERENCE_ID.contains(parameter.getReference().getId());
     }
 
-    private boolean hasAccessToProcess(Field field, String windowId) {
+    protected boolean hasAccessToProcess(Field field, String windowId) {
         Process process = field.getColumn() != null && field.getColumn().getOBUIAPPProcess() != null ? field.getColumn().getOBUIAPPProcess() : null;
         if (process != null) {
             HashMap<String, Object> params = new HashMap<>();
@@ -333,7 +346,7 @@ public class TabBuilder {
         return true;
     }
 
-    private boolean shouldDisplayField(Field field) {
+    protected boolean shouldDisplayField(Field field) {
         boolean isScanProcess = field.getColumn() != null && field.getColumn().getOBUIAPPProcess() != null && field.getColumn().getOBUIAPPProcess().isSmfmuScan() != null && field.getColumn().getOBUIAPPProcess().isSmfmuScan();
 
         return field.getColumn() != null && (field.isDisplayed() || isScanProcess || field.getColumn().isStoredInSession() || field.getColumn().isLinkToParentColumn() || ALWAYS_DISPLAYED_COLUMNS.contains(field.getColumn().getDBColumnName()));
@@ -536,4 +549,5 @@ public class TabBuilder {
         }
         return false;
     }
+
 }
