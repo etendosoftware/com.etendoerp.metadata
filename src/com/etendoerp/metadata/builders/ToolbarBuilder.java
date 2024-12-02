@@ -83,7 +83,7 @@ public class ToolbarBuilder {
         return response;
     }
 
-    private void addProcessButtons(JSONArray buttons, Tab tab) throws JSONException {
+    private void addProcessButtons(JSONArray buttons, Tab tab) throws Exception {
         JSONArray processButtons = getProcessButtons(tab);
         for (int i = 0; i < processButtons.length(); i++) {
             buttons.put(processButtons.get(i));
