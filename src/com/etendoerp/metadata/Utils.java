@@ -4,23 +4,14 @@ import com.etendoerp.metadata.exceptions.UnauthorizedException;
 import org.apache.http.entity.ContentType;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
-import org.openbravo.client.application.Parameter;
-import org.openbravo.client.application.Process;
-import org.openbravo.client.application.process.BaseProcessActionHandler;
-import org.openbravo.model.ad.ui.Field;
-import org.openbravo.service.json.DataResolvingMode;
-import org.openbravo.service.json.DataToJsonConverter;
 import org.openbravo.service.json.JsonUtils;
-import org.openbravo.model.ad.datamodel.Column;
 
 
 import javax.servlet.http.HttpServletRequest;
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.util.HashMap;
 
 public class Utils {
     private static final Logger logger = LogManager.getLogger(Utils.class);

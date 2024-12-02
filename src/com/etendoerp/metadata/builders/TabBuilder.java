@@ -64,6 +64,7 @@ public class TabBuilder {
     private static final String FIELD_ID_PROPERTY = "fieldId";
     private static final String DISPLAY_FIELD_PROPERTY = "displayField";
     private static final String VALUE_FIELD_PROPERTY = "valueField";
+    private static final String PROCESS_REFERENCE_VALUE = "28";
     private static final boolean DEFAULT_CHECKON_SAVE = true;
     private static final boolean DEFAULT_EDITABLE_FIELD = true;
     private static final DataToJsonConverter converter = new DataToJsonConverter();
@@ -291,7 +292,7 @@ public class TabBuilder {
 
         return column != null &&
                 column.getReference() != null &&
-                "28".equals(column.getReference().getId()) &&
+                PROCESS_REFERENCE_VALUE.equals(column.getReference().getId()) &&
                 column.getOBUIAPPProcess() != null;    }
 
     private boolean isRefListField(Field field) {
