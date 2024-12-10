@@ -8,7 +8,6 @@ import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.service.json.JsonUtils;
 
-
 import javax.servlet.http.HttpServletRequest;
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -35,6 +34,10 @@ public class Utils {
 
             return new JSONObject();
         }
+    }
+
+    public static boolean isNullOrEmpty(String value) {
+        return value == null || value.isEmpty();
     }
 
     public static String getToken(HttpServletRequest request) {

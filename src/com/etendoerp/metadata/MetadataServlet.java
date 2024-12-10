@@ -7,7 +7,8 @@ import com.etendoerp.metadata.builders.WindowBuilder;
 import com.etendoerp.metadata.exceptions.InternalServerException;
 import com.etendoerp.metadata.exceptions.NotFoundException;
 import com.etendoerp.metadata.exceptions.UnprocessableContentException;
-import org.apache.http.entity.ContentType;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
@@ -16,12 +17,13 @@ import org.openbravo.dal.core.OBContext;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 
 /**
  * @author luuchorocha
  */
 public class MetadataServlet extends BaseServlet {
+    private static final Logger logger = LogManager.getLogger(MetadataServlet.class);
+
     @Override
     public void process(HttpServletRequest request, HttpServletResponse response) throws IOException {
         handleRequest(request, response);
@@ -29,9 +31,6 @@ public class MetadataServlet extends BaseServlet {
 
     private void handleRequest(HttpServletRequest request, HttpServletResponse response) throws IOException {
         String path = request.getPathInfo();
-
-        response.setContentType(ContentType.APPLICATION_JSON.getMimeType());
-        response.setCharacterEncoding(StandardCharsets.UTF_8.toString());
 
         if (path.startsWith("/window/")) {
             response.getWriter().write(this.fetchWindow(request.getPathInfo().substring(8)).toString());
