@@ -10,7 +10,10 @@ import org.codehaus.jettison.json.JSONException;
 import org.openbravo.base.HttpBaseServlet;
 import org.openbravo.base.exception.OBSecurityException;
 import org.openbravo.base.secureApp.AllowedCrossDomainsHandler;
+import org.openbravo.base.secureApp.LoginUtils;
+import org.openbravo.base.secureApp.VariablesSecureApp;
 import org.openbravo.dal.core.OBContext;
+import org.openbravo.service.db.DalConnectionProvider;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
@@ -36,12 +39,30 @@ public abstract class BaseServlet extends HttpBaseServlet {
             if (!request.getMethod().equals("POST")) throw new MethodNotAllowedException();
 
             setContext(request, getDecodedToken(request));
+            setSession(request);
             process(request, response);
         } catch (Exception e) {
             logger.error(e.toString(), e);
             response.getWriter().write(buildErrorJson(e));
             response.setStatus(getResponseStatus(e));
+        } finally {
+            OBContext.restorePreviousMode();
         }
+    }
+
+    private void setSession(HttpServletRequest request) throws ServletException {
+        OBContext context = OBContext.getOBContext();
+        LoginUtils.fillSessionArguments(
+                new DalConnectionProvider(),
+                new VariablesSecureApp(request),
+                context.getUser().getId(),
+                context.getLanguage().getLanguage(),
+                context.isRTL() ? "Y" : "N",
+                context.getRole().getId(),
+                context.getCurrentClient().getId(),
+                context.getCurrentOrganization().getId(),
+                context.getWarehouse().getId()
+        );
     }
 
     protected DecodedJWT getDecodedToken(HttpServletRequest request) {
@@ -72,6 +93,7 @@ public abstract class BaseServlet extends HttpBaseServlet {
             throw new UnauthorizedException();
 
         OBContext.setOBContext(userId, roleId, clientId, orgId, language, warehouseId);
+        OBContext.setAdminMode();
     }
 
     protected int getResponseStatus(Exception e) {

@@ -13,7 +13,6 @@ import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.dal.core.OBContext;
 
-import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -24,13 +23,8 @@ import java.nio.charset.StandardCharsets;
  */
 public class MetadataServlet extends BaseServlet {
     @Override
-    public void process(HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException, JSONException {
-        try {
-            OBContext.setAdminMode(true);
-            handleRequest(request, response);
-        } finally {
-            OBContext.restorePreviousMode();
-        }
+    public void process(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        handleRequest(request, response);
     }
 
     private void handleRequest(HttpServletRequest request, HttpServletResponse response) throws IOException {
@@ -46,22 +40,26 @@ public class MetadataServlet extends BaseServlet {
         } else if (path.equals("/session")) {
             response.getWriter().write(this.fetchSession().toString());
         } else if (path.startsWith("/toolbar")) {
-            String[] pathParts = path.split("/");
-            if (pathParts.length < 3) {
-                throw new UnprocessableContentException("Invalid toolbar path");
-            }
-            try {
-                String windowId = pathParts[2];
-                String tabId = (pathParts.length >= 4 && !"undefined".equals(pathParts[3])) ? pathParts[3] : null;
-                JSONObject toolbar = fetchToolbar(windowId, tabId);
-                sendSuccessResponse(response, toolbar);
-            } catch (IllegalArgumentException e) {
-                throw new UnprocessableContentException(e.getMessage());
-            } catch (Exception e) {
-                throw new InternalServerException();
-            }
+            handleToolbarRequest(response, path);
         } else {
             throw new NotFoundException("Not found");
+        }
+    }
+
+    private void handleToolbarRequest(HttpServletResponse response, String path) {
+        String[] pathParts = path.split("/");
+        if (pathParts.length < 3) {
+            throw new UnprocessableContentException("Invalid toolbar path");
+        }
+        try {
+            String windowId = pathParts[2];
+            String tabId = (pathParts.length >= 4 && !"undefined".equals(pathParts[3])) ? pathParts[3] : null;
+            JSONObject toolbar = fetchToolbar(windowId, tabId);
+            sendSuccessResponse(response, toolbar);
+        } catch (IllegalArgumentException e) {
+            throw new UnprocessableContentException(e.getMessage());
+        } catch (Exception e) {
+            throw new InternalServerException();
         }
     }
 
