@@ -23,6 +23,9 @@ import java.nio.charset.StandardCharsets;
 import static com.etendoerp.metadata.Utils.*;
 import static com.smf.securewebservices.utils.SecureWebServicesUtils.decodeToken;
 
+/**
+ * @author luuchorocha
+ */
 public abstract class BaseServlet extends HttpBaseServlet {
     private static final Logger logger = LogManager.getLogger(BaseServlet.class);
 
