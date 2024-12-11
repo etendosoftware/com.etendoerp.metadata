@@ -31,6 +31,8 @@ public abstract class BaseServlet extends HttpBaseServlet {
 
     private static final String HTTP_METHOD_POST = "POST";
     private static final String HTTP_METHOD_OPTIONS = "OPTIONS";
+    public static final String INVALID_OR_MISSING_TOKEN = "Invalid or missing token";
+    public static final String ONLY_POST_METHOD_IS_ALLOWED = "Only POST method is allowed";
 
     @Override
     public final void service(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
@@ -59,7 +61,7 @@ public abstract class BaseServlet extends HttpBaseServlet {
 
     private void checkHttpMethod(HttpServletRequest request) {
         if (!HTTP_METHOD_POST.equals(request.getMethod())) {
-            throw new MethodNotAllowedException("Only POST method is allowed");
+            throw new MethodNotAllowedException(ONLY_POST_METHOD_IS_ALLOWED);
         }
     }
 
@@ -85,12 +87,12 @@ public abstract class BaseServlet extends HttpBaseServlet {
             DecodedJWT decodedToken = decodeToken(token);
 
             if (decodedToken == null) {
-                throw new UnauthorizedException("Invalid or missing token");
+                throw new UnauthorizedException(INVALID_OR_MISSING_TOKEN);
             }
             return decodedToken;
         } catch (Exception e) {
             logger.error("Failed to decode token", e);
-            throw new UnauthorizedException("Token decoding failed");
+            throw new UnauthorizedException(INVALID_OR_MISSING_TOKEN);
         }
     }
 
@@ -104,7 +106,7 @@ public abstract class BaseServlet extends HttpBaseServlet {
 
         if (isNullOrEmpty(userId) || isNullOrEmpty(roleId) || isNullOrEmpty(orgId) || isNullOrEmpty(warehouseId) || isNullOrEmpty(clientId)) {
             logger.error("Missing required claims: userId={}, roleId={}, orgId={}, warehouseId={}, clientId={}", userId, roleId, orgId, warehouseId, clientId);
-            throw new UnauthorizedException("Missing required claims");
+            throw new UnauthorizedException(INVALID_OR_MISSING_TOKEN);
         }
 
         OBContext.setOBContext(userId, roleId, clientId, orgId, language, warehouseId);
