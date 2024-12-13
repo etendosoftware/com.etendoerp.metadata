@@ -7,61 +7,84 @@ import com.etendoerp.metadata.builders.WindowBuilder;
 import com.etendoerp.metadata.exceptions.InternalServerException;
 import com.etendoerp.metadata.exceptions.NotFoundException;
 import com.etendoerp.metadata.exceptions.UnprocessableContentException;
-import org.apache.http.entity.ContentType;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
+import org.openbravo.base.weld.WeldUtils;
 import org.openbravo.dal.core.OBContext;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 
 /**
  * @author luuchorocha
  */
 public class MetadataServlet extends BaseServlet {
+    public static final String TOOLBAR_PATH = "/toolbar";
+    public static final String SESSION_PATH = "/session";
+    public static final String MENU_PATH = "/menu";
+    public static final String WINDOW_PATH = "/window/";
+    private static final Logger logger = LogManager.getLogger(MetadataServlet.class);
+    private static final String KERNEL_CLIENT_PATH = "/org.openbravo.client.kernel";
+
+    private static JSONObject getJsonObject() throws JSONException {
+        JSONObject error = new JSONObject();
+        error.put("message", "Error processing response");
+        error.put("messageType", "Error");
+        error.put("title", "");
+
+        JSONObject responseObj = new JSONObject();
+        responseObj.put("status", HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+        responseObj.put("error", error);
+        responseObj.put("totalRows", 0);
+
+        JSONObject wrapper = new JSONObject();
+        wrapper.put("response", responseObj);
+
+        return wrapper;
+    }
+
     @Override
-    public void process(HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException, JSONException {
-        try {
-            OBContext.setAdminMode(true);
-            handleRequest(request, response);
-        } finally {
-            OBContext.restorePreviousMode();
+    public void process(HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
+        String path = request.getPathInfo();
+
+        if (path.startsWith(WINDOW_PATH)) {
+            response.getWriter().write(this.fetchWindow(request.getPathInfo().substring(8)).toString());
+        } else if (path.equals(MENU_PATH)) {
+            response.getWriter().write(this.fetchMenu().toString());
+        } else if (path.equals(SESSION_PATH)) {
+            response.getWriter().write(this.fetchSession().toString());
+        } else if (path.startsWith(TOOLBAR_PATH)) {
+            handleToolbarRequest(response, path);
+        } else if (path.startsWith(KERNEL_CLIENT_PATH)) {
+            handleKernelRequest(request, response);
+        } else {
+            throw new NotFoundException();
         }
     }
 
-    private void handleRequest(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        String path = request.getPathInfo();
+    private void handleKernelRequest(HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
+        WeldUtils.getInstanceFromStaticBeanManager(org.openbravo.client.kernel.KernelServlet.class).doGet(request, response);
+    }
 
-        response.setContentType(ContentType.APPLICATION_JSON.getMimeType());
-        response.setCharacterEncoding(StandardCharsets.UTF_8.toString());
-
-        if (path.startsWith("/window/")) {
-            response.getWriter().write(this.fetchWindow(request.getPathInfo().substring(8)).toString());
-        } else if (path.equals("/menu")) {
-            response.getWriter().write(this.fetchMenu().toString());
-        } else if (path.equals("/session")) {
-            response.getWriter().write(this.fetchSession().toString());
-        } else if (path.startsWith("/toolbar")) {
-            String[] pathParts = path.split("/");
-            if (pathParts.length < 3) {
-                throw new UnprocessableContentException("Invalid toolbar path");
-            }
-            try {
-                String windowId = pathParts[2];
-                String tabId = (pathParts.length >= 4 && !"undefined".equals(pathParts[3])) ? pathParts[3] : null;
-                JSONObject toolbar = fetchToolbar(windowId, tabId);
-                sendSuccessResponse(response, toolbar);
-            } catch (IllegalArgumentException e) {
-                throw new UnprocessableContentException(e.getMessage());
-            } catch (Exception e) {
-                throw new InternalServerException();
-            }
-        } else {
-            throw new NotFoundException("Not found");
+    private void handleToolbarRequest(HttpServletResponse response, String path) {
+        String[] pathParts = path.split("/");
+        if (pathParts.length < 3) {
+            throw new UnprocessableContentException("Invalid toolbar path");
+        }
+        try {
+            String windowId = pathParts[2];
+            String tabId = (pathParts.length >= 4 && !"undefined".equals(pathParts[3])) ? pathParts[3] : null;
+            JSONObject toolbar = fetchToolbar(windowId, tabId);
+            sendSuccessResponse(response, toolbar);
+        } catch (IllegalArgumentException e) {
+            throw new UnprocessableContentException(e.getMessage());
+        } catch (Exception e) {
+            throw new InternalServerException();
         }
     }
 
@@ -72,27 +95,15 @@ public class MetadataServlet extends BaseServlet {
             response.getWriter().write(wrapper.toString());
         } catch (JSONException e) {
             logger.error("Error creating success response", e);
-            sendErrorResponse(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Error processing response");
+            sendErrorResponse(response);
         }
     }
 
-
-    private void sendErrorResponse(HttpServletResponse response, int status, String message) throws IOException {
+    private void sendErrorResponse(HttpServletResponse response) throws IOException {
         try {
-            JSONObject error = new JSONObject();
-            error.put("message", message);
-            error.put("messageType", "Error");
-            error.put("title", "");
+            JSONObject wrapper = getJsonObject();
 
-            JSONObject responseObj = new JSONObject();
-            responseObj.put("status", status);
-            responseObj.put("error", error);
-            responseObj.put("totalRows", 0);
-
-            JSONObject wrapper = new JSONObject();
-            wrapper.put("response", responseObj);
-
-            response.setStatus(status);
+            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             response.getWriter().write(wrapper.toString());
         } catch (JSONException e) {
             logger.error("Error creating error response", e);
