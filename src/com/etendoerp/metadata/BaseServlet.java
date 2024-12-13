@@ -6,7 +6,6 @@ import com.etendoerp.metadata.exceptions.UnauthorizedException;
 import org.apache.http.entity.ContentType;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.codehaus.jettison.json.JSONException;
 import org.openbravo.base.HttpBaseServlet;
 import org.openbravo.base.secureApp.AllowedCrossDomainsHandler;
 import org.openbravo.base.secureApp.LoginUtils;
@@ -27,12 +26,14 @@ import static com.smf.securewebservices.utils.SecureWebServicesUtils.decodeToken
  * @author luuchorocha
  */
 public abstract class BaseServlet extends HttpBaseServlet {
-    private static final Logger logger = LogManager.getLogger(BaseServlet.class);
-
-    private static final String HTTP_METHOD_POST = "POST";
-    private static final String HTTP_METHOD_OPTIONS = "OPTIONS";
     public static final String INVALID_OR_MISSING_TOKEN = "Invalid or missing token";
     public static final String ONLY_POST_METHOD_IS_ALLOWED = "Only POST method is allowed";
+    public static final String MISSING_REQUIRED_CLAIMS = "Missing required claims: userId={}, roleId={}, orgId={}, warehouseId={}, clientId={}";
+    public static final String ERROR_PROCESSING_REQUEST = "Error processing request";
+    public static final String FAILED_TO_DECODE_TOKEN = "Failed to decode token";
+    private static final Logger logger = LogManager.getLogger(BaseServlet.class);
+    private static final String HTTP_METHOD_POST = "POST";
+    private static final String HTTP_METHOD_OPTIONS = "OPTIONS";
 
     @Override
     public final void service(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
@@ -45,13 +46,11 @@ public abstract class BaseServlet extends HttpBaseServlet {
             }
 
             checkHttpMethod(request);
-            DecodedJWT decodedToken = getDecodedToken(request);
-            setContext(request, decodedToken);
+            setContext(request);
             setSession(request);
-
             process(request, response);
         } catch (Exception e) {
-            logger.error("Error processing request", e);
+            logger.error(ERROR_PROCESSING_REQUEST, e);
             response.getWriter().write(buildErrorJson(e));
             response.setStatus(getResponseStatus(e));
         } finally {
@@ -91,25 +90,26 @@ public abstract class BaseServlet extends HttpBaseServlet {
             }
             return decodedToken;
         } catch (Exception e) {
-            logger.error("Failed to decode token", e);
+            logger.error(FAILED_TO_DECODE_TOKEN, e);
             throw new UnauthorizedException(INVALID_OR_MISSING_TOKEN);
         }
     }
 
-    protected void setContext(HttpServletRequest request, DecodedJWT decodedToken) {
+    protected void setContext(HttpServletRequest request) {
+        DecodedJWT decodedToken = getDecodedToken(request);
+
         String userId = decodedToken.getClaim("user").asString();
         String roleId = decodedToken.getClaim("role").asString();
         String orgId = decodedToken.getClaim("organization").asString();
         String warehouseId = decodedToken.getClaim("warehouse").asString();
         String clientId = decodedToken.getClaim("client").asString();
-        String language = getLanguage(request);
 
         if (isNullOrEmpty(userId) || isNullOrEmpty(roleId) || isNullOrEmpty(orgId) || isNullOrEmpty(warehouseId) || isNullOrEmpty(clientId)) {
-            logger.error("Missing required claims: userId={}, roleId={}, orgId={}, warehouseId={}, clientId={}", userId, roleId, orgId, warehouseId, clientId);
+            logger.error(MISSING_REQUIRED_CLAIMS, userId, roleId, orgId, warehouseId, clientId);
             throw new UnauthorizedException(INVALID_OR_MISSING_TOKEN);
         }
 
-        OBContext.setOBContext(userId, roleId, clientId, orgId, language, warehouseId);
+        OBContext.setOBContext(userId, roleId, clientId, orgId, null, warehouseId);
         OBContext.setAdminMode();
     }
 
@@ -129,5 +129,5 @@ public abstract class BaseServlet extends HttpBaseServlet {
         }
     }
 
-    public abstract void process(HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException, JSONException;
+    public abstract void process(HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException;
 }

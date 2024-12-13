@@ -59,13 +59,5 @@ public class Utils {
             return "";
         }
     }
-
-    public static String getLanguage(HttpServletRequest request) {
-        try {
-            return getBody(request).getString("language");
-        } catch (JSONException e) {
-            return null;
-        }
-    }
 }
 

@@ -24,11 +24,11 @@ import java.io.IOException;
  * @author luuchorocha
  */
 public class MetadataServlet extends BaseServlet {
-    private static final Logger logger = LogManager.getLogger(MetadataServlet.class);
     public static final String TOOLBAR_PATH = "/toolbar";
     public static final String SESSION_PATH = "/session";
     public static final String MENU_PATH = "/menu";
     public static final String WINDOW_PATH = "/window/";
+    private static final Logger logger = LogManager.getLogger(MetadataServlet.class);
     private static final String KERNEL_CLIENT_PATH = "/org.openbravo.client.kernel";
 
     private static JSONObject getJsonObject() throws JSONException {
@@ -50,10 +50,6 @@ public class MetadataServlet extends BaseServlet {
 
     @Override
     public void process(HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
-        handleRequest(request, response);
-    }
-
-    private void handleRequest(HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
         String path = request.getPathInfo();
 
         if (path.startsWith(WINDOW_PATH)) {
