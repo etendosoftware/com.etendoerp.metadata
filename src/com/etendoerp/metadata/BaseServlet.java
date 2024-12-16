@@ -4,6 +4,7 @@ import com.auth0.jwt.interfaces.DecodedJWT;
 import com.etendoerp.metadata.exceptions.MethodNotAllowedException;
 import com.etendoerp.metadata.exceptions.UnauthorizedException;
 import com.smf.securewebservices.utils.SecureWebServicesUtils;
+import org.apache.commons.lang.StringUtils;
 import org.apache.http.entity.ContentType;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -78,7 +79,7 @@ public abstract class BaseServlet extends HttpBaseServlet {
     protected DecodedJWT getDecodedToken(HttpServletRequest request) {
         String token = getToken(request);
 
-        if (token.isBlank()) {
+        if (StringUtils.isBlank(token)) {
             throw new UnauthorizedException(INVALID_OR_MISSING_TOKEN);
         }
 
