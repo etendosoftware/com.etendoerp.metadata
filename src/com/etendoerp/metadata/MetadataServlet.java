@@ -13,6 +13,7 @@ import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.base.weld.WeldUtils;
+import org.openbravo.client.kernel.KernelServlet;
 import org.openbravo.dal.core.OBContext;
 
 import javax.servlet.ServletException;
@@ -68,7 +69,9 @@ public class MetadataServlet extends BaseServlet {
     }
 
     private void handleKernelRequest(HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
-        WeldUtils.getInstanceFromStaticBeanManager(org.openbravo.client.kernel.KernelServlet.class).doGet(request, response);
+        KernelServlet servlet = WeldUtils.getInstanceFromStaticBeanManager(KernelServlet.class);
+        servlet.init(this.getServletConfig());
+        servlet.doGet(request, response);
     }
 
     private void handleToolbarRequest(HttpServletResponse response, String path) {
