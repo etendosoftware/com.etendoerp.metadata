@@ -3,6 +3,8 @@ package com.etendoerp.metadata;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.etendoerp.metadata.exceptions.MethodNotAllowedException;
 import com.etendoerp.metadata.exceptions.UnauthorizedException;
+import com.smf.securewebservices.utils.SecureWebServicesUtils;
+import org.apache.commons.lang.StringUtils;
 import org.apache.http.entity.ContentType;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -19,6 +21,7 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
+import static com.etendoerp.metadata.Constants.*;
 import static com.etendoerp.metadata.Utils.*;
 import static com.smf.securewebservices.utils.SecureWebServicesUtils.decodeToken;
 
@@ -26,14 +29,7 @@ import static com.smf.securewebservices.utils.SecureWebServicesUtils.decodeToken
  * @author luuchorocha
  */
 public abstract class BaseServlet extends HttpBaseServlet {
-    public static final String INVALID_OR_MISSING_TOKEN = "Invalid or missing token";
-    public static final String ONLY_POST_METHOD_IS_ALLOWED = "Only POST method is allowed";
-    public static final String MISSING_REQUIRED_CLAIMS = "Missing required claims: userId={}, roleId={}, orgId={}, warehouseId={}, clientId={}";
-    public static final String ERROR_PROCESSING_REQUEST = "Error processing request";
-    public static final String FAILED_TO_DECODE_TOKEN = "Failed to decode token";
     private static final Logger logger = LogManager.getLogger(BaseServlet.class);
-    private static final String HTTP_METHOD_POST = "POST";
-    private static final String HTTP_METHOD_OPTIONS = "OPTIONS";
 
     @Override
     public final void service(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
@@ -81,13 +77,19 @@ public abstract class BaseServlet extends HttpBaseServlet {
     }
 
     protected DecodedJWT getDecodedToken(HttpServletRequest request) {
+        String token = getToken(request);
+
+        if (StringUtils.isBlank(token)) {
+            throw new UnauthorizedException(INVALID_OR_MISSING_TOKEN);
+        }
+
         try {
-            String token = getToken(request);
             DecodedJWT decodedToken = decodeToken(token);
 
             if (decodedToken == null) {
                 throw new UnauthorizedException(INVALID_OR_MISSING_TOKEN);
             }
+
             return decodedToken;
         } catch (Exception e) {
             logger.error(FAILED_TO_DECODE_TOKEN, e);
@@ -109,7 +111,7 @@ public abstract class BaseServlet extends HttpBaseServlet {
             throw new UnauthorizedException(INVALID_OR_MISSING_TOKEN);
         }
 
-        OBContext.setOBContext(userId, roleId, clientId, orgId, null, warehouseId);
+        OBContext.setOBContext(SecureWebServicesUtils.createContext(userId, roleId, orgId, warehouseId, clientId));
         OBContext.setAdminMode();
     }
 
