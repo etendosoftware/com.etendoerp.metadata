@@ -3,7 +3,6 @@ package com.etendoerp.metadata;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.etendoerp.metadata.exceptions.MethodNotAllowedException;
 import com.etendoerp.metadata.exceptions.UnauthorizedException;
-import com.smf.securewebservices.utils.SecureWebServicesUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.http.entity.ContentType;
 import org.apache.logging.log4j.LogManager;
@@ -34,6 +33,7 @@ public abstract class BaseServlet extends HttpBaseServlet {
     @Override
     public final void service(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         try {
+            OBContext.setAdminMode();
             setCorsHeaders(request, response);
             setContentHeaders(response);
 
@@ -99,20 +99,19 @@ public abstract class BaseServlet extends HttpBaseServlet {
 
     protected void setContext(HttpServletRequest request) {
         DecodedJWT decodedToken = getDecodedToken(request);
-
         String userId = decodedToken.getClaim("user").asString();
         String roleId = decodedToken.getClaim("role").asString();
         String orgId = decodedToken.getClaim("organization").asString();
         String warehouseId = decodedToken.getClaim("warehouse").asString();
         String clientId = decodedToken.getClaim("client").asString();
+        String languageCode = getLanguageCode(request);
 
         if (isNullOrEmpty(userId) || isNullOrEmpty(roleId) || isNullOrEmpty(orgId) || isNullOrEmpty(warehouseId) || isNullOrEmpty(clientId)) {
             logger.error(MISSING_REQUIRED_CLAIMS, userId, roleId, orgId, warehouseId, clientId);
             throw new UnauthorizedException(INVALID_OR_MISSING_TOKEN);
         }
 
-        OBContext.setOBContext(SecureWebServicesUtils.createContext(userId, roleId, orgId, warehouseId, clientId));
-        OBContext.setAdminMode();
+        OBContext.setOBContext(userId, roleId, clientId, orgId, languageCode, warehouseId);
     }
 
     protected int getResponseStatus(Exception e) {
