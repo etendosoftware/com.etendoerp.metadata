@@ -9,6 +9,9 @@ import org.openbravo.model.ad.system.Language;
 import org.openbravo.service.json.JsonUtils;
 
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.BufferedReader;
+import java.io.IOException;
 
 public class Utils {
     private static final Logger logger = LogManager.getLogger(Utils.class);
@@ -56,5 +59,45 @@ public class Utils {
 
         return null;
     }
-}
 
+    private static JSONObject getJsonObject() throws JSONException {
+        JSONObject error = new JSONObject();
+        error.put("message", "Error processing response");
+        error.put("messageType", "Error");
+        error.put("title", "");
+
+        JSONObject responseObj = new JSONObject();
+        responseObj.put("status", HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+        responseObj.put("error", error);
+        responseObj.put("totalRows", 0);
+
+        JSONObject wrapper = new JSONObject();
+        wrapper.put("response", responseObj);
+
+        return wrapper;
+    }
+
+    public static void sendSuccessResponse(HttpServletResponse response, JSONObject data) throws IOException {
+        try {
+            JSONObject wrapper = new JSONObject();
+            wrapper.put("response", data);
+            response.getWriter().write(wrapper.toString());
+        } catch (JSONException e) {
+            logger.error("Error creating success response", e);
+            sendErrorResponse(response);
+        }
+    }
+
+    public static void sendErrorResponse(HttpServletResponse response) throws IOException {
+        try {
+            JSONObject wrapper = getJsonObject();
+
+            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+            response.getWriter().write(wrapper.toString());
+        } catch (JSONException e) {
+            logger.error("Error creating error response", e);
+            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+            response.getWriter().write("{\"response\":{\"status\":500,\"error\":{\"message\":\"Internal server error\",\"messageType\":\"Error\",\"title\":\"\"},\"totalRows\":0}}");
+        }
+    }
+}
