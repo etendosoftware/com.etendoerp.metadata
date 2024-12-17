@@ -10,7 +10,6 @@ import com.etendoerp.metadata.exceptions.UnprocessableContentException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.codehaus.jettison.json.JSONArray;
-import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.base.weld.WeldUtils;
 import org.openbravo.client.kernel.KernelServlet;
@@ -20,6 +19,8 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+
+import static com.etendoerp.metadata.Utils.sendSuccessResponse;
 
 /**
  * @author luuchorocha
@@ -32,33 +33,16 @@ public class MetadataServlet extends BaseServlet {
     private static final Logger logger = LogManager.getLogger(MetadataServlet.class);
     private static final String KERNEL_CLIENT_PATH = "/org.openbravo.client.kernel";
 
-    private static JSONObject getJsonObject() throws JSONException {
-        JSONObject error = new JSONObject();
-        error.put("message", "Error processing response");
-        error.put("messageType", "Error");
-        error.put("title", "");
-
-        JSONObject responseObj = new JSONObject();
-        responseObj.put("status", HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-        responseObj.put("error", error);
-        responseObj.put("totalRows", 0);
-
-        JSONObject wrapper = new JSONObject();
-        wrapper.put("response", responseObj);
-
-        return wrapper;
-    }
-
     @Override
     public void process(HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
         String path = request.getPathInfo();
 
         if (path.startsWith(WINDOW_PATH)) {
-            response.getWriter().write(this.fetchWindow(request.getPathInfo().substring(8)).toString());
+            handleWindowRequest(request, response);
         } else if (path.equals(MENU_PATH)) {
-            response.getWriter().write(this.fetchMenu().toString());
+            handleMenuRequest(request, response);
         } else if (path.equals(SESSION_PATH)) {
-            response.getWriter().write(this.fetchSession().toString());
+            handleSessionRequest(request, response);
         } else if (path.startsWith(TOOLBAR_PATH)) {
             handleToolbarRequest(response, path);
         } else if (path.startsWith(KERNEL_CLIENT_PATH)) {
@@ -66,6 +50,18 @@ public class MetadataServlet extends BaseServlet {
         } else {
             throw new NotFoundException();
         }
+    }
+
+    private void handleWindowRequest(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        response.getWriter().write(this.fetchWindow(request.getPathInfo().substring(8)).toString());
+    }
+
+    private void handleMenuRequest(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        response.getWriter().write(this.fetchMenu().toString());
+    }
+
+    private void handleSessionRequest(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        response.getWriter().write(this.fetchSession().toString());
     }
 
     private void handleKernelRequest(HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
@@ -88,30 +84,6 @@ public class MetadataServlet extends BaseServlet {
             throw new UnprocessableContentException(e.getMessage());
         } catch (Exception e) {
             throw new InternalServerException();
-        }
-    }
-
-    private void sendSuccessResponse(HttpServletResponse response, JSONObject data) throws IOException {
-        try {
-            JSONObject wrapper = new JSONObject();
-            wrapper.put("response", data);
-            response.getWriter().write(wrapper.toString());
-        } catch (JSONException e) {
-            logger.error("Error creating success response", e);
-            sendErrorResponse(response);
-        }
-    }
-
-    private void sendErrorResponse(HttpServletResponse response) throws IOException {
-        try {
-            JSONObject wrapper = getJsonObject();
-
-            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-            response.getWriter().write(wrapper.toString());
-        } catch (JSONException e) {
-            logger.error("Error creating error response", e);
-            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-            response.getWriter().write("{\"response\":{\"status\":500,\"error\":{\"message\":\"Internal server error\",\"messageType\":\"Error\",\"title\":\"\"},\"totalRows\":0}}");
         }
     }
 
