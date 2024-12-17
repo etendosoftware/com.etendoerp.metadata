@@ -12,6 +12,7 @@ import org.openbravo.service.json.JsonUtils;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.Arrays;
 
 public class Utils {
     private static final Logger logger = LogManager.getLogger(Utils.class);
@@ -42,14 +43,10 @@ public class Utils {
 
     public static String getLanguageCode(HttpServletRequest request) {
         String[] providedLanguages = {request.getParameter("language"), request.getHeader("language"), request.getLocale().toString()};
-        String languageCode = null;
-
-        for (String language : providedLanguages) {
-            if (language != null && !language.isEmpty()) {
-                languageCode = language;
-                break;
-            }
-        }
+        String languageCode = Arrays.stream(providedLanguages)
+                .filter(language -> language != null && !language.isEmpty())
+                .findFirst()
+                .orElse(null);
 
         Language language = OBDal.getInstance().createQuery(Language.class, "language = :languageCode").setNamedParameter("languageCode", languageCode).uniqueResult();
 
