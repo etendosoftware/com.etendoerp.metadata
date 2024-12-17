@@ -44,7 +44,7 @@ public class MetadataServlet extends BaseServlet {
         } else if (path.equals(SESSION_PATH)) {
             handleSessionRequest(request, response);
         } else if (path.startsWith(TOOLBAR_PATH)) {
-            handleToolbarRequest(response, path);
+            handleToolbarRequest(request, response);
         } else if (path.startsWith(KERNEL_CLIENT_PATH)) {
             handleKernelRequest(request, response);
         } else {
@@ -70,7 +70,8 @@ public class MetadataServlet extends BaseServlet {
         servlet.doGet(request, response);
     }
 
-    private void handleToolbarRequest(HttpServletResponse response, String path) {
+    private void handleToolbarRequest(HttpServletRequest request, HttpServletResponse response) {
+        String path = request.getPathInfo();
         String[] pathParts = path.split("/");
         if (pathParts.length < 3) {
             throw new UnprocessableContentException("Invalid toolbar path");
