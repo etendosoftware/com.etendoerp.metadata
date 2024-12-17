@@ -1,41 +1,21 @@
 package com.etendoerp.metadata;
 
 import com.etendoerp.metadata.exceptions.UnauthorizedException;
-import org.apache.http.entity.ContentType;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
+import org.openbravo.dal.service.OBDal;
+import org.openbravo.model.ad.system.Language;
 import org.openbravo.service.json.JsonUtils;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import java.io.BufferedReader;
 import java.io.IOException;
+import java.util.Arrays;
 
 public class Utils {
     private static final Logger logger = LogManager.getLogger(Utils.class);
-
-    public static JSONObject getBody(HttpServletRequest request) {
-        try {
-            String contentType = request.getContentType();
-
-            if (null == contentType || !contentType.equals(ContentType.APPLICATION_JSON.getMimeType()))
-                return new JSONObject();
-
-            StringBuilder sb = new StringBuilder();
-            BufferedReader reader = request.getReader();
-            String line = reader.readLine();
-
-            do sb.append(line); while ((line = reader.readLine()) != null);
-
-            return new JSONObject(sb.toString());
-        } catch (JSONException | IOException e) {
-            logger.warn(e.getMessage());
-
-            return new JSONObject();
-        }
-    }
 
     public static boolean isNullOrEmpty(String value) {
         return value == null || value.isEmpty();
@@ -59,6 +39,22 @@ public class Utils {
 
             return "";
         }
+    }
+
+    public static String getLanguageCode(HttpServletRequest request) {
+        String[] providedLanguages = {request.getParameter("language"), request.getHeader("language"), request.getLocale().toString()};
+        String languageCode = Arrays.stream(providedLanguages)
+                .filter(language -> language != null && !language.isEmpty())
+                .findFirst()
+                .orElse(null);
+
+        Language language = OBDal.getInstance().createQuery(Language.class, "language = :languageCode").setNamedParameter("languageCode", languageCode).uniqueResult();
+
+        if (language != null) {
+            return language.getLanguage();
+        }
+
+        return null;
     }
 
     private static JSONObject getJsonObject() throws JSONException {
@@ -102,4 +98,3 @@ public class Utils {
         }
     }
 }
-
