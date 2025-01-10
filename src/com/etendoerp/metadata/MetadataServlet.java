@@ -1,9 +1,6 @@
 package com.etendoerp.metadata;
 
-import com.etendoerp.metadata.builders.MenuBuilder;
-import com.etendoerp.metadata.builders.SessionBuilder;
-import com.etendoerp.metadata.builders.ToolbarBuilder;
-import com.etendoerp.metadata.builders.WindowBuilder;
+import com.etendoerp.metadata.builders.*;
 import com.etendoerp.metadata.exceptions.InternalServerException;
 import com.etendoerp.metadata.exceptions.NotFoundException;
 import com.etendoerp.metadata.exceptions.UnprocessableContentException;
@@ -32,6 +29,7 @@ public class MetadataServlet extends BaseServlet {
     public static final String SESSION_PATH = "/session";
     public static final String MENU_PATH = "/menu";
     public static final String WINDOW_PATH = "/window/";
+    public static final String LANGUAGE_PATH = "/language";
     private static final Logger logger = LogManager.getLogger(MetadataServlet.class);
     private static final String KERNEL_CLIENT_PATH = "/org.openbravo.client.kernel";
     public static final String DELEGATED_SERVLET_PATH = "/servlets";
@@ -52,6 +50,8 @@ public class MetadataServlet extends BaseServlet {
             handleKernelRequest(request, response);
         } else if (path.startsWith(DELEGATED_SERVLET_PATH)) {
             handleDelegatedServletRequest(request, response);
+        } else if (path.startsWith(LANGUAGE_PATH)) {
+            handleLanguageRequest(request, response);
         } else {
             throw new NotFoundException();
         }
@@ -119,6 +119,10 @@ public class MetadataServlet extends BaseServlet {
         }
     }
 
+    private void handleLanguageRequest(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        response.getWriter().write(this.fetchLanguages().toString());
+    }
+
     private JSONObject fetchToolbar(String windowId, String tabId) {
         try {
             String language = OBContext.getOBContext().getLanguage().getLanguage();
@@ -141,5 +145,9 @@ public class MetadataServlet extends BaseServlet {
 
     private JSONObject fetchSession() {
         return new SessionBuilder().toJSON();
+    }
+
+    private JSONArray fetchLanguages() {
+        return new LanguageBuilder().toJSON();
     }
 }
