@@ -11,6 +11,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONObject;
+import org.openbravo.base.HttpBaseServlet;
 import org.openbravo.base.weld.WeldUtils;
 import org.openbravo.client.kernel.KernelServlet;
 import org.openbravo.dal.core.OBContext;
@@ -19,6 +20,7 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.List;
 
 import static com.etendoerp.metadata.Utils.sendSuccessResponse;
 
@@ -32,6 +34,7 @@ public class MetadataServlet extends BaseServlet {
     public static final String WINDOW_PATH = "/window/";
     private static final Logger logger = LogManager.getLogger(MetadataServlet.class);
     private static final String KERNEL_CLIENT_PATH = "/org.openbravo.client.kernel";
+    public static final String DELEGATED_SERVLET_PATH = "/servlets";
 
     @Override
     public void process(HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
@@ -47,6 +50,8 @@ public class MetadataServlet extends BaseServlet {
             handleToolbarRequest(request, response);
         } else if (path.startsWith(KERNEL_CLIENT_PATH)) {
             handleKernelRequest(request, response);
+        } else if (path.startsWith(DELEGATED_SERVLET_PATH)) {
+            handleDelegatedServletRequest(request, response);
         } else {
             throw new NotFoundException();
         }
@@ -84,6 +89,32 @@ public class MetadataServlet extends BaseServlet {
         } catch (IllegalArgumentException e) {
             throw new UnprocessableContentException(e.getMessage());
         } catch (Exception e) {
+            throw new InternalServerException();
+        }
+    }
+
+    private void handleDelegatedServletRequest(HttpServletRequest request, HttpServletResponse response) {
+        try {
+            HttpBaseServlet servlet;
+            String[] path = request.getPathInfo().split("/servlets/");
+            String servletName = path[path.length - 1];
+            List<?> servlets = WeldUtils.getInstances(Class.forName(servletName));
+
+            if (servlets.isEmpty()) {
+                servlet = (HttpBaseServlet) Class.forName(servletName).getDeclaredConstructor().newInstance();
+            } else {
+                servlet = (HttpBaseServlet) servlets.get(0);
+            }
+
+            servlet.init(this.getServletConfig());
+            servlet.service(request, response);
+        } catch (ClassNotFoundException e) {
+            logger.error(e.getMessage(), e);
+
+            throw new NotFoundException();
+        } catch (Exception e) {
+            logger.error(e.getMessage(), e);
+
             throw new InternalServerException();
         }
     }
