@@ -55,13 +55,13 @@ public abstract class BaseServlet extends HttpBaseServlet {
     }
 
     private void checkHttpMethod(HttpServletRequest request) {
-        if (!HTTP_METHOD_POST.equals(request.getMethod())) {
+        if (!(HTTP_METHOD_POST.equals(request.getMethod()) || HTTP_METHOD_GET.equals(request.getMethod()))) {
             throw new MethodNotAllowedException(ONLY_POST_METHOD_IS_ALLOWED);
         }
     }
 
     private void setCorsHeaders(HttpServletRequest request, HttpServletResponse response) {
-        if (HTTP_METHOD_OPTIONS.equals(request.getMethod()) || HTTP_METHOD_POST.equals(request.getMethod())) {
+        if (HTTP_METHOD_OPTIONS.equals(request.getMethod()) || HTTP_METHOD_POST.equals(request.getMethod()) || HTTP_METHOD_GET.equals(request.getMethod())) {
             AllowedCrossDomainsHandler.getInstance().setCORSHeaders(request, response);
         }
     }
