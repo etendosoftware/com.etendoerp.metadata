@@ -28,6 +28,7 @@ public class SessionBuilder {
 
             json.put("user", converter.toJsonObject(user, DataResolvingMode.FULL_TRANSLATABLE));
             json.put("role", converter.toJsonObject(role, DataResolvingMode.FULL_TRANSLATABLE));
+            json.put("languages", new LanguageBuilder().toJSON());
 
             return json;
         } catch (JSONException e) {
