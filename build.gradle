@@ -1,16 +1,8 @@
-/**
-*   This file was generated automatically by the 'createModuleBuild' task.
-*   Created at: 2024-08-21T18:43:31.151055398Z.
-*
-*   WARNING: Do not put your credentials directly in this file.
-*
-*/
-
-group          = "com.etendo"
-version        = "1.0.0"
-description    = "A module that provides API endpoints for loading windows metadata and other information"
-ext.artifact   = "metadata"
-ext.repository = "https://maven.pkg.github.com/etendosoftware/com.etendo.metadata"
+group = "com.etendoerp"
+version = "1.0.0"
+description = "A module that provides APIs for the new Etendo UI"
+ext.artifact = "metadata"
+ext.repository = "https://maven.pkg.github.com/etendosoftware/com.etendoerp.metadata"
 
 configurations {
     moduleDependencyContainer
@@ -18,16 +10,16 @@ configurations {
 
 publishing {
     publications {
-        "com.etendo.metadata"(MavenPublication) {
+        "com.etendoerp.metadata"(MavenPublication) {
             from components.java
-            groupId    = group
+            groupId = group
             artifactId = artifact
-            version    = version
+            version = version
         }
     }
     repositories {
         maven {
-            url "https://maven.pkg.github.com/etendosoftware/com.etendo.metadata"
+            url "https://maven.pkg.github.com/etendosoftware/com.etendoerp.metadata"
         }
     }
 }
@@ -35,7 +27,7 @@ publishing {
 repositories {
     mavenCentral()
     maven {
-        url "https://maven.pkg.github.com/etendosoftware/com.etendo.metadata"
+        url "https://maven.pkg.github.com/etendosoftware/com.etendoerp.metadata"
     }
     maven {
         url "https://repo.futit.cloud/repository/maven-releases"
@@ -48,10 +40,6 @@ repositories {
     }
 }
 
-/**
-* Declare Java dependencies using 'implementation'
-* Ex: implementation "com.sun.mail:javax.mail:1.6.2"
-*/
 dependencies {
-   implementation('com.etendoerp.platform:etendo-core:[22.1.0, latest.release)') 
+    implementation('com.etendoerp.platform:etendo-core:[22.1.0, 24.4.0]')
 }
