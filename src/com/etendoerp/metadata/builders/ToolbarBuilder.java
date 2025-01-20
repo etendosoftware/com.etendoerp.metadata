@@ -5,18 +5,20 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONObject;
+import org.openbravo.base.ConnectionProviderContextListener;
+import org.openbravo.client.application.Process;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.database.ConnectionProvider;
-import org.openbravo.base.ConnectionProviderContextListener;
-import org.openbravo.model.ad.ui.Window;
+import org.openbravo.erpCommon.utility.Utility;
 import org.openbravo.model.ad.ui.Field;
 import org.openbravo.model.ad.ui.Tab;
-import org.openbravo.client.application.Process;
-import org.openbravo.erpCommon.utility.Utility;
+import org.openbravo.model.ad.ui.Window;
+import org.openbravo.service.json.DataResolvingMode;
+import org.openbravo.service.json.DataToJsonConverter;
 
 import java.util.HashMap;
-import java.util.Map;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 public class ToolbarBuilder {
@@ -37,9 +39,7 @@ public class ToolbarBuilder {
         this.connectionProvider = ConnectionProviderContextListener.getPool();
 
         Window window = OBDal.getInstance().get(Window.class, windowId);
-        Tab mainTab = (tabId != null)
-                ? OBDal.getInstance().get(Tab.class, tabId)
-                :  window.getADTabList().get(0);
+        Tab mainTab = (tabId != null) ? OBDal.getInstance().get(Tab.class, tabId) : window.getADTabList().get(0);
         this.tabBuilder = new TabBuilder(mainTab, null);
     }
 
@@ -93,18 +93,12 @@ public class ToolbarBuilder {
     private JSONArray getProcessButtons(Tab tab) throws Exception {
         JSONArray buttons = new JSONArray();
 
-        List<Field> processFields = tab.getADFieldList()
-                .stream()
-                .filter(field ->
-                        field.isActive() &&
-                                tabBuilder.shouldDisplayField(field) &&
-                                tabBuilder.hasAccessToProcess(field, windowId) &&
-                                tabBuilder.isProcessField(field))
-                .collect(Collectors.toList());
+        List<Field> processFields = tab.getADFieldList().stream().filter(field -> field.isActive() && tabBuilder.shouldDisplayField(field) && tabBuilder.hasAccessToProcess(field, windowId) && tabBuilder.isProcessField(field)).collect(Collectors.toList());
 
         for (Field field : processFields) {
             Process process = field.getColumn().getOBUIAPPProcess();
             if (process != null) {
+                DataToJsonConverter converter = new DataToJsonConverter();
                 JSONObject button = new JSONObject();
                 JSONObject processInfo = ProcessUtils.createProcessJSON(process);
 
@@ -116,6 +110,8 @@ public class ToolbarBuilder {
                 button.put("displayLogic", field.getDisplayLogic());
                 button.put("buttonText", field.getColumn().getName());
                 button.put("tabId", tab.getId());
+                button.put("process", converter.toJsonObject(process, DataResolvingMode.FULL_TRANSLATABLE));
+                button.put("field", converter.toJsonObject(field, DataResolvingMode.FULL_TRANSLATABLE));
 
 
                 buttons.put(button);
@@ -138,6 +134,21 @@ public class ToolbarBuilder {
         return button;
     }
 
+    private Map<String, ButtonConfig> getStandardButtons() {
+        Map<String, ButtonConfig> buttons = new HashMap<>();
+
+        buttons.put("NEW", new ButtonConfig("NEW", "OBUIAPP_NewDoc", "NEW", true, "plus"));
+        buttons.put("SAVE", new ButtonConfig("SAVE", "OBUIAPP_SaveRow", "SAVE", true, "save"));
+        buttons.put("DELETE", new ButtonConfig("DELETE", "OBUIAPP_DeleteRow", "DELETE", !isNew, "trash"));
+        buttons.put("REFRESH", new ButtonConfig("REFRESH", "OBUIAPP_RefreshData", "REFRESH", true, "refresh-cw"));
+        buttons.put("FIND", new ButtonConfig("FIND", "OBUIAPP_Find", "FIND", true, "search"));
+        buttons.put("EXPORT", new ButtonConfig("EXPORT", "OBUIAPP_ExportGrid", "EXPORT", true, "download"));
+        buttons.put("ATTACHMENTS", new ButtonConfig("ATTACHMENTS", "OBUIAPP_Attachments", "ATTACHMENTS", true, "paperclip"));
+        buttons.put("GRID_VIEW", new ButtonConfig("GRID_VIEW", "OBUIAPP_GridView", "GRID_VIEW", true, "grid"));
+
+        return buttons;
+    }
+
     private static class ButtonConfig {
         String id;
         String name;
@@ -152,68 +163,5 @@ public class ToolbarBuilder {
             this.enabled = enabled;
             this.icon = icon;
         }
-    }
-
-    private Map<String, ButtonConfig> getStandardButtons() {
-        Map<String, ButtonConfig> buttons = new HashMap<>();
-
-        buttons.put("NEW", new ButtonConfig(
-                "NEW",
-                "OBUIAPP_NewDoc",
-                "NEW",
-                true,
-                "plus"
-        ));
-        buttons.put("SAVE", new ButtonConfig(
-                "SAVE",
-                "OBUIAPP_SaveRow",
-                "SAVE",
-                true,
-                "save"
-        ));
-        buttons.put("DELETE", new ButtonConfig(
-                "DELETE",
-                "OBUIAPP_DeleteRow",
-                "DELETE",
-                !isNew,
-                "trash"
-        ));
-        buttons.put("REFRESH", new ButtonConfig(
-                "REFRESH",
-                "OBUIAPP_RefreshData",
-                "REFRESH",
-                true,
-                "refresh-cw"
-        ));
-        buttons.put("FIND", new ButtonConfig(
-                "FIND",
-                "OBUIAPP_Find",
-                "FIND",
-                true,
-                "search"
-        ));
-        buttons.put("EXPORT", new ButtonConfig(
-                "EXPORT",
-                "OBUIAPP_ExportGrid",
-                "EXPORT",
-                true,
-                "download"
-        ));
-        buttons.put("ATTACHMENTS", new ButtonConfig(
-                "ATTACHMENTS",
-                "OBUIAPP_Attachments",
-                "ATTACHMENTS",
-                true,
-                "paperclip"
-        ));
-        buttons.put("GRID_VIEW", new ButtonConfig(
-                "GRID_VIEW",
-                "OBUIAPP_GridView",
-                "GRID_VIEW",
-                true,
-                "grid"
-        ));
-
-        return buttons;
     }
 }
