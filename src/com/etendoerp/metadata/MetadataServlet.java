@@ -2,13 +2,14 @@ package com.etendoerp.metadata;
 
 import com.etendoerp.metadata.builders.*;
 import com.etendoerp.metadata.exceptions.InternalServerException;
+import com.etendoerp.metadata.exceptions.MethodNotAllowedException;
 import com.etendoerp.metadata.exceptions.NotFoundException;
 import com.etendoerp.metadata.exceptions.UnprocessableContentException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONObject;
-import org.openbravo.base.HttpBaseServlet;
+import org.openbravo.base.secureApp.HttpSecureAppServlet;
 import org.openbravo.base.weld.WeldUtils;
 import org.openbravo.client.kernel.KernelServlet;
 import org.openbravo.dal.core.OBContext;
@@ -30,9 +31,9 @@ public class MetadataServlet extends BaseServlet {
     public static final String MENU_PATH = "/menu";
     public static final String WINDOW_PATH = "/window/";
     public static final String LANGUAGE_PATH = "/language";
+    public static final String DELEGATED_SERVLET_PATH = "/servlets";
     private static final Logger logger = LogManager.getLogger(MetadataServlet.class);
     private static final String KERNEL_CLIENT_PATH = "/org.openbravo.client.kernel";
-    public static final String DELEGATED_SERVLET_PATH = "/servlets";
 
     @Override
     public void process(HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
@@ -95,19 +96,27 @@ public class MetadataServlet extends BaseServlet {
 
     private void handleDelegatedServletRequest(HttpServletRequest request, HttpServletResponse response) {
         try {
-            HttpBaseServlet servlet;
+            HttpSecureAppServlet servlet;
+            String method = request.getMethod();
             String[] path = request.getPathInfo().split("/servlets/");
             String servletName = path[path.length - 1];
             List<?> servlets = WeldUtils.getInstances(Class.forName(servletName));
 
             if (servlets.isEmpty()) {
-                servlet = (HttpBaseServlet) Class.forName(servletName).getDeclaredConstructor().newInstance();
+                servlet = (HttpSecureAppServlet) Class.forName(servletName).getDeclaredConstructor().newInstance();
             } else {
-                servlet = (HttpBaseServlet) servlets.get(0);
+                servlet = (HttpSecureAppServlet) servlets.get(0);
             }
 
             servlet.init(this.getServletConfig());
-            servlet.service(request, response);
+
+            if (method.equals(Constants.HTTP_METHOD_POST)) {
+                servlet.doPostCall(request, response);
+            } else if (method.equals(Constants.HTTP_METHOD_GET)) {
+                servlet.doGet(request, response);
+            } else {
+                throw new MethodNotAllowedException();
+            }
         } catch (ClassNotFoundException e) {
             logger.error(e.getMessage(), e);
 

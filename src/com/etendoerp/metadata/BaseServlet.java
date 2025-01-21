@@ -9,10 +9,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.openbravo.base.HttpBaseServlet;
 import org.openbravo.base.secureApp.AllowedCrossDomainsHandler;
-import org.openbravo.base.secureApp.LoginUtils;
-import org.openbravo.base.secureApp.VariablesSecureApp;
 import org.openbravo.dal.core.OBContext;
-import org.openbravo.service.db.DalConnectionProvider;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
@@ -23,6 +20,7 @@ import java.nio.charset.StandardCharsets;
 import static com.etendoerp.metadata.Constants.*;
 import static com.etendoerp.metadata.Utils.*;
 import static com.smf.securewebservices.utils.SecureWebServicesUtils.decodeToken;
+import static com.smf.securewebservices.utils.SecureWebServicesUtils.fillSessionVariables;
 
 /**
  * @author luuchorocha
@@ -43,7 +41,7 @@ public abstract class BaseServlet extends HttpBaseServlet {
 
             checkHttpMethod(request);
             setContext(request);
-            setSession(request);
+            fillSessionVariables(request);
             process(request, response);
         } catch (Exception e) {
             logger.error(ERROR_PROCESSING_REQUEST, e);
@@ -69,11 +67,6 @@ public abstract class BaseServlet extends HttpBaseServlet {
     private void setContentHeaders(HttpServletResponse response) {
         response.setContentType(ContentType.APPLICATION_JSON.getMimeType());
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-    }
-
-    private void setSession(HttpServletRequest request) throws ServletException {
-        OBContext context = OBContext.getOBContext();
-        LoginUtils.fillSessionArguments(new DalConnectionProvider(), new VariablesSecureApp(request), context.getUser().getId(), context.getLanguage().getLanguage(), context.isRTL() ? "Y" : "N", context.getRole().getId(), context.getCurrentClient().getId(), context.getCurrentOrganization().getId(), context.getWarehouse().getId());
     }
 
     protected DecodedJWT getDecodedToken(HttpServletRequest request) {
