@@ -198,6 +198,7 @@ public class TabBuilder {
         addAccessProperties(jsonField, access);
         addBasicProperties(jsonField, field);
         addReferencedProperty(jsonField, field);
+        addReferencedTableInfo(jsonField, field);
 
         if (isProcessField(field)) {
             Process process = field.getColumn().getOBUIAPPProcess();
@@ -263,6 +264,41 @@ public class TabBuilder {
             jsonField.put("referencedWindowId", windowId);
             jsonField.put("referencedTabId", tabId);
         }
+    }
+
+    private void addReferencedTableInfo(JSONObject fieldJson, Field field) throws JSONException {
+        Property referenced = KernelUtils.getProperty(field).getReferencedProperty();
+
+        if (referenced != null) {
+            String tableId = referenced.getEntity().getTableId();
+            Table table = OBDal.getInstance().get(Table.class, tableId);
+
+            Tab referencedTab = (Tab) OBDal.getInstance().createCriteria(Tab.class)
+                    .add(Restrictions.eq(Tab.PROPERTY_TABLE, table))
+                    .add(Restrictions.eq(Tab.PROPERTY_ACTIVE, true))
+                    .setMaxResults(1)
+                    .uniqueResult();
+
+            if (referencedTab != null) {
+                fieldJson.put("referencedEntity", referenced.getEntity().getName());
+                fieldJson.put("referencedWindowId", referencedTab.getWindow().getId());
+                fieldJson.put("referencedTabId", referencedTab.getId());
+                fieldJson.put("referencedFields", getReferencedFields(referencedTab));
+            }
+        }
+    }
+
+    private JSONArray getReferencedFields(Tab tab) throws JSONException {
+        JSONArray fields = new JSONArray();
+        for (Field field : tab.getADFieldList()) {
+            if (field.isActive() && field.isDisplayed()) {
+                JSONObject fieldInfo = new JSONObject();
+                fieldInfo.put("name", field.getName());
+                fieldInfo.put("columnName", field.getColumn().getDBColumnName());
+                fields.put(fieldInfo);
+            }
+        }
+        return fields;
     }
 
     private JSONObject createProcessJSON(Process process) throws JSONException {
