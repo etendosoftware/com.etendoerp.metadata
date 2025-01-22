@@ -14,6 +14,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
 import static com.etendoerp.metadata.Constants.ERROR_PROCESSING_REQUEST;
+import static com.etendoerp.metadata.Constants.HTTP_METHOD_OPTIONS;
 import static com.etendoerp.metadata.Utils.getLanguage;
 
 /**
@@ -27,6 +28,11 @@ public abstract class BaseServlet extends HttpBaseServlet {
         try {
             OBContext.setAdminMode();
             setHeaders(request, response);
+
+            if (request.getMethod().equals(HTTP_METHOD_OPTIONS)) {
+                return;
+            }
+
             authenticate(request);
             process(request, response);
         } catch (Exception e) {
