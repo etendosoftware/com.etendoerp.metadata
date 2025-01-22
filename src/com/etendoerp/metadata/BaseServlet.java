@@ -29,7 +29,7 @@ public abstract class BaseServlet extends HttpBaseServlet {
             OBContext.setAdminMode();
             setHeaders(request, response);
 
-            if (request.getMethod().equals(HTTP_METHOD_OPTIONS)) {
+            if (HTTP_METHOD_OPTIONS.equals(request.getMethod())) {
                 return;
             }
 
