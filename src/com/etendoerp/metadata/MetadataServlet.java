@@ -74,7 +74,7 @@ public class MetadataServlet extends BaseServlet {
 
     private void handleKernelRequest(HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
         KernelServlet servlet = WeldUtils.getInstanceFromStaticBeanManager(KernelServlet.class);
-        servlet.init(this.getServletConfig());
+        initializeServlet(servlet, request);
         servlet.doGet(request, response);
     }
 
