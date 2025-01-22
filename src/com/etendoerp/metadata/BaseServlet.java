@@ -4,9 +4,6 @@ import org.apache.http.entity.ContentType;
 import org.openbravo.authentication.AuthenticationManager;
 import org.openbravo.base.HttpBaseServlet;
 import org.openbravo.base.secureApp.AllowedCrossDomainsHandler;
-import org.openbravo.base.secureApp.LoginUtils;
-import org.openbravo.base.secureApp.VariablesSecureApp;
-import org.openbravo.client.kernel.RequestContext;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.service.json.JsonUtils;
 
@@ -17,7 +14,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
 import static com.etendoerp.metadata.Constants.ERROR_PROCESSING_REQUEST;
-import static com.etendoerp.metadata.Utils.getLanguageCode;
+import static com.etendoerp.metadata.Utils.getLanguage;
 
 /**
  * @author luuchorocha
@@ -43,30 +40,7 @@ public abstract class BaseServlet extends HttpBaseServlet {
 
     protected void authenticate(HttpServletRequest request) throws ServletException {
         AuthenticationManager.getAuthenticationManager(this).webServiceAuthenticate(request);
-        String languageCode = getLanguageCode(request);
-        OBContext context = OBContext.getOBContext();
-        OBContext.setOBContextInSession(request, context);
-        String userId = context.getUser().getId();
-        String clientId = context.getCurrentClient().getId();
-        String orgId = context.getCurrentOrganization().getId();
-        String roleId = context.getRole().getId();
-        String warehouseId = context.getWarehouse().getId();
-        VariablesSecureApp vars = new VariablesSecureApp(userId, clientId, orgId, roleId, languageCode);
-        RequestContext requestContext = RequestContext.get();
-        requestContext.setRequest(request);
-        requestContext.setVariableSecureApp(vars);
-        boolean success = LoginUtils.fillSessionArguments(myPool,
-                                                          vars,
-                                                          userId,
-                                                          languageCode,
-                                                          OBContext.isRightToLeft() ? "Y" : "N",
-                                                          roleId,
-                                                          clientId,
-                                                          orgId,
-                                                          warehouseId);
-        if (!success) {
-            log4j.error("LoginUtils.fillSessionArguments error");
-        }
+        OBContext.getOBContext().setLanguage(getLanguage(request));
     }
 
     private void setHeaders(HttpServletRequest request, HttpServletResponse response) {

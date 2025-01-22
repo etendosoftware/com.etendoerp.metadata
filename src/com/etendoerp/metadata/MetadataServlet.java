@@ -2,7 +2,6 @@ package com.etendoerp.metadata;
 
 import com.etendoerp.metadata.builders.*;
 import com.etendoerp.metadata.exceptions.InternalServerException;
-import com.etendoerp.metadata.exceptions.MethodNotAllowedException;
 import com.etendoerp.metadata.exceptions.NotFoundException;
 import com.etendoerp.metadata.exceptions.UnprocessableContentException;
 import org.apache.logging.log4j.LogManager;
@@ -10,8 +9,11 @@ import org.apache.logging.log4j.Logger;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
+import org.openbravo.base.secureApp.LoginUtils;
+import org.openbravo.base.secureApp.VariablesSecureApp;
 import org.openbravo.base.weld.WeldUtils;
 import org.openbravo.client.kernel.KernelServlet;
+import org.openbravo.client.kernel.RequestContext;
 import org.openbravo.dal.core.OBContext;
 
 import javax.servlet.ServletException;
@@ -97,7 +99,6 @@ public class MetadataServlet extends BaseServlet {
     private void handleDelegatedServletRequest(HttpServletRequest request, HttpServletResponse response) {
         try {
             HttpSecureAppServlet servlet;
-            String method = request.getMethod();
             String[] path = request.getPathInfo().split("/servlets/");
             String servletName = path[path.length - 1];
             List<?> servlets = WeldUtils.getInstances(Class.forName(servletName));
@@ -108,15 +109,8 @@ public class MetadataServlet extends BaseServlet {
                 servlet = (HttpSecureAppServlet) servlets.get(0);
             }
 
-            servlet.init(this.getServletConfig());
-
-            if (method.equals(Constants.HTTP_METHOD_POST)) {
-                servlet.doPostCall(request, response);
-            } else if (method.equals(Constants.HTTP_METHOD_GET)) {
-                servlet.doGet(request, response);
-            } else {
-                throw new MethodNotAllowedException();
-            }
+            initializeServlet(servlet, request);
+            servlet.service(request, response);
         } catch (ClassNotFoundException e) {
             logger.error(e.getMessage(), e);
 
@@ -125,6 +119,33 @@ public class MetadataServlet extends BaseServlet {
             logger.error(e.getMessage(), e);
 
             throw new InternalServerException();
+        }
+    }
+
+    private void initializeServlet(HttpSecureAppServlet servlet, HttpServletRequest request) throws ServletException {
+        servlet.init(this.getServletConfig());
+        OBContext context = OBContext.getOBContext();
+        String userId = context.getUser().getId();
+        String clientId = context.getCurrentClient().getId();
+        String orgId = context.getCurrentOrganization().getId();
+        String roleId = context.getRole().getId();
+        String warehouseId = context.getWarehouse().getId();
+        String languageCode = context.getLanguage().getLanguage();
+        VariablesSecureApp vars = new VariablesSecureApp(userId, clientId, orgId, roleId, languageCode);
+        RequestContext requestContext = RequestContext.get();
+        requestContext.setRequest(request);
+        requestContext.setVariableSecureApp(vars);
+        boolean success = LoginUtils.fillSessionArguments(myPool,
+                                                          vars,
+                                                          userId,
+                                                          languageCode,
+                                                          OBContext.isRightToLeft() ? "Y" : "N",
+                                                          roleId,
+                                                          clientId,
+                                                          orgId,
+                                                          warehouseId);
+        if (!success) {
+            log4j.error("LoginUtils.fillSessionArguments error");
         }
     }
 
