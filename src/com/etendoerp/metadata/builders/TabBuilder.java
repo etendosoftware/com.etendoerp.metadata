@@ -23,6 +23,7 @@ import org.openbravo.dal.core.DalUtil;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.data.Sqlc;
+import org.openbravo.erpCommon.utility.Utility;
 import org.openbravo.model.ad.access.FieldAccess;
 import org.openbravo.model.ad.access.TabAccess;
 import org.openbravo.model.ad.datamodel.Column;
@@ -53,7 +54,11 @@ public class TabBuilder {
     private static final String TABLE_DIR_REFERENCE_ID = "19";
     private static final String TABLE_REFERENCE_ID = "18";
     private static final String TREE_REFERENCE_ID = "8C57A4A2E05F4261A1FADF47C30398AD";
-    private static final List<String> SELECTOR_REFERENCES = Arrays.asList(TABLE_REFERENCE_ID, TABLE_DIR_REFERENCE_ID, SEARCH_REFERENCE_ID, SELECTOR_REFERENCE_ID, TREE_REFERENCE_ID);
+    private static final List<String> SELECTOR_REFERENCES = Arrays.asList(TABLE_REFERENCE_ID,
+                                                                          TABLE_DIR_REFERENCE_ID,
+                                                                          SEARCH_REFERENCE_ID,
+                                                                          SELECTOR_REFERENCE_ID,
+                                                                          TREE_REFERENCE_ID);
     private static final List<String> ALWAYS_DISPLAYED_COLUMNS = Collections.singletonList("AD_Org_ID");
     private static final String LIST_REFERENCE_ID = "17";
     private static final String CUSTOM_QUERY_DS = "F8DD408F2F3A414188668836F84C21AF";
@@ -97,7 +102,8 @@ public class TabBuilder {
             final Property property = DalUtil.getPropertyFromPath(entity, selectorField.getProperty());
             Check.isNotNull(property, "Property " + selectorField.getProperty() + " not found in Entity " + entity);
             return property.getDomainType();
-        } else if (selectorField.getObuiselSelector().getTable() != null && selectorField.getObuiselSelector().isCustomQuery() && selectorField.getReference() != null) {
+        } else if (selectorField.getObuiselSelector().getTable() != null && selectorField.getObuiselSelector()
+                                                                                         .isCustomQuery() && selectorField.getReference() != null) {
             return getDomainType(selectorField.getReference().getId());
         } else if (selectorField.getObserdsDatasourceField().getReference() != null) {
             return getDomainType(selectorField.getObserdsDatasourceField().getReference().getId());
@@ -153,7 +159,11 @@ public class TabBuilder {
     private JSONArray getParentColumns() {
         JSONArray jsonColumns = new JSONArray();
 
-        tab.getTable().getADColumnList().stream().filter(column -> tab.getTabLevel() > 0 && column.isLinkToParentColumn()).forEach(column -> jsonColumns.put(getEntityColumnName(column)));
+        tab.getTable()
+           .getADColumnList()
+           .stream()
+           .filter(column -> tab.getTabLevel() > 0 && column.isLinkToParentColumn())
+           .forEach(column -> jsonColumns.put(getEntityColumnName(column)));
 
         return jsonColumns;
     }
@@ -164,7 +174,12 @@ public class TabBuilder {
 
         if (adFieldAccessList == null || adFieldAccessList.isEmpty()) {
             // All tabs
-            for (Field field : tab.getADFieldList().stream().filter(field -> field.isActive() && shouldDisplayField(field) && hasAccessToProcess(field, tab.getWindow().getId())).collect(Collectors.toList())) {
+            for (Field field : tab.getADFieldList()
+                                  .stream()
+                                  .filter(field -> field.isActive() && shouldDisplayField(field) && hasAccessToProcess(
+                                          field,
+                                          tab.getWindow().getId()))
+                                  .collect(Collectors.toList())) {
 
                 String columnName = getEntityColumnName(field.getColumn());
 
@@ -172,7 +187,13 @@ public class TabBuilder {
             }
         } else {
             // certain tabs
-            for (FieldAccess fieldAccess : adFieldAccessList.stream().filter(fieldAccess -> fieldAccess.isActive() && fieldAccess.getField().isActive() && shouldDisplayField(fieldAccess.getField()) && hasAccessToProcess(fieldAccess.getField(), tab.getWindow().getId())).collect(Collectors.toList())) {
+            for (FieldAccess fieldAccess : adFieldAccessList.stream()
+                                                            .filter(fieldAccess -> fieldAccess.isActive() && fieldAccess.getField()
+                                                                                                                        .isActive() && shouldDisplayField(
+                                                                    fieldAccess.getField()) && hasAccessToProcess(
+                                                                    fieldAccess.getField(),
+                                                                    tab.getWindow().getId()))
+                                                            .collect(Collectors.toList())) {
 
                 Field field = fieldAccess.getField();
 
@@ -209,6 +230,7 @@ public class TabBuilder {
             processJson.put("buttonText", field.getColumn().getName());
             processJson.put("fieldName", field.getName());
             processJson.put("reference", field.getColumn().getReference().getId());
+            processJson.put("manualURL", Utility.getTabURL(tab, null, false));
 
             jsonField.put("process", processJson);
         }
@@ -254,7 +276,11 @@ public class TabBuilder {
         if (referenced != null) {
             String tableId = referenced.getEntity().getTableId();
             Table table = OBDal.getInstance().get(Table.class, tableId);
-            Tab referencedTab = (Tab) OBDal.getInstance().createCriteria(Tab.class).add(Restrictions.eq(Tab.PROPERTY_TABLE, table)).setMaxResults(1).uniqueResult();
+            Tab referencedTab = (Tab) OBDal.getInstance()
+                                           .createCriteria(Tab.class)
+                                           .add(Restrictions.eq(Tab.PROPERTY_TABLE, table))
+                                           .setMaxResults(1)
+                                           .uniqueResult();
             Window referencedWindow = referencedTab != null ? referencedTab.getWindow() : null;
             String tabId = referencedTab != null ? referencedTab.getId() : null;
             String windowId = referencedWindow != null ? referencedWindow.getId() : null;
@@ -265,7 +291,7 @@ public class TabBuilder {
         }
     }
 
-    private JSONObject createProcessJSON(Process process) throws JSONException {
+    public JSONObject createProcessJSON(Process process) throws JSONException {
         JSONObject processJSON = converter.toJsonObject(process, DataResolvingMode.FULL_TRANSLATABLE);
         JSONArray parameters = new JSONArray();
 
@@ -290,10 +316,9 @@ public class TabBuilder {
     protected boolean isProcessField(Field field) {
         Column column = field.getColumn();
 
-        return column != null &&
-                column.getReference() != null &&
-                PROCESS_REFERENCE_VALUE.equals(column.getReference().getId()) &&
-                column.getOBUIAPPProcess() != null;    }
+        return column != null && column.getReference() != null && PROCESS_REFERENCE_VALUE.equals(column.getReference()
+                                                                                                       .getId()) && column.getOBUIAPPProcess() != null;
+    }
 
     private boolean isRefListField(Field field) {
         Column column = field.getColumn();
@@ -315,7 +340,8 @@ public class TabBuilder {
             // If the parent table is not based in a db table, don't try to retrieve the record
             // Because tables not based on db tables do not have BaseOBObjects
             // See issue https://issues.openbravo.com/view.php?id=29667
-            if (parentTab != null && ApplicationConstants.TABLEBASEDTABLE.equals(parentTab.getTable().getDataOriginType())) {
+            if (parentTab != null && ApplicationConstants.TABLEBASEDTABLE.equals(parentTab.getTable()
+                                                                                          .getDataOriginType())) {
                 parentEntity = ModelProvider.getInstance().getEntityByTableName(parentTab.getTable().getDBTableName());
             }
 
@@ -336,7 +362,8 @@ public class TabBuilder {
     }
 
     protected boolean hasAccessToProcess(Field field, String windowId) {
-        Process process = field.getColumn() != null && field.getColumn().getOBUIAPPProcess() != null ? field.getColumn().getOBUIAPPProcess() : null;
+        Process process = field.getColumn() != null && field.getColumn().getOBUIAPPProcess() != null ? field.getColumn()
+                                                                                                            .getOBUIAPPProcess() : null;
         if (process != null) {
             HashMap<String, Object> params = new HashMap<>();
             params.put("windowId", windowId);
@@ -347,9 +374,17 @@ public class TabBuilder {
     }
 
     protected boolean shouldDisplayField(Field field) {
-        boolean isScanProcess = field.getColumn() != null && field.getColumn().getOBUIAPPProcess() != null && field.getColumn().getOBUIAPPProcess().isSmfmuScan() != null && field.getColumn().getOBUIAPPProcess().isSmfmuScan();
+        boolean isScanProcess = field.getColumn() != null && field.getColumn()
+                                                                  .getOBUIAPPProcess() != null && field.getColumn()
+                                                                                                       .getOBUIAPPProcess()
+                                                                                                       .isSmfmuScan() != null && field.getColumn()
+                                                                                                                                      .getOBUIAPPProcess()
+                                                                                                                                      .isSmfmuScan();
 
-        return field.getColumn() != null && (field.isDisplayed() || isScanProcess || field.getColumn().isStoredInSession() || field.getColumn().isLinkToParentColumn() || ALWAYS_DISPLAYED_COLUMNS.contains(field.getColumn().getDBColumnName()));
+        return field.getColumn() != null && (field.isDisplayed() || isScanProcess || field.getColumn()
+                                                                                          .isStoredInSession() || field.getColumn()
+                                                                                                                       .isLinkToParentColumn() || ALWAYS_DISPLAYED_COLUMNS.contains(
+                field.getColumn().getDBColumnName()));
     }
 
     private JSONObject getSelectorInfo(String fieldId, Reference ref) throws JSONException {
@@ -382,7 +417,10 @@ public class TabBuilder {
             selectorInfo.put("filterClass", "org.openbravo.userinterface.selector.SelectorDataSourceFilter");
 
             if (selector.getDisplayfield() != null) {
-                selectorInfo.put(JsonConstants.SORTBY_PARAMETER, selector.getDisplayfield().getDisplayColumnAlias() != null ? selector.getDisplayfield().getDisplayColumnAlias() : selector.getDisplayfield().getProperty());
+                selectorInfo.put(JsonConstants.SORTBY_PARAMETER,
+                                 selector.getDisplayfield().getDisplayColumnAlias() != null ? selector.getDisplayfield()
+                                                                                                      .getDisplayColumnAlias() : selector.getDisplayfield()
+                                                                                                                                         .getProperty());
             } else {
                 selectorInfo.put(JsonConstants.SORTBY_PARAMETER, JsonConstants.IDENTIFIER);
             }
@@ -391,7 +429,10 @@ public class TabBuilder {
             // For now we only support suggestion style search (only drop down)
             selectorInfo.put(JsonConstants.TEXTMATCH_PARAMETER, selector.getSuggestiontextmatchstyle());
 
-            setSelectorProperties(selector.getOBUISELSelectorFieldList(), selector.getDisplayfield(), selector.getValuefield(), selectorInfo);
+            setSelectorProperties(selector.getOBUISELSelectorFieldList(),
+                                  selector.getDisplayfield(),
+                                  selector.getValuefield(),
+                                  selectorInfo);
 
             selectorInfo.put("extraSearchFields", getExtraSearchFields(selector));
             selectorInfo.put(DISPLAY_FIELD_PROPERTY, getDisplayField(selector));
@@ -458,7 +499,8 @@ public class TabBuilder {
                 selectedProperties.append(",").append(fieldName);
             }
 
-            if ((!field.isOutfield() || (displayField == null || fieldName.equals(displayFieldProperty))) && (valueField == null || fieldName.equals(valueFieldProperty))) {
+            if ((!field.isOutfield() || (displayField == null || fieldName.equals(displayFieldProperty))) && (valueField == null || fieldName.equals(
+                    valueFieldProperty))) {
                 if (field.isOutfield()) {
                     extraProperties.append(",").append(fieldName);
                 }
@@ -472,7 +514,10 @@ public class TabBuilder {
     public String getExtraSearchFields(Selector selector) {
         final String displayField = getDisplayField(selector);
         final StringBuilder sb = new StringBuilder();
-        for (SelectorField selectorField : selector.getOBUISELSelectorFieldList().stream().filter(SelectorField::isActive).collect(Collectors.toList())) {
+        for (SelectorField selectorField : selector.getOBUISELSelectorFieldList()
+                                                   .stream()
+                                                   .filter(SelectorField::isActive)
+                                                   .collect(Collectors.toList())) {
             String fieldName = getPropertyOrDataSourceField(selectorField);
             if (fieldName.equals(displayField)) {
                 continue;
