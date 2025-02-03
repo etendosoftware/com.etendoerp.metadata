@@ -1,6 +1,7 @@
 package com.etendoerp.metadata.builders;
 
 import com.etendoerp.metadata.exceptions.InternalServerException;
+import org.apache.commons.lang.StringUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.codehaus.jettison.json.JSONArray;
@@ -15,6 +16,7 @@ import org.openbravo.base.model.domaintype.ForeignKeyDomainType;
 import org.openbravo.base.model.domaintype.PrimitiveDomainType;
 import org.openbravo.base.util.Check;
 import org.openbravo.client.application.ApplicationConstants;
+import org.openbravo.client.application.DynamicExpressionParser;
 import org.openbravo.client.application.Parameter;
 import org.openbravo.client.application.Process;
 import org.openbravo.client.application.process.BaseProcessActionHandler;
@@ -71,6 +73,7 @@ public class TabBuilder {
     private static final Logger logger = LogManager.getLogger();
     private final Tab tab;
     private final TabAccess tabAccess;
+
 
     public TabBuilder(Tab tab, TabAccess tabAccess) {
         this.tab = tab;
@@ -199,6 +202,9 @@ public class TabBuilder {
         addBasicProperties(jsonField, field);
         addReferencedProperty(jsonField, field);
         addReferencedTableInfo(jsonField, field);
+
+        JSONObject readOnlyState = getFieldReadOnlyState(field);
+        jsonField.put("readOnlyState", readOnlyState);
 
         if (isProcessField(field)) {
             Process process = field.getColumn().getOBUIAPPProcess();
@@ -584,6 +590,52 @@ public class TabBuilder {
             return boolean.class == primitiveDomainType.getPrimitiveType() || Boolean.class == primitiveDomainType.getPrimitiveType();
         }
         return false;
+    }
+
+    private JSONObject getFieldReadOnlyState(Field field) {
+        JSONObject readOnlyInfo = new JSONObject();
+        try {
+            boolean isReadOnly = field.isReadOnly();
+
+            if (tabAccess != null) {
+                for (FieldAccess fieldAccess : tabAccess.getADFieldAccessList()) {
+                    if (fieldAccess.getField().equals(field)) {
+                        isReadOnly = isReadOnly || !fieldAccess.isEditableField();
+                        break;
+                    }
+                }
+            }
+
+            if (field.getColumn() != null && field.getColumn().getReadOnlyLogic() != null) {
+                final DynamicExpressionParser parser = new DynamicExpressionParser(
+                        field.getColumn().getReadOnlyLogic(),
+                        tab,
+                        field
+                );
+                String jsExpr = parser.getJSExpression();
+                if (StringUtils.isNotEmpty(jsExpr)) {
+                    readOnlyInfo.put("readOnlyLogicExpr", jsExpr);
+                    isReadOnly = true;
+                }
+            }
+
+            readOnlyInfo.put("readOnly", isReadOnly);
+            readOnlyInfo.put("readOnlyReason", getReadOnlyReason(field, isReadOnly));
+
+        } catch (JSONException e) {
+            logger.error("Error computing read-only state for field: " + field.getName(), e);
+        }
+        return readOnlyInfo;
+    }
+
+    private String getReadOnlyReason(Field field, boolean isReadOnly) {
+        if (!isReadOnly) return null;
+
+        if (field.isReadOnly()) return "FIELD_READONLY";
+        if (field.getColumn() != null && field.getColumn().getReadOnlyLogic() != null) {
+            return "READONLY_LOGIC";
+        }
+        return "ACCESS_LEVEL";
     }
 
 }
