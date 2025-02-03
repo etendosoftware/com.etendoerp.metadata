@@ -1,6 +1,7 @@
 package com.etendoerp.metadata.builders;
 
 import com.etendoerp.metadata.exceptions.InternalServerException;
+import org.apache.commons.lang.StringUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.codehaus.jettison.json.JSONArray;
@@ -76,13 +77,12 @@ public class TabBuilder {
     private static final Logger logger = LogManager.getLogger();
     private final Tab tab;
     private final TabAccess tabAccess;
-    private final FormInitializationComponent fic;
 
 
     public TabBuilder(Tab tab, TabAccess tabAccess) {
         this.tab = tab;
         this.tabAccess = tabAccess;
-        this.fic = WeldUtils.getInstanceFromStaticBeanManager(FormInitializationComponent.class);
+        FormInitializationComponent fic = WeldUtils.getInstanceFromStaticBeanManager(FormInitializationComponent.class);
     }
 
     private static JSONArray getListInfo(Reference refList) throws JSONException {
@@ -618,7 +618,7 @@ public class TabBuilder {
                         field
                 );
                 String jsExpr = parser.getJSExpression();
-                if (jsExpr != null && !jsExpr.isEmpty()) {
+                if (jsExpr != null && (!StringUtils.isNotEmpty(jsExpr))) {
                     readOnlyInfo.put("readOnlyLogicExpr", jsExpr);
                     isReadOnly = true;
                 }
