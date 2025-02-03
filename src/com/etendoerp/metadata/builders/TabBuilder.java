@@ -14,18 +14,14 @@ import org.openbravo.base.model.Property;
 import org.openbravo.base.model.domaintype.DomainType;
 import org.openbravo.base.model.domaintype.ForeignKeyDomainType;
 import org.openbravo.base.model.domaintype.PrimitiveDomainType;
-import org.openbravo.base.structure.BaseOBObject;
 import org.openbravo.base.util.Check;
-import org.openbravo.base.weld.WeldUtils;
 import org.openbravo.client.application.ApplicationConstants;
 import org.openbravo.client.application.DynamicExpressionParser;
 import org.openbravo.client.application.Parameter;
 import org.openbravo.client.application.Process;
 import org.openbravo.client.application.process.BaseProcessActionHandler;
-import org.openbravo.client.application.window.FormInitializationComponent;
 import org.openbravo.client.kernel.KernelUtils;
 import org.openbravo.dal.core.DalUtil;
-import org.openbravo.dal.security.SecurityChecker;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.data.Sqlc;
@@ -82,7 +78,6 @@ public class TabBuilder {
     public TabBuilder(Tab tab, TabAccess tabAccess) {
         this.tab = tab;
         this.tabAccess = tabAccess;
-        FormInitializationComponent fic = WeldUtils.getInstanceFromStaticBeanManager(FormInitializationComponent.class);
     }
 
     private static JSONArray getListInfo(Reference refList) throws JSONException {
@@ -618,7 +613,7 @@ public class TabBuilder {
                         field
                 );
                 String jsExpr = parser.getJSExpression();
-                if (jsExpr != null && (!StringUtils.isNotEmpty(jsExpr))) {
+                if (StringUtils.isNotEmpty(jsExpr)) {
                     readOnlyInfo.put("readOnlyLogicExpr", jsExpr);
                     isReadOnly = true;
                 }
