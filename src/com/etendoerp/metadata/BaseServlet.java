@@ -1,67 +1,58 @@
 package com.etendoerp.metadata;
 
-import com.auth0.jwt.interfaces.DecodedJWT;
-import com.etendoerp.metadata.exceptions.MethodNotAllowedException;
-import com.etendoerp.metadata.exceptions.UnauthorizedException;
-import org.apache.commons.lang.StringUtils;
 import org.apache.http.entity.ContentType;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-import org.openbravo.base.HttpBaseServlet;
 import org.openbravo.base.secureApp.AllowedCrossDomainsHandler;
+import org.openbravo.base.secureApp.HttpSecureAppServlet;
 import org.openbravo.dal.core.OBContext;
+import org.openbravo.service.json.JsonUtils;
 
-import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
-import static com.etendoerp.metadata.Constants.*;
-import static com.etendoerp.metadata.Utils.*;
-import static com.smf.securewebservices.utils.SecureWebServicesUtils.decodeToken;
-import static com.smf.securewebservices.utils.SecureWebServicesUtils.fillSessionVariables;
+import static com.etendoerp.metadata.Utils.getLanguage;
 
 /**
  * @author luuchorocha
  */
-public abstract class BaseServlet extends HttpBaseServlet {
-    private static final Logger logger = LogManager.getLogger(BaseServlet.class);
+public abstract class BaseServlet extends HttpSecureAppServlet {
+    protected abstract void process(HttpServletRequest request, HttpServletResponse response) throws Exception;
 
     @Override
-    public final void service(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+    public final void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException {
         try {
             OBContext.setAdminMode();
-            setCorsHeaders(request, response);
-            setContentHeaders(response);
-
-            if (HTTP_METHOD_OPTIONS.equals(request.getMethod())) {
-                return;
-            }
-
-            checkHttpMethod(request);
-            setContext(request);
-            fillSessionVariables(request);
+            setHeaders(request, response);
+            setContext(request, response);
             process(request, response);
         } catch (Exception e) {
-            logger.error(ERROR_PROCESSING_REQUEST, e);
-            response.getWriter().write(buildErrorJson(e));
+            log4j.error(e.getMessage(), e);
             response.setStatus(getResponseStatus(e));
+            response.getWriter().write(JsonUtils.convertExceptionToJson(e));
         } finally {
             OBContext.restorePreviousMode();
         }
     }
 
-    private void checkHttpMethod(HttpServletRequest request) {
-        if (!(HTTP_METHOD_POST.equals(request.getMethod()) || HTTP_METHOD_GET.equals(request.getMethod()))) {
-            throw new MethodNotAllowedException(ONLY_POST_METHOD_IS_ALLOWED);
-        }
+    @Override
+    public final void doPost(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        doGet(request, response);
+    }
+
+    private void setContext(HttpServletRequest request, HttpServletResponse response) {
+        OBContext context = OBContext.getOBContext();
+        OBContext.setOBContextInSession(request, context);
+        context.setLanguage(getLanguage(request));
+    }
+
+    private void setHeaders(HttpServletRequest request, HttpServletResponse response) {
+        setCorsHeaders(request, response);
+        setContentHeaders(response);
     }
 
     private void setCorsHeaders(HttpServletRequest request, HttpServletResponse response) {
-        if (HTTP_METHOD_OPTIONS.equals(request.getMethod()) || HTTP_METHOD_POST.equals(request.getMethod()) || HTTP_METHOD_GET.equals(request.getMethod())) {
-            AllowedCrossDomainsHandler.getInstance().setCORSHeaders(request, response);
-        }
+        AllowedCrossDomainsHandler.getInstance().setCORSHeaders(request, response);
     }
 
     private void setContentHeaders(HttpServletResponse response) {
@@ -69,48 +60,8 @@ public abstract class BaseServlet extends HttpBaseServlet {
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
     }
 
-    protected DecodedJWT getDecodedToken(HttpServletRequest request) {
-        String token = getToken(request);
-
-        if (StringUtils.isBlank(token)) {
-            throw new UnauthorizedException(INVALID_OR_MISSING_TOKEN);
-        }
-
-        try {
-            DecodedJWT decodedToken = decodeToken(token);
-
-            if (decodedToken == null) {
-                throw new UnauthorizedException(INVALID_OR_MISSING_TOKEN);
-            }
-
-            return decodedToken;
-        } catch (Exception e) {
-            logger.error(FAILED_TO_DECODE_TOKEN, e);
-            throw new UnauthorizedException(INVALID_OR_MISSING_TOKEN);
-        }
-    }
-
-    protected void setContext(HttpServletRequest request) {
-        DecodedJWT decodedToken = getDecodedToken(request);
-        String userId = decodedToken.getClaim("user").asString();
-        String roleId = decodedToken.getClaim("role").asString();
-        String orgId = decodedToken.getClaim("organization").asString();
-        String warehouseId = decodedToken.getClaim("warehouse").asString();
-        String clientId = decodedToken.getClaim("client").asString();
-        String languageCode = getLanguageCode(request);
-
-        if (isNullOrEmpty(userId) || isNullOrEmpty(roleId) || isNullOrEmpty(orgId) || isNullOrEmpty(warehouseId) || isNullOrEmpty(clientId)) {
-            logger.error(MISSING_REQUIRED_CLAIMS, userId, roleId, orgId, warehouseId, clientId);
-            throw new UnauthorizedException(INVALID_OR_MISSING_TOKEN);
-        }
-
-        OBContext.setOBContext(userId, roleId, clientId, orgId, languageCode, warehouseId);
-    }
-
     protected int getResponseStatus(Exception e) {
-        String exceptionName = e.getClass().getSimpleName();
-
-        switch (exceptionName) {
+        switch (e.getClass().getSimpleName()) {
             case "OBSecurityException":
             case "UnauthorizedException":
                 return 401;
@@ -122,6 +73,4 @@ public abstract class BaseServlet extends HttpBaseServlet {
                 return 500;
         }
     }
-
-    public abstract void process(HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException;
 }
