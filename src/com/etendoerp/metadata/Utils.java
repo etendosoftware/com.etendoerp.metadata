@@ -23,7 +23,7 @@ public class Utils {
                                     .orElse(null);
 
         return OBDal.getInstance()
-                    .createQuery(Language.class, "language = :languageCode")
+                    .createQuery(Language.class, "language = :languageCode AND IsSystemLanguage='Y'")
                     .setNamedParameter("languageCode", languageCode)
                     .uniqueResult();
     }

@@ -149,34 +149,40 @@ public class MetadataServlet extends BaseServlet {
     }
 
 
-    private void initializeServlet(HttpSecureAppServlet servlet, HttpServletRequest request, HttpServletResponse response) throws ServletException {
-        servlet.init(this.getServletConfig());
+    private void initializeServlet(HttpSecureAppServlet servlet, HttpServletRequest request, HttpServletResponse response) {
+        try {
+            servlet.init(this.getServletConfig());
 
-        OBContext context = OBContext.getOBContext();
-        VariablesSecureApp vars = new VariablesSecureApp(request, false);
+            OBContext context = OBContext.getOBContext();
+            VariablesSecureApp vars = new VariablesSecureApp(request, false);
 
-        String userId = context.getUser().getId();
-        String language = context.getLanguage().getLanguage();
-        String isRTL = context.isRTL() ? "Y" : "N";
-        String roleId = context.getRole().getId();
-        String clientId = context.getCurrentClient().getId();
-        String orgId = context.getCurrentOrganization().getId();
-        String warehouseId = context.getWarehouse() != null ? context.getWarehouse().getId() : "";
+            String userId = context.getUser().getId();
+            String language = context.getLanguage().getLanguage();
+            String isRTL = context.isRTL() ? "Y" : "N";
+            String roleId = context.getRole().getId();
+            String clientId = context.getCurrentClient().getId();
+            String orgId = context.getCurrentOrganization().getId();
+            String warehouseId = context.getWarehouse() != null ? context.getWarehouse().getId() : "";
 
-        boolean sessionFilled = LoginUtils.fillSessionArguments(myPool,
-                                                                vars,
-                                                                userId,
-                                                                language,
-                                                                isRTL,
-                                                                roleId,
-                                                                clientId,
-                                                                orgId,
-                                                                warehouseId);
+            boolean sessionFilled = LoginUtils.fillSessionArguments(myPool,
+                                                                    vars,
+                                                                    userId,
+                                                                    language,
+                                                                    isRTL,
+                                                                    roleId,
+                                                                    clientId,
+                                                                    orgId,
+                                                                    warehouseId);
 
-        if (sessionFilled) {
-            readProperties(vars);
-            readNumberFormat(vars, globalParameters.getFormatPath());
-            LoginUtils.saveLoginBD(request, vars, "0", "0");
+            if (sessionFilled) {
+                readProperties(vars);
+                readNumberFormat(vars, globalParameters.getFormatPath());
+                LoginUtils.saveLoginBD(request, vars, "0", "0");
+            }
+        } catch (Exception e) {
+            log4j.error(e.getMessage(), e);
+
+            throw new InternalServerException(e.getMessage());
         }
     }
 

@@ -4,6 +4,7 @@ import org.apache.http.entity.ContentType;
 import org.openbravo.base.secureApp.AllowedCrossDomainsHandler;
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
 import org.openbravo.dal.core.OBContext;
+import org.openbravo.model.ad.system.Language;
 import org.openbravo.service.json.JsonUtils;
 
 import javax.servlet.http.HttpServletRequest;
@@ -42,8 +43,13 @@ public abstract class BaseServlet extends HttpSecureAppServlet {
 
     private void setContext(HttpServletRequest request, HttpServletResponse response) {
         OBContext context = OBContext.getOBContext();
+        Language language = getLanguage(request);
+
+        if (language != null) {
+            context.setLanguage(getLanguage(request));
+        }
+
         OBContext.setOBContextInSession(request, context);
-        context.setLanguage(getLanguage(request));
     }
 
     private void setHeaders(HttpServletRequest request, HttpServletResponse response) {
