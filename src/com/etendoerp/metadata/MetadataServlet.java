@@ -10,15 +10,19 @@ import org.apache.logging.log4j.Logger;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
+import org.openbravo.base.secureApp.LoginUtils;
+import org.openbravo.base.secureApp.VariablesSecureApp;
 import org.openbravo.base.weld.WeldUtils;
-import org.openbravo.client.kernel.KernelServlet;
 import org.openbravo.dal.core.OBContext;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.lang.reflect.Method;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 import static com.etendoerp.metadata.Utils.sendSuccessResponse;
 
@@ -33,7 +37,6 @@ public class MetadataServlet extends BaseServlet {
     public static final String LANGUAGE_PATH = "/language";
     public static final String DELEGATED_SERVLET_PATH = "/servlets";
     private static final Logger logger = LogManager.getLogger(MetadataServlet.class);
-    private static final String KERNEL_CLIENT_PATH = "/org.openbravo.client.kernel";
 
     @Override
     public void process(HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
@@ -47,8 +50,6 @@ public class MetadataServlet extends BaseServlet {
             handleSessionRequest(request, response);
         } else if (path.startsWith(TOOLBAR_PATH)) {
             handleToolbarRequest(request, response);
-        } else if (path.startsWith(KERNEL_CLIENT_PATH)) {
-            handleKernelRequest(request, response);
         } else if (path.startsWith(DELEGATED_SERVLET_PATH)) {
             handleDelegatedServletRequest(request, response);
         } else if (path.startsWith(LANGUAGE_PATH)) {
@@ -68,12 +69,6 @@ public class MetadataServlet extends BaseServlet {
 
     private void handleSessionRequest(HttpServletRequest request, HttpServletResponse response) throws IOException {
         response.getWriter().write(this.fetchSession().toString());
-    }
-
-    private void handleKernelRequest(HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
-        KernelServlet servlet = WeldUtils.getInstanceFromStaticBeanManager(KernelServlet.class);
-        servlet.init(this.getServletConfig());
-        servlet.doGet(request, response);
     }
 
     private void handleToolbarRequest(HttpServletRequest request, HttpServletResponse response) {
@@ -96,37 +91,101 @@ public class MetadataServlet extends BaseServlet {
 
     private void handleDelegatedServletRequest(HttpServletRequest request, HttpServletResponse response) {
         try {
-            HttpSecureAppServlet servlet;
             String method = request.getMethod();
-            String[] path = request.getPathInfo().split("/servlets/");
-            String servletName = path[path.length - 1];
-            List<?> servlets = WeldUtils.getInstances(Class.forName(servletName));
+            String pathInfo = request.getPathInfo();
 
-            if (servlets.isEmpty()) {
-                servlet = (HttpSecureAppServlet) Class.forName(servletName).getDeclaredConstructor().newInstance();
-            } else {
-                servlet = (HttpSecureAppServlet) servlets.get(0);
+            if (pathInfo == null || !pathInfo.contains("/servlets/")) {
+                throw new NotFoundException();
             }
 
-            servlet.init(this.getServletConfig());
+            String[] path = pathInfo.split("/servlets/");
 
-            if (method.equals(Constants.HTTP_METHOD_POST)) {
-                servlet.doPostCall(request, response);
-            } else if (method.equals(Constants.HTTP_METHOD_GET)) {
-                servlet.doGet(request, response);
-            } else {
-                throw new MethodNotAllowedException();
+            if (path.length < 2 || path[1].isEmpty()) {
+                throw new NotFoundException("Invalid servlet name in request path: " + pathInfo);
             }
+
+            String servletName = path[1];
+            HttpSecureAppServlet servlet = getOrCreateServlet(servletName);
+
+            initializeServlet(servlet, request, response);
+
+            Map<String, String> methodMap = Map.of(Constants.HTTP_METHOD_GET,
+                                                   "doGet",
+                                                   Constants.HTTP_METHOD_POST,
+                                                   "doPost");
+
+            String servletMethodName = methodMap.getOrDefault(method, "service");
+            Method delegatedMethod = findMethod(servlet, servletMethodName);
+
+            delegatedMethod.invoke(servlet, request, response);
+
         } catch (ClassNotFoundException e) {
             logger.error(e.getMessage(), e);
-
             throw new NotFoundException();
         } catch (Exception e) {
             logger.error(e.getMessage(), e);
-
             throw new InternalServerException();
         }
     }
+
+    private HttpSecureAppServlet getOrCreateServlet(String servletName) throws Exception {
+        List<?> servlets = WeldUtils.getInstances(Class.forName(servletName));
+
+        if (!servlets.isEmpty()) {
+            return (HttpSecureAppServlet) servlets.get(0);
+        }
+
+        Class<? extends HttpSecureAppServlet> servletClass = Class.forName(servletName)
+                                                                  .asSubclass(HttpSecureAppServlet.class);
+
+        return servletClass.getDeclaredConstructor().newInstance();
+    }
+
+    private Method findMethod(HttpSecureAppServlet servlet, String methodName) throws MethodNotAllowedException {
+        return Arrays.stream(servlet.getClass().getDeclaredMethods())
+                     .filter(m -> m.getName().equals(methodName))
+                     .findFirst()
+                     .orElseThrow(MethodNotAllowedException::new);
+    }
+
+
+    private void initializeServlet(HttpSecureAppServlet servlet, HttpServletRequest request, HttpServletResponse response) {
+        try {
+            servlet.init(this.getServletConfig());
+
+            OBContext context = OBContext.getOBContext();
+            VariablesSecureApp vars = new VariablesSecureApp(request, false);
+
+            String userId = context.getUser().getId();
+            String language = context.getLanguage().getLanguage();
+            String isRTL = context.isRTL() ? "Y" : "N";
+            String roleId = context.getRole().getId();
+            String clientId = context.getCurrentClient().getId();
+            String orgId = context.getCurrentOrganization().getId();
+            String warehouseId = context.getWarehouse() != null ? context.getWarehouse().getId() : "";
+
+            boolean sessionFilled = LoginUtils.fillSessionArguments(myPool,
+                                                                    vars,
+                                                                    userId,
+                                                                    language,
+                                                                    isRTL,
+                                                                    roleId,
+                                                                    clientId,
+                                                                    orgId,
+                                                                    warehouseId);
+
+            if (sessionFilled) {
+                readProperties(vars);
+                readNumberFormat(vars, globalParameters.getFormatPath());
+                LoginUtils.saveLoginBD(request, vars, "0", "0");
+            }
+        } catch (Exception e) {
+            log4j.error(e.getMessage(), e);
+
+            throw new InternalServerException(e.getMessage());
+        }
+    }
+
 
     private void handleLanguageRequest(HttpServletRequest request, HttpServletResponse response) throws IOException {
         response.getWriter().write(this.fetchLanguages().toString());

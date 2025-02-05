@@ -1,6 +1,5 @@
 package com.etendoerp.metadata.builders;
 
-import com.etendoerp.metadata.ProcessUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.codehaus.jettison.json.JSONArray;
@@ -93,14 +92,19 @@ public class ToolbarBuilder {
     private JSONArray getProcessButtons(Tab tab) throws Exception {
         JSONArray buttons = new JSONArray();
 
-        List<Field> processFields = tab.getADFieldList().stream().filter(field -> field.isActive() && tabBuilder.shouldDisplayField(field) && tabBuilder.hasAccessToProcess(field, windowId) && tabBuilder.isProcessField(field)).collect(Collectors.toList());
+        List<Field> processFields = tab.getADFieldList()
+                                       .stream()
+                                       .filter(field -> field.isActive() && tabBuilder.shouldDisplayField(field) && tabBuilder.hasAccessToProcess(
+                                               field,
+                                               windowId) && tabBuilder.isProcessField(field))
+                                       .collect(Collectors.toList());
 
         for (Field field : processFields) {
             Process process = field.getColumn().getOBUIAPPProcess();
             if (process != null) {
                 DataToJsonConverter converter = new DataToJsonConverter();
                 JSONObject button = new JSONObject();
-                JSONObject processInfo = ProcessUtils.createProcessJSON(process);
+                JSONObject processInfo = tabBuilder.createProcessJSON(process);
 
                 button.put("id", field.getName());
                 button.put("name", Utility.messageBD(connectionProvider, field.getName(), language));
@@ -109,8 +113,18 @@ public class ToolbarBuilder {
                 button.put("processInfo", processInfo);
                 button.put("displayLogic", field.getDisplayLogic());
                 button.put("buttonText", field.getColumn().getName());
+                org.openbravo.model.ad.ui.Process processDefinition = field.getColumn().getProcess();
+                Process processAction = field.getColumn().getOBUIAPPProcess();
+
+                if (processDefinition != null) {
+                    button.put("processDefinition", converter.toJsonObject(processDefinition, DataResolvingMode.FULL_TRANSLATABLE));
+                }
+
+                if (processAction != null) {
+                    button.put("processAction", converter.toJsonObject(processAction, DataResolvingMode.FULL_TRANSLATABLE));
+                }
+
                 button.put("tabId", tab.getId());
-                button.put("process", converter.toJsonObject(process, DataResolvingMode.FULL_TRANSLATABLE));
                 button.put("field", converter.toJsonObject(field, DataResolvingMode.FULL_TRANSLATABLE));
 
 
@@ -143,7 +157,8 @@ public class ToolbarBuilder {
         buttons.put("REFRESH", new ButtonConfig("REFRESH", "OBUIAPP_RefreshData", "REFRESH", true, "refresh-cw"));
         buttons.put("FIND", new ButtonConfig("FIND", "OBUIAPP_Find", "FIND", true, "search"));
         buttons.put("EXPORT", new ButtonConfig("EXPORT", "OBUIAPP_ExportGrid", "EXPORT", true, "download"));
-        buttons.put("ATTACHMENTS", new ButtonConfig("ATTACHMENTS", "OBUIAPP_Attachments", "ATTACHMENTS", true, "paperclip"));
+        buttons.put("ATTACHMENTS",
+                    new ButtonConfig("ATTACHMENTS", "OBUIAPP_Attachments", "ATTACHMENTS", true, "paperclip"));
         buttons.put("GRID_VIEW", new ButtonConfig("GRID_VIEW", "OBUIAPP_GridView", "GRID_VIEW", true, "grid"));
 
         return buttons;
