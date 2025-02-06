@@ -20,15 +20,18 @@ import org.openbravo.service.json.DataResolvingMode;
 import org.openbravo.service.json.DataToJsonConverter;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 public class WindowBuilder {
     private final Logger logger = LogManager.getLogger(this.getClass());
     private final String id;
     private final DataToJsonConverter converter = new DataToJsonConverter();
+    private final Map<String, String> accountingConfig;
 
-    public WindowBuilder(String id) {
+    public WindowBuilder(String id, Map<String, String> accountingConfig) {
         this.id = id;
+        this.accountingConfig = accountingConfig;
     }
 
     public JSONObject toJSON() {
@@ -83,7 +86,7 @@ public class WindowBuilder {
     }
 
     private JSONObject createTabJson(Tab tab, TabAccess tabAccess) {
-        return new TabBuilder(tab, tabAccess).toJSON();
+        return new TabBuilder(tab, tabAccess, accountingConfig).toJSON();
     }
 
     private boolean isTabAccessAllowed(TabAccess tabAccess) {

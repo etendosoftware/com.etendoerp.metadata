@@ -39,7 +39,7 @@ public class ToolbarBuilder {
 
         Window window = OBDal.getInstance().get(Window.class, windowId);
         Tab mainTab = (tabId != null) ? OBDal.getInstance().get(Tab.class, tabId) : window.getADTabList().get(0);
-        this.tabBuilder = new TabBuilder(mainTab, null);
+        this.tabBuilder = new TabBuilder(mainTab, null, null);
     }
 
     public JSONObject toJSON() {

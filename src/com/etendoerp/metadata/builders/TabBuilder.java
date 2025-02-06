@@ -21,10 +21,12 @@ import org.openbravo.client.application.Parameter;
 import org.openbravo.client.application.Process;
 import org.openbravo.client.application.process.BaseProcessActionHandler;
 import org.openbravo.client.kernel.KernelUtils;
+import org.openbravo.client.kernel.RequestContext;
 import org.openbravo.dal.core.DalUtil;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.data.Sqlc;
+import org.openbravo.erpCommon.utility.DimensionDisplayUtility;
 import org.openbravo.erpCommon.utility.Utility;
 import org.openbravo.model.ad.access.FieldAccess;
 import org.openbravo.model.ad.access.TabAccess;
@@ -38,16 +40,14 @@ import org.openbravo.model.ad.ui.Tab;
 import org.openbravo.model.ad.ui.Window;
 import org.openbravo.service.datasource.DataSource;
 import org.openbravo.service.datasource.DatasourceField;
+import org.openbravo.service.db.DalConnectionProvider;
 import org.openbravo.service.json.DataResolvingMode;
 import org.openbravo.service.json.DataToJsonConverter;
 import org.openbravo.service.json.JsonConstants;
 import org.openbravo.userinterface.selector.Selector;
 import org.openbravo.userinterface.selector.SelectorField;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class TabBuilder {
@@ -78,11 +78,13 @@ public class TabBuilder {
     private static final Logger logger = LogManager.getLogger();
     private final Tab tab;
     private final TabAccess tabAccess;
+    private final Map<String, String> accountingConfig;
 
 
-    public TabBuilder(Tab tab, TabAccess tabAccess) {
+    public TabBuilder(Tab tab, TabAccess tabAccess, Map<String, String> accountingConfig) {
         this.tab = tab;
         this.tabAccess = tabAccess;
+        this.accountingConfig = accountingConfig != null ? accountingConfig : new HashMap<>();
     }
 
     private static JSONArray getListInfo(Reference refList) throws JSONException {
@@ -226,6 +228,9 @@ public class TabBuilder {
 
         JSONObject readOnlyState = getFieldReadOnlyState(field);
         jsonField.put("readOnlyState", readOnlyState);
+
+        JSONObject displayLogicState = getFieldDisplayLogicState(field);
+        jsonField.put("displayLogicState", displayLogicState);
 
         if (isProcessField(field)) {
             Process process = field.getColumn().getOBUIAPPProcess();
@@ -683,4 +688,26 @@ public class TabBuilder {
         return "ACCESS_LEVEL";
     }
 
+    private JSONObject getFieldDisplayLogicState(Field field) {
+        JSONObject displayLogicState = new JSONObject();
+        try {
+            if (field.getDisplayLogic() != null) {
+                final DynamicExpressionParser parser = new DynamicExpressionParser(
+                        field.getDisplayLogic(),
+                        tab,
+                        field
+                );
+
+                displayLogicState.put("sessionAttributes", new JSONObject(accountingConfig));
+
+                String jsExpr = parser.getJSExpression();
+                if (StringUtils.isNotEmpty(jsExpr)) {
+                    displayLogicState.put("displayLogicExpr", jsExpr);
+                }
+            }
+        } catch (JSONException e) {
+            logger.error("Error computing display logic state for field: " + field.getName(), e);
+        }
+        return displayLogicState;
+    }
 }

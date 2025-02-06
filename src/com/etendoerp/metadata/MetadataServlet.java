@@ -14,6 +14,10 @@ import org.openbravo.base.secureApp.LoginUtils;
 import org.openbravo.base.secureApp.VariablesSecureApp;
 import org.openbravo.base.weld.WeldUtils;
 import org.openbravo.dal.core.OBContext;
+import org.openbravo.erpCommon.businessUtility.Preferences;
+import org.openbravo.erpCommon.utility.DimensionDisplayUtility;
+import org.openbravo.erpCommon.utility.PropertyNotFoundException;
+import org.openbravo.model.ad.system.Client;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
@@ -21,6 +25,7 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -59,8 +64,58 @@ public class MetadataServlet extends BaseServlet {
         }
     }
 
+    private Map<String, String> getAccountingConfiguration(HttpServletRequest request) {
+        OBContext context = OBContext.getOBContext();
+        Map<String, String> configuration = new HashMap<>();
+
+        try {
+            Map<String, String> accountingDimConfig = DimensionDisplayUtility
+                    .getAccountingDimensionConfiguration(context.getCurrentClient());
+            configuration.putAll(accountingDimConfig);
+
+            Client client = context.getCurrentClient();
+            String isAcctDimCentrally = client.isAcctdimCentrallyMaintained() ? "Y" : "N";
+            configuration.put("$IsAcctDimCentrally", isAcctDimCentrally);
+
+            addBaseDimensionElements(configuration, client);
+
+            return configuration;
+        } catch (Exception e) {
+            logger.error("Error getting accounting configuration", e);
+            throw new InternalServerException("Error getting accounting configuration");
+        }
+    }
+
+    private void addBaseDimensionElements(Map<String, String> configuration, Client client) {
+        // Organization
+        configuration.put("$Element_OO", client.isOrgAcctdimIsenable() ? "Y" : "N");
+
+        // Business Partner
+        configuration.put("$Element_BP", client.isBpartnerAcctdimIsenable() ? "Y" : "N");
+
+        // Project
+        configuration.put("$Element_PJ", client.isProjectAcctdimIsenable() ? "Y" : "N");
+
+        // Product
+        configuration.put("$Element_PR", client.isProductAcctdimIsenable() ? "Y" : "N");
+
+        // User1
+        configuration.put("$Element_U1", client.isUser1AcctdimIsenable() ? "Y" : "N");
+
+        // User2
+        configuration.put("$Element_U2", client.isUser2AcctdimIsenable() ? "Y" : "N");
+
+        // Cost Center
+        configuration.put("$Element_CC", client.isCostcenterAcctdimIsenable() ? "Y" : "N");
+    }
+
+    private JSONObject fetchWindow(String id, HttpServletRequest request) {
+        Map<String, String> accountingConfig = getAccountingConfiguration(request);
+        return new WindowBuilder(id, accountingConfig).toJSON();
+    }
+
     private void handleWindowRequest(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        response.getWriter().write(this.fetchWindow(request.getPathInfo().substring(8)).toString());
+        response.getWriter().write(this.fetchWindow(request.getPathInfo().substring(8), request).toString());
     }
 
     private void handleMenuRequest(HttpServletRequest request, HttpServletResponse response) throws IOException {
@@ -201,10 +256,6 @@ public class MetadataServlet extends BaseServlet {
             logger.error("Error creating toolbar for window: {}", windowId, e);
             throw new RuntimeException("Error creating toolbar", e);
         }
-    }
-
-    private JSONObject fetchWindow(String id) {
-        return new WindowBuilder(id).toJSON();
     }
 
     private JSONArray fetchMenu() {
