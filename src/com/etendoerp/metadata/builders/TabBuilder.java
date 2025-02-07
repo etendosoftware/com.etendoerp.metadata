@@ -223,6 +223,7 @@ public class TabBuilder {
         addBasicProperties(jsonField, field);
         addReferencedProperty(jsonField, field);
         addReferencedTableInfo(jsonField, field);
+        addDisplayLogic(jsonField, field);
 
         JSONObject readOnlyState = getFieldReadOnlyState(field);
         jsonField.put("readOnlyState", readOnlyState);
@@ -251,6 +252,15 @@ public class TabBuilder {
         }
 
         return jsonField;
+    }
+
+    private void addDisplayLogic(JSONObject jsonField, Field field) throws JSONException {
+        String displayLogic = field.getDisplayLogic();
+
+        if (displayLogic != null && !displayLogic.isBlank()) {
+            DynamicExpressionParser parser = new DynamicExpressionParser(field.getDisplayLogic(), tab, field);
+            jsonField.put("displayLogicExpression", parser.getJSExpression());
+        }
     }
 
     private void addAccessProperties(JSONObject jsonField, FieldAccess access) throws JSONException {
@@ -305,11 +315,12 @@ public class TabBuilder {
             String tableId = referenced.getEntity().getTableId();
             Table table = OBDal.getInstance().get(Table.class, tableId);
 
-            Tab referencedTab = (Tab) OBDal.getInstance().createCriteria(Tab.class)
-                    .add(Restrictions.eq(Tab.PROPERTY_TABLE, table))
-                    .add(Restrictions.eq(Tab.PROPERTY_ACTIVE, true))
-                    .setMaxResults(1)
-                    .uniqueResult();
+            Tab referencedTab = (Tab) OBDal.getInstance()
+                                           .createCriteria(Tab.class)
+                                           .add(Restrictions.eq(Tab.PROPERTY_TABLE, table))
+                                           .add(Restrictions.eq(Tab.PROPERTY_ACTIVE, true))
+                                           .setMaxResults(1)
+                                           .uniqueResult();
 
             if (referencedTab != null) {
                 fieldJson.put("referencedEntity", referenced.getEntity().getName());
@@ -652,11 +663,9 @@ public class TabBuilder {
             }
 
             if (field.getColumn() != null && field.getColumn().getReadOnlyLogic() != null) {
-                final DynamicExpressionParser parser = new DynamicExpressionParser(
-                        field.getColumn().getReadOnlyLogic(),
-                        tab,
-                        field
-                );
+                final DynamicExpressionParser parser = new DynamicExpressionParser(field.getColumn().getReadOnlyLogic(),
+                                                                                   tab,
+                                                                                   field);
                 String jsExpr = parser.getJSExpression();
                 if (StringUtils.isNotEmpty(jsExpr)) {
                     readOnlyInfo.put("readOnlyLogicExpr", jsExpr);
@@ -668,7 +677,7 @@ public class TabBuilder {
             readOnlyInfo.put("readOnlyReason", getReadOnlyReason(field, isReadOnly));
 
         } catch (JSONException e) {
-            logger.error("Error computing read-only state for field: " + field.getName(), e);
+            logger.error("Error computing read-only state for field: {}", field.getName(), e);
         }
         return readOnlyInfo;
     }
