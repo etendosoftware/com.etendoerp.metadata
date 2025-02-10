@@ -4,6 +4,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
+import org.hibernate.criterion.Restrictions;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.system.Language;
 
@@ -22,10 +23,12 @@ public class Utils {
                                     .findFirst()
                                     .orElse(null);
 
-        return OBDal.getInstance()
-                    .createQuery(Language.class, "language = :languageCode AND IsSystemLanguage='Y'")
-                    .setNamedParameter("languageCode", languageCode)
-                    .uniqueResult();
+        return (Language) OBDal.getInstance()
+                               .createCriteria(Language.class)
+                               .add(Restrictions.eq(Language.PROPERTY_SYSTEMLANGUAGE, true))
+                               .add(Restrictions.eq(Language.PROPERTY_ACTIVE, true))
+                               .add(Restrictions.eq(Language.PROPERTY_LANGUAGE, languageCode))
+                               .uniqueResult();
     }
 
     private static JSONObject getJsonObject() throws JSONException {

@@ -68,6 +68,7 @@ public class MetadataServlet extends BaseServlet {
     }
 
     private void handleSessionRequest(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        initializeSession(this, request, response);
         response.getWriter().write(this.fetchSession().toString());
     }
 
@@ -93,52 +94,44 @@ public class MetadataServlet extends BaseServlet {
         try {
             String method = request.getMethod();
             String pathInfo = request.getPathInfo();
-
-            if (pathInfo == null || !pathInfo.contains("/servlets/")) {
-                throw new NotFoundException();
-            }
-
             String[] path = pathInfo.split("/servlets/");
 
-            if (path.length < 2 || path[1].isEmpty()) {
-                throw new NotFoundException("Invalid servlet name in request path: " + pathInfo);
+            if (pathInfo.isBlank() || path.length < 2 || path[1].isEmpty()) {
+                throw new NotFoundException("Invalid servlet name: " + pathInfo);
             }
 
-            String servletName = path[1];
-            HttpSecureAppServlet servlet = getOrCreateServlet(servletName);
-
-            initializeServlet(servlet, request, response);
-
-            Map<String, String> methodMap = Map.of(Constants.HTTP_METHOD_GET,
-                                                   "doGet",
-                                                   Constants.HTTP_METHOD_POST,
-                                                   "doPost");
-
-            String servletMethodName = methodMap.getOrDefault(method, "service");
+            HttpSecureAppServlet servlet = getOrCreateServlet(path[1]);
+            String servletMethodName = getMethodName(servlet, method);
             Method delegatedMethod = findMethod(servlet, servletMethodName);
 
+            initializeSession(servlet, request, response);
             delegatedMethod.invoke(servlet, request, response);
-
         } catch (ClassNotFoundException e) {
             logger.error(e.getMessage(), e);
+
             throw new NotFoundException();
         } catch (Exception e) {
             logger.error(e.getMessage(), e);
+
             throw new InternalServerException();
         }
+    }
+
+    private String getMethodName(HttpSecureAppServlet servlet, String method) {
+        return Map.of(Constants.HTTP_METHOD_GET,
+                      Constants.SERVLET_DO_GET_METHOD,
+                      Constants.HTTP_METHOD_POST,
+                      Constants.SERVLET_DO_POST_METHOD).getOrDefault(method, "service");
     }
 
     private HttpSecureAppServlet getOrCreateServlet(String servletName) throws Exception {
         List<?> servlets = WeldUtils.getInstances(Class.forName(servletName));
 
-        if (!servlets.isEmpty()) {
-            return (HttpSecureAppServlet) servlets.get(0);
-        }
+        return (HttpSecureAppServlet) (servlets.isEmpty() ? getInstanceOf(servletName) : servlets.get(0));
+    }
 
-        Class<? extends HttpSecureAppServlet> servletClass = Class.forName(servletName)
-                                                                  .asSubclass(HttpSecureAppServlet.class);
-
-        return servletClass.getDeclaredConstructor().newInstance();
+    private HttpSecureAppServlet getInstanceOf(String servletName) throws Exception {
+        return Class.forName(servletName).asSubclass(HttpSecureAppServlet.class).getDeclaredConstructor().newInstance();
     }
 
     private Method findMethod(HttpSecureAppServlet servlet, String methodName) throws MethodNotAllowedException {
@@ -149,10 +142,9 @@ public class MetadataServlet extends BaseServlet {
     }
 
 
-    private void initializeServlet(HttpSecureAppServlet servlet, HttpServletRequest request, HttpServletResponse response) {
+    private void initializeSession(HttpSecureAppServlet servlet, HttpServletRequest request, HttpServletResponse response) {
         try {
             servlet.init(this.getServletConfig());
-
             OBContext context = OBContext.getOBContext();
             VariablesSecureApp vars = new VariablesSecureApp(request, false);
 
@@ -178,6 +170,8 @@ public class MetadataServlet extends BaseServlet {
                 readProperties(vars);
                 readNumberFormat(vars, globalParameters.getFormatPath());
                 LoginUtils.saveLoginBD(request, vars, "0", "0");
+            } else {
+                throw new InternalServerException("Could not initialize a session");
             }
         } catch (Exception e) {
             log4j.error(e.getMessage(), e);
@@ -185,7 +179,6 @@ public class MetadataServlet extends BaseServlet {
             throw new InternalServerException(e.getMessage());
         }
     }
-
 
     private void handleLanguageRequest(HttpServletRequest request, HttpServletResponse response) throws IOException {
         response.getWriter().write(this.fetchLanguages().toString());
