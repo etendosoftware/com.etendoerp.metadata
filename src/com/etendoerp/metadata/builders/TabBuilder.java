@@ -224,6 +224,7 @@ public class TabBuilder {
         addReferencedProperty(jsonField, field);
         addReferencedTableInfo(jsonField, field);
         addDisplayLogic(jsonField, field);
+        addReadOnlyLogic(jsonField, field);
 
         JSONObject readOnlyState = getFieldReadOnlyState(field);
         jsonField.put("readOnlyState", readOnlyState);
@@ -258,8 +259,17 @@ public class TabBuilder {
         String displayLogic = field.getDisplayLogic();
 
         if (displayLogic != null && !displayLogic.isBlank()) {
-            DynamicExpressionParser parser = new DynamicExpressionParser(field.getDisplayLogic(), tab, field);
+            DynamicExpressionParser parser = new DynamicExpressionParser(displayLogic, tab, field);
             jsonField.put("displayLogicExpression", parser.getJSExpression());
+        }
+    }
+
+    private void addReadOnlyLogic(JSONObject jsonField, Field field) throws JSONException {
+        String readOnlyLogic = field.getColumn().getReadOnlyLogic();
+
+        if (readOnlyLogic != null && !readOnlyLogic.isBlank()) {
+            DynamicExpressionParser parser = new DynamicExpressionParser(readOnlyLogic, tab, field);
+            jsonField.put("readOnlyLogicExpression", parser.getJSExpression());
         }
     }
 
