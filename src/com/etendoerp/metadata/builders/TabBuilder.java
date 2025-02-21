@@ -1,5 +1,6 @@
 package com.etendoerp.metadata.builders;
 
+import com.etendoerp.etendorx.utils.DataSourceUtils;
 import com.etendoerp.metadata.exceptions.InternalServerException;
 import org.apache.commons.lang.StringUtils;
 import org.apache.logging.log4j.LogManager;
@@ -24,7 +25,6 @@ import org.openbravo.client.kernel.KernelUtils;
 import org.openbravo.dal.core.DalUtil;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
-import org.openbravo.data.Sqlc;
 import org.openbravo.erpCommon.utility.Utility;
 import org.openbravo.model.ad.access.FieldAccess;
 import org.openbravo.model.ad.access.TabAccess;
@@ -284,16 +284,19 @@ public class TabBuilder {
     }
 
     private void addBasicProperties(JSONObject jsonField, Field field) throws JSONException {
-        boolean mandatory = field.getColumn().isMandatory();
+        Column column = field.getColumn();
+        boolean mandatory = column.isMandatory();
         boolean isParentRecordProperty = isParentRecordProperty(field, field.getTab());
-        JSONObject column = converter.toJsonObject(field.getColumn(), DataResolvingMode.FULL_TRANSLATABLE);
-        String inputName = Sqlc.TransformaNombreColumna(field.getColumn().getDBColumnName());
-        String columnName = getEntityColumnName(field.getColumn());
+        JSONObject columnJson = converter.toJsonObject(field.getColumn(), DataResolvingMode.FULL_TRANSLATABLE);
+        String inputName = DataSourceUtils.getInpName(column);
+        String hqlName = DataSourceUtils.getHQLColumnName(field)[0];
+        String columnName = column.getDBColumnName();
 
+        jsonField.put("hqlName", hqlName);
         jsonField.put("columnName", columnName);
-        jsonField.put("column", column);
+        jsonField.put("column", columnJson);
         jsonField.put("isMandatory", mandatory);
-        jsonField.put("inpName", inputName);
+        jsonField.put("inputName", inputName);
         jsonField.put("isParentRecordProperty", isParentRecordProperty);
     }
 
