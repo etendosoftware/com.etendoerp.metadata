@@ -5,6 +5,7 @@ import com.etendoerp.metadata.exceptions.InternalServerException;
 import com.etendoerp.metadata.exceptions.MethodNotAllowedException;
 import com.etendoerp.metadata.exceptions.NotFoundException;
 import com.etendoerp.metadata.exceptions.UnprocessableContentException;
+import org.apache.commons.lang.StringUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.codehaus.jettison.json.JSONArray;
@@ -17,6 +18,7 @@ import org.openbravo.dal.core.OBContext;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletRequestWrapper;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.lang.reflect.Method;
@@ -100,12 +102,14 @@ public class MetadataServlet extends BaseServlet {
                 throw new NotFoundException("Invalid servlet name: " + pathInfo);
             }
 
-            HttpSecureAppServlet servlet = getOrCreateServlet(path[1]);
+            String servletName = path[1].split("/")[0];
+            HttpSecureAppServlet servlet = getOrCreateServlet(servletName);
             String servletMethodName = getMethodName(servlet, method);
             Method delegatedMethod = findMethod(servlet, servletMethodName);
+            HttpServletRequest wrappedRequest = wrapRequestWithRemainingPath(request, pathInfo, servletName);
 
-            initializeSession(servlet, request, response);
-            delegatedMethod.invoke(servlet, request, response);
+            initializeSession(servlet, wrappedRequest, response);
+            delegatedMethod.invoke(servlet, wrappedRequest, response);
         } catch (ClassNotFoundException e) {
             logger.error(e.getMessage(), e);
 
@@ -132,6 +136,18 @@ public class MetadataServlet extends BaseServlet {
 
     private HttpSecureAppServlet getInstanceOf(String servletName) throws Exception {
         return Class.forName(servletName).asSubclass(HttpSecureAppServlet.class).getDeclaredConstructor().newInstance();
+    }
+
+    private HttpServletRequest wrapRequestWithRemainingPath(HttpServletRequest request, String pathInfo, String servletName) {
+        String className = pathInfo.split("/servlets/")[1];
+        String packageName = StringUtils.substring(className, 0, className.lastIndexOf('.'));
+
+        return new HttpServletRequestWrapper(request) {
+            @Override
+            public String getRequestURI() {
+                return request.getRequestURI().replaceFirst(servletName, packageName);
+            }
+        };
     }
 
     private Method findMethod(HttpSecureAppServlet servlet, String methodName) throws MethodNotAllowedException {
