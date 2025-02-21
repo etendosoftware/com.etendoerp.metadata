@@ -5,6 +5,7 @@ import com.etendoerp.metadata.exceptions.InternalServerException;
 import com.etendoerp.metadata.exceptions.MethodNotAllowedException;
 import com.etendoerp.metadata.exceptions.NotFoundException;
 import com.etendoerp.metadata.exceptions.UnprocessableContentException;
+import org.apache.commons.lang.StringUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.codehaus.jettison.json.JSONArray;
@@ -139,7 +140,7 @@ public class MetadataServlet extends BaseServlet {
 
     private HttpServletRequest wrapRequestWithRemainingPath(HttpServletRequest request, String pathInfo, String servletName) {
         String className = pathInfo.split("/servlets/")[1];
-        String packageName = className.substring(0, className.lastIndexOf('.'));
+        String packageName = StringUtils.substring(className, 0, className.lastIndexOf('.'));
 
         return new HttpServletRequestWrapper(request) {
             @Override
