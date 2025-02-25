@@ -96,7 +96,7 @@ public class ToolbarBuilder {
                                        .stream()
                                        .filter(field -> field.isActive() && tabBuilder.shouldDisplayField(field) && tabBuilder.hasAccessToProcess(
                                                field,
-                                               windowId) && tabBuilder.isProcessField(field))
+                                               windowId) && FieldBuilder.isProcessField(field))
                                        .collect(Collectors.toList());
 
         for (Field field : processFields) {
@@ -104,7 +104,7 @@ public class ToolbarBuilder {
             if (process != null) {
                 DataToJsonConverter converter = new DataToJsonConverter();
                 JSONObject button = new JSONObject();
-                JSONObject processInfo = tabBuilder.createProcessJSON(process);
+                JSONObject processInfo = FieldBuilder.createProcessJSON(process);
 
                 button.put("id", field.getName());
                 button.put("name", Utility.messageBD(connectionProvider, field.getName(), language));
@@ -165,11 +165,11 @@ public class ToolbarBuilder {
     }
 
     private static class ButtonConfig {
-        String id;
-        String name;
-        String action;
-        boolean enabled;
-        String icon;
+        final String id;
+        final String name;
+        final String action;
+        final boolean enabled;
+        final String icon;
 
         ButtonConfig(String id, String name, String action, boolean enabled, String icon) {
             this.id = id;
