@@ -72,4 +72,18 @@ public class Utils {
                     .write("{\"response\":{\"status\":500,\"error\":{\"message\":\"Internal server error\",\"messageType\":\"Error\",\"title\":\"\"},\"totalRows\":0}}");
         }
     }
+
+    public static int getResponseStatus(Exception e) {
+        switch (e.getClass().getSimpleName()) {
+            case "OBSecurityException":
+            case "UnauthorizedException":
+                return 401;
+            case "MethodNotAllowedException":
+                return 405;
+            case "UnprocessableContentException":
+                return 422;
+            default:
+                return 500;
+        }
+    }
 }
