@@ -20,7 +20,6 @@ import org.openbravo.service.json.DataResolvingMode;
 import org.openbravo.service.json.DataToJsonConverter;
 
 import java.util.List;
-import java.util.Optional;
 
 public class WindowBuilder {
     private final Logger logger = LogManager.getLogger(this.getClass());
@@ -37,7 +36,6 @@ public class WindowBuilder {
         JSONObject windowJson = converter.toJsonObject(window, DataResolvingMode.FULL_TRANSLATABLE);
 
         try {
-
             windowJson.put("tabs", getTabsAndFields(windowAccess.getADTabAccessList(), windowAccess.getWindow()));
         } catch (JSONException e) {
             logger.error(e.getMessage(), e);
@@ -49,17 +47,23 @@ public class WindowBuilder {
     private WindowAccess getWindowAccess() {
         Role role = OBContext.getOBContext().getRole();
         OBCriteria<WindowAccess> windowAccessCriteria = OBDal.getInstance().createCriteria(WindowAccess.class);
-        Optional<Window> adWindowOptional = Optional.ofNullable(OBDal.getInstance().get(Window.class, this.id));
-        Window adWindow = adWindowOptional.orElseThrow(NotFoundException::new);
+        Window adWindow = OBDal.getInstance().get(Window.class, this.id);
+
+        if (adWindow == null) {
+            throw new NotFoundException();
+        }
 
         windowAccessCriteria.add(Restrictions.eq(WindowAccess.PROPERTY_ROLE, role));
         windowAccessCriteria.add(Restrictions.eq(WindowAccess.PROPERTY_ACTIVE, true));
         windowAccessCriteria.add(Restrictions.eq(WindowAccess.PROPERTY_WINDOW, adWindow));
         windowAccessCriteria.setMaxResults(1);
 
-        Optional<WindowAccess> windowAccessOptional = Optional.ofNullable((WindowAccess) windowAccessCriteria.uniqueResult());
+        WindowAccess windowAccess = (WindowAccess) windowAccessCriteria.uniqueResult();
+        if (windowAccess == null) {
+            throw new UnauthorizedException();
+        }
 
-        return windowAccessOptional.orElseThrow(UnauthorizedException::new);
+        return windowAccess;
     }
 
     private JSONArray getTabsAndFields(List<TabAccess> tabAccesses, org.openbravo.model.ad.ui.Window window) {
@@ -75,11 +79,19 @@ public class WindowBuilder {
     }
 
     private void addTabs(JSONArray tabs, List<Tab> tabList) {
-        tabList.stream().filter(Tab::isActive).filter(this::isTabAllowed).map(tab -> createTabJson(tab, null)).forEach(tabs::put);
+        for (Tab tab : tabList) {
+            if (tab.isActive() && isTabAllowed(tab)) {
+                tabs.put(createTabJson(tab, null));
+            }
+        }
     }
 
     private void addTabAccess(JSONArray tabs, List<TabAccess> tabAccesses) {
-        tabAccesses.stream().filter(this::isTabAccessAllowed).map(tabAccess -> createTabJson(tabAccess.getTab(), tabAccess)).forEach(tabs::put);
+        for (TabAccess tabAccess : tabAccesses) {
+            if (isTabAccessAllowed(tabAccess)) {
+                tabs.put(createTabJson(tabAccess.getTab(), tabAccess));
+            }
+        }
     }
 
     private JSONObject createTabJson(Tab tab, TabAccess tabAccess) {
@@ -91,6 +103,7 @@ public class WindowBuilder {
     }
 
     private boolean isTabAllowed(Tab tab) {
-        return tab.getDisplayLogic() == null || tab.getDisplayLogic().trim().isEmpty();
+        String displayLogic = tab.getDisplayLogic();
+        return displayLogic == null || displayLogic.trim().isEmpty();
     }
 }

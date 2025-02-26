@@ -16,7 +16,6 @@ import org.openbravo.base.secureApp.VariablesSecureApp;
 import org.openbravo.base.weld.WeldUtils;
 import org.openbravo.dal.core.OBContext;
 
-import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
 import javax.servlet.http.HttpServletResponse;
@@ -41,7 +40,7 @@ public class MetadataServlet extends BaseServlet {
     private static final Logger logger = LogManager.getLogger(MetadataServlet.class);
 
     @Override
-    public void process(HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
+    public void process(HttpServletRequest request, HttpServletResponse response) throws IOException {
         String path = request.getPathInfo();
 
         if (path.startsWith(WINDOW_PATH)) {
