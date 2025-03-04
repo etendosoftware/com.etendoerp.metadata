@@ -54,10 +54,6 @@ public class FieldBuilder extends Builder {
         this.json = converter.toJsonObject(field, DataResolvingMode.FULL_TRANSLATABLE);
     }
 
-    public FieldBuilder(Field field) {
-        this(field, null);
-    }
-
     public static boolean isProcessField(Field field) {
         Column column = field.getColumn();
 

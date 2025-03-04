@@ -1,4 +1,4 @@
-package com.etendoerp.metadata.requests;
+package com.etendoerp.metadata.service;
 
 import com.etendoerp.metadata.Constants;
 import com.etendoerp.metadata.exceptions.InternalServerException;
@@ -8,7 +8,6 @@ import org.apache.commons.lang.StringUtils;
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
 import org.openbravo.base.weld.WeldUtils;
 
-import javax.servlet.ServletConfig;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
 import javax.servlet.http.HttpServletResponse;
@@ -19,12 +18,9 @@ import java.util.Map;
 
 import static com.etendoerp.metadata.SessionManager.initializeSession;
 
-public class DelegatedRequest extends Request {
-    private final ServletConfig config;
-
-    public DelegatedRequest(HttpServletRequest request, HttpServletResponse response, ServletConfig config) {
+public class ServletService extends BaseService {
+    public ServletService(HttpServletRequest request, HttpServletResponse response) {
         super(request, response);
-        this.config = config;
     }
 
     private static String getMethodName(String method) {
@@ -79,8 +75,7 @@ public class DelegatedRequest extends Request {
             String servletMethodName = getMethodName(method);
             Method delegatedMethod = findMethod(servlet, servletMethodName);
             HttpServletRequest wrappedRequest = wrapRequestWithRemainingPath(request, pathInfo, servletName);
-
-            initializeSession(config, servlet, wrappedRequest);
+            initializeSession(wrappedRequest);
             delegatedMethod.invoke(servlet, wrappedRequest, response);
         } catch (ClassNotFoundException e) {
             logger.error(e.getMessage(), e);
