@@ -68,7 +68,7 @@ public class MenuBuilder extends Builder {
 
         for (MenuOption item : this.menu.getChildren()) {
             try {
-                result.put(item.getId(), toJSON(item));
+                result.put(item.getMenu().getId(), toJSON(item));
             } catch (JSONException e) {
                 logger.error(e.getMessage(), e);
             }
