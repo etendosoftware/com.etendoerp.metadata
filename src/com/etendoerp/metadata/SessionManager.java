@@ -1,0 +1,60 @@
+package com.etendoerp.metadata;
+
+import com.etendoerp.metadata.exceptions.InternalServerException;
+import org.apache.log4j.LogManager;
+import org.apache.log4j.Logger;
+import org.openbravo.base.secureApp.HttpSecureAppServlet;
+import org.openbravo.base.secureApp.LoginUtils;
+import org.openbravo.base.secureApp.VariablesSecureApp;
+import org.openbravo.client.kernel.KernelServlet;
+import org.openbravo.dal.core.OBContext;
+import org.openbravo.service.db.DalConnectionProvider;
+
+import javax.servlet.ServletConfig;
+import javax.servlet.http.HttpServletRequest;
+
+/**
+ * @author luuchorocha
+ */
+public class SessionManager {
+    private final static Logger logger = LogManager.getLogger(SessionManager.class);
+
+    public static void initializeSession(ServletConfig config, HttpSecureAppServlet servlet,
+                                         HttpServletRequest request) {
+        try {
+            servlet.init(config);
+
+            OBContext context = OBContext.getOBContext();
+            VariablesSecureApp vars = new VariablesSecureApp(request, false);
+
+            String userId = context.getUser().getId();
+            String language = context.getLanguage().getLanguage();
+            String isRTL = context.isRTL() ? "Y" : "N";
+            String roleId = context.getRole().getId();
+            String clientId = context.getCurrentClient().getId();
+            String orgId = context.getCurrentOrganization().getId();
+            String warehouseId = context.getWarehouse() != null ? context.getWarehouse().getId() : "";
+
+            boolean sessionFilled = LoginUtils.fillSessionArguments(new DalConnectionProvider(),
+                                                                    vars,
+                                                                    userId,
+                                                                    language,
+                                                                    isRTL,
+                                                                    roleId,
+                                                                    clientId,
+                                                                    orgId,
+                                                                    warehouseId);
+
+            if (sessionFilled) {
+                LoginUtils.readNumberFormat(vars, KernelServlet.getGlobalParameters().getFormatPath());
+                LoginUtils.saveLoginBD(request, vars, "0", "0");
+            } else {
+                throw new InternalServerException("Could not initialize a session");
+            }
+        } catch (Exception e) {
+            logger.error(e.getMessage(), e);
+
+            throw new InternalServerException(e.getMessage());
+        }
+    }
+}

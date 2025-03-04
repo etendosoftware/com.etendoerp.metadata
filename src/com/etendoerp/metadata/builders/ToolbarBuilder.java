@@ -94,9 +94,9 @@ public class ToolbarBuilder {
 
         List<Field> processFields = tab.getADFieldList()
                                        .stream()
-                                       .filter(field -> field.isActive() && tabBuilder.shouldDisplayField(field) && tabBuilder.hasAccessToProcess(
-                                               field,
-                                               windowId) && FieldBuilder.isProcessField(field))
+                                       .filter(field -> field.isActive() && tabBuilder.shouldDisplayField(field) &&
+                                                        tabBuilder.hasAccessToProcess(field, windowId) &&
+                                                        FieldBuilder.isProcessField(field))
                                        .collect(Collectors.toList());
 
         for (Field field : processFields) {
@@ -104,7 +104,7 @@ public class ToolbarBuilder {
             if (process != null) {
                 DataToJsonConverter converter = new DataToJsonConverter();
                 JSONObject button = new JSONObject();
-                JSONObject processInfo = FieldBuilder.createProcessJSON(process);
+                JSONObject processInfo = new ProcessBuilder(process).toJSON();
 
                 button.put("id", field.getName());
                 button.put("name", Utility.messageBD(connectionProvider, field.getName(), language));
@@ -117,11 +117,13 @@ public class ToolbarBuilder {
                 Process processAction = field.getColumn().getOBUIAPPProcess();
 
                 if (processDefinition != null) {
-                    button.put("processDefinition", converter.toJsonObject(processDefinition, DataResolvingMode.FULL_TRANSLATABLE));
+                    button.put("processDefinition",
+                               converter.toJsonObject(processDefinition, DataResolvingMode.FULL_TRANSLATABLE));
                 }
 
                 if (processAction != null) {
-                    button.put("processAction", converter.toJsonObject(processAction, DataResolvingMode.FULL_TRANSLATABLE));
+                    button.put("processAction",
+                               converter.toJsonObject(processAction, DataResolvingMode.FULL_TRANSLATABLE));
                 }
 
                 button.put("tabId", tab.getId());
