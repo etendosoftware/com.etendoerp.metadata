@@ -1,218 +1,63 @@
 package com.etendoerp.metadata;
 
-import com.etendoerp.metadata.builders.*;
-import com.etendoerp.metadata.exceptions.InternalServerException;
-import com.etendoerp.metadata.exceptions.MethodNotAllowedException;
+import com.etendoerp.metadata.builders.LanguageBuilder;
+import com.etendoerp.metadata.builders.MenuBuilder;
+import com.etendoerp.metadata.builders.SessionBuilder;
 import com.etendoerp.metadata.exceptions.NotFoundException;
-import com.etendoerp.metadata.exceptions.UnprocessableContentException;
-import org.apache.commons.lang.StringUtils;
+import com.etendoerp.metadata.requests.DelegatedRequest;
+import com.etendoerp.metadata.requests.WindowRequest;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONObject;
-import org.openbravo.base.secureApp.HttpSecureAppServlet;
-import org.openbravo.base.secureApp.LoginUtils;
-import org.openbravo.base.secureApp.VariablesSecureApp;
-import org.openbravo.base.weld.WeldUtils;
-import org.openbravo.dal.core.OBContext;
 
 import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletRequestWrapper;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.lang.reflect.Method;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
 
-import static com.etendoerp.metadata.Utils.sendSuccessResponse;
+import static com.etendoerp.metadata.SessionManager.initializeSession;
 
 /**
  * @author luuchorocha
  */
 public class MetadataServlet extends BaseServlet {
-    public static final String TOOLBAR_PATH = "/toolbar";
-    public static final String SESSION_PATH = "/session";
-    public static final String MENU_PATH = "/menu";
-    public static final String WINDOW_PATH = "/window/";
-    public static final String LANGUAGE_PATH = "/language";
-    public static final String DELEGATED_SERVLET_PATH = "/servlets";
     private static final Logger logger = LogManager.getLogger(MetadataServlet.class);
 
     @Override
     public void process(HttpServletRequest request, HttpServletResponse response) throws IOException {
         String path = request.getPathInfo();
 
-        if (path.startsWith(WINDOW_PATH)) {
-            handleWindowRequest(request, response);
-        } else if (path.equals(MENU_PATH)) {
+        if (path.startsWith(Constants.WINDOW_PATH)) {
+            new WindowRequest(request, response).process();
+        } else if (path.equals(Constants.MENU_PATH)) {
             handleMenuRequest(request, response);
-        } else if (path.equals(SESSION_PATH)) {
+        } else if (path.equals(Constants.SESSION_PATH)) {
             handleSessionRequest(request, response);
-        } else if (path.startsWith(TOOLBAR_PATH)) {
+        } else if (path.startsWith(Constants.TOOLBAR_PATH)) {
             handleToolbarRequest(request, response);
-        } else if (path.startsWith(DELEGATED_SERVLET_PATH)) {
-            handleDelegatedServletRequest(request, response);
-        } else if (path.startsWith(LANGUAGE_PATH)) {
+        } else if (path.startsWith(Constants.DELEGATED_SERVLET_PATH)) {
+            new DelegatedRequest(request, response, this.getServletConfig()).process();
+        } else if (path.startsWith(Constants.LANGUAGE_PATH)) {
             handleLanguageRequest(request, response);
         } else {
             throw new NotFoundException();
         }
     }
 
-    private void handleWindowRequest(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        response.getWriter().write(this.fetchWindow(request.getPathInfo().substring(8)).toString());
-    }
-
     private void handleMenuRequest(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        response.getWriter().write(this.fetchMenu().toString());
+        response.getWriter().write(fetchMenu().toString());
     }
 
     private void handleSessionRequest(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        initializeSession(this, request, response);
-        response.getWriter().write(this.fetchSession().toString());
+        initializeSession(this.getServletConfig(), this, request);
+        response.getWriter().write(fetchSession().toString());
     }
 
     private void handleToolbarRequest(HttpServletRequest request, HttpServletResponse response) {
-        String path = request.getPathInfo();
-        String[] pathParts = path.split("/");
-        if (pathParts.length < 3) {
-            throw new UnprocessableContentException("Invalid toolbar path");
-        }
-        try {
-            String windowId = pathParts[2];
-            String tabId = (pathParts.length >= 4 && !"undefined".equals(pathParts[3])) ? pathParts[3] : null;
-            JSONObject toolbar = fetchToolbar(windowId, tabId);
-            sendSuccessResponse(response, toolbar);
-        } catch (IllegalArgumentException e) {
-            throw new UnprocessableContentException(e.getMessage());
-        } catch (Exception e) {
-            throw new InternalServerException();
-        }
-    }
-
-    private void handleDelegatedServletRequest(HttpServletRequest request, HttpServletResponse response) {
-        try {
-            String method = request.getMethod();
-            String pathInfo = request.getPathInfo();
-            String[] path = pathInfo.split("/servlets/");
-
-            if (pathInfo.isBlank() || path.length < 2 || path[1].isEmpty()) {
-                throw new NotFoundException("Invalid servlet name: " + pathInfo);
-            }
-
-            String servletName = path[1].split("/")[0];
-            HttpSecureAppServlet servlet = getOrCreateServlet(servletName);
-            String servletMethodName = getMethodName(servlet, method);
-            Method delegatedMethod = findMethod(servlet, servletMethodName);
-            HttpServletRequest wrappedRequest = wrapRequestWithRemainingPath(request, pathInfo, servletName);
-
-            initializeSession(servlet, wrappedRequest, response);
-            delegatedMethod.invoke(servlet, wrappedRequest, response);
-        } catch (ClassNotFoundException e) {
-            logger.error(e.getMessage(), e);
-
-            throw new NotFoundException();
-        } catch (Exception e) {
-            logger.error(e.getMessage(), e);
-
-            throw new InternalServerException();
-        }
-    }
-
-    private String getMethodName(HttpSecureAppServlet servlet, String method) {
-        return Map.of(Constants.HTTP_METHOD_GET,
-                      Constants.SERVLET_DO_GET_METHOD,
-                      Constants.HTTP_METHOD_POST,
-                      Constants.SERVLET_DO_POST_METHOD).getOrDefault(method, "service");
-    }
-
-    private HttpSecureAppServlet getOrCreateServlet(String servletName) throws Exception {
-        List<?> servlets = WeldUtils.getInstances(Class.forName(servletName));
-
-        return (HttpSecureAppServlet) (servlets.isEmpty() ? getInstanceOf(servletName) : servlets.get(0));
-    }
-
-    private HttpSecureAppServlet getInstanceOf(String servletName) throws Exception {
-        return Class.forName(servletName).asSubclass(HttpSecureAppServlet.class).getDeclaredConstructor().newInstance();
-    }
-
-    private HttpServletRequest wrapRequestWithRemainingPath(HttpServletRequest request, String pathInfo, String servletName) {
-        String className = pathInfo.split("/servlets/")[1];
-        String packageName = StringUtils.substring(className, 0, className.lastIndexOf('.'));
-
-        return new HttpServletRequestWrapper(request) {
-            @Override
-            public String getRequestURI() {
-                return request.getRequestURI().replaceFirst(servletName, packageName);
-            }
-        };
-    }
-
-    private Method findMethod(HttpSecureAppServlet servlet, String methodName) throws MethodNotAllowedException {
-        return Arrays.stream(servlet.getClass().getDeclaredMethods())
-                     .filter(m -> m.getName().equals(methodName))
-                     .findFirst()
-                     .orElseThrow(MethodNotAllowedException::new);
-    }
-
-
-    private void initializeSession(HttpSecureAppServlet servlet, HttpServletRequest request, HttpServletResponse response) {
-        try {
-            servlet.init(this.getServletConfig());
-            OBContext context = OBContext.getOBContext();
-            VariablesSecureApp vars = new VariablesSecureApp(request, false);
-
-            String userId = context.getUser().getId();
-            String language = context.getLanguage().getLanguage();
-            String isRTL = context.isRTL() ? "Y" : "N";
-            String roleId = context.getRole().getId();
-            String clientId = context.getCurrentClient().getId();
-            String orgId = context.getCurrentOrganization().getId();
-            String warehouseId = context.getWarehouse() != null ? context.getWarehouse().getId() : "";
-
-            boolean sessionFilled = LoginUtils.fillSessionArguments(myPool,
-                                                                    vars,
-                                                                    userId,
-                                                                    language,
-                                                                    isRTL,
-                                                                    roleId,
-                                                                    clientId,
-                                                                    orgId,
-                                                                    warehouseId);
-
-            if (sessionFilled) {
-                readProperties(vars);
-                readNumberFormat(vars, globalParameters.getFormatPath());
-                LoginUtils.saveLoginBD(request, vars, "0", "0");
-            } else {
-                throw new InternalServerException("Could not initialize a session");
-            }
-        } catch (Exception e) {
-            log4j.error(e.getMessage(), e);
-
-            throw new InternalServerException(e.getMessage());
-        }
     }
 
     private void handleLanguageRequest(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        response.getWriter().write(this.fetchLanguages().toString());
-    }
-
-    private JSONObject fetchToolbar(String windowId, String tabId) {
-        try {
-            String language = OBContext.getOBContext().getLanguage().getLanguage();
-            boolean isNew = false;
-            ToolbarBuilder toolbarBuilder = new ToolbarBuilder(language, windowId, tabId, isNew);
-            return toolbarBuilder.toJSON();
-        } catch (Exception e) {
-            logger.error("Error creating toolbar for window: {}", windowId, e);
-            throw new RuntimeException("Error creating toolbar", e);
-        }
-    }
-
-    private JSONObject fetchWindow(String id) {
-        return new WindowBuilder(id).toJSON();
+        response.getWriter().write(fetchLanguages().toString());
     }
 
     private JSONArray fetchMenu() {
@@ -223,7 +68,7 @@ public class MetadataServlet extends BaseServlet {
         return new SessionBuilder().toJSON();
     }
 
-    private JSONArray fetchLanguages() {
+    private JSONObject fetchLanguages() {
         return new LanguageBuilder().toJSON();
     }
 }

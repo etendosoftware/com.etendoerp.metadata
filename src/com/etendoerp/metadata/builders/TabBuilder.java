@@ -1,8 +1,7 @@
 package com.etendoerp.metadata.builders;
 
+import com.etendoerp.metadata.Constants;
 import com.etendoerp.metadata.exceptions.InternalServerException;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
@@ -18,17 +17,12 @@ import org.openbravo.model.ad.ui.Field;
 import org.openbravo.model.ad.ui.Tab;
 import org.openbravo.model.ad.ui.Window;
 import org.openbravo.service.json.DataResolvingMode;
-import org.openbravo.service.json.DataToJsonConverter;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 
-public class TabBuilder {
-    private static final List<String> ALWAYS_DISPLAYED_COLUMNS = Collections.singletonList("AD_Org_ID");
-    private static final DataToJsonConverter converter = new DataToJsonConverter();
-    private static final Logger logger = LogManager.getLogger();
+public class TabBuilder extends Builder {
     private final Tab tab;
     private final TabAccess tabAccess;
 
@@ -153,6 +147,6 @@ public class TabBuilder {
         return field.getColumn() != null &&
                (field.isDisplayed() || isScanProcess || field.getColumn().isStoredInSession() ||
                 field.getColumn().isLinkToParentColumn() ||
-                ALWAYS_DISPLAYED_COLUMNS.contains(field.getColumn().getDBColumnName()));
+                Constants.ALWAYS_DISPLAYED_COLUMNS.contains(field.getColumn().getDBColumnName()));
     }
 }

@@ -13,11 +13,15 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Arrays;
 
+/**
+ * @author luuchorocha
+ */
 public class Utils {
     private static final Logger logger = LogManager.getLogger(Utils.class);
 
     public static Language getLanguage(HttpServletRequest request) {
-        String[] providedLanguages = {request.getParameter("language"), request.getHeader("language"), request.getLocale().toString()};
+        String[] providedLanguages =
+                {request.getParameter("language"), request.getHeader("language"), request.getLocale().toString()};
         String languageCode = Arrays.stream(providedLanguages)
                                     .filter(language -> language != null && !language.isEmpty())
                                     .findFirst()

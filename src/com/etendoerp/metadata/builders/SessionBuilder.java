@@ -9,18 +9,14 @@ import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.access.Role;
 import org.openbravo.model.ad.access.User;
 import org.openbravo.service.json.DataResolvingMode;
-import org.openbravo.service.json.DataToJsonConverter;
 
 import javax.servlet.http.HttpSession;
 import java.util.Enumeration;
 
+/**
+ * @author luuchorocha
+ */
 public class SessionBuilder extends Builder {
-    private final DataToJsonConverter converter;
-
-    public SessionBuilder() {
-        converter = new DataToJsonConverter();
-    }
-
     public JSONObject toJSON() {
         try {
             JSONObject json = new JSONObject();
@@ -45,10 +41,9 @@ public class SessionBuilder extends Builder {
     private JSONObject buildSessionJSON() throws JSONException {
         JSONObject result = new JSONObject();
         HttpSession session = RequestContext.get().getRequest().getSession();
-        Enumeration<String> attributes = session.getAttributeNames();
 
-        while (attributes.hasMoreElements()) {
-            String attribute = attributes.nextElement();
+        for (Enumeration<String> e = session.getAttributeNames(); e.hasMoreElements(); ) {
+            String attribute = e.nextElement();
             result.put(attribute, session.getAttribute(attribute));
         }
 

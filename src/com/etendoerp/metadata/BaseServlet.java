@@ -1,18 +1,19 @@
 package com.etendoerp.metadata;
 
 import org.apache.http.entity.ContentType;
-import org.openbravo.base.secureApp.AllowedCrossDomainsHandler;
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.model.ad.system.Language;
 import org.openbravo.service.json.JsonUtils;
 
+import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
 import static com.etendoerp.metadata.Utils.getLanguage;
+import static org.openbravo.authentication.AuthenticationManager.STATELESS_REQUEST_PARAMETER;
 
 /**
  * @author luuchorocha
@@ -21,11 +22,17 @@ public abstract class BaseServlet extends HttpSecureAppServlet {
     protected abstract void process(HttpServletRequest request, HttpServletResponse response) throws Exception;
 
     @Override
+    public void service(HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
+        request.setAttribute(STATELESS_REQUEST_PARAMETER, "true");
+        super.service(request, response);
+    }
+
+    @Override
     public final void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException {
         try {
             OBContext.setAdminMode();
-            setHeaders(request, response);
-            setContext(request, response);
+            setContext(request);
+            setContentHeaders(response);
             process(request, response);
         } catch (Exception e) {
             log4j.error(e.getMessage(), e);
@@ -41,7 +48,7 @@ public abstract class BaseServlet extends HttpSecureAppServlet {
         doGet(request, response);
     }
 
-    private void setContext(HttpServletRequest request, HttpServletResponse response) {
+    private void setContext(HttpServletRequest request) {
         OBContext context = OBContext.getOBContext();
         Language language = getLanguage(request);
 
@@ -50,15 +57,6 @@ public abstract class BaseServlet extends HttpSecureAppServlet {
         }
 
         OBContext.setOBContextInSession(request, context);
-    }
-
-    private void setHeaders(HttpServletRequest request, HttpServletResponse response) {
-        setCorsHeaders(request, response);
-        setContentHeaders(response);
-    }
-
-    private void setCorsHeaders(HttpServletRequest request, HttpServletResponse response) {
-        AllowedCrossDomainsHandler.getInstance().setCORSHeaders(request, response);
     }
 
     private void setContentHeaders(HttpServletResponse response) {
