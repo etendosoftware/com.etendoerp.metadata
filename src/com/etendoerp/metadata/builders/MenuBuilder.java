@@ -1,6 +1,7 @@
 package com.etendoerp.metadata.builders;
 
 import com.etendoerp.metadata.exceptions.InternalServerException;
+import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.client.application.GlobalMenu;
@@ -63,16 +64,15 @@ public class MenuBuilder extends Builder {
     }
 
     @Override
-    public JSONObject toJSON() {
+    public JSONObject toJSON() throws JSONException {
         JSONObject result = new JSONObject();
+        JSONArray items = new JSONArray();
 
         for (MenuOption item : this.menu.getChildren()) {
-            try {
-                result.put(item.getMenu().getId(), toJSON(item));
-            } catch (JSONException e) {
-                logger.error(e.getMessage(), e);
-            }
+            items.put(toJSON(item));
         }
+
+        result.put("menu", items);
 
         return result;
     }
