@@ -11,6 +11,7 @@ import org.openbravo.dal.core.OBContext;
 import org.openbravo.service.db.DalConnectionProvider;
 
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpSession;
 
 /**
  * @author luuchorocha
@@ -42,8 +43,11 @@ public class SessionManager {
                                                                     warehouseId);
 
             if (sessionFilled) {
+                HttpSession session = request.getSession(false);
+                session.setAttribute("forceLogin", "Y");
+                LoginUtils.saveLoginBD(request, vars, clientId, orgId);
+                bypassCSRF(request, userId);
                 setRequestContext(request, vars);
-                LoginUtils.saveLoginBD(request, vars, "0", "0");
             } else {
                 throw new InternalServerException("Could not initialize a session");
             }
@@ -51,6 +55,15 @@ public class SessionManager {
             logger.error(e.getMessage(), e);
 
             throw new InternalServerException(e.getMessage());
+        }
+    }
+
+    private static void bypassCSRF(HttpServletRequest request, String userId) {
+        HttpSession session = request.getSession(false);
+
+        if (session != null) {
+            session.setAttribute("#CSRF_TOKEN", userId);
+            session.setAttribute("#CSRF_Token", userId);
         }
     }
 

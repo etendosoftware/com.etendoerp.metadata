@@ -64,7 +64,7 @@ public class MenuBuilder extends Builder {
     }
 
     @Override
-    public JSONObject toJSON() throws JSONException {
+    public JSONObject toJSON() {
         JSONObject result = new JSONObject();
         JSONArray items = new JSONArray();
 
@@ -72,7 +72,11 @@ public class MenuBuilder extends Builder {
             items.put(toJSON(item));
         }
 
-        result.put("menu", items);
+        try {
+            result.put("menu", items);
+        } catch (JSONException e) {
+            throw new InternalServerException(e.getMessage());
+        }
 
         return result;
     }
