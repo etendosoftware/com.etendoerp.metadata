@@ -3,15 +3,15 @@ package com.etendoerp.metadata;
 import com.etendoerp.metadata.exceptions.InternalServerException;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
-import org.openbravo.base.secureApp.HttpSecureAppServlet;
+import org.openbravo.base.ConfigParameters;
 import org.openbravo.base.secureApp.LoginUtils;
 import org.openbravo.base.secureApp.VariablesSecureApp;
-import org.openbravo.client.kernel.KernelServlet;
+import org.openbravo.client.kernel.RequestContext;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.service.db.DalConnectionProvider;
 
-import javax.servlet.ServletConfig;
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpSession;
 
 /**
  * @author luuchorocha
@@ -19,11 +19,8 @@ import javax.servlet.http.HttpServletRequest;
 public class SessionManager {
     private final static Logger logger = LogManager.getLogger(SessionManager.class);
 
-    public static void initializeSession(ServletConfig config, HttpSecureAppServlet servlet,
-                                         HttpServletRequest request) {
+    public static void initializeSession(HttpServletRequest request) {
         try {
-            servlet.init(config);
-
             OBContext context = OBContext.getOBContext();
             VariablesSecureApp vars = new VariablesSecureApp(request, false);
 
@@ -46,8 +43,11 @@ public class SessionManager {
                                                                     warehouseId);
 
             if (sessionFilled) {
-                LoginUtils.readNumberFormat(vars, KernelServlet.getGlobalParameters().getFormatPath());
-                LoginUtils.saveLoginBD(request, vars, "0", "0");
+                HttpSession session = request.getSession(false);
+                session.setAttribute("forceLogin", "Y");
+                LoginUtils.saveLoginBD(request, vars, clientId, orgId);
+                bypassCSRF(request, userId);
+                setRequestContext(request, vars);
             } else {
                 throw new InternalServerException("Could not initialize a session");
             }
@@ -56,5 +56,33 @@ public class SessionManager {
 
             throw new InternalServerException(e.getMessage());
         }
+    }
+
+    private static void bypassCSRF(HttpServletRequest request, String userId) {
+        HttpSession session = request.getSession(false);
+
+        if (session != null) {
+            session.setAttribute("#CSRF_TOKEN", userId);
+            session.setAttribute("#CSRF_Token", userId);
+        }
+    }
+
+    private static void setRequestContext(HttpServletRequest request, VariablesSecureApp vars) {
+        RequestContext requestContext = RequestContext.get();
+        requestContext.setRequest(request);
+        requestContext.setVariableSecureApp(vars);
+        readNumberFormat(request, vars);
+    }
+
+    private static void readNumberFormat(HttpServletRequest request, VariablesSecureApp vars) {
+        String formatPath = getFormatPath(request);
+
+        if (formatPath != null && !formatPath.isBlank()) {
+            LoginUtils.readNumberFormat(vars, formatPath);
+        }
+    }
+
+    private static String getFormatPath(HttpServletRequest request) {
+        return ConfigParameters.retrieveFrom(request.getServletContext()).getFormatPath();
     }
 }

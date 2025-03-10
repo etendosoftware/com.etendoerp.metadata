@@ -1,8 +1,6 @@
 package com.etendoerp.metadata.builders;
 
 import com.etendoerp.metadata.exceptions.InternalServerException;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
@@ -19,8 +17,7 @@ import org.openbravo.model.ad.ui.Window;
 import java.util.List;
 import java.util.stream.Collectors;
 
-public class MenuBuilder {
-    private final Logger logger;
+public class MenuBuilder extends Builder {
     private final MenuOption menu;
     private final Language language;
 
@@ -29,7 +26,6 @@ public class MenuBuilder {
         manager.setGlobalMenuOptions(new GlobalMenu());
         menu = manager.getMenu();
         language = OBContext.getOBContext().getLanguage();
-        logger = LogManager.getLogger(this.getClass());
     }
 
     private JSONObject toJSON(MenuOption entry) {
@@ -56,7 +52,8 @@ public class MenuBuilder {
             if (null != processDefinition) json.put("processDefinitionId", processDefinition.getId());
             if (null != form) json.put("formId", form.getId());
 
-            if (!children.isEmpty()) json.put("children", children.stream().map(this::toJSON).collect(Collectors.toList()));
+            if (!children.isEmpty())
+                json.put("children", children.stream().map(this::toJSON).collect(Collectors.toList()));
 
             return json;
         } catch (JSONException e) {
@@ -66,7 +63,21 @@ public class MenuBuilder {
         }
     }
 
-    public JSONArray toJSON() {
-        return new JSONArray(this.menu.getChildren().stream().map(this::toJSON).collect(Collectors.toList()));
+    @Override
+    public JSONObject toJSON() {
+        JSONObject result = new JSONObject();
+        JSONArray items = new JSONArray();
+
+        for (MenuOption item : this.menu.getChildren()) {
+            items.put(toJSON(item));
+        }
+
+        try {
+            result.put("menu", items);
+        } catch (JSONException e) {
+            throw new InternalServerException(e.getMessage());
+        }
+
+        return result;
     }
 }

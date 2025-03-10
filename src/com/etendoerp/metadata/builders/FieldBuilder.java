@@ -54,10 +54,6 @@ public class FieldBuilder extends Builder {
         this.json = converter.toJsonObject(field, DataResolvingMode.FULL_TRANSLATABLE);
     }
 
-    public FieldBuilder(Field field) {
-        this(field, null);
-    }
-
     public static boolean isProcessField(Field field) {
         Column column = field.getColumn();
 
@@ -373,11 +369,11 @@ public class FieldBuilder extends Builder {
         addBasicProperties(field);
         addReferencedProperty(field);
         addReferencedTableInfo(field);
-        addDisplayLogic(json, field);
-        addReadOnlyLogic(json, field);
-        addProcessInfo(json, field);
-        addSelectorReferenceList(json, field);
-        addComboSelectInfo(json, field);
+        addDisplayLogic(field);
+        addReadOnlyLogic(field);
+        addProcessInfo(field);
+        addSelectorReferenceList(field);
+        addComboSelectInfo(field);
 
         return json;
     }
@@ -465,40 +461,39 @@ public class FieldBuilder extends Builder {
         }
     }
 
-    private void addComboSelectInfo(JSONObject jsonField, Field field) throws JSONException {
+    private void addComboSelectInfo(Field field) throws JSONException {
         if (isSelectorField(field)) {
-            jsonField.put("selector", getSelectorInfo(field.getId(), field.getColumn().getReferenceSearchKey()));
+            json.put("selector", getSelectorInfo(field.getId(), field.getColumn().getReferenceSearchKey()));
         }
     }
 
-    private void addSelectorReferenceList(JSONObject jsonField, Field field) throws JSONException {
+    private void addSelectorReferenceList(Field field) throws JSONException {
         if (isRefListField(field)) {
-            jsonField.put("refList", getListInfo(field.getColumn().getReferenceSearchKey()));
+            json.put("refList", getListInfo(field.getColumn().getReferenceSearchKey()));
         }
     }
 
-    private void addProcessInfo(JSONObject jsonField, Field field) throws JSONException {
+    private void addProcessInfo(Field field) throws JSONException {
         if (isProcessField(field)) {
-            jsonField.put("process", getFieldProcess(field));
+            json.put("process", getFieldProcess(field));
         }
     }
 
-    private void addDisplayLogic(JSONObject jsonField, Field field) throws JSONException {
+    private void addDisplayLogic(Field field) throws JSONException {
         String displayLogic = field.getDisplayLogic();
 
         if (displayLogic != null && !displayLogic.isBlank()) {
             DynamicExpressionParser parser = new DynamicExpressionParser(displayLogic, field.getTab(), field);
-            jsonField.put("displayLogicFields", getDisplayLogicFields(parser));
-            jsonField.put("displayLogicExpression", parser.getJSExpression());
+            json.put("displayLogicExpression", parser.getJSExpression());
         }
     }
 
-    private void addReadOnlyLogic(JSONObject jsonField, Field field) throws JSONException {
+    private void addReadOnlyLogic(Field field) throws JSONException {
         String readOnlyLogic = field.getColumn().getReadOnlyLogic();
 
         if (readOnlyLogic != null && !readOnlyLogic.isBlank()) {
             DynamicExpressionParser parser = new DynamicExpressionParser(readOnlyLogic, field.getTab(), field);
-            jsonField.put("readOnlyLogicExpression", parser.getJSExpression());
+            json.put("readOnlyLogicExpression", parser.getJSExpression());
         }
     }
 
