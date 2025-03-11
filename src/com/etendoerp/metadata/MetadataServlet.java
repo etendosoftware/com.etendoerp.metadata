@@ -56,7 +56,7 @@ public class MetadataServlet extends HttpSecureAppServlet {
         Language language = getLanguage(request);
 
         if (language != null) {
-            context.setLanguage(getLanguage(request));
+            context.setLanguage(language);
         }
 
         OBContext.setOBContextInSession(request, context);

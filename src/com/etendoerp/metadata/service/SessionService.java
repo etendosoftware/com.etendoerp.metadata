@@ -1,6 +1,5 @@
 package com.etendoerp.metadata.service;
 
-import com.etendoerp.metadata.SessionManager;
 import com.etendoerp.metadata.builders.SessionBuilder;
 
 import javax.servlet.http.HttpServletRequest;
@@ -13,7 +12,6 @@ public class SessionService extends BaseService {
 
     @Override
     public void process() {
-        SessionManager.initializeSession(request);
         write(new SessionBuilder().toJSON());
     }
 }

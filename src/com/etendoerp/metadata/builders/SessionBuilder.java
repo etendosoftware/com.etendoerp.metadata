@@ -6,12 +6,14 @@ import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.client.kernel.RequestContext;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
+import org.openbravo.erpCommon.utility.DimensionDisplayUtility;
 import org.openbravo.model.ad.access.Role;
 import org.openbravo.model.ad.access.User;
 import org.openbravo.service.json.DataResolvingMode;
 
 import javax.servlet.http.HttpSession;
 import java.util.Enumeration;
+import java.util.Map;
 
 /**
  * @author luuchorocha
@@ -28,7 +30,7 @@ public class SessionBuilder extends Builder {
             json.put("user", converter.toJsonObject(user, DataResolvingMode.FULL_TRANSLATABLE));
             json.put("role", converter.toJsonObject(role, DataResolvingMode.FULL_TRANSLATABLE));
             json.put("languages", new LanguageBuilder().toJSON());
-            json.put("session", buildSessionJSON());
+            json.put("configuration", getConfiguration());
 
             return json;
         } catch (JSONException e) {
@@ -36,6 +38,10 @@ public class SessionBuilder extends Builder {
 
             throw new InternalServerException();
         }
+    }
+
+    private Map<String, String> getConfiguration() {
+        return DimensionDisplayUtility.getAccountingDimensionConfiguration(OBContext.getOBContext().getCurrentClient());
     }
 
     private JSONObject buildSessionJSON() throws JSONException {
