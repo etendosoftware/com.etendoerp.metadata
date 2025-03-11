@@ -1,6 +1,7 @@
 package com.etendoerp.metadata.service;
 
 import com.etendoerp.metadata.Constants;
+import com.etendoerp.metadata.MetadataServlet;
 import com.etendoerp.metadata.exceptions.InternalServerException;
 import com.etendoerp.metadata.exceptions.MethodNotAllowedException;
 import com.etendoerp.metadata.exceptions.NotFoundException;
@@ -19,8 +20,11 @@ import java.util.Map;
 import static com.etendoerp.metadata.SessionManager.initializeSession;
 
 public class ServletService extends BaseService {
-    public ServletService(HttpServletRequest request, HttpServletResponse response) {
+    private final HttpSecureAppServlet caller;
+
+    public ServletService(HttpSecureAppServlet caller, HttpServletRequest request, HttpServletResponse response) {
         super(request, response);
+        this.caller = caller;
     }
 
     private static String getMethodName(String method) {
@@ -75,6 +79,7 @@ public class ServletService extends BaseService {
             String servletMethodName = getMethodName(method);
             Method delegatedMethod = findMethod(servlet, servletMethodName);
             HttpServletRequest wrappedRequest = wrapRequestWithRemainingPath(request, pathInfo, servletName);
+            servlet.init(caller.getServletConfig());
             initializeSession(wrappedRequest);
             delegatedMethod.invoke(servlet, wrappedRequest, response);
         } catch (ClassNotFoundException e) {

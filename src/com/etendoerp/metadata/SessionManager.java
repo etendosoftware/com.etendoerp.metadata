@@ -43,11 +43,12 @@ public class SessionManager {
                                                                     warehouseId);
 
             if (sessionFilled) {
-                HttpSession session = request.getSession(false);
-                session.setAttribute("forceLogin", "Y");
-                LoginUtils.saveLoginBD(request, vars, clientId, orgId);
+//                HttpSession session = request.getSession(false);
+//                session.setAttribute("forceLogin", "Y");
+//                LoginUtils.saveLoginBD(request, vars, clientId, orgId);
+//                setRequestContext(request, vars);
+                readNumberFormat(request, vars);
                 bypassCSRF(request, userId);
-                setRequestContext(request, vars);
             } else {
                 throw new InternalServerException("Could not initialize a session");
             }
@@ -71,7 +72,6 @@ public class SessionManager {
         RequestContext requestContext = RequestContext.get();
         requestContext.setRequest(request);
         requestContext.setVariableSecureApp(vars);
-        readNumberFormat(request, vars);
     }
 
     private static void readNumberFormat(HttpServletRequest request, VariablesSecureApp vars) {
