@@ -1,5 +1,6 @@
 package com.etendoerp.metadata;
 
+import com.etendoerp.metadata.data.RequestVariables;
 import com.etendoerp.metadata.exceptions.InternalServerException;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
@@ -19,10 +20,20 @@ import javax.servlet.http.HttpSession;
 public class SessionManager {
     private final static Logger logger = LogManager.getLogger(SessionManager.class);
 
-    public static void initializeSession(HttpServletRequest request) {
+    public static VariablesSecureApp initializeSession(HttpServletRequest request) {
+        return initializeSession(request, false);
+    }
+
+    public static VariablesSecureApp initializeSession(HttpServletRequest request, boolean createSession) {
         try {
             OBContext context = OBContext.getOBContext();
-            VariablesSecureApp vars = new VariablesSecureApp(request, false);
+            VariablesSecureApp vars;
+
+            if (createSession) {
+                vars = new RequestVariables(request, false);
+            } else {
+                vars = new RequestVariables(request);
+            }
 
             String userId = context.getUser().getId();
             String language = context.getLanguage().getLanguage();
@@ -43,12 +54,10 @@ public class SessionManager {
                                                                     warehouseId);
 
             if (sessionFilled) {
-//                HttpSession session = request.getSession(false);
-//                session.setAttribute("forceLogin", "Y");
-//                LoginUtils.saveLoginBD(request, vars, clientId, orgId);
-//                setRequestContext(request, vars);
                 readNumberFormat(request, vars);
                 bypassCSRF(request, userId);
+
+                return vars;
             } else {
                 throw new InternalServerException("Could not initialize a session");
             }
