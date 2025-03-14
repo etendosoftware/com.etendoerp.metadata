@@ -1,5 +1,6 @@
 package com.etendoerp.metadata;
 
+import com.etendoerp.metadata.data.RequestVariables;
 import com.etendoerp.metadata.exceptions.InternalServerException;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
@@ -19,10 +20,10 @@ import javax.servlet.http.HttpSession;
 public class SessionManager {
     private final static Logger logger = LogManager.getLogger(SessionManager.class);
 
-    public static void initializeSession(HttpServletRequest request) {
+    public static RequestVariables initializeSession(HttpServletRequest request, boolean createSession) {
         try {
             OBContext context = OBContext.getOBContext();
-            VariablesSecureApp vars = new VariablesSecureApp(request, false);
+            RequestVariables vars = createSession ? new RequestVariables(request, true) : new RequestVariables(request);
 
             String userId = context.getUser().getId();
             String language = context.getLanguage().getLanguage();
@@ -43,11 +44,11 @@ public class SessionManager {
                                                                     warehouseId);
 
             if (sessionFilled) {
-                HttpSession session = request.getSession(false);
-                session.setAttribute("forceLogin", "Y");
-                LoginUtils.saveLoginBD(request, vars, clientId, orgId);
+                readNumberFormat(request, vars);
                 bypassCSRF(request, userId);
-                setRequestContext(request, vars);
+                RequestContext.get().setRequest(request);
+
+                return vars;
             } else {
                 throw new InternalServerException("Could not initialize a session");
             }
@@ -65,13 +66,6 @@ public class SessionManager {
             session.setAttribute("#CSRF_TOKEN", userId);
             session.setAttribute("#CSRF_Token", userId);
         }
-    }
-
-    private static void setRequestContext(HttpServletRequest request, VariablesSecureApp vars) {
-        RequestContext requestContext = RequestContext.get();
-        requestContext.setRequest(request);
-        requestContext.setVariableSecureApp(vars);
-        readNumberFormat(request, vars);
     }
 
     private static void readNumberFormat(HttpServletRequest request, VariablesSecureApp vars) {

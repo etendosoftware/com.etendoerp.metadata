@@ -4,7 +4,6 @@ import com.etendoerp.metadata.exceptions.NotFoundException;
 import com.etendoerp.metadata.service.*;
 import org.apache.http.entity.ContentType;
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
-import org.openbravo.client.kernel.RequestContext;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.model.ad.system.Language;
 import org.openbravo.service.json.JsonUtils;
@@ -24,9 +23,7 @@ import static org.openbravo.authentication.AuthenticationManager.STATELESS_REQUE
 public class MetadataServlet extends HttpSecureAppServlet {
     @Override
     public void service(HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
-        RequestContext requestContext = RequestContext.get();
         request.setAttribute(STATELESS_REQUEST_PARAMETER, "true");
-        requestContext.setRequest(request);
         super.service(request, response);
     }
 
@@ -56,7 +53,7 @@ public class MetadataServlet extends HttpSecureAppServlet {
         Language language = getLanguage(request);
 
         if (language != null) {
-            context.setLanguage(getLanguage(request));
+            context.setLanguage(language);
         }
 
         OBContext.setOBContextInSession(request, context);
@@ -90,7 +87,7 @@ public class MetadataServlet extends HttpSecureAppServlet {
         } else if (path.startsWith(Constants.TOOLBAR_PATH)) {
             service = new ToolbarService(request, response);
         } else if (path.startsWith(Constants.DELEGATED_SERVLET_PATH)) {
-            service = new ServletService(request, response);
+            service = new ServletService(this, request, response);
         } else if (path.startsWith(Constants.LANGUAGE_PATH)) {
             service = new LanguageService(request, response);
         } else if (Constants.MENU_PATH.equals(path)) {
