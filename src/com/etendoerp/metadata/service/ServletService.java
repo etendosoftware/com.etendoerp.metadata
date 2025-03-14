@@ -5,12 +5,12 @@ import com.etendoerp.metadata.SessionManager;
 import com.etendoerp.metadata.exceptions.InternalServerException;
 import com.etendoerp.metadata.exceptions.MethodNotAllowedException;
 import com.etendoerp.metadata.exceptions.NotFoundException;
+import com.etendoerp.metadata.http.HttpServletRequestWrapper;
 import org.apache.commons.lang.StringUtils;
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
 import org.openbravo.base.weld.WeldUtils;
 
 import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletRequestWrapper;
 import javax.servlet.http.HttpServletResponse;
 import java.lang.reflect.Method;
 import java.util.Arrays;
@@ -42,17 +42,12 @@ public class ServletService extends BaseService {
         return Class.forName(servletName).asSubclass(HttpSecureAppServlet.class).getDeclaredConstructor().newInstance();
     }
 
-    private static HttpServletRequest wrapRequestWithRemainingPath(HttpServletRequest request, String pathInfo,
+    private static HttpServletRequestWrapper wrapRequestWithRemainingPath(HttpServletRequest request, String pathInfo,
                                                                    String servletName) {
         String className = pathInfo.split("/servlets/")[1];
         String packageName = StringUtils.substring(className, 0, className.lastIndexOf('.'));
 
-        return new HttpServletRequestWrapper(request) {
-            @Override
-            public String getRequestURI() {
-                return request.getRequestURI().replaceFirst(servletName, packageName);
-            }
-        };
+        return new HttpServletRequestWrapper(request, servletName, packageName);
     }
 
     public static Method findMethod(HttpSecureAppServlet servlet, String methodName) throws MethodNotAllowedException {
@@ -76,9 +71,9 @@ public class ServletService extends BaseService {
             HttpSecureAppServlet servlet = getOrCreateServlet(servletName);
             String servletMethodName = getMethodName(method);
             Method delegatedMethod = findMethod(servlet, servletMethodName);
-            HttpServletRequest wrappedRequest = wrapRequestWithRemainingPath(request, pathInfo, servletName);
+            HttpServletRequestWrapper wrappedRequest = wrapRequestWithRemainingPath(request, pathInfo, servletName);
             servlet.init(caller.getServletConfig());
-            SessionManager.initializeSession(wrappedRequest);
+            SessionManager.initializeSession(wrappedRequest, true);
             delegatedMethod.invoke(servlet, wrappedRequest, response);
         } catch (ClassNotFoundException e) {
             logger.error(e.getMessage(), e);

@@ -4,7 +4,6 @@ import com.etendoerp.metadata.exceptions.NotFoundException;
 import com.etendoerp.metadata.service.*;
 import org.apache.http.entity.ContentType;
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
-import org.openbravo.client.kernel.RequestContext;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.model.ad.system.Language;
 import org.openbravo.service.json.JsonUtils;
@@ -24,9 +23,7 @@ import static org.openbravo.authentication.AuthenticationManager.STATELESS_REQUE
 public class MetadataServlet extends HttpSecureAppServlet {
     @Override
     public void service(HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
-        RequestContext requestContext = RequestContext.get();
         request.setAttribute(STATELESS_REQUEST_PARAMETER, "true");
-        requestContext.setRequest(request);
         super.service(request, response);
     }
 

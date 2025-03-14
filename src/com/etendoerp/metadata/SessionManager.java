@@ -20,14 +20,10 @@ import javax.servlet.http.HttpSession;
 public class SessionManager {
     private final static Logger logger = LogManager.getLogger(SessionManager.class);
 
-    public static void initializeSession(HttpServletRequest request) {
-        initializeSession(request, false);
-    }
-
-    public static void initializeSession(HttpServletRequest request, boolean createSession) {
+    public static RequestVariables initializeSession(HttpServletRequest request, boolean createSession) {
         try {
             OBContext context = OBContext.getOBContext();
-            VariablesSecureApp vars = new RequestVariables(request, false);
+            RequestVariables vars = createSession ? new RequestVariables(request, true) : new RequestVariables(request);
 
             String userId = context.getUser().getId();
             String language = context.getLanguage().getLanguage();
@@ -50,6 +46,9 @@ public class SessionManager {
             if (sessionFilled) {
                 readNumberFormat(request, vars);
                 bypassCSRF(request, userId);
+                RequestContext.get().setRequest(request);
+
+                return vars;
             } else {
                 throw new InternalServerException("Could not initialize a session");
             }
@@ -67,12 +66,6 @@ public class SessionManager {
             session.setAttribute("#CSRF_TOKEN", userId);
             session.setAttribute("#CSRF_Token", userId);
         }
-    }
-
-    private static void setRequestContext(HttpServletRequest request, VariablesSecureApp vars) {
-        RequestContext requestContext = RequestContext.get();
-        requestContext.setRequest(request);
-        requestContext.setVariableSecureApp(vars);
     }
 
     private static void readNumberFormat(HttpServletRequest request, VariablesSecureApp vars) {
