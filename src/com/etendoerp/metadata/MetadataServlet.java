@@ -56,7 +56,7 @@ public class MetadataServlet extends HttpSecureAppServlet {
         Language language = getLanguage(request);
 
         if (language != null) {
-            context.setLanguage(getLanguage(request));
+            context.setLanguage(language);
         }
 
         OBContext.setOBContextInSession(request, context);
@@ -90,7 +90,7 @@ public class MetadataServlet extends HttpSecureAppServlet {
         } else if (path.startsWith(Constants.TOOLBAR_PATH)) {
             service = new ToolbarService(request, response);
         } else if (path.startsWith(Constants.DELEGATED_SERVLET_PATH)) {
-            service = new ServletService(request, response);
+            service = new ServletService(this, request, response);
         } else if (path.startsWith(Constants.LANGUAGE_PATH)) {
             service = new LanguageService(request, response);
         } else if (Constants.MENU_PATH.equals(path)) {

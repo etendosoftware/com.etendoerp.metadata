@@ -1,5 +1,6 @@
 package com.etendoerp.metadata;
 
+import com.etendoerp.metadata.data.RequestVariables;
 import com.etendoerp.metadata.exceptions.InternalServerException;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
@@ -20,9 +21,13 @@ public class SessionManager {
     private final static Logger logger = LogManager.getLogger(SessionManager.class);
 
     public static void initializeSession(HttpServletRequest request) {
+        initializeSession(request, false);
+    }
+
+    public static void initializeSession(HttpServletRequest request, boolean createSession) {
         try {
             OBContext context = OBContext.getOBContext();
-            VariablesSecureApp vars = new VariablesSecureApp(request, false);
+            VariablesSecureApp vars = new RequestVariables(request, false);
 
             String userId = context.getUser().getId();
             String language = context.getLanguage().getLanguage();
@@ -43,11 +48,8 @@ public class SessionManager {
                                                                     warehouseId);
 
             if (sessionFilled) {
-                HttpSession session = request.getSession(false);
-                session.setAttribute("forceLogin", "Y");
-                LoginUtils.saveLoginBD(request, vars, clientId, orgId);
+                readNumberFormat(request, vars);
                 bypassCSRF(request, userId);
-                setRequestContext(request, vars);
             } else {
                 throw new InternalServerException("Could not initialize a session");
             }
@@ -71,7 +73,6 @@ public class SessionManager {
         RequestContext requestContext = RequestContext.get();
         requestContext.setRequest(request);
         requestContext.setVariableSecureApp(vars);
-        readNumberFormat(request, vars);
     }
 
     private static void readNumberFormat(HttpServletRequest request, VariablesSecureApp vars) {

@@ -12,8 +12,7 @@ import java.util.Arrays;
  */
 public class Utils {
     public static Language getLanguage(HttpServletRequest request) {
-        String[] providedLanguages =
-                {request.getParameter("language"), request.getHeader("language"), request.getLocale().toString()};
+        String[] providedLanguages = {request.getParameter("language"), request.getHeader("language")};
         String languageCode = Arrays.stream(providedLanguages)
                                     .filter(language -> language != null && !language.isEmpty())
                                     .findFirst()
