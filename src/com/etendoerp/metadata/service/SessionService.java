@@ -14,6 +14,6 @@ public class SessionService extends BaseService {
 
     @Override
     public void process() {
-        write(new SessionBuilder((RequestVariables) SessionManager.initializeSession(request)).toJSON());
+        write(new SessionBuilder().toJSON());
     }
 }

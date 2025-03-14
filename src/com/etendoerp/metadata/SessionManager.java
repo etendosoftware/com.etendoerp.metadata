@@ -20,20 +20,14 @@ import javax.servlet.http.HttpSession;
 public class SessionManager {
     private final static Logger logger = LogManager.getLogger(SessionManager.class);
 
-    public static VariablesSecureApp initializeSession(HttpServletRequest request) {
-        return initializeSession(request, false);
+    public static void initializeSession(HttpServletRequest request) {
+        initializeSession(request, false);
     }
 
-    public static VariablesSecureApp initializeSession(HttpServletRequest request, boolean createSession) {
+    public static void initializeSession(HttpServletRequest request, boolean createSession) {
         try {
             OBContext context = OBContext.getOBContext();
-            VariablesSecureApp vars;
-
-            if (createSession) {
-                vars = new RequestVariables(request, false);
-            } else {
-                vars = new RequestVariables(request);
-            }
+            VariablesSecureApp vars = new RequestVariables(request, false);
 
             String userId = context.getUser().getId();
             String language = context.getLanguage().getLanguage();
@@ -56,8 +50,6 @@ public class SessionManager {
             if (sessionFilled) {
                 readNumberFormat(request, vars);
                 bypassCSRF(request, userId);
-
-                return vars;
             } else {
                 throw new InternalServerException("Could not initialize a session");
             }
