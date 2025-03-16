@@ -94,7 +94,7 @@ public class ToolbarBuilder {
 
         List<Field> processFields = tab.getADFieldList()
                                        .stream()
-                                       .filter(field -> field.isActive() && tabBuilder.shouldDisplayField(field) &&
+                                       .filter(field -> field.isActive() &&
                                                         tabBuilder.hasAccessToProcess(field, windowId) &&
                                                         FieldBuilder.isProcessField(field))
                                        .collect(Collectors.toList());

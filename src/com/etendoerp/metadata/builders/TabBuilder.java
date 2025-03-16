@@ -1,6 +1,5 @@
 package com.etendoerp.metadata.builders;
 
-import com.etendoerp.metadata.Constants;
 import com.etendoerp.metadata.exceptions.InternalServerException;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
@@ -48,6 +47,12 @@ public class TabBuilder extends Builder {
             json.put("parentColumns", getParentColumns());
             json.put("fields", getFields());
 
+            Tab parentTab = getParentTab();
+
+            if (parentTab != null) {
+                json.put("parentTab", converter.toJsonObject(parentTab, DataResolvingMode.FULL_TRANSLATABLE));
+            }
+
             return json;
         } catch (JSONException e) {
             logger.warn(e.getMessage(), e);
@@ -55,12 +60,28 @@ public class TabBuilder extends Builder {
         }
     }
 
+    private Tab getParentTab() {
+        Long level = tab.getTabLevel();
+        if (tab.getTabLevel() > 0) {
+            for (Tab relatedTab : tab.getWindow().getADTabList()) {
+                if (level == relatedTab.getTabLevel() + 1) {
+                    return relatedTab;
+                }
+
+            }
+        }
+
+        return null;
+    }
+
     private JSONArray getParentColumns() {
         JSONArray jsonColumns = new JSONArray();
 
-        for (Column column : tab.getTable().getADColumnList()) {
-            if (tab.getTabLevel() > 0 && column.isLinkToParentColumn()) {
-                jsonColumns.put(getEntityColumnName(column));
+        if (tab.getTabLevel() > 0) {
+            for (Column column : tab.getTable().getADColumnList()) {
+                if (column.isLinkToParentColumn()) {
+                    jsonColumns.put(getEntityColumnName(column));
+                }
             }
         }
 
@@ -108,13 +129,12 @@ public class TabBuilder extends Builder {
     }
 
     private boolean isFieldAllowed(Field field) {
-        return field.isActive() && shouldDisplayField(field) && hasAccessToProcess(field, tab.getWindow().getId());
+        return field.isActive() && hasAccessToProcess(field, tab.getWindow().getId());
     }
 
     private boolean isFieldAccessAllowed(FieldAccess fieldAccess) {
         Field field = fieldAccess.getField();
-        return fieldAccess.isActive() && field.isActive() && shouldDisplayField(field) &&
-               hasAccessToProcess(field, tab.getWindow().getId());
+        return fieldAccess.isActive() && field.isActive() && hasAccessToProcess(field, tab.getWindow().getId());
     }
 
     private String getEntityColumnName(Column column) {
@@ -137,16 +157,5 @@ public class TabBuilder extends Builder {
         }
 
         return true;
-    }
-
-    protected boolean shouldDisplayField(Field field) {
-        boolean isScanProcess = field.getColumn() != null && field.getColumn().getOBUIAPPProcess() != null &&
-                                field.getColumn().getOBUIAPPProcess().isSmfmuScan() != null &&
-                                field.getColumn().getOBUIAPPProcess().isSmfmuScan();
-
-        return field.getColumn() != null &&
-               (field.isDisplayed() || isScanProcess || field.getColumn().isStoredInSession() ||
-                field.getColumn().isLinkToParentColumn() ||
-                Constants.ALWAYS_DISPLAYED_COLUMNS.contains(field.getColumn().getDBColumnName()));
     }
 }
