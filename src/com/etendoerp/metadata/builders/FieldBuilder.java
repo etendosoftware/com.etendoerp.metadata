@@ -383,8 +383,9 @@ public class FieldBuilder extends Builder {
         boolean editableField = access != null ? access.isEditableField() : Constants.DEFAULT_EDITABLE_FIELD;
         boolean isColUpdatable = field.getColumn() != null ? field.getColumn().isUpdatable() : true;
 
-        boolean readOnly = (access != null && !access.isEditableField() && access.getField().isReadOnly())
-                || !isColUpdatable;
+        boolean fieldIsReadOnly = field.isReadOnly();
+
+        boolean readOnly = fieldIsReadOnly || (access != null && !access.isEditableField()) || !isColUpdatable;
 
         json.put("checkonsave", checkOnSave);
         json.put("editableField", editableField);
