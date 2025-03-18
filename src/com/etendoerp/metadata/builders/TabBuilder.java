@@ -50,7 +50,7 @@ public class TabBuilder extends Builder {
             Tab parentTab = getParentTab();
 
             if (parentTab != null) {
-                json.put("parentTab", converter.toJsonObject(parentTab, DataResolvingMode.FULL_TRANSLATABLE));
+                json.put("parentTabId", parentTab.getId());
             }
 
             return json;
