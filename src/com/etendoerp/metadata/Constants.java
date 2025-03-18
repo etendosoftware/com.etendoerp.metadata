@@ -16,6 +16,7 @@ public class Constants {
     public static final String SESSION_PATH = "/session";
     public static final String MENU_PATH = "/menu";
     public static final String WINDOW_PATH = "/window/";
+    public static final String TAB_PATH = "/tab/";
     public static final String LANGUAGE_PATH = "/language";
     public static final String DELEGATED_SERVLET_PATH = "/servlets";
     public static final boolean DEFAULT_CHECKON_SAVE = true;

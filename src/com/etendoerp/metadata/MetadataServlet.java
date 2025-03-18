@@ -84,6 +84,8 @@ public class MetadataServlet extends HttpSecureAppServlet {
 
         if (path.startsWith(Constants.WINDOW_PATH)) {
             service = new WindowService(request, response);
+        } else if (path.startsWith(Constants.TAB_PATH)) {
+            service = new TabService(request, response);
         } else if (path.startsWith(Constants.TOOLBAR_PATH)) {
             service = new ToolbarService(request, response);
         } else if (path.startsWith(Constants.DELEGATED_SERVLET_PATH)) {
