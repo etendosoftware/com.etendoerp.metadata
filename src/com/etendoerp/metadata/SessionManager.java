@@ -12,7 +12,6 @@ import org.openbravo.dal.core.OBContext;
 import org.openbravo.service.db.DalConnectionProvider;
 
 import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpSession;
 
 /**
  * @author luuchorocha
@@ -45,7 +44,6 @@ public class SessionManager {
 
             if (sessionFilled) {
                 readNumberFormat(request, vars);
-                bypassCSRF(request, userId);
                 RequestContext.get().setRequest(request);
 
                 return vars;
@@ -56,15 +54,6 @@ public class SessionManager {
             logger.error(e.getMessage(), e);
 
             throw new InternalServerException(e.getMessage());
-        }
-    }
-
-    private static void bypassCSRF(HttpServletRequest request, String userId) {
-        HttpSession session = request.getSession(false);
-
-        if (session != null) {
-            session.setAttribute("#CSRF_TOKEN", userId);
-            session.setAttribute("#CSRF_Token", userId);
         }
     }
 
