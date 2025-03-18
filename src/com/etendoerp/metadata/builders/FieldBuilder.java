@@ -381,15 +381,15 @@ public class FieldBuilder extends Builder {
     private void addAccessProperties(FieldAccess access) throws JSONException {
         boolean checkOnSave = access != null ? access.isCheckonsave() : Constants.DEFAULT_CHECKON_SAVE;
         boolean editableField = access != null ? access.isEditableField() : Constants.DEFAULT_EDITABLE_FIELD;
-        boolean isColUpdatable = field.getColumn() != null ? field.getColumn().isUpdatable() : true;
-
         boolean fieldIsReadOnly = field.isReadOnly();
+        boolean isColUpdatable = field.getColumn() != null ? field.getColumn().isUpdatable() : true;
 
         boolean readOnly = fieldIsReadOnly || (access != null && !access.isEditableField()) || !isColUpdatable;
 
         json.put("checkonsave", checkOnSave);
         json.put("editableField", editableField);
         json.put("readOnly", readOnly);
+        json.put("isUpdatable", isColUpdatable);
     }
 
     private void addBasicProperties(Field field) throws JSONException {
