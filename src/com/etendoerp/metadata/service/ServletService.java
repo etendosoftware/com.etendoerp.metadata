@@ -17,6 +17,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
+import static org.openbravo.authentication.AuthenticationManager.STATELESS_REQUEST_PARAMETER;
+
 public class ServletService extends BaseService {
     private final HttpSecureAppServlet caller;
 
@@ -43,7 +45,7 @@ public class ServletService extends BaseService {
     }
 
     private static HttpServletRequestWrapper wrapRequestWithRemainingPath(HttpServletRequest request, String pathInfo,
-                                                                   String servletName) {
+                                                                          String servletName) {
         String className = pathInfo.split("/servlets/")[1];
         String packageName = StringUtils.substring(className, 0, className.lastIndexOf('.'));
 
@@ -72,6 +74,7 @@ public class ServletService extends BaseService {
             String servletMethodName = getMethodName(method);
             Method delegatedMethod = findMethod(servlet, servletMethodName);
             HttpServletRequestWrapper wrappedRequest = wrapRequestWithRemainingPath(request, pathInfo, servletName);
+            wrappedRequest.removeAttribute(STATELESS_REQUEST_PARAMETER);
             servlet.init(caller.getServletConfig());
             SessionManager.initializeSession(wrappedRequest, true);
             delegatedMethod.invoke(servlet, wrappedRequest, response);
