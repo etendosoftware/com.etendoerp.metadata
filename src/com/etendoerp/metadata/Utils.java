@@ -3,18 +3,29 @@ package com.etendoerp.metadata;
 import org.hibernate.criterion.Restrictions;
 import org.openbravo.base.expression.OBScriptEngine;
 import org.openbravo.client.application.DynamicExpressionParser;
+import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
+import org.openbravo.erpCommon.businessUtility.Preferences;
+import org.openbravo.erpCommon.utility.PropertyException;
 import org.openbravo.model.ad.system.Language;
 import org.openbravo.model.ad.ui.Field;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.script.ScriptException;
 import javax.servlet.http.HttpServletRequest;
 import java.util.Arrays;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import static org.openbravo.client.application.DynamicExpressionParser.REPLACE_DISPLAY_LOGIC_SERVER_PATTERN;
 
 /**
  * @author luuchorocha
  */
 public class Utils {
+    private static final Logger log = LoggerFactory.getLogger(Utils.class);
+
     public static Language getLanguage(HttpServletRequest request) {
         String[] providedLanguages = {request.getParameter("language"), request.getHeader("language")};
         String languageCode = Arrays.stream(providedLanguages)
@@ -37,8 +48,7 @@ public class Utils {
             return true;
         }
 
-        String translatedDisplayLogic =
-                DynamicExpressionParser.replaceSystemPreferencesInDisplayLogic(displayLogicEvaluatedInTheServer);
+        String translatedDisplayLogic = DynamicExpressionParser.replaceSystemPreferencesInDisplayLogic(displayLogicEvaluatedInTheServer);
 
         boolean result;
 
@@ -48,6 +58,33 @@ public class Utils {
             result = (Boolean) OBScriptEngine.getInstance().eval(parser.getJSExpression());
         } catch (ScriptException e) {
             result = true;
+        }
+
+        return result;
+    }
+
+    public static String replaceSystemPreferencesInDisplayLogic(Field field) {
+        String result = field.getDisplayLogicEvaluatedInTheServer();
+        OBContext context = OBContext.getOBContext();
+        Pattern pattern = Pattern.compile(REPLACE_DISPLAY_LOGIC_SERVER_PATTERN);
+        Matcher matcher = pattern.matcher(result);
+
+        while (matcher.find()) {
+            String preferenceName = matcher.group(1);
+
+            try {
+                String value = Preferences.getPreferenceValue(preferenceName,
+                                                              false,
+                                                              context.getCurrentClient(),
+                                                              context.getCurrentOrganization(),
+                                                              context.getUser(),
+                                                              context.getRole(),
+                                                              field.getTab().getWindow());
+
+                result = result.replaceAll("@" + matcher.group(1) + "@", "'" + value + "'");
+            } catch (PropertyException e) {
+                log.debug(e.getMessage(), e);
+            }
         }
 
         return result;
