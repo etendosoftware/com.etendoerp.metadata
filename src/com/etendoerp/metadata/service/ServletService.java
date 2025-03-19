@@ -31,7 +31,9 @@ public class ServletService extends BaseService {
         return Map.of(Constants.HTTP_METHOD_GET,
                       Constants.SERVLET_DO_GET_METHOD,
                       Constants.HTTP_METHOD_POST,
-                      Constants.SERVLET_DO_POST_METHOD).getOrDefault(method, "service");
+                      Constants.SERVLET_DO_POST_METHOD,
+                      Constants.HTTP_METHOD_DELETE,
+                      Constants.SERVLET_DO_DELETE_METHOD).getOrDefault(method, "service");
     }
 
     private static HttpSecureAppServlet getOrCreateServlet(String servletName) throws Exception {

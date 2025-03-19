@@ -10,8 +10,10 @@ import java.util.List;
 public class Constants {
     public static final String HTTP_METHOD_GET = "GET";
     public static final String HTTP_METHOD_POST = "POST";
+    public static final String HTTP_METHOD_DELETE = "DELETE";
     public static final String SERVLET_DO_POST_METHOD = "doPost";
     public static final String SERVLET_DO_GET_METHOD = "doGet";
+    public static final String SERVLET_DO_DELETE_METHOD = "doDelete";
     public static final String TOOLBAR_PATH = "/toolbar";
     public static final String SESSION_PATH = "/session";
     public static final String MENU_PATH = "/menu";

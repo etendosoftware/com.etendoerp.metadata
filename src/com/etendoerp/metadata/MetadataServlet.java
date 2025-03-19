@@ -48,6 +48,11 @@ public class MetadataServlet extends HttpSecureAppServlet {
         doGet(request, response);
     }
 
+    @Override
+    public final void doDelete(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        doGet(request, response);
+    }
+
     private void setContext(HttpServletRequest request) {
         OBContext context = OBContext.getOBContext();
         Language language = getLanguage(request);
