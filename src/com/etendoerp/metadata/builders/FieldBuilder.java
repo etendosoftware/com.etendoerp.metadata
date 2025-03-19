@@ -25,6 +25,7 @@ import org.openbravo.model.ad.datamodel.Table;
 import org.openbravo.model.ad.domain.Reference;
 import org.openbravo.model.ad.domain.ReferencedTree;
 import org.openbravo.model.ad.ui.Field;
+import org.openbravo.model.ad.ui.Process;
 import org.openbravo.model.ad.ui.Tab;
 import org.openbravo.model.ad.ui.Window;
 import org.openbravo.service.datasource.DataSource;
@@ -36,8 +37,6 @@ import org.openbravo.userinterface.selector.SelectorField;
 
 import java.util.List;
 import java.util.stream.Collectors;
-
-import static com.etendoerp.metadata.builders.ProcessBuilder.getFieldProcess;
 
 /**
  * @author luuchorocha
@@ -58,8 +57,7 @@ public class FieldBuilder extends Builder {
         Column column = field.getColumn();
 
         return column != null && column.getReference() != null &&
-               Constants.PROCESS_REFERENCE_VALUE.equals(column.getReference().getId()) &&
-               column.getOBUIAPPProcess() != null;
+               Constants.PROCESS_REFERENCE_VALUE.equals(column.getReference().getId());
     }
 
 
@@ -478,7 +476,14 @@ public class FieldBuilder extends Builder {
 
     private void addProcessInfo(Field field) throws JSONException {
         if (isProcessField(field)) {
-            json.put("process", getFieldProcess(field));
+            Process processDefinition = field.getColumn().getProcess();
+            org.openbravo.client.application.Process process = field.getColumn().getOBUIAPPProcess();
+
+            if (processDefinition != null) {
+                json.put("process", ProcessDefinitionBuilder.getFieldProcess(field));
+            } else if (process != null) {
+                json.put("process", ProcessBuilder.getFieldProcess(field));
+            }
         }
     }
 
