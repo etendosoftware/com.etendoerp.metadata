@@ -46,7 +46,7 @@ public class SessionManager {
             if (sessionFilled) {
                 readNumberFormat(request, vars);
                 bypassCSRF(request, userId);
-                RequestContext.get().setRequest(request);
+                setRequestContext(request, vars);
 
                 return vars;
             } else {
@@ -57,6 +57,13 @@ public class SessionManager {
 
             throw new InternalServerException(e.getMessage());
         }
+    }
+
+    private static void setRequestContext(HttpServletRequest request, RequestVariables vars) {
+        RequestContext requestContext = RequestContext.get();
+        requestContext.setRequest(request);
+        requestContext.setVariableSecureApp(vars);
+
     }
 
     private static void bypassCSRF(HttpServletRequest request, String userId) {

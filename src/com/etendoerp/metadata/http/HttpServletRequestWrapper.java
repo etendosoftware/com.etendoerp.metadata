@@ -6,9 +6,14 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
 
 public class HttpServletRequestWrapper extends RequestContext.HttpServletRequestWrapper {
-    private final String servletName;
-    private final String packageName;
+    private String servletName;
+    private String packageName;
     private final HttpSession session;
+
+    public HttpServletRequestWrapper(HttpServletRequest request) {
+        super(request);
+        this.session = new RequestContext.HttpSessionWrapper();
+    }
 
     public HttpServletRequestWrapper(HttpServletRequest request, String servletName, String packageName) {
         super(request);
@@ -19,7 +24,11 @@ public class HttpServletRequestWrapper extends RequestContext.HttpServletRequest
 
     @Override
     public String getRequestURI() {
-        return getDelegate().getRequestURI().replaceFirst(servletName, packageName);
+        if (servletName != null && packageName != null) {
+            return getDelegate().getRequestURI().replaceFirst(servletName, packageName);
+        } else {
+            return super.getRequestURI();
+        }
     }
 
     @Override

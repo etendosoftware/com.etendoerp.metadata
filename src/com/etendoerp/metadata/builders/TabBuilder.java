@@ -21,6 +21,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
+import static com.etendoerp.metadata.Utils.evaluateDisplayLogicAtServerLevel;
+
 public class TabBuilder extends Builder {
     private final Tab tab;
     private final TabAccess tabAccess;
@@ -95,18 +97,25 @@ public class TabBuilder extends Builder {
         if (adFieldAccessList == null || adFieldAccessList.isEmpty()) {
             for (Field field : getFieldList()) {
                 String columnName = getEntityColumnName(field.getColumn());
-                fields.put(columnName, getJSONField(field, null));
+
+                if (evaluateDisplayLogicAtServerLevel(field)) {
+                    fields.put(columnName, getJSONField(field, null));
+                }
             }
         } else {
             for (FieldAccess fieldAccess : getFieldAccessList(adFieldAccessList)) {
                 Field field = fieldAccess.getField();
                 String columnName = getEntityColumnName(field.getColumn());
-                fields.put(columnName, getJSONField(field, fieldAccess));
+
+                if (evaluateDisplayLogicAtServerLevel(field)) {
+                    fields.put(columnName, getJSONField(field, fieldAccess));
+                }
             }
         }
 
         return fields;
     }
+
 
     private List<FieldAccess> getFieldAccessList(List<FieldAccess> adFieldAccessList) {
         List<FieldAccess> result = new ArrayList<>();
