@@ -3,10 +3,10 @@ package com.etendoerp.metadata.builders;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
-import org.openbravo.client.application.Parameter;
-import org.openbravo.client.application.Process;
 import org.openbravo.erpCommon.utility.Utility;
 import org.openbravo.model.ad.ui.Field;
+import org.openbravo.model.ad.ui.Process;
+import org.openbravo.model.ad.ui.ProcessParameter;
 import org.openbravo.service.json.DataResolvingMode;
 
 import static com.etendoerp.metadata.Constants.LIST_REFERENCE_ID;
@@ -14,30 +14,31 @@ import static com.etendoerp.metadata.Constants.SELECTOR_REFERENCES;
 import static com.etendoerp.metadata.builders.FieldBuilder.getListInfo;
 import static com.etendoerp.metadata.builders.FieldBuilder.getSelectorInfo;
 
-public class ProcessBuilder extends Builder {
+public class ProcessActionBuilder extends Builder {
     private final Process process;
 
-    public ProcessBuilder(Process process) {
+    public ProcessActionBuilder(Process process) {
         this.process = process;
     }
 
-    private static boolean isSelectorParameter(Parameter parameter) {
+    private static boolean isSelectorParameter(ProcessParameter parameter) {
         return parameter != null && parameter.getReference() != null &&
                SELECTOR_REFERENCES.contains(parameter.getReference().getId());
     }
 
-    private static boolean isListParameter(Parameter parameter) {
+    private static boolean isListParameter(ProcessParameter parameter) {
         return parameter != null && parameter.getReference() != null &&
                LIST_REFERENCE_ID.contains(parameter.getReference().getId());
     }
 
     public static JSONObject getFieldProcess(Field field) throws JSONException {
-        if (field == null || field.getColumn() == null || field.getColumn().getOBUIAPPProcess() == null) {
+        org.openbravo.model.ad.ui.Process process = field.getColumn().getProcess();
+
+        if (process == null) {
             return new JSONObject();
         }
 
-        Process process = field.getColumn().getOBUIAPPProcess();
-        JSONObject processJson = new ProcessBuilder(process).toJSON();
+        JSONObject processJson = new ProcessActionBuilder(process).toJSON();
 
         processJson.put("fieldId", field.getId());
         processJson.put("columnId", field.getColumn().getId());
@@ -50,7 +51,7 @@ public class ProcessBuilder extends Builder {
         return processJson;
     }
 
-    private JSONObject buildParameterJSON(Parameter param) throws JSONException {
+    private JSONObject buildParameterJSON(ProcessParameter param) throws JSONException {
         JSONObject paramJSON = converter.toJsonObject(param, DataResolvingMode.FULL_TRANSLATABLE);
 
         if (isSelectorParameter(param)) {
@@ -68,7 +69,7 @@ public class ProcessBuilder extends Builder {
         JSONObject processJSON = converter.toJsonObject(process, DataResolvingMode.FULL_TRANSLATABLE);
         JSONArray parameters = new JSONArray();
 
-        for (Parameter param : process.getOBUIAPPParameterList()) {
+        for (ProcessParameter param : process.getADProcessParameterList()) {
             if (param != null) {
                 parameters.put(buildParameterJSON(param));
             }

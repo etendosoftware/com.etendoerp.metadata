@@ -100,38 +100,30 @@ public class ToolbarBuilder {
                                        .collect(Collectors.toList());
 
         for (Field field : processFields) {
-            Process process = field.getColumn().getOBUIAPPProcess();
-            if (process != null) {
-                DataToJsonConverter converter = new DataToJsonConverter();
-                JSONObject button = new JSONObject();
-                JSONObject processInfo = new ProcessBuilder(process).toJSON();
+            DataToJsonConverter converter = new DataToJsonConverter();
+            JSONObject button = new JSONObject();
+            Process processDefinition = field.getColumn().getOBUIAPPProcess();
+            org.openbravo.model.ad.ui.Process processAction = field.getColumn().getProcess();
 
-                button.put("id", field.getName());
-                button.put("name", Utility.messageBD(connectionProvider, field.getName(), language));
-                button.put("action", "PROCESS");
-                button.put("processId", process.getId());
-                button.put("processInfo", processInfo);
-                button.put("displayLogic", field.getDisplayLogic());
-                button.put("buttonText", field.getColumn().getName());
-                org.openbravo.model.ad.ui.Process processDefinition = field.getColumn().getProcess();
-                Process processAction = field.getColumn().getOBUIAPPProcess();
+            button.put("id", field.getName());
+            button.put("name", Utility.messageBD(connectionProvider, field.getName(), language));
+            button.put("action", "PROCESS");
+            button.put("displayLogic", field.getDisplayLogic());
+            button.put("buttonText", field.getColumn().getName());
 
-                if (processDefinition != null) {
-                    button.put("processDefinition",
-                               converter.toJsonObject(processDefinition, DataResolvingMode.FULL_TRANSLATABLE));
-                }
-
-                if (processAction != null) {
-                    button.put("processAction",
-                               converter.toJsonObject(processAction, DataResolvingMode.FULL_TRANSLATABLE));
-                }
-
-                button.put("tabId", tab.getId());
-                button.put("field", converter.toJsonObject(field, DataResolvingMode.FULL_TRANSLATABLE));
-
-
-                buttons.put(button);
+            if (processDefinition != null) {
+                button.put("processDefinition", ProcessDefinitionBuilder.getFieldProcess(field));
             }
+
+            if (processAction != null) {
+                button.put("processAction", ProcessActionBuilder.getFieldProcess(field));
+            }
+
+            button.put("tabId", tab.getId());
+            button.put("field", converter.toJsonObject(field, DataResolvingMode.FULL_TRANSLATABLE));
+
+
+            buttons.put(button);
         }
 
         return buttons;

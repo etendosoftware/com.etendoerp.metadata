@@ -54,10 +54,10 @@ public class FieldBuilder extends Builder {
     }
 
     public static boolean isProcessField(Field field) {
-        Column column = field.getColumn();
+        Process processAction = field.getColumn().getProcess();
+        org.openbravo.client.application.Process processDefinition = field.getColumn().getOBUIAPPProcess();
 
-        return column != null && column.getReference() != null &&
-               Constants.PROCESS_REFERENCE_VALUE.equals(column.getReference().getId());
+        return (processAction != null || processDefinition != null);
     }
 
 
@@ -476,13 +476,15 @@ public class FieldBuilder extends Builder {
 
     private void addProcessInfo(Field field) throws JSONException {
         if (isProcessField(field)) {
-            Process processDefinition = field.getColumn().getProcess();
-            org.openbravo.client.application.Process process = field.getColumn().getOBUIAPPProcess();
+            Process processAction = field.getColumn().getProcess();
+            org.openbravo.client.application.Process processDefinition = field.getColumn().getOBUIAPPProcess();
 
             if (processDefinition != null) {
-                json.put("process", ProcessDefinitionBuilder.getFieldProcess(field));
-            } else if (process != null) {
-                json.put("process", ProcessBuilder.getFieldProcess(field));
+                json.put("processDefinition", ProcessDefinitionBuilder.getFieldProcess(field));
+            }
+
+            if (processAction != null) {
+                json.put("processAction", ProcessActionBuilder.getFieldProcess(field));
             }
         }
     }

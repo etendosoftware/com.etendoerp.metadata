@@ -3,10 +3,10 @@ package com.etendoerp.metadata.builders;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
+import org.openbravo.client.application.Parameter;
+import org.openbravo.client.application.Process;
 import org.openbravo.erpCommon.utility.Utility;
 import org.openbravo.model.ad.ui.Field;
-import org.openbravo.model.ad.ui.Process;
-import org.openbravo.model.ad.ui.ProcessParameter;
 import org.openbravo.service.json.DataResolvingMode;
 
 import static com.etendoerp.metadata.Constants.LIST_REFERENCE_ID;
@@ -21,24 +21,24 @@ public class ProcessDefinitionBuilder extends Builder {
         this.process = process;
     }
 
-    private static boolean isSelectorParameter(ProcessParameter parameter) {
+    private static boolean isSelectorParameter(Parameter parameter) {
         return parameter != null && parameter.getReference() != null &&
                SELECTOR_REFERENCES.contains(parameter.getReference().getId());
     }
 
-    private static boolean isListParameter(ProcessParameter parameter) {
+    private static boolean isListParameter(Parameter parameter) {
         return parameter != null && parameter.getReference() != null &&
                LIST_REFERENCE_ID.contains(parameter.getReference().getId());
     }
 
     public static JSONObject getFieldProcess(Field field) throws JSONException {
-        org.openbravo.model.ad.ui.Process processDefinition = field.getColumn().getProcess();
+        Process process = field.getColumn().getOBUIAPPProcess();
 
-        if (processDefinition == null) {
+        if (process == null) {
             return new JSONObject();
         }
 
-        JSONObject processJson = new ProcessDefinitionBuilder(processDefinition).toJSON();
+        JSONObject processJson = new ProcessDefinitionBuilder(process).toJSON();
 
         processJson.put("fieldId", field.getId());
         processJson.put("columnId", field.getColumn().getId());
@@ -51,7 +51,7 @@ public class ProcessDefinitionBuilder extends Builder {
         return processJson;
     }
 
-    private JSONObject buildParameterJSON(ProcessParameter param) throws JSONException {
+    private JSONObject buildParameterJSON(Parameter param) throws JSONException {
         JSONObject paramJSON = converter.toJsonObject(param, DataResolvingMode.FULL_TRANSLATABLE);
 
         if (isSelectorParameter(param)) {
@@ -69,7 +69,7 @@ public class ProcessDefinitionBuilder extends Builder {
         JSONObject processJSON = converter.toJsonObject(process, DataResolvingMode.FULL_TRANSLATABLE);
         JSONArray parameters = new JSONArray();
 
-        for (ProcessParameter param : process.getADProcessParameterList()) {
+        for (Parameter param : process.getOBUIAPPParameterList()) {
             if (param != null) {
                 parameters.put(buildParameterJSON(param));
             }
