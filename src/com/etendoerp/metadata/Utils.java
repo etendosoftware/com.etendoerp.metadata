@@ -6,8 +6,6 @@ import org.openbravo.client.application.DynamicExpressionParser;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.system.Language;
 import org.openbravo.model.ad.ui.Field;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.script.ScriptException;
 import javax.servlet.http.HttpServletRequest;
@@ -19,8 +17,6 @@ import static org.openbravo.client.application.DynamicExpressionParser.replaceSy
  * @author luuchorocha
  */
 public class Utils {
-    private static final Logger log = LoggerFactory.getLogger(Utils.class);
-
     public static Language getLanguage(HttpServletRequest request) {
         String[] providedLanguages = {request.getParameter("language"), request.getHeader("language")};
         String languageCode = Arrays.stream(providedLanguages)

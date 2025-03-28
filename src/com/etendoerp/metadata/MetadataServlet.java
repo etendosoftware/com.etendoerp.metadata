@@ -15,7 +15,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
 import static com.etendoerp.metadata.Utils.getLanguage;
-import static org.openbravo.authentication.AuthenticationManager.STATELESS_REQUEST_PARAMETER;
 
 /**
  * @author luuchorocha
@@ -23,7 +22,6 @@ import static org.openbravo.authentication.AuthenticationManager.STATELESS_REQUE
 public class MetadataServlet extends HttpSecureAppServlet {
     @Override
     public void service(HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
-        request.setAttribute(STATELESS_REQUEST_PARAMETER, "true");
         super.service(request, response);
     }
 
