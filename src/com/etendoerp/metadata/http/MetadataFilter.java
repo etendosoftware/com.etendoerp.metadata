@@ -1,5 +1,7 @@
 package com.etendoerp.metadata.http;
 
+import org.apache.log4j.Logger;
+import org.openbravo.client.kernel.RequestContext;
 import org.openbravo.dal.core.ThreadHandler;
 
 import javax.servlet.*;
@@ -10,8 +12,12 @@ import static org.openbravo.authentication.AuthenticationManager.STATELESS_REQUE
 
 @WebFilter(urlPatterns = {"/meta", "/meta/*"})
 public class MetadataFilter implements Filter {
+    private static final Logger logger = Logger.getLogger(MetadataFilter.class);
+
     @Override
     public void init(FilterConfig fConfig) throws ServletException {
+        RequestContext.setServletContext(fConfig.getServletContext());
+        logger.info("MetadataFilter initialized");
     }
 
     @Override
@@ -20,7 +26,6 @@ public class MetadataFilter implements Filter {
                                                                                               ServletException {
 
         final ThreadHandler handler = new ThreadHandler() {
-
             @Override
             public void doBefore() {
                 request.setAttribute(STATELESS_REQUEST_PARAMETER, "true");
@@ -33,7 +38,9 @@ public class MetadataFilter implements Filter {
 
             @Override
             public void doFinal(boolean error) {
-
+                if (error) {
+                    logger.error("An error occurred in MetadataFilter");
+                }
             }
         };
 
@@ -42,5 +49,6 @@ public class MetadataFilter implements Filter {
 
     @Override
     public void destroy() {
+        logger.info("MetadataFilter destroyed");
     }
 }
