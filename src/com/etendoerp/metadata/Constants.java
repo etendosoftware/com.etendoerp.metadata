@@ -20,6 +20,7 @@ public class Constants {
     public static final String WINDOW_PATH = "/window/";
     public static final String TAB_PATH = "/tab/";
     public static final String LANGUAGE_PATH = "/language";
+    public static final String MESSAGE_PATH = "/message";
     public static final String DELEGATED_SERVLET_PATH = "/servlets";
     public static final boolean DEFAULT_CHECKON_SAVE = true;
     public static final boolean DEFAULT_EDITABLE_FIELD = true;
