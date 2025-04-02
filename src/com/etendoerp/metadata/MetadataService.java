@@ -21,7 +21,7 @@ public abstract class MetadataService {
 
   protected void write(JSONObject data) {
     try {
-      response.setHeader("Content-type", "application/json)");
+      response.setHeader("Content-type", "application/json");
       response.getWriter().write(data.toString());
     } catch (Exception e) {
       logger.error(e.getMessage(), e);
