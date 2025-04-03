@@ -76,7 +76,7 @@ public class MetadataServlet extends HttpSecureAppServlet {
     }
 
     private void process(HttpServletRequest request, HttpServletResponse response) {
-        BaseService service;
+        MetadataService service;
         String path = request.getPathInfo();
 
         if (path.startsWith(Constants.WINDOW_PATH)) {
@@ -93,6 +93,8 @@ public class MetadataServlet extends HttpSecureAppServlet {
             service = new MenuService(request, response);
         } else if (Constants.SESSION_PATH.equals(path)) {
             service = new SessionService(request, response);
+        } else if (Constants.MESSAGE_PATH.equals(path)) {
+            service = new MessageService(request, response);
         } else {
             throw new NotFoundException("Invalid URL: " + path);
         }

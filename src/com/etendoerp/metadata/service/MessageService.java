@@ -1,0 +1,60 @@
+package com.etendoerp.metadata.service;
+
+import com.etendoerp.metadata.MetadataService;
+import com.etendoerp.metadata.SessionManager;
+import com.etendoerp.metadata.builders.SessionBuilder;
+import com.etendoerp.metadata.data.RequestVariables;
+import org.codehaus.jettison.json.JSONException;
+import org.codehaus.jettison.json.JSONObject;
+import org.openbravo.base.exception.OBException;
+import org.openbravo.base.secureApp.VariablesSecureApp;
+import org.openbravo.erpCommon.utility.OBError;
+
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.util.Enumeration;
+
+public class MessageService extends MetadataService {
+
+    public MessageService(HttpServletRequest request, HttpServletResponse response) {
+        super(request, response);
+    }
+
+    protected void setCORSHeaders(HttpServletRequest request, HttpServletResponse response)
+        throws ServletException, IOException {
+
+        String origin = request.getHeader("Origin");
+
+        if (origin != null && !origin.equals("")) {
+            response.setHeader("Access-Control-Allow-Origin", origin);
+            response.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
+            response.setHeader("Access-Control-Allow-Credentials", "true");
+            response.setHeader("Access-Control-Allow-Headers",
+                "Content-Type, origin, accept, X-Requested-With");
+            response.setHeader("Access-Control-Max-Age", "1000");
+        }
+    }
+
+    @Override
+    public void process() {
+        final VariablesSecureApp vars = new VariablesSecureApp(request);
+        OBError error = vars.getMessage("186");
+        vars.setMessage("186", null);
+        JSONObject jsonResponse = new JSONObject();
+        try {
+            if (error != null) {
+                jsonResponse.put("message", error.getMessage());
+                jsonResponse.put("type", error.getType());
+                jsonResponse.put("title", error.getTitle());
+            } else {
+                jsonResponse.put("message", "No message found");
+            }
+            setCORSHeaders(request, response);
+        } catch (Exception e) {
+            throw new OBException("Error while processing message", e);
+        }
+        write(jsonResponse);
+    }
+}
