@@ -37,10 +37,13 @@ public class ServletRequestWrapper extends HttpServletRequestWrapper {
 
     @Override
     public HttpSession getSession(boolean f) {
-        if (f && session == null) {
-            this.session = new HttpSessionWrapper();
+        if (f) {
+            synchronized (this) {
+                if (session == null) {
+                    this.session = new HttpSessionWrapper();
+                }
+            }
         }
-
         return session;
     }
 }
