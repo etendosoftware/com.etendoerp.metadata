@@ -23,12 +23,12 @@ public class ProcessActionBuilder extends Builder {
 
     private static boolean isSelectorParameter(ProcessParameter parameter) {
         return parameter != null && parameter.getReference() != null &&
-               SELECTOR_REFERENCES.contains(parameter.getReference().getId());
+                SELECTOR_REFERENCES.contains(parameter.getReference().getId());
     }
 
     private static boolean isListParameter(ProcessParameter parameter) {
         return parameter != null && parameter.getReference() != null &&
-               LIST_REFERENCE_ID.contains(parameter.getReference().getId());
+                LIST_REFERENCE_ID.contains(parameter.getReference().getId());
     }
 
     public static JSONObject getFieldProcess(Field field) throws JSONException {

@@ -1,7 +1,7 @@
 package com.etendoerp.metadata.http;
 
-import org.openbravo.client.kernel.RequestContext.HttpSessionWrapper;
 import org.openbravo.client.kernel.RequestContext.HttpServletRequestWrapper;
+import org.openbravo.client.kernel.RequestContext.HttpSessionWrapper;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;

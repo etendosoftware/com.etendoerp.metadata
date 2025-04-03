@@ -4,89 +4,124 @@ import com.etendoerp.metadata.Constants;
 import com.etendoerp.metadata.SessionManager;
 import com.etendoerp.metadata.exceptions.InternalServerException;
 import com.etendoerp.metadata.exceptions.MethodNotAllowedException;
-import com.etendoerp.metadata.exceptions.NotFoundException;
 import com.etendoerp.metadata.http.ServletRequestWrapper;
-import org.apache.commons.lang.StringUtils;
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
 import org.openbravo.base.weld.WeldUtils;
 
+import javax.servlet.ServletRegistration;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
+import static com.etendoerp.metadata.Constants.DELEGATED_SERVLET_PATH;
 import static org.openbravo.authentication.AuthenticationManager.STATELESS_REQUEST_PARAMETER;
 
 public class ServletService extends BaseService {
+    private static final Map<String, String> METHOD_MAP = new HashMap<>();
+    private static final Map<String, HttpSecureAppServlet> SERVLET_CACHE = new ConcurrentHashMap<>();
+    private static final Map<Class<?>, Map<String, Method>> METHOD_CACHE = new ConcurrentHashMap<>();
+    private static final Map<String, ServletRegistration> SERVLET_REGISTRY = new ConcurrentHashMap<>();
+    private static final Map<String, Class<?>> CLASS_CACHE = new ConcurrentHashMap<>();
+
+    static {
+        METHOD_MAP.put(Constants.HTTP_METHOD_GET, Constants.SERVLET_DO_GET_METHOD);
+        METHOD_MAP.put(Constants.HTTP_METHOD_POST, Constants.SERVLET_DO_POST_METHOD);
+        METHOD_MAP.put(Constants.HTTP_METHOD_DELETE, Constants.SERVLET_DO_DELETE_METHOD);
+    }
+
     private final HttpSecureAppServlet caller;
 
     public ServletService(HttpSecureAppServlet caller, HttpServletRequest request, HttpServletResponse response) {
         super(request, response);
         this.caller = caller;
+        initializeServletRegistry();
     }
 
     private static String getMethodName(String method) {
-        return Map.of(Constants.HTTP_METHOD_GET,
-                      Constants.SERVLET_DO_GET_METHOD,
-                      Constants.HTTP_METHOD_POST,
-                      Constants.SERVLET_DO_POST_METHOD,
-                      Constants.HTTP_METHOD_DELETE,
-                      Constants.SERVLET_DO_DELETE_METHOD).getOrDefault(method, "service");
+        return METHOD_MAP.getOrDefault(method, "service");
     }
 
-    private static HttpSecureAppServlet getOrCreateServlet(String servletName) throws Exception {
-        List<?> servlets = WeldUtils.getInstances(Class.forName(servletName));
-
-        return (HttpSecureAppServlet) (servlets.isEmpty() ? getInstanceOf(servletName) : servlets.get(0));
+    private static HttpSecureAppServlet getOrCreateServlet(String servletName) {
+        return SERVLET_CACHE.computeIfAbsent(servletName, key -> {
+            try {
+                List<?> servlets = WeldUtils.getInstances(getClassCached(key));
+                return !servlets.isEmpty() ? (HttpSecureAppServlet) servlets.get(0) : createServletInstance(key);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
     }
 
-    private static HttpSecureAppServlet getInstanceOf(String servletName) throws Exception {
-        return Class.forName(servletName).asSubclass(HttpSecureAppServlet.class).getDeclaredConstructor().newInstance();
+    private static HttpSecureAppServlet createServletInstance(String servletName) throws Exception {
+        return getClassCached(servletName).asSubclass(HttpSecureAppServlet.class).getDeclaredConstructor().newInstance();
     }
 
-    private static ServletRequestWrapper wrapRequestWithRemainingPath(HttpServletRequest request, String pathInfo,
-                                                                      String servletName) {
-        String className = pathInfo.split("/servlets/")[1];
-        String packageName = StringUtils.substring(className, 0, className.lastIndexOf('.'));
-
-        return new ServletRequestWrapper(request, servletName, packageName);
+    private static Class<?> getClassCached(String className) {
+        return CLASS_CACHE.computeIfAbsent(className, key -> {
+            try {
+                return Class.forName(key);
+            } catch (ClassNotFoundException e) {
+                throw new RuntimeException(e);
+            }
+        });
     }
 
     public static Method findMethod(HttpSecureAppServlet servlet, String methodName) throws MethodNotAllowedException {
-        return Arrays.stream(servlet.getClass().getDeclaredMethods()).filter(m -> m.getName().equals(methodName))
-                     .findFirst().orElseThrow(MethodNotAllowedException::new);
+        return METHOD_CACHE.computeIfAbsent(servlet.getClass(), cls -> {
+            Map<String, Method> methods = new HashMap<>();
+            for (Method method : cls.getDeclaredMethods()) {
+                methods.put(method.getName(), method);
+            }
+            return methods;
+        }).getOrDefault(methodName, null);
     }
 
+    public static String getFirstSegment(String path) {
+        int firstSlash = path.indexOf("/");
+        int secondSlash = path.indexOf("/", firstSlash + 1);
+
+        if (firstSlash == -1) return path; // Si no hay "/", devolver tal cual
+        if (secondSlash == -1) return path; // Si solo hay un "/", devolver todo
+
+        return path.substring(0, secondSlash); // Tomar hasta el segundo "/"
+    }
+
+    private void initializeServletRegistry() {
+        caller.getServletContext().getServletRegistrations().values().forEach(sr -> {
+            for (String mapping : sr.getMappings()) {
+                SERVLET_REGISTRY.put(mapping.replace("/*", ""), sr);
+            }
+        });
+    }
+
+    private ServletRegistration findMatchingServlet(String uri) {
+        return SERVLET_REGISTRY.get(uri);
+    }
+
+    @Override
     public void process() {
         try {
-            String method = request.getMethod();
-            String pathInfo = request.getPathInfo();
-            String[] path = pathInfo.split("/servlets/");
-
-            if (pathInfo.isBlank() || path.length < 2 || path[1].isEmpty()) {
-                throw new NotFoundException("Invalid servlet name: " + pathInfo);
-            }
-
-            String servletName = path[1].split("/")[0];
+            String uri = getFirstSegment(request.getPathInfo().replaceAll(DELEGATED_SERVLET_PATH, ""));
+            String servletName = findMatchingServlet(uri).getClassName();
             HttpSecureAppServlet servlet = getOrCreateServlet(servletName);
-            String servletMethodName = getMethodName(method);
-            Method delegatedMethod = findMethod(servlet, servletMethodName);
-            ServletRequestWrapper wrappedRequest = wrapRequestWithRemainingPath(request, pathInfo, servletName);
-            wrappedRequest.removeAttribute(STATELESS_REQUEST_PARAMETER);
-            servlet.init(caller.getServletConfig());
-            SessionManager.initializeSession(wrappedRequest, true);
-            delegatedMethod.invoke(servlet, wrappedRequest, response);
-        } catch (ClassNotFoundException e) {
-            logger.error(e.getMessage(), e);
+            ServletRequestWrapper wrappedRequest = new ServletRequestWrapper(request, servletName, "");
 
-            throw new NotFoundException();
+            forwardRequest(wrappedRequest, servlet);
         } catch (Exception e) {
-            logger.error(e.getMessage(), e);
-
-            throw new InternalServerException();
+            logger.error("Internal server error: {}", e.getMessage(), e);
+            throw new InternalServerException(e.getMessage());
         }
     }
 
+    private void forwardRequest(ServletRequestWrapper wrappedRequest, HttpSecureAppServlet servlet) throws IllegalAccessException, InvocationTargetException {
+        wrappedRequest.removeAttribute(STATELESS_REQUEST_PARAMETER);
+        servlet.init(caller.getServletConfig());
+        SessionManager.initializeSession(wrappedRequest, true);
+        findMethod(servlet, getMethodName(request.getMethod())).invoke(servlet, wrappedRequest, response);
+    }
 }

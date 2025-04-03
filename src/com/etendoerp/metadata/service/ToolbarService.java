@@ -30,8 +30,8 @@ public class ToolbarService extends BaseService {
 
     private JSONObject fetchToolbar(String windowId, String tabId) {
         return new ToolbarBuilder(OBContext.getOBContext().getLanguage().getLanguage(),
-                                  windowId,
-                                  tabId,
-                                  false).toJSON();
+                windowId,
+                tabId,
+                false).toJSON();
     }
 }

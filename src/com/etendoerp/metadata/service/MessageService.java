@@ -6,10 +6,8 @@ import org.openbravo.base.exception.OBException;
 import org.openbravo.base.secureApp.VariablesSecureApp;
 import org.openbravo.erpCommon.utility.OBError;
 
-import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import java.io.IOException;
 
 public class MessageService extends MetadataService {
     private static final String ALLOW_ORIGIN = "Access-Control-Allow-Origin";
@@ -22,9 +20,7 @@ public class MessageService extends MetadataService {
         super(request, response);
     }
 
-    protected void setCORSHeaders(HttpServletRequest request, HttpServletResponse response) throws
-                                                                                            ServletException,
-                                                                                            IOException {
+    protected void setCORSHeaders(HttpServletRequest request, HttpServletResponse response) throws Exception {
 
         String origin = request.getHeader("Origin");
 

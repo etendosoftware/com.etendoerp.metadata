@@ -93,11 +93,11 @@ public class ToolbarBuilder {
         JSONArray buttons = new JSONArray();
 
         List<Field> processFields = tab.getADFieldList()
-                                       .stream()
-                                       .filter(field -> field.isActive() &&
-                                                        tabBuilder.hasAccessToProcess(field, windowId) &&
-                                                        FieldBuilder.isProcessField(field))
-                                       .collect(Collectors.toList());
+                .stream()
+                .filter(field -> field.isActive() &&
+                        tabBuilder.hasAccessToProcess(field, windowId) &&
+                        FieldBuilder.isProcessField(field))
+                .collect(Collectors.toList());
 
         for (Field field : processFields) {
             DataToJsonConverter converter = new DataToJsonConverter();
@@ -152,7 +152,7 @@ public class ToolbarBuilder {
         buttons.put("FIND", new ButtonConfig("FIND", "OBUIAPP_Find", "FIND", true, "search"));
         buttons.put("EXPORT", new ButtonConfig("EXPORT", "OBUIAPP_ExportGrid", "EXPORT", true, "download"));
         buttons.put("ATTACHMENTS",
-                    new ButtonConfig("ATTACHMENTS", "OBUIAPP_Attachments", "ATTACHMENTS", true, "paperclip"));
+                new ButtonConfig("ATTACHMENTS", "OBUIAPP_Attachments", "ATTACHMENTS", true, "paperclip"));
         buttons.put("GRID_VIEW", new ButtonConfig("GRID_VIEW", "OBUIAPP_GridView", "GRID_VIEW", true, "grid"));
 
         return buttons;

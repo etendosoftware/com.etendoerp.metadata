@@ -1,7 +1,6 @@
 package com.etendoerp.metadata;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 
 /**
@@ -22,7 +21,7 @@ public class Constants {
     public static final String LANGUAGE_PATH = "/language";
     public static final String MESSAGE_PATH = "/message";
     public static final String DELEGATED_SERVLET_PATH = "/servlets";
-    public static final boolean DEFAULT_CHECKON_SAVE = true;
+    public static final boolean DEFAULT_CHECK_ON_SAVE = true;
     public static final boolean DEFAULT_EDITABLE_FIELD = true;
     public static final String LIST_REFERENCE_ID = "17";
     public static final String CUSTOM_QUERY_DS = "F8DD408F2F3A414188668836F84C21AF";
@@ -33,16 +32,10 @@ public class Constants {
     public static final String FIELD_ID_PROPERTY = "fieldId";
     public static final String DISPLAY_FIELD_PROPERTY = "displayField";
     public static final String VALUE_FIELD_PROPERTY = "valueField";
-    public static final String PROCESS_REFERENCE_VALUE = "28";
     private static final String SELECTOR_REFERENCE_ID = "95E2A8B50A254B2AAE6774B8C2F28120";
     private static final String SEARCH_REFERENCE_ID = "30";
     private static final String TABLE_DIR_REFERENCE_ID = "19";
     private static final String TABLE_REFERENCE_ID = "18";
     private static final String TREE_REFERENCE_ID = "8C57A4A2E05F4261A1FADF47C30398AD";
-    public static final List<String> SELECTOR_REFERENCES = Arrays.asList(TABLE_REFERENCE_ID,
-                                                                         TABLE_DIR_REFERENCE_ID,
-                                                                         SEARCH_REFERENCE_ID,
-                                                                         SELECTOR_REFERENCE_ID,
-                                                                         TREE_REFERENCE_ID);
-    public static final List<String> ALWAYS_DISPLAYED_COLUMNS = Collections.singletonList("AD_Org_ID");
+    public static final List<String> SELECTOR_REFERENCES = Arrays.asList(TABLE_REFERENCE_ID, TABLE_DIR_REFERENCE_ID, SEARCH_REFERENCE_ID, SELECTOR_REFERENCE_ID, TREE_REFERENCE_ID);
 }
