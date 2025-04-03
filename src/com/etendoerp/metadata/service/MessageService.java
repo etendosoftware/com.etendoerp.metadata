@@ -48,6 +48,8 @@ public class MessageService extends MetadataService {
                 jsonResponse.put("message", error.getMessage());
                 jsonResponse.put("type", error.getType());
                 jsonResponse.put("title", error.getTitle());
+            } else {
+                jsonResponse.put("message", "");
             }
             setCORSHeaders(request, response);
         } catch (Exception e) {
