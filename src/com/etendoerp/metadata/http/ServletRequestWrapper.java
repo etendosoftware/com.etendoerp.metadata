@@ -1,23 +1,22 @@
 package com.etendoerp.metadata.http;
 
-import org.openbravo.client.kernel.RequestContext;
+import org.openbravo.client.kernel.RequestContext.HttpSessionWrapper;
+import org.openbravo.client.kernel.RequestContext.HttpServletRequestWrapper;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
 
-public class HttpServletRequestWrapper extends RequestContext.HttpServletRequestWrapper {
+public class ServletRequestWrapper extends HttpServletRequestWrapper {
     private String servletName;
     private String packageName;
-    private final HttpSession session;
+    private HttpSession session;
 
-    public HttpServletRequestWrapper(HttpServletRequest request) {
+    public ServletRequestWrapper(HttpServletRequest request) {
         super(request);
-        this.session = new RequestContext.HttpSessionWrapper();
     }
 
-    public HttpServletRequestWrapper(HttpServletRequest request, String servletName, String packageName) {
+    public ServletRequestWrapper(HttpServletRequest request, String servletName, String packageName) {
         super(request);
-        this.session = new RequestContext.HttpSessionWrapper();
         this.servletName = servletName;
         this.packageName = packageName;
     }
@@ -38,6 +37,10 @@ public class HttpServletRequestWrapper extends RequestContext.HttpServletRequest
 
     @Override
     public HttpSession getSession(boolean f) {
+        if (f && session == null) {
+            this.session = new HttpSessionWrapper();
+        }
+
         return session;
     }
 }

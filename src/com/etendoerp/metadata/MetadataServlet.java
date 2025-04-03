@@ -4,21 +4,34 @@ import com.etendoerp.metadata.exceptions.NotFoundException;
 import com.etendoerp.metadata.service.*;
 import org.apache.http.entity.ContentType;
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
+import org.openbravo.client.kernel.RequestContext;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.model.ad.system.Language;
 import org.openbravo.service.json.JsonUtils;
 
+import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
 import static com.etendoerp.metadata.Utils.getLanguage;
+import static org.openbravo.authentication.AuthenticationManager.STATELESS_REQUEST_PARAMETER;
 
 /**
  * @author luuchorocha
  */
 public class MetadataServlet extends HttpSecureAppServlet {
+    @Override
+    public void service(HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
+        RequestContext requestContext = RequestContext.get();
+        RequestContext.setServletContext(this.getServletContext());
+        request.setAttribute(STATELESS_REQUEST_PARAMETER, "true");
+        requestContext.setRequest(request);
+        requestContext.setResponse(response);
+        super.service(request, response);
+    }
+
     @Override
     public final void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException {
         try {

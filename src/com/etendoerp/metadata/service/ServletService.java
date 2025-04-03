@@ -5,7 +5,7 @@ import com.etendoerp.metadata.SessionManager;
 import com.etendoerp.metadata.exceptions.InternalServerException;
 import com.etendoerp.metadata.exceptions.MethodNotAllowedException;
 import com.etendoerp.metadata.exceptions.NotFoundException;
-import com.etendoerp.metadata.http.HttpServletRequestWrapper;
+import com.etendoerp.metadata.http.ServletRequestWrapper;
 import org.apache.commons.lang.StringUtils;
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
 import org.openbravo.base.weld.WeldUtils;
@@ -46,19 +46,17 @@ public class ServletService extends BaseService {
         return Class.forName(servletName).asSubclass(HttpSecureAppServlet.class).getDeclaredConstructor().newInstance();
     }
 
-    private static HttpServletRequestWrapper wrapRequestWithRemainingPath(HttpServletRequest request, String pathInfo,
-                                                                          String servletName) {
+    private static ServletRequestWrapper wrapRequestWithRemainingPath(HttpServletRequest request, String pathInfo,
+                                                                      String servletName) {
         String className = pathInfo.split("/servlets/")[1];
         String packageName = StringUtils.substring(className, 0, className.lastIndexOf('.'));
 
-        return new HttpServletRequestWrapper(request, servletName, packageName);
+        return new ServletRequestWrapper(request, servletName, packageName);
     }
 
     public static Method findMethod(HttpSecureAppServlet servlet, String methodName) throws MethodNotAllowedException {
-        return Arrays.stream(servlet.getClass().getDeclaredMethods())
-                     .filter(m -> m.getName().equals(methodName))
-                     .findFirst()
-                     .orElseThrow(MethodNotAllowedException::new);
+        return Arrays.stream(servlet.getClass().getDeclaredMethods()).filter(m -> m.getName().equals(methodName))
+                     .findFirst().orElseThrow(MethodNotAllowedException::new);
     }
 
     public void process() {
@@ -75,7 +73,7 @@ public class ServletService extends BaseService {
             HttpSecureAppServlet servlet = getOrCreateServlet(servletName);
             String servletMethodName = getMethodName(method);
             Method delegatedMethod = findMethod(servlet, servletMethodName);
-            HttpServletRequestWrapper wrappedRequest = wrapRequestWithRemainingPath(request, pathInfo, servletName);
+            ServletRequestWrapper wrappedRequest = wrapRequestWithRemainingPath(request, pathInfo, servletName);
             wrappedRequest.removeAttribute(STATELESS_REQUEST_PARAMETER);
             servlet.init(caller.getServletConfig());
             SessionManager.initializeSession(wrappedRequest, true);

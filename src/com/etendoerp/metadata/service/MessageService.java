@@ -1,10 +1,6 @@
 package com.etendoerp.metadata.service;
 
 import com.etendoerp.metadata.MetadataService;
-import com.etendoerp.metadata.SessionManager;
-import com.etendoerp.metadata.builders.SessionBuilder;
-import com.etendoerp.metadata.data.RequestVariables;
-import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.base.exception.OBException;
 import org.openbravo.base.secureApp.VariablesSecureApp;
@@ -14,7 +10,6 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.Enumeration;
 
 public class MessageService extends MetadataService {
 
@@ -22,17 +17,17 @@ public class MessageService extends MetadataService {
         super(request, response);
     }
 
-    protected void setCORSHeaders(HttpServletRequest request, HttpServletResponse response)
-        throws ServletException, IOException {
+    protected void setCORSHeaders(HttpServletRequest request, HttpServletResponse response) throws
+                                                                                            ServletException,
+                                                                                            IOException {
 
         String origin = request.getHeader("Origin");
 
-        if (origin != null && !origin.equals("")) {
+        if (origin != null && !origin.isEmpty()) {
             response.setHeader("Access-Control-Allow-Origin", origin);
             response.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
             response.setHeader("Access-Control-Allow-Credentials", "true");
-            response.setHeader("Access-Control-Allow-Headers",
-                "Content-Type, origin, accept, X-Requested-With");
+            response.setHeader("Access-Control-Allow-Headers", "Content-Type, origin, accept, X-Requested-With");
             response.setHeader("Access-Control-Max-Age", "1000");
         }
     }
