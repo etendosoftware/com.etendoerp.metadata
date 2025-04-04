@@ -9,10 +9,9 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 public abstract class MetadataService {
-
     protected final Logger logger = LogManager.getLogger(this.getClass());
-    protected HttpServletRequest request;
     protected final HttpServletResponse response;
+    protected HttpServletRequest request;
 
     public MetadataService(HttpServletRequest request, HttpServletResponse response) {
         this.request = request;

@@ -4,12 +4,11 @@ import org.openbravo.client.kernel.RequestContext.HttpServletRequestWrapper;
 import org.openbravo.client.kernel.RequestContext.HttpSessionWrapper;
 
 import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpSession;
 
 public class ServletRequestWrapper extends HttpServletRequestWrapper {
     private String servletName;
     private String packageName;
-    private HttpSession session;
+    private volatile HttpSessionWrapper session;
 
     public ServletRequestWrapper(HttpServletRequest request) {
         super(request);
@@ -24,23 +23,23 @@ public class ServletRequestWrapper extends HttpServletRequestWrapper {
     @Override
     public String getRequestURI() {
         if (servletName != null && packageName != null) {
-            return getDelegate().getRequestURI().replaceFirst(servletName, packageName);
+            return super.getRequestURI().replaceFirst(servletName, packageName);
         } else {
             return super.getRequestURI();
         }
     }
 
     @Override
-    public HttpSession getSession() {
+    public HttpSessionWrapper getSession() {
         return session;
     }
 
     @Override
-    public HttpSession getSession(boolean f) {
-        if (f) {
+    public HttpSessionWrapper getSession(boolean f) {
+        if (f && session == null) {
             synchronized (this) {
                 if (session == null) {
-                    this.session = new HttpSessionWrapper();
+                    session = new HttpSessionWrapper();
                 }
             }
         }
