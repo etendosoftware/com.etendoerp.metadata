@@ -21,7 +21,7 @@ public class SessionManager {
 
     public static RequestVariables initializeSession(HttpServletRequest request, boolean createSession) {
         try {
-            OBContext context = getOBContextThreadSafe(request);
+            OBContext context = OBContext.getOBContext();
             RequestVariables vars = createSession ? new RequestVariables(request, true) : new RequestVariables(request);
             SessionIdentifiers ids = new SessionIdentifiers(context);
 

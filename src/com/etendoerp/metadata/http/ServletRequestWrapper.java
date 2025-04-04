@@ -4,45 +4,48 @@ import org.openbravo.client.kernel.RequestContext.HttpServletRequestWrapper;
 import org.openbravo.client.kernel.RequestContext.HttpSessionWrapper;
 
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpSession;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
-public class ServletRequestWrapper extends HttpServletRequestWrapper {
-    private String servletName;
-    private String packageName;
-    private volatile HttpSessionWrapper session;
+/**
+ * Thread-safe wrapper for servlet requests, used to customize the request URI and lazy-initialize the session.
+ */
+public final class ServletRequestWrapper extends HttpServletRequestWrapper {
+
+    private final String servletName;
+    private final String packageName;
+
+    // Use volatile for safe publication across threads
+    private final HttpSession session;
 
     public ServletRequestWrapper(HttpServletRequest request) {
-        super(request);
+        this(request, null, null);
     }
 
     public ServletRequestWrapper(HttpServletRequest request, String servletName, String packageName) {
         super(request);
         this.servletName = servletName;
         this.packageName = packageName;
+        this.session = new HttpSessionWrapper();
     }
 
     @Override
     public String getRequestURI() {
         if (servletName != null && packageName != null) {
-            return super.getRequestURI().replaceFirst(servletName, packageName);
-        } else {
-            return super.getRequestURI();
+            return super.getRequestURI()
+                        .replaceFirst(Pattern.quote(servletName), Matcher.quoteReplacement(packageName));
         }
+        return super.getRequestURI();
     }
 
     @Override
-    public HttpSessionWrapper getSession() {
+    public HttpSession getSession() {
         return session;
     }
 
     @Override
-    public HttpSessionWrapper getSession(boolean f) {
-        if (f && session == null) {
-            synchronized (this) {
-                if (session == null) {
-                    session = new HttpSessionWrapper();
-                }
-            }
-        }
+    public HttpSession getSession(boolean create) {
         return session;
     }
 }
