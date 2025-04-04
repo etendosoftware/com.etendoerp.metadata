@@ -2,15 +2,18 @@ package com.etendoerp.metadata;
 
 import com.etendoerp.metadata.exceptions.NotFoundException;
 import com.etendoerp.metadata.service.*;
+import org.apache.http.entity.ContentType;
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
 import org.openbravo.client.kernel.RequestContext;
 import org.openbravo.dal.core.OBContext;
+import org.openbravo.model.ad.system.Language;
 import org.openbravo.service.json.JsonUtils;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 
 import static org.openbravo.authentication.AuthenticationManager.STATELESS_REQUEST_PARAMETER;
 
@@ -30,12 +33,29 @@ public class MetadataServlet extends HttpSecureAppServlet {
         super.service(request, response);
     }
 
+
+    private void setContext(HttpServletRequest request) {
+        OBContext context = OBContext.getOBContext();
+        Language language = Utils.getLanguage(request);
+
+        if (context != null && language != null) {
+            context.setLanguage(language);
+        }
+
+        OBContext.setOBContextInSession(request, context);
+    }
+
+    private void setContentHeaders(HttpServletResponse response) {
+        response.setContentType(ContentType.APPLICATION_JSON.getMimeType());
+        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+    }
+
     @Override
     public final void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException {
         try {
             OBContext.setAdminMode();
-            Utils.setContext(request);
-            Utils.setContentHeaders(response);
+            setContext(request);
+            setContentHeaders(response);
             process(request, response);
         } catch (Exception e) {
             log4j.error(e.getMessage(), e);

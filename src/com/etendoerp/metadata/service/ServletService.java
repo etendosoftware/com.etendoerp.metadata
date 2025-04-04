@@ -1,6 +1,7 @@
 package com.etendoerp.metadata.service;
 
 import com.etendoerp.metadata.Constants;
+import com.etendoerp.metadata.MetadataService;
 import com.etendoerp.metadata.SessionManager;
 import com.etendoerp.metadata.exceptions.InternalServerException;
 import com.etendoerp.metadata.exceptions.MethodNotAllowedException;
@@ -8,6 +9,7 @@ import com.etendoerp.metadata.http.ServletRequestWrapper;
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
 import org.openbravo.base.weld.WeldUtils;
 
+import javax.servlet.ServletException;
 import javax.servlet.ServletRegistration;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -21,7 +23,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import static com.etendoerp.metadata.Constants.DELEGATED_SERVLET_PATH;
 import static org.openbravo.authentication.AuthenticationManager.STATELESS_REQUEST_PARAMETER;
 
-public class ServletService extends BaseService {
+public class ServletService extends MetadataService {
     private static final Map<String, String> METHOD_MAP = new HashMap<>();
     private static final Map<String, HttpSecureAppServlet> SERVLET_CACHE = new ConcurrentHashMap<>();
     private static final Map<Class<?>, Map<String, Method>> METHOD_CACHE = new ConcurrentHashMap<>();
@@ -47,18 +49,17 @@ public class ServletService extends BaseService {
     }
 
     private static HttpSecureAppServlet getOrCreateServlet(String servletName) {
-        return SERVLET_CACHE.computeIfAbsent(servletName, key -> {
             try {
-                List<?> servlets = WeldUtils.getInstances(getClassCached(key));
-                return !servlets.isEmpty() ? (HttpSecureAppServlet) servlets.get(0) : createServletInstance(key);
+                List<?> servlets = WeldUtils.getInstances(getClassCached(servletName));
+                return !servlets.isEmpty() ? (HttpSecureAppServlet) servlets.get(0) : createServletInstance(servletName);
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
-        });
     }
 
     private static HttpSecureAppServlet createServletInstance(String servletName) throws Exception {
-        return getClassCached(servletName).asSubclass(HttpSecureAppServlet.class).getDeclaredConstructor().newInstance();
+        return getClassCached(servletName).asSubclass(HttpSecureAppServlet.class).getDeclaredConstructor()
+                                          .newInstance();
     }
 
     private static Class<?> getClassCached(String className) {
@@ -85,10 +86,10 @@ public class ServletService extends BaseService {
         int firstSlash = path.indexOf("/");
         int secondSlash = path.indexOf("/", firstSlash + 1);
 
-        if (firstSlash == -1) return path; // Si no hay "/", devolver tal cual
-        if (secondSlash == -1) return path; // Si solo hay un "/", devolver todo
+        if (firstSlash == -1) return path;
+        if (secondSlash == -1) return path;
 
-        return path.substring(0, secondSlash); // Tomar hasta el segundo "/"
+        return path.substring(0, secondSlash);
     }
 
     private void initializeServletRegistry() {
@@ -109,7 +110,7 @@ public class ServletService extends BaseService {
             String uri = getFirstSegment(request.getPathInfo().replaceAll(DELEGATED_SERVLET_PATH, ""));
             String servletName = findMatchingServlet(uri).getClassName();
             HttpSecureAppServlet servlet = getOrCreateServlet(servletName);
-            ServletRequestWrapper wrappedRequest = new ServletRequestWrapper(request, servletName, "");
+            ServletRequestWrapper wrappedRequest = new ServletRequestWrapper(request);
 
             forwardRequest(wrappedRequest, servlet);
         } catch (Exception e) {
@@ -118,9 +119,15 @@ public class ServletService extends BaseService {
         }
     }
 
-    private void forwardRequest(ServletRequestWrapper wrappedRequest, HttpSecureAppServlet servlet) throws IllegalAccessException, InvocationTargetException {
+    private void forwardRequest(ServletRequestWrapper wrappedRequest, HttpSecureAppServlet servlet) throws
+                                                                                                    IllegalAccessException,
+                                                                                                    InvocationTargetException,
+                                                                                                    ServletException {
         wrappedRequest.removeAttribute(STATELESS_REQUEST_PARAMETER);
-        servlet.init(caller.getServletConfig());
+        if (servlet.getServletConfig() == null) {
+            servlet.init();
+        }
+
         SessionManager.initializeSession(wrappedRequest, true);
         findMethod(servlet, getMethodName(request.getMethod())).invoke(servlet, wrappedRequest, response);
     }

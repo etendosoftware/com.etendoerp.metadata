@@ -1,5 +1,6 @@
 package com.etendoerp.metadata.service;
 
+import com.etendoerp.metadata.MetadataService;
 import com.etendoerp.metadata.SessionManager;
 import com.etendoerp.metadata.builders.SessionBuilder;
 import com.etendoerp.metadata.data.RequestVariables;
@@ -7,7 +8,7 @@ import com.etendoerp.metadata.data.RequestVariables;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-public class SessionService extends BaseService {
+public class SessionService extends MetadataService {
     private final RequestVariables vars;
 
     public SessionService(HttpServletRequest request, HttpServletResponse response) {

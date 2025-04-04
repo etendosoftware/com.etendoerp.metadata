@@ -1,19 +1,15 @@
 package com.etendoerp.metadata;
 
 import org.apache.http.HttpStatus;
-import org.apache.http.entity.ContentType;
 import org.hibernate.criterion.Restrictions;
 import org.openbravo.base.expression.OBScriptEngine;
 import org.openbravo.client.application.DynamicExpressionParser;
-import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.system.Language;
 import org.openbravo.model.ad.ui.Field;
 
 import javax.script.ScriptException;
 import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
 import static com.etendoerp.metadata.Constants.FALSE;
@@ -56,22 +52,6 @@ public class Utils {
 
     public static String injectPreferences(String displayLogic) {
         return DynamicExpressionParser.replaceSystemPreferencesInDisplayLogic(displayLogic);
-    }
-
-    public static void setContext(HttpServletRequest request) {
-        OBContext context = OBContext.getOBContext();
-        Language language = getLanguage(request);
-
-        if (context != null && language != null) {
-            context.setLanguage(language);
-        }
-
-        OBContext.setOBContextInSession(request, context);
-    }
-
-    public static void setContentHeaders(HttpServletResponse response) {
-        response.setContentType(ContentType.APPLICATION_JSON.getMimeType());
-        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
     }
 
     public static int getResponseStatus(Exception e) {

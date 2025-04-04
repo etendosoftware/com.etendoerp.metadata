@@ -1,5 +1,6 @@
 package com.etendoerp.metadata.service;
 
+import com.etendoerp.metadata.MetadataService;
 import com.etendoerp.metadata.builders.ToolbarBuilder;
 import com.etendoerp.metadata.exceptions.UnprocessableContentException;
 import org.codehaus.jettison.json.JSONObject;
@@ -8,7 +9,7 @@ import org.openbravo.dal.core.OBContext;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-public class ToolbarService extends BaseService {
+public class ToolbarService extends MetadataService {
     public ToolbarService(HttpServletRequest request, HttpServletResponse response) {
         super(request, response);
     }
