@@ -37,5 +37,9 @@ public class Constants {
     private static final String TABLE_DIR_REFERENCE_ID = "19";
     private static final String TABLE_REFERENCE_ID = "18";
     private static final String TREE_REFERENCE_ID = "8C57A4A2E05F4261A1FADF47C30398AD";
-    public static final List<String> SELECTOR_REFERENCES = Arrays.asList(TABLE_REFERENCE_ID, TABLE_DIR_REFERENCE_ID, SEARCH_REFERENCE_ID, SELECTOR_REFERENCE_ID, TREE_REFERENCE_ID);
+    public static final List<String> SELECTOR_REFERENCES = Arrays.asList(TABLE_REFERENCE_ID,
+                                                                         TABLE_DIR_REFERENCE_ID,
+                                                                         SEARCH_REFERENCE_ID,
+                                                                         SELECTOR_REFERENCE_ID,
+                                                                         TREE_REFERENCE_ID);
 }

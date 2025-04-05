@@ -158,7 +158,7 @@ public class TabBuilder extends Builder {
 
     protected boolean hasAccessToProcess(Field field, String windowId) {
         Process process = field.getColumn() != null && field.getColumn().getOBUIAPPProcess() != null ?
-                field.getColumn().getOBUIAPPProcess() : null;
+                          field.getColumn().getOBUIAPPProcess() : null;
 
         if (process != null) {
             HashMap<String, Object> params = new HashMap<>();

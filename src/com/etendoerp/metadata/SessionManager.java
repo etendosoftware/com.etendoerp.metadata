@@ -34,14 +34,14 @@ public class SessionManager {
             String warehouseId = context.getWarehouse() != null ? context.getWarehouse().getId() : "";
 
             boolean sessionFilled = LoginUtils.fillSessionArguments(new DalConnectionProvider(),
-                    vars,
-                    userId,
-                    language,
-                    isRTL,
-                    roleId,
-                    clientId,
-                    orgId,
-                    warehouseId);
+                                                                    vars,
+                                                                    userId,
+                                                                    language,
+                                                                    isRTL,
+                                                                    roleId,
+                                                                    clientId,
+                                                                    orgId,
+                                                                    warehouseId);
 
             if (sessionFilled) {
                 readNumberFormat(request, vars);
@@ -63,7 +63,6 @@ public class SessionManager {
         RequestContext requestContext = RequestContext.get();
         requestContext.setRequest(request);
         requestContext.setVariableSecureApp(vars);
-
     }
 
     private static void bypassCSRF(HttpServletRequest request, String userId) {

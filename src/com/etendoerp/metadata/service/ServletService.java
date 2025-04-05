@@ -4,14 +4,13 @@ import com.etendoerp.metadata.Constants;
 import com.etendoerp.metadata.SessionManager;
 import com.etendoerp.metadata.exceptions.InternalServerException;
 import com.etendoerp.metadata.exceptions.MethodNotAllowedException;
-import com.etendoerp.metadata.http.ServletRequestWrapper;
+import org.jboss.weld.module.web.servlet.SessionHolder;
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
 import org.openbravo.base.weld.WeldUtils;
 
 import javax.servlet.ServletRegistration;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.List;
@@ -58,7 +57,8 @@ public class ServletService extends BaseService {
     }
 
     private static HttpSecureAppServlet createServletInstance(String servletName) throws Exception {
-        return getClassCached(servletName).asSubclass(HttpSecureAppServlet.class).getDeclaredConstructor().newInstance();
+        return getClassCached(servletName).asSubclass(HttpSecureAppServlet.class).getDeclaredConstructor()
+                                          .newInstance();
     }
 
     private static Class<?> getClassCached(String className) {
@@ -109,19 +109,14 @@ public class ServletService extends BaseService {
             String uri = getFirstSegment(request.getPathInfo().replaceAll(DELEGATED_SERVLET_PATH, ""));
             String servletName = findMatchingServlet(uri).getClassName();
             HttpSecureAppServlet servlet = getOrCreateServlet(servletName);
-            ServletRequestWrapper wrappedRequest = new ServletRequestWrapper(request, servletName, "");
-
-            forwardRequest(wrappedRequest, servlet);
+            request.removeAttribute(STATELESS_REQUEST_PARAMETER);
+            servlet.init(caller.getServletConfig());
+            SessionManager.initializeSession(request, true);
+            SessionHolder.requestInitialized(request);
+            findMethod(servlet, getMethodName(request.getMethod())).invoke(servlet, request, response);
         } catch (Exception e) {
             logger.error("Internal server error: {}", e.getMessage(), e);
             throw new InternalServerException(e.getMessage());
         }
-    }
-
-    private void forwardRequest(ServletRequestWrapper wrappedRequest, HttpSecureAppServlet servlet) throws IllegalAccessException, InvocationTargetException {
-        wrappedRequest.removeAttribute(STATELESS_REQUEST_PARAMETER);
-        servlet.init(caller.getServletConfig());
-        SessionManager.initializeSession(wrappedRequest, true);
-        findMethod(servlet, getMethodName(request.getMethod())).invoke(servlet, wrappedRequest, response);
     }
 }

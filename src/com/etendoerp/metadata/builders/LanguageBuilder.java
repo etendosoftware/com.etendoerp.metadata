@@ -15,9 +15,9 @@ public class LanguageBuilder extends Builder {
 
         try {
             for (Language lang : OBDal.getInstance()
-                    .createCriteria(Language.class)
-                    .add(Restrictions.eq(Language.PROPERTY_SYSTEMLANGUAGE, true))
-                    .list()) {
+                                      .createCriteria(Language.class)
+                                      .add(Restrictions.eq(Language.PROPERTY_SYSTEMLANGUAGE, true))
+                                      .list()) {
                 json.put(lang.getLanguage(), converter.toJsonObject(lang, DataResolvingMode.FULL_TRANSLATABLE));
             }
         } catch (Exception e) {

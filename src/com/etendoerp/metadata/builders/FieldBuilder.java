@@ -143,7 +143,10 @@ public class FieldBuilder extends Builder {
         selectorInfo.put("filterClass", "org.openbravo.userinterface.selector.SelectorDataSourceFilter");
 
         if (selector.getDisplayfield() != null) {
-            selectorInfo.put(JsonConstants.SORTBY_PARAMETER, selector.getDisplayfield().getDisplayColumnAlias() != null ? selector.getDisplayfield().getDisplayColumnAlias() : selector.getDisplayfield().getProperty());
+            selectorInfo.put(JsonConstants.SORTBY_PARAMETER,
+                             selector.getDisplayfield().getDisplayColumnAlias() != null ?
+                             selector.getDisplayfield().getDisplayColumnAlias() :
+                             selector.getDisplayfield().getProperty());
         } else {
             selectorInfo.put(JsonConstants.SORTBY_PARAMETER, JsonConstants.IDENTIFIER);
         }
@@ -152,7 +155,10 @@ public class FieldBuilder extends Builder {
         // For now, we only support suggestion style search (only drop down)
         selectorInfo.put(JsonConstants.TEXTMATCH_PARAMETER, selector.getSuggestiontextmatchstyle());
 
-        setSelectorProperties(selector.getOBUISELSelectorFieldList(), selector.getDisplayfield(), selector.getValuefield(), selectorInfo);
+        setSelectorProperties(selector.getOBUISELSelectorFieldList(),
+                              selector.getDisplayfield(),
+                              selector.getValuefield(),
+                              selectorInfo);
 
         selectorInfo.put("extraSearchFields", getExtraSearchFields(selector));
         selectorInfo.put(Constants.DISPLAY_FIELD_PROPERTY, getDisplayField(selector));
@@ -161,9 +167,12 @@ public class FieldBuilder extends Builder {
         return selectorInfo;
     }
 
-    private static void setSelectorProperties(List<SelectorField> fields, SelectorField displayField, SelectorField valueField, JSONObject selectorInfo) throws JSONException {
-        String valueFieldProperty = valueField != null ? getValueField(valueField.getObuiselSelector()) : JsonConstants.IDENTIFIER;
-        String displayFieldProperty = displayField != null ? getDisplayField(displayField.getObuiselSelector()) : JsonConstants.IDENTIFIER;
+    private static void setSelectorProperties(List<SelectorField> fields, SelectorField displayField,
+                                              SelectorField valueField, JSONObject selectorInfo) throws JSONException {
+        String valueFieldProperty =
+                valueField != null ? getValueField(valueField.getObuiselSelector()) : JsonConstants.IDENTIFIER;
+        String displayFieldProperty =
+                displayField != null ? getDisplayField(displayField.getObuiselSelector()) : JsonConstants.IDENTIFIER;
 
         StringBuilder selectedProperties = new StringBuilder(JsonConstants.ID);
         StringBuilder derivedProperties = new StringBuilder();
@@ -193,7 +202,8 @@ public class FieldBuilder extends Builder {
                 selectedProperties.append(",").append(fieldName);
             }
 
-            if ((!field.isOutfield() || (displayField == null || fieldName.equals(displayFieldProperty))) && (valueField == null || fieldName.equals(valueFieldProperty))) {
+            if ((!field.isOutfield() || (displayField == null || fieldName.equals(displayFieldProperty))) &&
+                (valueField == null || fieldName.equals(valueFieldProperty))) {
                 if (field.isOutfield()) {
                     extraProperties.append(",").append(fieldName);
                 }
@@ -220,7 +230,8 @@ public class FieldBuilder extends Builder {
     public static String getExtraSearchFields(Selector selector) {
         final String displayField = getDisplayField(selector);
         final StringBuilder sb = new StringBuilder();
-        for (SelectorField selectorField : selector.getOBUISELSelectorFieldList().stream().filter(SelectorField::isActive).collect(Collectors.toList())) {
+        for (SelectorField selectorField : selector.getOBUISELSelectorFieldList().stream()
+                                                   .filter(SelectorField::isActive).collect(Collectors.toList())) {
             String fieldName = getPropertyOrDataSourceField(selectorField);
             if (fieldName.equals(displayField)) {
                 continue;
@@ -293,7 +304,8 @@ public class FieldBuilder extends Builder {
         final DomainType domainType = getDomainType(selectorField);
         if (domainType instanceof PrimitiveDomainType) {
             PrimitiveDomainType primitiveDomainType = (PrimitiveDomainType) domainType;
-            return boolean.class == primitiveDomainType.getPrimitiveType() || Boolean.class == primitiveDomainType.getPrimitiveType();
+            return boolean.class == primitiveDomainType.getPrimitiveType() ||
+                   Boolean.class == primitiveDomainType.getPrimitiveType();
         }
         return false;
     }
@@ -305,7 +317,9 @@ public class FieldBuilder extends Builder {
             final Property property = DalUtil.getPropertyFromPath(entity, selectorField.getProperty());
             Check.isNotNull(property, "Property " + selectorField.getProperty() + " not found in Entity " + entity);
             return property.getDomainType();
-        } else if (selectorField.getObuiselSelector().getTable() != null && selectorField.getObuiselSelector().isCustomQuery() && selectorField.getReference() != null) {
+        } else if (selectorField.getObuiselSelector().getTable() != null &&
+                   selectorField.getObuiselSelector().isCustomQuery() &&
+                   selectorField.getReference() != null) {
             return getDomainType(selectorField.getReference().getId());
         } else if (selectorField.getObserdsDatasourceField().getReference() != null) {
             return getDomainType(selectorField.getObserdsDatasourceField().getReference().getId());
@@ -328,7 +342,9 @@ public class FieldBuilder extends Builder {
         } else if (selectorField.getObserdsDatasourceField() != null) {
             result = selectorField.getObserdsDatasourceField().getName();
         } else {
-            throw new IllegalStateException("Selector field " + selectorField + " has a null datasource and a null property");
+            throw new IllegalStateException("Selector field " +
+                                            selectorField +
+                                            " has a null datasource and a null property");
         }
         return result.replace(DalUtil.DOT, DalUtil.FIELDSEPARATOR);
     }
@@ -337,7 +353,8 @@ public class FieldBuilder extends Builder {
         String tableId = referenced.getEntity().getTableId();
         Table table = OBDal.getInstance().get(Table.class, tableId);
 
-        return (Tab) OBDal.getInstance().createCriteria(Tab.class).add(Restrictions.eq(Tab.PROPERTY_TABLE, table)).add(Restrictions.eq(Tab.PROPERTY_ACTIVE, true)).setMaxResults(1).uniqueResult();
+        return (Tab) OBDal.getInstance().createCriteria(Tab.class).add(Restrictions.eq(Tab.PROPERTY_TABLE, table))
+                          .add(Restrictions.eq(Tab.PROPERTY_ACTIVE, true)).setMaxResults(1).uniqueResult();
     }
 
     @Override
@@ -391,7 +408,9 @@ public class FieldBuilder extends Builder {
         if (referenced != null) {
             String tableId = referenced.getEntity().getTableId();
             Table table = OBDal.getInstance().get(Table.class, tableId);
-            Tab referencedTab = (Tab) OBDal.getInstance().createCriteria(Tab.class).add(Restrictions.eq(Tab.PROPERTY_TABLE, table)).setMaxResults(1).uniqueResult();
+            Tab referencedTab =
+                    (Tab) OBDal.getInstance().createCriteria(Tab.class).add(Restrictions.eq(Tab.PROPERTY_TABLE, table))
+                               .setMaxResults(1).uniqueResult();
             Window referencedWindow = referencedTab != null ? referencedTab.getWindow() : null;
             String tabId = referencedTab != null ? referencedTab.getId() : null;
             String windowId = referencedWindow != null ? referencedWindow.getId() : null;
@@ -410,7 +429,8 @@ public class FieldBuilder extends Builder {
             // If the parent table is not based in a db table, don't try to retrieve the record
             // Because tables not based on db tables do not have BaseOBObjects
             // See issue https://issues.openbravo.com/view.php?id=29667
-            if (parentTab != null && ApplicationConstants.TABLEBASEDTABLE.equals(parentTab.getTable().getDataOriginType())) {
+            if (parentTab != null &&
+                ApplicationConstants.TABLEBASEDTABLE.equals(parentTab.getTable().getDataOriginType())) {
                 parentEntity = ModelProvider.getInstance().getEntityByTableName(parentTab.getTable().getDBTableName());
             }
 

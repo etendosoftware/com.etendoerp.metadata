@@ -1,6 +1,5 @@
 package com.etendoerp.metadata.service;
 
-import com.etendoerp.metadata.MetadataService;
 import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.base.exception.OBException;
 import org.openbravo.base.secureApp.VariablesSecureApp;
@@ -9,7 +8,7 @@ import org.openbravo.erpCommon.utility.OBError;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-public class MessageService extends MetadataService {
+public class MessageService extends BaseService {
     private static final String ALLOW_ORIGIN = "Access-Control-Allow-Origin";
     private static final String ALLOW_METHODS = "Access-Control-Allow-Methods";
     private static final String ALLOW_CREDENTIALS = "Access-Control-Allow-Credentials";
