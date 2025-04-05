@@ -9,10 +9,10 @@ import org.openbravo.model.ad.ui.Process;
 import org.openbravo.model.ad.ui.ProcessParameter;
 import org.openbravo.service.json.DataResolvingMode;
 
-import static com.etendoerp.metadata.utils.Constants.LIST_REFERENCE_ID;
-import static com.etendoerp.metadata.utils.Constants.SELECTOR_REFERENCES;
 import static com.etendoerp.metadata.builders.FieldBuilder.getListInfo;
 import static com.etendoerp.metadata.builders.FieldBuilder.getSelectorInfo;
+import static com.etendoerp.metadata.utils.Constants.LIST_REFERENCE_ID;
+import static com.etendoerp.metadata.utils.Constants.SELECTOR_REFERENCES;
 
 public class ProcessActionBuilder extends Builder {
     private final Process process;

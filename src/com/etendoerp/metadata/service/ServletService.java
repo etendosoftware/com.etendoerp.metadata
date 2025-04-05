@@ -1,10 +1,10 @@
 package com.etendoerp.metadata.service;
 
-import com.etendoerp.metadata.utils.Constants;
 import com.etendoerp.metadata.auth.SessionManager;
 import com.etendoerp.metadata.exceptions.MethodNotAllowedException;
 import com.etendoerp.metadata.exceptions.NotFoundException;
 import com.etendoerp.metadata.http.HttpServletRequestWrapper;
+import com.etendoerp.metadata.utils.Constants;
 import org.openbravo.base.HttpBaseServlet;
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
 import org.openbravo.base.weld.WeldUtils;

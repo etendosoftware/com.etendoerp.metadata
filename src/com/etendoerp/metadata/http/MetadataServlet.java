@@ -8,7 +8,6 @@ import org.openbravo.dal.core.OBContext;
 import org.openbravo.model.ad.system.Language;
 import org.openbravo.service.json.JsonUtils;
 
-import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -20,11 +19,6 @@ import static com.etendoerp.metadata.utils.Utils.getLanguage;
  * @author luuchorocha
  */
 public class MetadataServlet extends HttpSecureAppServlet {
-    @Override
-    public void service(HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
-        super.service(new HttpServletRequestWrapper(request), response);
-    }
-
     @Override
     public final void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException {
         try {
