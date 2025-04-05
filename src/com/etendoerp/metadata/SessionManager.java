@@ -24,24 +24,22 @@ public class SessionManager {
         try {
             OBContext context = OBContext.getOBContext();
             RequestVariables vars = createSession ? new RequestVariables(request, true) : new RequestVariables(request);
-
+            DalConnectionProvider conn = new DalConnectionProvider();
             String userId = context.getUser().getId();
             String language = context.getLanguage().getLanguage();
             String isRTL = context.isRTL() ? "Y" : "N";
             String roleId = context.getRole().getId();
-            String clientId = context.getCurrentClient().getId();
-            String orgId = context.getCurrentOrganization().getId();
-            String warehouseId = context.getWarehouse() != null ? context.getWarehouse().getId() : "";
+            LoginUtils.RoleDefaults defaults = LoginUtils.getLoginDefaults(userId, roleId, conn);
 
-            boolean sessionFilled = LoginUtils.fillSessionArguments(new DalConnectionProvider(),
+            boolean sessionFilled = LoginUtils.fillSessionArguments(conn,
                                                                     vars,
                                                                     userId,
                                                                     language,
                                                                     isRTL,
-                                                                    roleId,
-                                                                    clientId,
-                                                                    orgId,
-                                                                    warehouseId);
+                                                                    defaults.role,
+                                                                    defaults.client,
+                                                                    defaults.org,
+                                                                    defaults.warehouse);
 
             if (sessionFilled) {
                 readNumberFormat(request, vars);
