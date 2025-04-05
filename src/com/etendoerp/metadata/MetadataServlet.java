@@ -1,7 +1,7 @@
 package com.etendoerp.metadata;
 
-import com.etendoerp.metadata.exceptions.NotFoundException;
-import com.etendoerp.metadata.service.*;
+import com.etendoerp.metadata.service.ServiceFactory;
+import org.apache.http.HttpStatus;
 import org.apache.http.entity.ContentType;
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
 import org.openbravo.dal.core.OBContext;
@@ -62,44 +62,24 @@ public class MetadataServlet extends HttpSecureAppServlet {
     }
 
     protected int getResponseStatus(Exception e) {
-        switch (e.getClass().getSimpleName()) {
+        String exceptionName = e.getClass().getSimpleName();
+
+        switch (exceptionName) {
             case "OBSecurityException":
             case "UnauthorizedException":
-                return 401;
+                return HttpStatus.SC_UNAUTHORIZED;
             case "MethodNotAllowedException":
-                return 405;
+                return HttpStatus.SC_METHOD_NOT_ALLOWED;
             case "UnprocessableContentException":
-                return 422;
+                return HttpStatus.SC_UNPROCESSABLE_ENTITY;
             default:
-                return 500;
+                return HttpStatus.SC_INTERNAL_SERVER_ERROR;
         }
     }
 
     private void process(HttpServletRequest request, HttpServletResponse response) {
-        MetadataService service;
-        String path = request.getPathInfo();
-
-        if (path.startsWith(Constants.WINDOW_PATH)) {
-            service = new WindowService(request, response);
-        } else if (path.startsWith(Constants.TAB_PATH)) {
-            service = new TabService(request, response);
-        } else if (path.startsWith(Constants.TOOLBAR_PATH)) {
-            service = new ToolbarService(request, response);
-        } else if (path.startsWith(Constants.DELEGATED_SERVLET_PATH)) {
-            service = new ServletService(this, request, response);
-        } else if (path.startsWith(Constants.LANGUAGE_PATH)) {
-            service = new LanguageService(request, response);
-        } else if (Constants.MENU_PATH.equals(path)) {
-            service = new MenuService(request, response);
-        } else if (Constants.SESSION_PATH.equals(path)) {
-            service = new SessionService(request, response);
-        } else if (Constants.MESSAGE_PATH.equals(path)) {
-            service = new MessageService(request, response);
-        } else {
-            throw new NotFoundException("Invalid URL: " + path);
-        }
-
-        service.process();
+        ServiceFactory factory = new ServiceFactory(this);
+        factory.getService(request.getPathInfo(), request, response).process();
     }
 }
 
