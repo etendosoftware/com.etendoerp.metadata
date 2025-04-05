@@ -7,6 +7,7 @@ import org.openbravo.dal.core.OBContext;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
 
 public class ToolbarService extends BaseService {
     public ToolbarService(HttpServletRequest request, HttpServletResponse response) {
@@ -14,7 +15,7 @@ public class ToolbarService extends BaseService {
     }
 
     @Override
-    public void process() {
+    public void process() throws IOException {
         String path = request.getPathInfo();
         String[] pathParts = path.split("/");
 

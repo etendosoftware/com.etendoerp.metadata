@@ -1,5 +1,6 @@
 package com.etendoerp.metadata;
 
+import org.apache.http.HttpStatus;
 import org.hibernate.criterion.Restrictions;
 import org.openbravo.base.expression.OBScriptEngine;
 import org.openbravo.client.application.DynamicExpressionParser;
@@ -52,4 +53,19 @@ public class Utils {
         return result;
     }
 
+    public static int getResponseStatus(Exception e) {
+        String exceptionName = e.getClass().getSimpleName();
+
+        switch (exceptionName) {
+            case "OBSecurityException":
+            case "UnauthorizedException":
+                return HttpStatus.SC_UNAUTHORIZED;
+            case "MethodNotAllowedException":
+                return HttpStatus.SC_METHOD_NOT_ALLOWED;
+            case "UnprocessableContentException":
+                return HttpStatus.SC_UNPROCESSABLE_ENTITY;
+            default:
+                return HttpStatus.SC_INTERNAL_SERVER_ERROR;
+        }
+    }
 }

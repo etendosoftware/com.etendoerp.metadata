@@ -6,6 +6,7 @@ import com.etendoerp.metadata.data.RequestVariables;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
 
 public class SessionService extends BaseService {
     private final RequestVariables vars;
@@ -16,7 +17,7 @@ public class SessionService extends BaseService {
     }
 
     @Override
-    public void process() {
+    public void process() throws IOException {
         write(new SessionBuilder(vars).toJSON());
     }
 }

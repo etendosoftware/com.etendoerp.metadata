@@ -6,6 +6,7 @@ import org.openbravo.model.ad.ui.Tab;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
 
 public class TabService extends BaseService {
     public TabService(HttpServletRequest request, HttpServletResponse response) {
@@ -13,7 +14,7 @@ public class TabService extends BaseService {
     }
 
     @Override
-    public void process() {
+    public void process() throws IOException {
         String tabId = request.getPathInfo().substring(5);
         Tab tab = OBDal.getInstance().get(Tab.class, tabId);
         write(new TabBuilder(tab, null).toJSON());

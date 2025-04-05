@@ -4,6 +4,7 @@ import com.etendoerp.metadata.builders.LanguageBuilder;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
 
 public class LanguageService extends BaseService {
     public LanguageService(HttpServletRequest request, HttpServletResponse response) {
@@ -11,7 +12,7 @@ public class LanguageService extends BaseService {
     }
 
     @Override
-    public void process() {
+    public void process() throws IOException {
         write(new LanguageBuilder().toJSON());
     }
 }

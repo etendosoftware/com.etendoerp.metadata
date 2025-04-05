@@ -4,6 +4,7 @@ import com.etendoerp.metadata.builders.WindowBuilder;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
 
 public class WindowService extends BaseService {
     public WindowService(HttpServletRequest request, HttpServletResponse response) {
@@ -11,7 +12,7 @@ public class WindowService extends BaseService {
     }
 
     @Override
-    public void process() {
+    public void process() throws IOException {
         String id = request.getPathInfo().substring(8);
         write(new WindowBuilder(id).toJSON());
     }

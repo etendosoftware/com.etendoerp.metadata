@@ -1,7 +1,6 @@
 package com.etendoerp.metadata;
 
 import com.etendoerp.metadata.service.ServiceFactory;
-import org.apache.http.HttpStatus;
 import org.apache.http.entity.ContentType;
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
 import org.openbravo.dal.core.OBContext;
@@ -25,10 +24,12 @@ public class MetadataServlet extends HttpSecureAppServlet {
             OBContext.setAdminMode();
             setContext(request);
             setContentHeaders(response);
-            process(request, response);
+            ServiceFactory factory = new ServiceFactory(this);
+            MetadataService service = factory.getService(request.getPathInfo(), request, response);
+            service.process();
         } catch (Exception e) {
             log4j.error(e.getMessage(), e);
-            response.setStatus(getResponseStatus(e));
+            response.setStatus(Utils.getResponseStatus(e));
             response.getWriter().write(JsonUtils.convertExceptionToJson(e));
         } finally {
             OBContext.restorePreviousMode();
@@ -61,25 +62,5 @@ public class MetadataServlet extends HttpSecureAppServlet {
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
     }
 
-    protected int getResponseStatus(Exception e) {
-        String exceptionName = e.getClass().getSimpleName();
-
-        switch (exceptionName) {
-            case "OBSecurityException":
-            case "UnauthorizedException":
-                return HttpStatus.SC_UNAUTHORIZED;
-            case "MethodNotAllowedException":
-                return HttpStatus.SC_METHOD_NOT_ALLOWED;
-            case "UnprocessableContentException":
-                return HttpStatus.SC_UNPROCESSABLE_ENTITY;
-            default:
-                return HttpStatus.SC_INTERNAL_SERVER_ERROR;
-        }
-    }
-
-    private void process(HttpServletRequest request, HttpServletResponse response) throws Exception {
-        ServiceFactory factory = new ServiceFactory(this);
-        factory.getService(request.getPathInfo(), request, response).process();
-    }
 }
 

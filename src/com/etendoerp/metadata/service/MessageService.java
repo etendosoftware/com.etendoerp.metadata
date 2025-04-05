@@ -23,7 +23,7 @@ public class MessageService extends MetadataService {
 
         String origin = request.getHeader("Origin");
 
-        if (origin != null && !origin.equals("")) {
+        if (origin != null && !origin.isEmpty()) {
             response.setHeader("Access-Control-Allow-Origin", origin);
             response.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
             response.setHeader("Access-Control-Allow-Credentials", "true");
@@ -33,7 +33,7 @@ public class MessageService extends MetadataService {
     }
 
     @Override
-    public void process() {
+    public void process() throws IOException {
         final VariablesSecureApp vars = new VariablesSecureApp(request);
         OBError error = vars.getMessage("186");
         vars.setMessage("186", null);
@@ -44,7 +44,7 @@ public class MessageService extends MetadataService {
                 jsonResponse.put("type", error.getType());
                 jsonResponse.put("title", error.getTitle());
             } else {
-                jsonResponse.put("message", "No message found");
+                jsonResponse.put("message", "");
             }
             setCORSHeaders(request, response);
         } catch (Exception e) {

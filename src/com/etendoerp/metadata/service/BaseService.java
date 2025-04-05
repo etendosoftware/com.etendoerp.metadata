@@ -6,15 +6,16 @@ import org.jboss.weld.module.web.servlet.SessionHolder;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
 
 public abstract class BaseService extends MetadataService {
 
     public BaseService(HttpServletRequest request, HttpServletResponse response) {
-      super(request, response);
-      HttpServletRequest wrapped = new HttpServletRequestWrapper(request);
-      SessionHolder.requestInitialized(wrapped);
-      setRequest(wrapped);
+        super(request, response);
+        HttpServletRequest wrapped = new HttpServletRequestWrapper(request);
+        SessionHolder.requestInitialized(wrapped);
+        setRequest(wrapped);
     }
 
-    public abstract void process() throws Exception;
+    public abstract void process() throws IOException;
 }
