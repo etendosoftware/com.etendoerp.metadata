@@ -2,8 +2,8 @@ package com.etendoerp.metadata.service;
 
 import com.etendoerp.metadata.Constants;
 import com.etendoerp.metadata.SessionManager;
-import com.etendoerp.metadata.exceptions.InternalServerException;
 import com.etendoerp.metadata.exceptions.MethodNotAllowedException;
+import com.etendoerp.metadata.exceptions.NotFoundException;
 import com.etendoerp.metadata.http.HttpServletRequestWrapper;
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
 import org.openbravo.base.weld.WeldUtils;
@@ -11,6 +11,7 @@ import org.openbravo.base.weld.WeldUtils;
 import javax.servlet.ServletRegistration;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.List;
@@ -105,18 +106,18 @@ public class ServletService extends BaseService {
 
     @Override
     public void process() {
+        String uri = getFirstSegment(request.getPathInfo().replaceAll(DELEGATED_SERVLET_PATH, ""));
+        String servletName = findMatchingServlet(uri).getClassName();
+        HttpSecureAppServlet servlet = getOrCreateServlet(servletName);
+        HttpServletRequest wrappedRequest = new HttpServletRequestWrapper(request);
+        wrappedRequest.removeAttribute(STATELESS_REQUEST_PARAMETER);
+        servlet.init(caller.getServletConfig());
+        SessionManager.initializeSession(wrappedRequest, true);
+
         try {
-            String uri = getFirstSegment(request.getPathInfo().replaceAll(DELEGATED_SERVLET_PATH, ""));
-            String servletName = findMatchingServlet(uri).getClassName();
-            HttpSecureAppServlet servlet = getOrCreateServlet(servletName);
-            HttpServletRequest wrappedRequest = new HttpServletRequestWrapper(request);
-            wrappedRequest.removeAttribute(STATELESS_REQUEST_PARAMETER);
-            servlet.init(caller.getServletConfig());
-            SessionManager.initializeSession(wrappedRequest, true);
             findMethod(servlet, getMethodName(wrappedRequest.getMethod())).invoke(servlet, wrappedRequest, response);
-        } catch (Exception e) {
-            logger.error("Internal server error: {}", e.getMessage(), e);
-            throw new InternalServerException(e.getMessage());
+        } catch (IllegalAccessException | InvocationTargetException e) {
+            throw new NotFoundException("Invalid path: " + uri);
         }
     }
 }
