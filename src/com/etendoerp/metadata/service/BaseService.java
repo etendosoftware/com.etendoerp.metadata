@@ -16,5 +16,5 @@ public abstract class BaseService extends MetadataService {
       setRequest(wrapped);
     }
 
-    public abstract void process();
+    public abstract void process() throws Exception;
 }

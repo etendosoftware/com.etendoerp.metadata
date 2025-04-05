@@ -77,7 +77,7 @@ public class MetadataServlet extends HttpSecureAppServlet {
         }
     }
 
-    private void process(HttpServletRequest request, HttpServletResponse response) {
+    private void process(HttpServletRequest request, HttpServletResponse response) throws Exception {
         ServiceFactory factory = new ServiceFactory(this);
         factory.getService(request.getPathInfo(), request, response).process();
     }
