@@ -5,6 +5,7 @@ import com.etendoerp.metadata.SessionManager;
 import com.etendoerp.metadata.exceptions.MethodNotAllowedException;
 import com.etendoerp.metadata.exceptions.NotFoundException;
 import com.etendoerp.metadata.http.HttpServletRequestWrapper;
+import org.openbravo.base.HttpBaseServlet;
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
 import org.openbravo.base.weld.WeldUtils;
 
@@ -72,7 +73,7 @@ public class ServletService extends BaseService {
         });
     }
 
-    public static Method findMethod(HttpSecureAppServlet servlet, String methodName) throws MethodNotAllowedException {
+    public static Method findMethod(HttpBaseServlet servlet, String methodName) throws MethodNotAllowedException {
         return METHOD_CACHE.computeIfAbsent(servlet.getClass(), cls -> {
             Map<String, Method> methods = new HashMap<>();
             for (Method method : cls.getDeclaredMethods()) {
@@ -108,7 +109,7 @@ public class ServletService extends BaseService {
     public void process() {
         String uri = getFirstSegment(request.getPathInfo().replaceAll(DELEGATED_SERVLET_PATH, ""));
         String servletName = findMatchingServlet(uri).getClassName();
-        HttpSecureAppServlet servlet = getOrCreateServlet(servletName);
+        HttpBaseServlet servlet = getOrCreateServlet(servletName);
         HttpServletRequest wrappedRequest = new HttpServletRequestWrapper(request);
         wrappedRequest.removeAttribute(STATELESS_REQUEST_PARAMETER);
         servlet.init(caller.getServletConfig());
