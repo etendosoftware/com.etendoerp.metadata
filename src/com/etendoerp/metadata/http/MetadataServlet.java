@@ -1,5 +1,6 @@
-package com.etendoerp.metadata;
+package com.etendoerp.metadata.http;
 
+import com.etendoerp.metadata.utils.Utils;
 import com.etendoerp.metadata.service.MetadataService;
 import com.etendoerp.metadata.service.ServiceFactory;
 import org.apache.http.entity.ContentType;
@@ -13,7 +14,7 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
-import static com.etendoerp.metadata.Utils.getLanguage;
+import static com.etendoerp.metadata.utils.Utils.getLanguage;
 
 /**
  * @author luuchorocha

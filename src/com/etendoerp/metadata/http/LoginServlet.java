@@ -1,7 +1,6 @@
-package com.etendoerp.metadata;
+package com.etendoerp.metadata.http;
 
 import com.etendoerp.metadata.auth.LoginManager;
-import com.etendoerp.metadata.http.HttpServletRequestWrapper;
 import org.apache.http.entity.ContentType;
 import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.base.HttpBaseServlet;

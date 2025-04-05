@@ -1,6 +1,6 @@
 package com.etendoerp.metadata.service;
 
-import com.etendoerp.metadata.Constants;
+import com.etendoerp.metadata.utils.Constants;
 import com.etendoerp.metadata.auth.SessionManager;
 import com.etendoerp.metadata.exceptions.MethodNotAllowedException;
 import com.etendoerp.metadata.exceptions.NotFoundException;
@@ -19,7 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static com.etendoerp.metadata.Constants.DELEGATED_SERVLET_PATH;
+import static com.etendoerp.metadata.utils.Constants.DELEGATED_SERVLET_PATH;
 import static org.openbravo.authentication.AuthenticationManager.STATELESS_REQUEST_PARAMETER;
 
 public class ServletService extends BaseService {

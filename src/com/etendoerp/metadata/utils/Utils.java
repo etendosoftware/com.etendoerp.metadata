@@ -1,4 +1,4 @@
-package com.etendoerp.metadata;
+package com.etendoerp.metadata.utils;
 
 import org.apache.http.HttpStatus;
 import org.hibernate.criterion.Restrictions;

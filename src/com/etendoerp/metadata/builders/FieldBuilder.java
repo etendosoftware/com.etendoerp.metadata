@@ -1,7 +1,7 @@
 package com.etendoerp.metadata.builders;
 
 import com.etendoerp.etendorx.utils.DataSourceUtils;
-import com.etendoerp.metadata.Constants;
+import com.etendoerp.metadata.utils.Constants;
 import com.etendoerp.metadata.data.ReferenceSelectors;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;

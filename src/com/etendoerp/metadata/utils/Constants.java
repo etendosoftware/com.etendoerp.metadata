@@ -1,4 +1,4 @@
-package com.etendoerp.metadata;
+package com.etendoerp.metadata.utils;
 
 import java.util.Arrays;
 import java.util.List;
