@@ -1,14 +1,14 @@
 package com.etendoerp.metadata.http;
 
-import com.etendoerp.metadata.utils.Utils;
-import com.etendoerp.metadata.service.MetadataService;
 import com.etendoerp.metadata.service.ServiceFactory;
+import com.etendoerp.metadata.utils.Utils;
 import org.apache.http.entity.ContentType;
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.model.ad.system.Language;
 import org.openbravo.service.json.JsonUtils;
 
+import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -21,14 +21,18 @@ import static com.etendoerp.metadata.utils.Utils.getLanguage;
  */
 public class MetadataServlet extends HttpSecureAppServlet {
     @Override
+    public void service(HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
+        super.service(new HttpServletRequestWrapper(request), response);
+    }
+
+    @Override
     public final void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException {
         try {
             OBContext.setAdminMode();
             setContext(request);
             setContentHeaders(response);
             ServiceFactory factory = new ServiceFactory(this);
-            MetadataService service = factory.getService(request.getPathInfo(), request, response);
-            service.process();
+            factory.getService(request, response).process();
         } catch (Exception e) {
             log4j.error(e.getMessage(), e);
             response.setStatus(Utils.getResponseStatus(e));

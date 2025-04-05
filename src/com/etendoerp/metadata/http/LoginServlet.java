@@ -15,7 +15,7 @@ import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 
 public class LoginServlet extends HttpBaseServlet {
-    private final LoginManager loginService = new LoginManager(myPool);
+    private final LoginManager loginService = new LoginManager();
 
     @Override
     public void service(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {

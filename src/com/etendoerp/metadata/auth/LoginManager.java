@@ -20,6 +20,7 @@ import org.openbravo.model.ad.access.Role;
 import org.openbravo.model.ad.access.User;
 import org.openbravo.model.common.enterprise.Organization;
 import org.openbravo.model.common.enterprise.Warehouse;
+import org.openbravo.service.db.DalConnectionProvider;
 
 import javax.servlet.http.HttpServletRequest;
 import java.util.Optional;
@@ -29,9 +30,9 @@ public class LoginManager {
     private final ConnectionProvider conn;
     private final OBDal entityProvider;
 
-    public LoginManager(ConnectionProvider conn) {
+    public LoginManager() {
         this.entityProvider = OBDal.getInstance();
-        this.conn = conn;
+        this.conn = new DalConnectionProvider();
     }
 
     public JSONObject processLogin(HttpServletRequest request) throws Exception {
