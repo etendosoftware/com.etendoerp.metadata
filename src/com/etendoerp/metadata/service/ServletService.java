@@ -55,12 +55,11 @@ public class ServletService extends BaseService {
     }
 
     public static Method findMethod(HttpSecureAppServlet servlet, String methodName) throws MethodNotAllowedException {
-        return Arrays.stream(servlet.getClass().getDeclaredMethods())
-                     .filter(m -> m.getName().equals(methodName))
-                     .findFirst()
-                     .orElseThrow(MethodNotAllowedException::new);
+        return Arrays.stream(servlet.getClass().getDeclaredMethods()).filter(m -> m.getName().equals(methodName))
+                     .findFirst().orElseThrow(MethodNotAllowedException::new);
     }
 
+    @Override
     public void process() {
         try {
             String method = request.getMethod();

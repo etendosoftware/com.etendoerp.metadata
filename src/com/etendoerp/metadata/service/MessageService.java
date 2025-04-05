@@ -1,10 +1,6 @@
 package com.etendoerp.metadata.service;
 
 import com.etendoerp.metadata.MetadataService;
-import com.etendoerp.metadata.SessionManager;
-import com.etendoerp.metadata.builders.SessionBuilder;
-import com.etendoerp.metadata.data.RequestVariables;
-import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.base.exception.OBException;
 import org.openbravo.base.secureApp.VariablesSecureApp;
@@ -14,7 +10,6 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.Enumeration;
 
 public class MessageService extends MetadataService {
 
