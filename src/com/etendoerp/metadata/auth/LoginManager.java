@@ -1,0 +1,196 @@
+package com.etendoerp.metadata.auth;
+
+import com.auth0.jwt.exceptions.JWTCreationException;
+import com.auth0.jwt.interfaces.DecodedJWT;
+import com.etendoerp.metadata.data.AuthData;
+import com.smf.securewebservices.SWSConfig;
+import com.smf.securewebservices.utils.SecureWebServicesUtils;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.codehaus.jettison.json.JSONArray;
+import org.codehaus.jettison.json.JSONException;
+import org.codehaus.jettison.json.JSONObject;
+import org.openbravo.authentication.hashing.PasswordHash;
+import org.openbravo.base.secureApp.LoginUtils;
+import org.openbravo.dal.core.OBContext;
+import org.openbravo.dal.service.OBDal;
+import org.openbravo.database.ConnectionProvider;
+import org.openbravo.erpCommon.utility.Utility;
+import org.openbravo.model.ad.access.Role;
+import org.openbravo.model.ad.access.User;
+import org.openbravo.model.common.enterprise.Organization;
+import org.openbravo.model.common.enterprise.Warehouse;
+
+import javax.servlet.http.HttpServletRequest;
+import java.util.Optional;
+
+public class LoginManager {
+    private static final Logger logger = LogManager.getLogger(LoginManager.class);
+    private final ConnectionProvider conn;
+    private final OBDal entityProvider;
+
+    public LoginManager(ConnectionProvider conn) {
+        this.entityProvider = OBDal.getInstance();
+        this.conn = conn;
+    }
+
+    public JSONObject processLogin(HttpServletRequest request) throws Exception {
+        validateSWSConfig();
+
+        return generateLoginResult(authenticate(getRequestData(request), extractToken(request)),
+                                   request);
+    }
+
+    private JSONObject getRequestData(HttpServletRequest request) {
+        try {
+            return new JSONObject(request.getReader().lines().reduce("", String::concat));
+        } catch (Exception e) {
+            return new JSONObject();
+        }
+    }
+
+    private String extractToken(HttpServletRequest request) {
+        String authStr = request.getHeader("Authorization");
+        return (authStr != null && authStr.startsWith("Bearer ")) ? authStr.substring(7) : null;
+    }
+
+    private void validateSWSConfig() throws Exception {
+        SWSConfig config = SWSConfig.getInstance();
+        if (config.getPrivateKey() == null) {
+            logger.warn("SWS - SWS are misconfigured");
+            throw new Exception(Utility.messageBD(conn,
+                                                  "SMFSWS_Misconfigured",
+                                                  OBContext.getOBContext()
+                                                           .getLanguage()
+                                                           .getLanguage()));
+        }
+    }
+
+    private AuthData authenticate(JSONObject data, String token) throws Exception {
+        User user;
+        Role role;
+        Organization org;
+        Warehouse warehouse;
+
+        if (data.has("username") && data.has("password")) {
+            user = authenticateWithCredentials(data);
+            role = getEntity(data, "role", Role.class);
+            org = getEntity(data, "organization", Organization.class);
+            warehouse = getEntity(data, "warehouse", Warehouse.class);
+        } else if (token != null) {
+            DecodedJWT decoded = SecureWebServicesUtils.decodeToken(token);
+            if (decoded == null) {
+                logger.warn("SWS - Token is not valid");
+                throw new Exception(Utility.messageBD(conn,
+                                                      "SMFSWS_InvalidToken",
+                                                      OBContext.getOBContext()
+                                                               .getLanguage()
+                                                               .getLanguage()));
+            }
+            user = entityProvider.get(User.class, decoded.getClaim("user").asString());
+            role = getClaimedEntity(data, decoded, "role", Role.class);
+            org = getClaimedEntity(data, decoded, "organization", Organization.class);
+            warehouse = getClaimedEntity(data, decoded, "warehouse", Warehouse.class);
+        } else {
+            logger.warn("SWS - You must specify a username and password or a valid token");
+            throw new Exception(Utility.messageBD(conn,
+                                                  "SMFSWS_PassOrTokenNeeded",
+                                                  OBContext.getOBContext()
+                                                           .getLanguage()
+                                                           .getLanguage()));
+        }
+
+        return new AuthData(user, role, org, warehouse);
+    }
+
+    private User authenticateWithCredentials(JSONObject data) throws Exception {
+        String username = data.getString("username");
+        String pass = data.getString("password");
+        Optional<User> opUser = PasswordHash.getUserWithPassword(username, pass);
+
+        if (opUser.isPresent()) return opUser.get();
+
+        throw new Exception(Utility.messageBD(conn,
+                                              "IDENTIFICATION_FAILURE_TITLE",
+                                              OBContext.getOBContext()
+                                                       .getLanguage()
+                                                       .getLanguage()));
+    }
+
+    private <T> T getEntity(JSONObject data, String key, Class<T> clazz) throws JSONException {
+        if (data.has(key)) {
+            return entityProvider.get(clazz, data.getString(key));
+        }
+        return null;
+    }
+
+    private <T> T getClaimedEntity(JSONObject data, DecodedJWT token, String key, Class<T> clazz) throws JSONException {
+        String id = data.has(key) ? data.getString(key) : token.getClaim(key).asString();
+        return entityProvider.get(clazz, id);
+    }
+
+    private JSONObject generateLoginResult(AuthData authData, HttpServletRequest request) throws Exception {
+        JSONObject result = new JSONObject();
+        try {
+            if (authData.role == null) {
+                authData.role = authData.user.getDefaultRole();
+            }
+
+            String roleId = authData.role != null ? authData.role.getId() : null;
+            LoginUtils.RoleDefaults defaults = LoginUtils.getLoginDefaults(authData.user.getId(),
+                                                                           roleId,
+                                                                           conn);
+
+            if (authData.org == null) {
+                authData.org = entityProvider.get(Organization.class, defaults.org);
+            }
+            if (authData.warehouse == null) {
+                authData.warehouse = entityProvider.get(Warehouse.class, defaults.warehouse);
+            }
+
+            String token = SecureWebServicesUtils.generateToken(authData.user,
+                                                                authData.role,
+                                                                authData.org,
+                                                                authData.warehouse);
+
+            result.put("status", "success");
+            result.put("token", token);
+
+            if (!"false".equals(request.getParameter("showRoles"))) {
+                JSONArray rolesAndOrgs = SecureWebServicesUtils.getUserRolesAndOrg(authData.user,
+                                                                                   !"false".equals(
+                                                                                           request.getParameter(
+                                                                                                   "showOrgs")),
+                                                                                   !"false".equals(
+                                                                                           request.getParameter(
+                                                                                                   "showWarehouses")));
+                result.put("roleList", rolesAndOrgs);
+            }
+        } catch (JWTCreationException e) {
+            logger.warn("SWS - Error creating token", e);
+            throw new Exception(Utility.messageBD(conn,
+                                                  "SMFSWS_ErrorCreatingToken",
+                                                  OBContext.getOBContext()
+                                                           .getLanguage()
+                                                           .getLanguage()));
+        }
+        return result;
+    }
+
+    public JSONObject buildErrorResponse(Exception e) {
+        JSONObject result = new JSONObject();
+        try {
+            result.put("status", "error");
+            result.put("message",
+                       e.getMessage() != null ? e.getMessage() : Utility.messageBD(conn,
+                                                                                   "SMFSWS_GenericErrorLog",
+                                                                                   OBContext.getOBContext()
+                                                                                            .getLanguage()
+                                                                                            .getLanguage()));
+        } catch (JSONException jsonException) {
+            logger.error("Error building error response", jsonException);
+        }
+        logger.error("Login failed", e);
+        return result;
+    }
+}

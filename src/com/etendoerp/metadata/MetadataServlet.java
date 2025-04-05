@@ -1,5 +1,6 @@
 package com.etendoerp.metadata;
 
+import com.etendoerp.metadata.service.MetadataService;
 import com.etendoerp.metadata.service.ServiceFactory;
 import org.apache.http.entity.ContentType;
 import org.openbravo.base.secureApp.HttpSecureAppServlet;

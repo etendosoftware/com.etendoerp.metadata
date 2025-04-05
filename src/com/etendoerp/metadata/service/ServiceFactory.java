@@ -1,7 +1,6 @@
 package com.etendoerp.metadata.service;
 
 import com.etendoerp.metadata.Constants;
-import com.etendoerp.metadata.MetadataService;
 import com.etendoerp.metadata.exceptions.NotFoundException;
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
 

@@ -1,6 +1,6 @@
 package com.etendoerp.metadata.service;
 
-import com.etendoerp.metadata.SessionManager;
+import com.etendoerp.metadata.auth.SessionManager;
 import com.etendoerp.metadata.builders.SessionBuilder;
 import com.etendoerp.metadata.data.RequestVariables;
 

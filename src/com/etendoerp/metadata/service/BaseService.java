@@ -1,6 +1,5 @@
 package com.etendoerp.metadata.service;
 
-import com.etendoerp.metadata.MetadataService;
 import com.etendoerp.metadata.http.HttpServletRequestWrapper;
 import org.jboss.weld.module.web.servlet.SessionHolder;
 
