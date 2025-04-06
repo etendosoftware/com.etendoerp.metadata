@@ -37,11 +37,11 @@ public class LoginServlet extends HttpBaseServlet {
 
     @Override
     public void doPost(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        AllowedCrossDomainsHandler.getInstance().setCORSHeaders(request, response);
-        OBContext.setAdminMode(true);
         JSONObject result;
 
         try {
+            AllowedCrossDomainsHandler.getInstance().setCORSHeaders(request, response);
+            OBContext.setAdminMode(true);
             result = loginService.processLogin(request);
         } catch (Exception e) {
             log4j.error(e.getMessage(), e);

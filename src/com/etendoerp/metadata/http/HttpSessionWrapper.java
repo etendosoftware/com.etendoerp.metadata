@@ -7,7 +7,7 @@ import java.util.Enumeration;
 import java.util.Vector;
 
 public class HttpSessionWrapper extends RequestContext.HttpSessionWrapper {
-    private Enumeration<String> attributeNames = null;
+    private volatile Enumeration<String> attributeNames = null;
 
     @Override
     public Enumeration<String> getAttributeNames() {
