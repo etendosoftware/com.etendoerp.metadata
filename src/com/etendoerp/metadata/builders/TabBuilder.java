@@ -21,7 +21,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
-import static com.etendoerp.metadata.Utils.evaluateDisplayLogicAtServerLevel;
+import static com.etendoerp.metadata.utils.Utils.evaluateDisplayLogicAtServerLevel;
 
 public class TabBuilder extends Builder {
     private final Tab tab;

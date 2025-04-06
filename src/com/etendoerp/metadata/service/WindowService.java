@@ -1,14 +1,15 @@
 package com.etendoerp.metadata.service;
 
 import com.etendoerp.metadata.builders.WindowBuilder;
+import org.openbravo.base.secureApp.HttpSecureAppServlet;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 
 public class WindowService extends BaseService {
-    public WindowService(HttpServletRequest request, HttpServletResponse response) {
-        super(request, response);
+    public WindowService(HttpSecureAppServlet caller, HttpServletRequest request, HttpServletResponse response) {
+        super(caller, request, response);
     }
 
     @Override

@@ -1,13 +1,14 @@
 package com.etendoerp.metadata.service;
 
-import com.etendoerp.metadata.Constants;
-import com.etendoerp.metadata.SessionManager;
+import com.etendoerp.metadata.auth.SessionManager;
 import com.etendoerp.metadata.exceptions.MethodNotAllowedException;
 import com.etendoerp.metadata.exceptions.NotFoundException;
 import com.etendoerp.metadata.http.HttpServletRequestWrapper;
+import com.etendoerp.metadata.utils.Constants;
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
 import org.openbravo.base.weld.WeldUtils;
 
+import javax.servlet.ServletException;
 import javax.servlet.ServletRegistration;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -18,7 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static com.etendoerp.metadata.Constants.DELEGATED_SERVLET_PATH;
+import static com.etendoerp.metadata.utils.Constants.DELEGATED_SERVLET_PATH;
 import static org.openbravo.authentication.AuthenticationManager.STATELESS_REQUEST_PARAMETER;
 
 public class ServletService extends BaseService {
@@ -34,11 +35,8 @@ public class ServletService extends BaseService {
         METHOD_MAP.put(Constants.HTTP_METHOD_DELETE, Constants.SERVLET_DO_DELETE_METHOD);
     }
 
-    private final HttpSecureAppServlet caller;
-
     public ServletService(HttpSecureAppServlet caller, HttpServletRequest request, HttpServletResponse response) {
-        super(request, response);
-        this.caller = caller;
+        super(caller, request, response);
         initializeServletRegistry();
     }
 
@@ -93,7 +91,7 @@ public class ServletService extends BaseService {
     }
 
     private void initializeServletRegistry() {
-        caller.getServletContext().getServletRegistrations().values().forEach(sr -> {
+        request.getServletContext().getServletRegistrations().values().forEach(sr -> {
             for (String mapping : sr.getMappings()) {
                 SERVLET_REGISTRY.put(mapping.replace("/*", ""), sr);
             }
@@ -105,14 +103,14 @@ public class ServletService extends BaseService {
     }
 
     @Override
-    public void process() {
+    public void process() throws ServletException {
         String uri = getFirstSegment(request.getPathInfo().replaceAll(DELEGATED_SERVLET_PATH, ""));
         String servletName = findMatchingServlet(uri).getClassName();
         HttpSecureAppServlet servlet = getOrCreateServlet(servletName);
         HttpServletRequest wrappedRequest = new HttpServletRequestWrapper(request);
         wrappedRequest.removeAttribute(STATELESS_REQUEST_PARAMETER);
-        servlet.init(caller.getServletConfig());
-        SessionManager.initializeSession(wrappedRequest, true);
+        servlet.init(caller);
+        SessionManager.initializeSession(wrappedRequest);
 
         try {
             findMethod(servlet, getMethodName(wrappedRequest.getMethod())).invoke(servlet, wrappedRequest, response);

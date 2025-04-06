@@ -1,36 +1,34 @@
-package com.etendoerp.metadata;
+package com.etendoerp.metadata.http;
 
 import com.etendoerp.metadata.service.ServiceFactory;
 import org.apache.http.entity.ContentType;
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.model.ad.system.Language;
-import org.openbravo.service.json.JsonUtils;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
-import static com.etendoerp.metadata.Utils.getLanguage;
+import static com.etendoerp.metadata.exceptions.Utils.handleException;
+import static com.etendoerp.metadata.utils.Utils.getLanguage;
 
 /**
  * @author luuchorocha
  */
 public class MetadataServlet extends HttpSecureAppServlet {
+    private final static ServiceFactory factory = new ServiceFactory();
+
     @Override
     public final void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException {
         try {
             OBContext.setAdminMode();
             setContext(request);
             setContentHeaders(response);
-            ServiceFactory factory = new ServiceFactory(this);
-            MetadataService service = factory.getService(request.getPathInfo(), request, response);
-            service.process();
+            factory.getService(this, request, response).process();
         } catch (Exception e) {
-            log4j.error(e.getMessage(), e);
-            response.setStatus(Utils.getResponseStatus(e));
-            response.getWriter().write(JsonUtils.convertExceptionToJson(e));
+            handleException(e, response);
         } finally {
             OBContext.restorePreviousMode();
         }

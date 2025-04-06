@@ -9,10 +9,6 @@ import java.util.Map;
 public class RequestVariables extends VariablesSecureApp {
     private final Map<String, Object> casedSessionAttributes = new HashMap<>();
 
-    public RequestVariables(HttpServletRequest request, boolean f) {
-        super(request, f);
-    }
-
     public RequestVariables(HttpServletRequest request) {
         super(request);
     }

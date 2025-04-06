@@ -15,7 +15,7 @@ public class MetadataFilter implements Filter {
     private static final Logger logger = Logger.getLogger(MetadataFilter.class);
 
     @Override
-    public void init(FilterConfig fConfig) throws ServletException {
+    public void init(FilterConfig fConfig) {
         RequestContext.setServletContext(fConfig.getServletContext());
         logger.info("MetadataFilter initialized");
     }
@@ -41,6 +41,8 @@ public class MetadataFilter implements Filter {
                 if (error) {
                     logger.error("An error occurred in MetadataFilter");
                 }
+
+                RequestContext.clear();
             }
         };
 

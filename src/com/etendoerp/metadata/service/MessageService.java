@@ -1,25 +1,22 @@
 package com.etendoerp.metadata.service;
 
-import com.etendoerp.metadata.MetadataService;
 import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.base.exception.OBException;
+import org.openbravo.base.secureApp.HttpSecureAppServlet;
 import org.openbravo.base.secureApp.VariablesSecureApp;
 import org.openbravo.erpCommon.utility.OBError;
 
-import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 
-public class MessageService extends MetadataService {
+public class MessageService extends BaseService {
 
-    public MessageService(HttpServletRequest request, HttpServletResponse response) {
-        super(request, response);
+    public MessageService(HttpSecureAppServlet caller, HttpServletRequest request, HttpServletResponse response) {
+        super(caller, request, response);
     }
 
-    protected void setCORSHeaders(HttpServletRequest request, HttpServletResponse response) throws
-                                                                                            ServletException,
-                                                                                            IOException {
+    protected void setCORSHeaders(HttpServletRequest request, HttpServletResponse response) {
 
         String origin = request.getHeader("Origin");
 

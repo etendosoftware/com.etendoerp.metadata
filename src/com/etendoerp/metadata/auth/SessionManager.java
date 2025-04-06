@@ -1,4 +1,4 @@
-package com.etendoerp.metadata;
+package com.etendoerp.metadata.auth;
 
 import com.etendoerp.metadata.data.RequestVariables;
 import com.etendoerp.metadata.exceptions.InternalServerException;
@@ -20,26 +20,28 @@ import javax.servlet.http.HttpSession;
 public class SessionManager {
     private final static Logger logger = LogManager.getLogger(SessionManager.class);
 
-    public static RequestVariables initializeSession(HttpServletRequest request, boolean createSession) {
+    public static RequestVariables initializeSession(HttpServletRequest request) {
         try {
             OBContext context = OBContext.getOBContext();
-            RequestVariables vars = createSession ? new RequestVariables(request, true) : new RequestVariables(request);
+            RequestVariables vars = new RequestVariables(request);
             DalConnectionProvider conn = new DalConnectionProvider();
             String userId = context.getUser().getId();
             String language = context.getLanguage().getLanguage();
             String isRTL = context.isRTL() ? "Y" : "N";
+            String clientId = context.getCurrentClient().getId();
             String roleId = context.getRole().getId();
-            LoginUtils.RoleDefaults defaults = LoginUtils.getLoginDefaults(userId, roleId, conn);
+            String orgId = context.getCurrentOrganization().getId();
+            String warehouseId = context.getWarehouse().getId();
 
             boolean sessionFilled = LoginUtils.fillSessionArguments(conn,
                                                                     vars,
                                                                     userId,
                                                                     language,
                                                                     isRTL,
-                                                                    defaults.role,
-                                                                    defaults.client,
-                                                                    defaults.org,
-                                                                    defaults.warehouse);
+                                                                    roleId,
+                                                                    clientId,
+                                                                    orgId,
+                                                                    warehouseId);
 
             if (sessionFilled) {
                 readNumberFormat(request, vars);
@@ -61,7 +63,6 @@ public class SessionManager {
         RequestContext requestContext = RequestContext.get();
         requestContext.setRequest(request);
         requestContext.setVariableSecureApp(vars);
-
     }
 
     private static void bypassCSRF(HttpServletRequest request, String userId) {
