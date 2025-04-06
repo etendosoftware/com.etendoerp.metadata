@@ -32,7 +32,7 @@ public class ProcessActionBuilder extends Builder {
     }
 
     public static JSONObject getFieldProcess(Field field) throws JSONException {
-        org.openbravo.model.ad.ui.Process process = field.getColumn().getProcess();
+       Process process = field.getColumn().getProcess();
 
         if (process == null) {
             return new JSONObject();

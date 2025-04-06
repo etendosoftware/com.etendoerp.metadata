@@ -20,13 +20,10 @@ import javax.servlet.http.HttpSession;
 public class SessionManager {
     private final static Logger logger = LogManager.getLogger(SessionManager.class);
 
-    public static RequestVariables initializeSession(HttpServletRequest request,
-                                                     boolean createSession) {
+    public static RequestVariables initializeSession(HttpServletRequest request) {
         try {
             OBContext context = OBContext.getOBContext();
-            RequestVariables vars = createSession ? new RequestVariables(request,
-                                                                         true) : new RequestVariables(
-                    request);
+            RequestVariables vars = new RequestVariables(request);
             DalConnectionProvider conn = new DalConnectionProvider();
             String userId = context.getUser().getId();
             String language = context.getLanguage().getLanguage();
@@ -66,7 +63,6 @@ public class SessionManager {
         RequestContext requestContext = RequestContext.get();
         requestContext.setRequest(request);
         requestContext.setVariableSecureApp(vars);
-
     }
 
     private static void bypassCSRF(HttpServletRequest request, String userId) {

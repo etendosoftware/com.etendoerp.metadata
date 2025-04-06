@@ -14,12 +14,20 @@ import java.io.IOException;
 import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 
+import static com.etendoerp.metadata.exceptions.Utils.handleException;
+
 public class LoginServlet extends HttpBaseServlet {
     private final LoginManager loginService = new LoginManager();
 
     @Override
-    public void service(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-        super.service(new HttpServletRequestWrapper(request), response);
+    public final void service(HttpServletRequest request, HttpServletResponse response) throws
+                                                                                        ServletException,
+                                                                                        IOException {
+        try {
+            super.service(new HttpServletRequestWrapper(request), response);
+        } catch (Exception e) {
+            handleException(e, response);
+        }
     }
 
     @Override
@@ -36,6 +44,7 @@ public class LoginServlet extends HttpBaseServlet {
         try {
             result = loginService.processLogin(request);
         } catch (Exception e) {
+            log4j.error(e.getMessage(), e);
             result = loginService.buildErrorResponse(e);
         } finally {
             OBContext.restorePreviousMode();
@@ -47,6 +56,7 @@ public class LoginServlet extends HttpBaseServlet {
     private void writeResponse(HttpServletResponse response, JSONObject result) throws IOException {
         response.setContentType(ContentType.APPLICATION_JSON.getMimeType());
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+
         try (Writer out = response.getWriter()) {
             out.write(result.toString());
         }

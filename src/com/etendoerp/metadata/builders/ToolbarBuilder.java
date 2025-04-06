@@ -1,5 +1,6 @@
 package com.etendoerp.metadata.builders;
 
+import com.etendoerp.metadata.data.ButtonConfig;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.codehaus.jettison.json.JSONArray;
@@ -158,19 +159,4 @@ public class ToolbarBuilder {
         return buttons;
     }
 
-    private static class ButtonConfig {
-        final String id;
-        final String name;
-        final String action;
-        final boolean enabled;
-        final String icon;
-
-        ButtonConfig(String id, String name, String action, boolean enabled, String icon) {
-            this.id = id;
-            this.name = name;
-            this.action = action;
-            this.enabled = enabled;
-            this.icon = icon;
-        }
-    }
 }

@@ -9,15 +9,13 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 
 public class SessionService extends BaseService {
-    private final RequestVariables vars;
-
     public SessionService(HttpServletRequest request, HttpServletResponse response) {
         super(request, response);
-        this.vars = SessionManager.initializeSession(request, false);
     }
 
     @Override
     public void process() throws IOException {
+        RequestVariables vars = SessionManager.initializeSession(request);
         write(new SessionBuilder(vars).toJSON());
     }
 }

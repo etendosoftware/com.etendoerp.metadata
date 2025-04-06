@@ -38,8 +38,7 @@ public class LoginManager {
     public JSONObject processLogin(HttpServletRequest request) throws Exception {
         validateSWSConfig();
 
-        return generateLoginResult(authenticate(getRequestData(request), extractToken(request)),
-                                   request);
+        return generateLoginResult(authenticate(getRequestData(request), extractToken(request)), request);
     }
 
     private JSONObject getRequestData(HttpServletRequest request) {
@@ -61,9 +60,7 @@ public class LoginManager {
             logger.warn("SWS - SWS are misconfigured");
             throw new Exception(Utility.messageBD(conn,
                                                   "SMFSWS_Misconfigured",
-                                                  OBContext.getOBContext()
-                                                           .getLanguage()
-                                                           .getLanguage()));
+                                                  OBContext.getOBContext().getLanguage().getLanguage()));
         }
     }
 
@@ -84,9 +81,7 @@ public class LoginManager {
                 logger.warn("SWS - Token is not valid");
                 throw new Exception(Utility.messageBD(conn,
                                                       "SMFSWS_InvalidToken",
-                                                      OBContext.getOBContext()
-                                                               .getLanguage()
-                                                               .getLanguage()));
+                                                      OBContext.getOBContext().getLanguage().getLanguage()));
             }
             user = entityProvider.get(User.class, decoded.getClaim("user").asString());
             role = getClaimedEntity(data, decoded, "role", Role.class);
@@ -96,9 +91,7 @@ public class LoginManager {
             logger.warn("SWS - You must specify a username and password or a valid token");
             throw new Exception(Utility.messageBD(conn,
                                                   "SMFSWS_PassOrTokenNeeded",
-                                                  OBContext.getOBContext()
-                                                           .getLanguage()
-                                                           .getLanguage()));
+                                                  OBContext.getOBContext().getLanguage().getLanguage()));
         }
 
         return new AuthData(user, role, org, warehouse);
@@ -113,9 +106,7 @@ public class LoginManager {
 
         throw new Exception(Utility.messageBD(conn,
                                               "IDENTIFICATION_FAILURE_TITLE",
-                                              OBContext.getOBContext()
-                                                       .getLanguage()
-                                                       .getLanguage()));
+                                              OBContext.getOBContext().getLanguage().getLanguage()));
     }
 
     private <T> T getEntity(JSONObject data, String key, Class<T> clazz) throws JSONException {
@@ -138,9 +129,7 @@ public class LoginManager {
             }
 
             String roleId = authData.role != null ? authData.role.getId() : null;
-            LoginUtils.RoleDefaults defaults = LoginUtils.getLoginDefaults(authData.user.getId(),
-                                                                           roleId,
-                                                                           conn);
+            LoginUtils.RoleDefaults defaults = LoginUtils.getLoginDefaults(authData.user.getId(), roleId, conn);
 
             if (authData.org == null) {
                 authData.org = entityProvider.get(Organization.class, defaults.org);
@@ -159,21 +148,17 @@ public class LoginManager {
 
             if (!"false".equals(request.getParameter("showRoles"))) {
                 JSONArray rolesAndOrgs = SecureWebServicesUtils.getUserRolesAndOrg(authData.user,
-                                                                                   !"false".equals(
-                                                                                           request.getParameter(
-                                                                                                   "showOrgs")),
-                                                                                   !"false".equals(
-                                                                                           request.getParameter(
-                                                                                                   "showWarehouses")));
+                                                                                   !"false".equals(request.getParameter(
+                                                                                           "showOrgs")),
+                                                                                   !"false".equals(request.getParameter(
+                                                                                           "showWarehouses")));
                 result.put("roleList", rolesAndOrgs);
             }
         } catch (JWTCreationException e) {
             logger.warn("SWS - Error creating token", e);
             throw new Exception(Utility.messageBD(conn,
                                                   "SMFSWS_ErrorCreatingToken",
-                                                  OBContext.getOBContext()
-                                                           .getLanguage()
-                                                           .getLanguage()));
+                                                  OBContext.getOBContext().getLanguage().getLanguage()));
         }
         return result;
     }

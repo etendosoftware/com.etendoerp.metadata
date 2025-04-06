@@ -41,6 +41,8 @@ public class MetadataFilter implements Filter {
                 if (error) {
                     logger.error("An error occurred in MetadataFilter");
                 }
+
+                RequestContext.clear();
             }
         };
 

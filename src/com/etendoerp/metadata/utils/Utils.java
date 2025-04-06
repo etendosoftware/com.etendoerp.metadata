@@ -1,6 +1,5 @@
 package com.etendoerp.metadata.utils;
 
-import org.apache.http.HttpStatus;
 import org.hibernate.criterion.Restrictions;
 import org.openbravo.base.expression.OBScriptEngine;
 import org.openbravo.client.application.DynamicExpressionParser;
@@ -20,17 +19,14 @@ import static org.openbravo.client.application.DynamicExpressionParser.replaceSy
 public class Utils {
     public static Language getLanguage(HttpServletRequest request) {
         String[] providedLanguages = {request.getParameter("language"), request.getHeader("language")};
-        String languageCode = Arrays.stream(providedLanguages)
-                                    .filter(language -> language != null && !language.isEmpty())
-                                    .findFirst()
-                                    .orElse(null);
+        String languageCode =
+                Arrays.stream(providedLanguages).filter(language -> language != null && !language.isEmpty()).findFirst()
+                      .orElse(null);
 
-        return (Language) OBDal.getInstance()
-                               .createCriteria(Language.class)
+        return (Language) OBDal.getInstance().createCriteria(Language.class)
                                .add(Restrictions.eq(Language.PROPERTY_SYSTEMLANGUAGE, true))
                                .add(Restrictions.eq(Language.PROPERTY_ACTIVE, true))
-                               .add(Restrictions.eq(Language.PROPERTY_LANGUAGE, languageCode))
-                               .uniqueResult();
+                               .add(Restrictions.eq(Language.PROPERTY_LANGUAGE, languageCode)).uniqueResult();
     }
 
     public static boolean evaluateDisplayLogicAtServerLevel(Field field) {
@@ -51,21 +47,5 @@ public class Utils {
         }
 
         return result;
-    }
-
-    public static int getResponseStatus(Exception e) {
-        String exceptionName = e.getClass().getSimpleName();
-
-        switch (exceptionName) {
-            case "OBSecurityException":
-            case "UnauthorizedException":
-                return HttpStatus.SC_UNAUTHORIZED;
-            case "MethodNotAllowedException":
-                return HttpStatus.SC_METHOD_NOT_ALLOWED;
-            case "UnprocessableContentException":
-                return HttpStatus.SC_UNPROCESSABLE_ENTITY;
-            default:
-                return HttpStatus.SC_INTERNAL_SERVER_ERROR;
-        }
     }
 }
