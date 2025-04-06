@@ -2,6 +2,7 @@ package com.etendoerp.metadata.service;
 
 import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.base.exception.OBException;
+import org.openbravo.base.secureApp.HttpSecureAppServlet;
 import org.openbravo.base.secureApp.VariablesSecureApp;
 import org.openbravo.erpCommon.utility.OBError;
 
@@ -9,10 +10,10 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 
-public class MessageService extends MetadataService {
+public class MessageService extends BaseService {
 
-    public MessageService(HttpServletRequest request, HttpServletResponse response) {
-        super(request, response);
+    public MessageService(HttpSecureAppServlet caller, HttpServletRequest request, HttpServletResponse response) {
+        super(caller, request, response);
     }
 
     protected void setCORSHeaders(HttpServletRequest request, HttpServletResponse response) {
@@ -23,8 +24,7 @@ public class MessageService extends MetadataService {
             response.setHeader("Access-Control-Allow-Origin", origin);
             response.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
             response.setHeader("Access-Control-Allow-Credentials", "true");
-            response.setHeader("Access-Control-Allow-Headers",
-                               "Content-Type, origin, accept, X-Requested-With");
+            response.setHeader("Access-Control-Allow-Headers", "Content-Type, origin, accept, X-Requested-With");
             response.setHeader("Access-Control-Max-Age", "1000");
         }
     }

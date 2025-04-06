@@ -3,14 +3,15 @@ package com.etendoerp.metadata.service;
 import com.etendoerp.metadata.auth.SessionManager;
 import com.etendoerp.metadata.builders.SessionBuilder;
 import com.etendoerp.metadata.data.RequestVariables;
+import org.openbravo.base.secureApp.HttpSecureAppServlet;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 
 public class SessionService extends BaseService {
-    public SessionService(HttpServletRequest request, HttpServletResponse response) {
-        super(request, response);
+    public SessionService(HttpSecureAppServlet caller, HttpServletRequest request, HttpServletResponse response) {
+        super(caller, request, response);
     }
 
     @Override

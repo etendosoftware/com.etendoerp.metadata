@@ -18,7 +18,7 @@ import static com.etendoerp.metadata.utils.Utils.getLanguage;
  * @author luuchorocha
  */
 public class MetadataServlet extends HttpSecureAppServlet {
-    private static final ServiceFactory factory = new ServiceFactory();
+    private final static ServiceFactory factory = new ServiceFactory();
 
     @Override
     public final void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException {
@@ -26,7 +26,7 @@ public class MetadataServlet extends HttpSecureAppServlet {
             OBContext.setAdminMode();
             setContext(request);
             setContentHeaders(response);
-            factory.getService(request, response).process();
+            factory.getService(this, request, response).process();
         } catch (Exception e) {
             handleException(e, response);
         } finally {

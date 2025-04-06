@@ -35,8 +35,8 @@ public class ServletService extends BaseService {
         METHOD_MAP.put(Constants.HTTP_METHOD_DELETE, Constants.SERVLET_DO_DELETE_METHOD);
     }
 
-    public ServletService(HttpServletRequest request, HttpServletResponse response) {
-        super(request, response);
+    public ServletService(HttpSecureAppServlet caller, HttpServletRequest request, HttpServletResponse response) {
+        super(caller, request, response);
         initializeServletRegistry();
     }
 
@@ -109,7 +109,7 @@ public class ServletService extends BaseService {
         HttpSecureAppServlet servlet = getOrCreateServlet(servletName);
         HttpServletRequest wrappedRequest = new HttpServletRequestWrapper(request);
         wrappedRequest.removeAttribute(STATELESS_REQUEST_PARAMETER);
-        servlet.init();
+        servlet.init(caller);
         SessionManager.initializeSession(wrappedRequest);
 
         try {

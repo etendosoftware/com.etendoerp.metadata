@@ -1,11 +1,12 @@
 package com.etendoerp.metadata.service;
 
 import com.etendoerp.metadata.exceptions.NotFoundException;
+import org.apache.commons.lang3.function.TriFunction;
+import org.openbravo.base.secureApp.HttpSecureAppServlet;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.util.List;
-import java.util.function.BiFunction;
 import java.util.function.Predicate;
 
 import static com.etendoerp.metadata.utils.Constants.*;
@@ -25,19 +26,22 @@ public class ServiceFactory {
                            new Service(path -> path.startsWith(DELEGATED_SERVLET_PATH), ServletService::new));
     }
 
-    public MetadataService getService(final HttpServletRequest req, final HttpServletResponse res) {
+    public MetadataService getService(final HttpSecureAppServlet servlet, final HttpServletRequest req,
+                                      final HttpServletResponse res) {
         final String path = req.getPathInfo();
 
-        return services.stream().filter(entry -> entry.matches(path)).findFirst().map(entry -> entry.create(req, res))
+        return services.stream().filter(entry -> entry.matches(path)).findFirst()
+                       .map(entry -> entry.create(servlet, req, res))
                        .orElseThrow(() -> new NotFoundException("Invalid URL: " + path));
     }
 
     private static class Service {
         private final Predicate<String> matcher;
-        private final BiFunction<HttpServletRequest, HttpServletResponse, MetadataService> creator;
+        private final TriFunction<HttpSecureAppServlet, HttpServletRequest, HttpServletResponse, MetadataService>
+                creator;
 
         public Service(final Predicate<String> matcher,
-                       final BiFunction<HttpServletRequest, HttpServletResponse, MetadataService> creator) {
+                       final TriFunction<HttpSecureAppServlet, HttpServletRequest, HttpServletResponse, MetadataService> creator) {
             this.matcher = matcher;
             this.creator = creator;
         }
@@ -46,8 +50,9 @@ public class ServiceFactory {
             return matcher.test(path);
         }
 
-        public MetadataService create(final HttpServletRequest req, final HttpServletResponse res) {
-            return creator.apply(req, res);
+        public MetadataService create(final HttpSecureAppServlet caller, HttpServletRequest req,
+                                      final HttpServletResponse res) {
+            return creator.apply(caller, req, res);
         }
     }
 }

@@ -1,6 +1,7 @@
 package com.etendoerp.metadata.service;
 
 import com.etendoerp.metadata.builders.TabBuilder;
+import org.openbravo.base.secureApp.HttpSecureAppServlet;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.ui.Tab;
 
@@ -9,8 +10,8 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 
 public class TabService extends BaseService {
-    public TabService(HttpServletRequest request, HttpServletResponse response) {
-        super(request, response);
+    public TabService(HttpSecureAppServlet caller, HttpServletRequest request, HttpServletResponse response) {
+        super(caller, request, response);
     }
 
     @Override

@@ -10,7 +10,7 @@ public class HttpServletRequestWrapper extends RequestContext.HttpServletRequest
 
     public HttpServletRequestWrapper(HttpServletRequest request) {
         super(request);
-        this.session = new RequestContext.HttpSessionWrapper();
+        this.session = new HttpSessionWrapper();
     }
 
     @Override
