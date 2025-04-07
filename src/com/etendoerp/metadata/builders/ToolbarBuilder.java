@@ -120,7 +120,7 @@ public class ToolbarBuilder {
             }
 
             button.put("tabId", tab.getId());
-            button.put("field", converter.toJsonObject(field, DataResolvingMode.FULL_TRANSLATABLE));
+            button.put("field", new FieldBuilder(field, null).toJSON());
 
 
             buttons.put(button);
