@@ -25,6 +25,9 @@ import org.openbravo.service.db.DalConnectionProvider;
 import javax.servlet.http.HttpServletRequest;
 import java.util.Optional;
 
+/**
+ * @author luuchorocha
+ */
 public class LoginManager {
     private static final Logger logger = LogManager.getLogger(LoginManager.class);
     private final ConnectionProvider conn;

@@ -10,7 +10,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 
-public class ToolbarService extends BaseService {
+public class ToolbarService extends MetadataService {
     public ToolbarService(HttpSecureAppServlet caller, HttpServletRequest request, HttpServletResponse response) {
         super(caller, request, response);
     }

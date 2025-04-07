@@ -5,6 +5,9 @@ import org.openbravo.model.ad.access.User;
 import org.openbravo.model.common.enterprise.Organization;
 import org.openbravo.model.common.enterprise.Warehouse;
 
+/**
+ * @author luuchorocha
+ */
 public class AuthData {
     public final User user;
     public Role role;

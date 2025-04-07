@@ -17,6 +17,9 @@ import org.openbravo.model.ad.ui.Window;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * @author luuchorocha
+ */
 public class MenuBuilder extends Builder {
     private final MenuOption menu;
     private final Language language;

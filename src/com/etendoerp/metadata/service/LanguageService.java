@@ -7,7 +7,10 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 
-public class LanguageService extends BaseService {
+/**
+ * @author luuchorocha
+ */
+public class LanguageService extends MetadataService {
     public LanguageService(HttpSecureAppServlet caller, HttpServletRequest request, HttpServletResponse response) {
         super(caller, request, response);
     }

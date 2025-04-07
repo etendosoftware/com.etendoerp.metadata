@@ -2,6 +2,7 @@ package com.etendoerp.metadata.auth;
 
 import com.etendoerp.metadata.data.RequestVariables;
 import com.etendoerp.metadata.exceptions.InternalServerException;
+import com.etendoerp.metadata.http.HttpServletRequestWrapper;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import org.openbravo.base.ConfigParameters;
@@ -20,9 +21,14 @@ import javax.servlet.http.HttpSession;
 public class SessionManager {
     private final static Logger logger = LogManager.getLogger(SessionManager.class);
 
-    public static RequestVariables initializeSession(HttpServletRequest request) {
+    public static RequestVariables initializeSession(HttpServletRequestWrapper request) {
         try {
             OBContext context = OBContext.getOBContext();
+
+            if (context == null) {
+                throw new InternalServerException("OBContext not initialized for this thread");
+            }
+
             RequestVariables vars = new RequestVariables(request);
             DalConnectionProvider conn = new DalConnectionProvider();
             String userId = context.getUser().getId();

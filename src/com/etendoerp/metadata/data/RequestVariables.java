@@ -6,6 +6,9 @@ import javax.servlet.http.HttpServletRequest;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * @author luuchorocha
+ */
 public class RequestVariables extends VariablesSecureApp {
     private final Map<String, Object> casedSessionAttributes = new HashMap<>();
 

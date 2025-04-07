@@ -1,6 +1,7 @@
 package com.etendoerp.metadata.builders;
 
 import com.etendoerp.metadata.data.ButtonConfig;
+import com.etendoerp.metadata.exceptions.InternalServerException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.codehaus.jettison.json.JSONArray;
@@ -21,6 +22,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import static com.etendoerp.metadata.utils.Utils.formatMessage;
+
 public class ToolbarBuilder {
     private static final Logger logger = LogManager.getLogger(ToolbarBuilder.class);
 
@@ -29,7 +32,8 @@ public class ToolbarBuilder {
     private final String tabId;
     private final boolean isNew;
     private final ConnectionProvider connectionProvider;
-    private final TabBuilder tabBuilder;
+    private final Tab tab;
+    private final Window window;
 
     public ToolbarBuilder(String language, String windowId, String tabId, boolean isNew) {
         this.language = language != null ? language : "en_US";
@@ -38,18 +42,29 @@ public class ToolbarBuilder {
         this.tabId = tabId;
         this.connectionProvider = ConnectionProviderContextListener.getPool();
 
-        Window window = OBDal.getInstance().get(Window.class, windowId);
-        Tab mainTab = (tabId != null) ? OBDal.getInstance().get(Tab.class, tabId) : window.getADTabList().get(0);
-        this.tabBuilder = new TabBuilder(mainTab, null);
+        if (tabId != null) {
+            this.tab = OBDal.getInstance().get(Tab.class, tabId);
+        } else {
+            this.tab = null;
+        }
+
+        if (windowId != null) {
+            this.window = OBDal.getInstance().get(Window.class, windowId);
+        } else {
+            this.window = null;
+        }
     }
 
     public JSONObject toJSON() {
         try {
-            Window window = OBDal.getInstance().get(Window.class, windowId);
             return buildToolbarJSON(window);
         } catch (Exception e) {
-            logger.error("Error building toolbar for window: {}", windowId, e);
-            throw new RuntimeException("Failed to build toolbar", e);
+            logger.error("Error building toolbar for window: {} - tab: {}", windowId, tabId, e);
+            throw new InternalServerException(formatMessage(
+                    "Error building toolbar for window: {} - tab: {} - error: {}",
+                    windowId,
+                    tabId,
+                    e));
         }
     }
 
@@ -62,11 +77,8 @@ public class ToolbarBuilder {
             buttons.put(createButtonJSON(config));
         }
 
-        if (tabId != null) {
-            Tab tab = OBDal.getInstance().get(Tab.class, tabId);
-            if (tab != null) {
-                addProcessButtons(buttons, tab);
-            }
+        if (tab != null) {
+            addProcessButtons(buttons, tab);
         } else {
             for (Tab tab : window.getADTabList()) {
                 if (tab.isActive()) {
@@ -93,11 +105,10 @@ public class ToolbarBuilder {
     private JSONArray getProcessButtons(Tab tab) throws Exception {
         JSONArray buttons = new JSONArray();
 
-        List<Field> processFields = tab.getADFieldList()
-                                       .stream()
-                                       .filter(field -> field.isActive() &&
-                                                        tabBuilder.hasAccessToProcess(field, windowId) &&
-                                                        FieldBuilder.isProcessField(field))
+        List<Field> processFields = tab.getADFieldList().stream().filter(field -> field.isActive() &&
+                                                                                  TabBuilder.hasAccessToProcess(field,
+                                                                                                                windowId) &&
+                                                                                  FieldBuilder.isProcessField(field))
                                        .collect(Collectors.toList());
 
         for (Field field : processFields) {

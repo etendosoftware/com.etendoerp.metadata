@@ -16,6 +16,9 @@ import java.nio.charset.StandardCharsets;
 
 import static com.etendoerp.metadata.exceptions.Utils.handleException;
 
+/**
+ * @author luuchorocha
+ */
 public class LoginServlet extends HttpBaseServlet {
     private final LoginManager loginService = new LoginManager();
 

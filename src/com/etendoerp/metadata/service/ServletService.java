@@ -22,7 +22,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import static com.etendoerp.metadata.utils.Constants.DELEGATED_SERVLET_PATH;
 import static org.openbravo.authentication.AuthenticationManager.STATELESS_REQUEST_PARAMETER;
 
-public class ServletService extends BaseService {
+/**
+ * @author luuchorocha
+ */
+public class ServletService extends MetadataService {
     private static final Map<String, String> METHOD_MAP = new HashMap<>();
     private static final Map<String, HttpSecureAppServlet> SERVLET_CACHE = new ConcurrentHashMap<>();
     private static final Map<Class<?>, Map<String, Method>> METHOD_CACHE = new ConcurrentHashMap<>();
@@ -104,18 +107,18 @@ public class ServletService extends BaseService {
 
     @Override
     public void process() throws ServletException {
-        String uri = getFirstSegment(request.getPathInfo().replaceAll(DELEGATED_SERVLET_PATH, ""));
-        String servletName = findMatchingServlet(uri).getClassName();
-        HttpSecureAppServlet servlet = getOrCreateServlet(servletName);
-        HttpServletRequest wrappedRequest = new HttpServletRequestWrapper(request);
-        wrappedRequest.removeAttribute(STATELESS_REQUEST_PARAMETER);
-        servlet.init(caller);
-        SessionManager.initializeSession(wrappedRequest);
-
         try {
+            String uri = getFirstSegment(request.getPathInfo().replaceAll(DELEGATED_SERVLET_PATH, ""));
+            String servletName = findMatchingServlet(uri).getClassName();
+            HttpSecureAppServlet servlet = getOrCreateServlet(servletName);
+            HttpServletRequestWrapper wrappedRequest = new HttpServletRequestWrapper(request);
+            wrappedRequest.removeAttribute(STATELESS_REQUEST_PARAMETER);
+            servlet.init(caller.getServletConfig());
+            SessionManager.initializeSession(wrappedRequest);
+
             findMethod(servlet, getMethodName(wrappedRequest.getMethod())).invoke(servlet, wrappedRequest, response);
         } catch (IllegalAccessException | InvocationTargetException e) {
-            throw new NotFoundException("Invalid path: " + uri);
+            throw new NotFoundException("Invalid path: " + request.getPathInfo());
         }
     }
 }

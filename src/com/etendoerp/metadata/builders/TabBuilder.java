@@ -146,17 +146,17 @@ public class TabBuilder extends Builder {
         return fieldAccess.isActive() && field.isActive() && hasAccessToProcess(field, tab.getWindow().getId());
     }
 
-    private String getEntityColumnName(Column column) {
+    public static String getEntityColumnName(Column column) {
         String tableName = column.getTable().getName();
         String columnName = column.getDBColumnName();
         return ModelProvider.getInstance().getEntity(tableName).getPropertyByColumnName(columnName).getName();
     }
 
-    private JSONObject getJSONField(Field field, FieldAccess access) throws JSONException {
+    public static JSONObject getJSONField(Field field, FieldAccess access) throws JSONException {
         return new FieldBuilder(field, access).toJSON();
     }
 
-    protected boolean hasAccessToProcess(Field field, String windowId) {
+    public static boolean hasAccessToProcess(Field field, String windowId) {
         Process process = field.getColumn() != null && field.getColumn().getOBUIAPPProcess() != null ?
                           field.getColumn().getOBUIAPPProcess() : null;
 
@@ -167,5 +167,40 @@ public class TabBuilder extends Builder {
         }
 
         return true;
+    }
+
+    public static JSONArray createTabsJson(List<TabAccess> tabAccesses, List<Tab> tabs) {
+        JSONArray result = new JSONArray();
+
+        try {
+            if (tabAccesses.isEmpty()) {
+                for (Tab tab : tabs) {
+                    if (isTabAllowed(tab)) {
+                        result.put(new TabBuilder(tab, null).toJSON());
+                    }
+                }
+            } else {
+                for (TabAccess tabAccess : tabAccesses) {
+                    if (isTabAccessAllowed(tabAccess)) {
+                        result.put(new TabBuilder(tabAccess.getTab(), tabAccess).toJSON());
+                    }
+                }
+            }
+
+            return result;
+        } catch (Exception e) {
+            logger.error(e.getMessage(), e);
+
+            return result;
+        }
+    }
+
+    public static boolean isTabAccessAllowed(TabAccess tabAccess) {
+        return tabAccess.isActive() && tabAccess.isAllowRead() && isTabAllowed(tabAccess.getTab());
+    }
+
+    public static boolean isTabAllowed(Tab tab) {
+        String displayLogic = tab.getDisplayLogic();
+        return displayLogic == null || displayLogic.trim().isEmpty();
     }
 }

@@ -13,6 +13,9 @@ import java.util.Optional;
 
 import static org.openbravo.service.json.JsonUtils.convertExceptionToJson;
 
+/**
+ * @author luuchorocha
+ */
 public class Utils {
     private static final Logger log4j = LogManager.getLogger();
     private static final Map<Class<? extends Exception>, Integer> EXCEPTION_STATUS_MAP = new HashMap<>();

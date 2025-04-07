@@ -1,6 +1,7 @@
 package com.etendoerp.metadata.http;
 
 import org.apache.log4j.Logger;
+import org.jboss.weld.module.web.servlet.SessionHolder;
 import org.openbravo.client.kernel.RequestContext;
 import org.openbravo.dal.core.ThreadHandler;
 
@@ -10,6 +11,9 @@ import java.io.IOException;
 
 import static org.openbravo.authentication.AuthenticationManager.STATELESS_REQUEST_PARAMETER;
 
+/**
+ * @author luuchorocha
+ */
 @WebFilter(urlPatterns = {"/meta", "/meta/*"})
 public class MetadataFilter implements Filter {
     private static final Logger logger = Logger.getLogger(MetadataFilter.class);
@@ -43,6 +47,8 @@ public class MetadataFilter implements Filter {
                 }
 
                 RequestContext.clear();
+                SessionHolder.clear();
+                HttpServletRequestWrapper.clearSession();
             }
         };
 

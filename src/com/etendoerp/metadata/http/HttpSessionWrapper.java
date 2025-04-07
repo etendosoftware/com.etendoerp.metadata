@@ -6,15 +6,21 @@ import java.util.Collections;
 import java.util.Enumeration;
 import java.util.Vector;
 
+/**
+ * @author luuchorocha
+ */
 public class HttpSessionWrapper extends RequestContext.HttpSessionWrapper {
     private volatile Enumeration<String> attributeNames = null;
 
     @Override
     public Enumeration<String> getAttributeNames() {
         if (attributeNames == null) {
-            attributeNames = new Vector<>(Collections.list(super.getAttributeNames())).elements();
+            synchronized (this) {
+                if (attributeNames == null) {
+                    attributeNames = new Vector<>(Collections.list(super.getAttributeNames())).elements();
+                }
+            }
         }
-
         return attributeNames;
     }
 }

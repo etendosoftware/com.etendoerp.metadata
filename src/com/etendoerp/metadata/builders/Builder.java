@@ -10,7 +10,8 @@ import org.openbravo.service.json.DataToJsonConverter;
  * @author luuchorocha
  */
 public abstract class Builder {
-    public final Logger logger = LogManager.getLogger(this.getClass());
+    public static final Logger logger = LogManager.getLogger();
+
     protected final DataToJsonConverter converter;
 
     public Builder() {

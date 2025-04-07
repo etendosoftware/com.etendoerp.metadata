@@ -10,7 +10,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 
-public class MessageService extends BaseService {
+public class MessageService extends MetadataService {
 
     public MessageService(HttpSecureAppServlet caller, HttpServletRequest request, HttpServletResponse response) {
         super(caller, request, response);
