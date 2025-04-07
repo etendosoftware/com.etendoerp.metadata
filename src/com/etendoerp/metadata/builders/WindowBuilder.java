@@ -2,6 +2,7 @@ package com.etendoerp.metadata.builders;
 
 import com.etendoerp.metadata.exceptions.NotFoundException;
 import com.etendoerp.metadata.exceptions.UnauthorizedException;
+import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.hibernate.criterion.Restrictions;
@@ -16,11 +17,7 @@ import org.openbravo.model.ad.ui.Window;
 import org.openbravo.service.json.DataResolvingMode;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
-/**
- * @author luuchorocha
- */
 public class WindowBuilder extends Builder {
     private static final String SELECTED_PROPERTIES =
             String.join(",", Window.PROPERTY_ID, Window.PROPERTY_NAME, Window.PROPERTY_WINDOWTYPE);
@@ -38,7 +35,9 @@ public class WindowBuilder extends Builder {
 
         try {
             List<TabAccess> tabAccesses = windowAccess.getADTabAccessList();
-            windowJson.put("tabs", window.getADTabList().stream().map(Tab::getId).collect(Collectors.toList()));
+            List<Tab> tabs = window.getADTabList();
+            JSONArray tabsJson = createTabsJson(tabAccesses, tabs);
+            windowJson.put("tabs", tabsJson);
         } catch (JSONException e) {
             logger.error("Error creating JSON for window tabs: {}", e.getMessage(), e);
         }
@@ -67,4 +66,38 @@ public class WindowBuilder extends Builder {
         return windowAccess;
     }
 
+    private JSONArray createTabsJson(List<TabAccess> tabAccesses, List<Tab> tabs) {
+        JSONArray result = new JSONArray();
+
+        try {
+            if (tabAccesses.isEmpty()) {
+                for (Tab tab : tabs) {
+                    if (isTabAllowed(tab)) {
+                        result.put(new TabBuilder(tab, null).toJSON());
+                    }
+                }
+            } else {
+                for (TabAccess tabAccess : tabAccesses) {
+                    if (isTabAccessAllowed(tabAccess)) {
+                        result.put(new TabBuilder(tabAccess.getTab(), tabAccess).toJSON());
+                    }
+                }
+            }
+
+            return result;
+        } catch (Exception e) {
+            logger.error(e.getMessage(), e);
+
+            return result;
+        }
+    }
+
+    private boolean isTabAccessAllowed(TabAccess tabAccess) {
+        return tabAccess.isActive() && tabAccess.isAllowRead() && isTabAllowed(tabAccess.getTab());
+    }
+
+    private boolean isTabAllowed(Tab tab) {
+        String displayLogic = tab.getDisplayLogic();
+        return displayLogic == null || displayLogic.trim().isEmpty();
+    }
 }
