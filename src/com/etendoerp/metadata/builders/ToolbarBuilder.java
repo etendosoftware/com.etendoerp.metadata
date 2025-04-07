@@ -113,7 +113,7 @@ public class ToolbarBuilder {
 
         for (Field field : processFields) {
             DataToJsonConverter converter = new DataToJsonConverter();
-            JSONObject button = new JSONObject();
+            JSONObject button = new FieldBuilder(field, null).toJSON();
             Process processDefinition = field.getColumn().getOBUIAPPProcess();
             org.openbravo.model.ad.ui.Process processAction = field.getColumn().getProcess();
 
