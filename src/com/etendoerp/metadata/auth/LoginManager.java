@@ -21,6 +21,8 @@ import org.openbravo.model.ad.access.User;
 import org.openbravo.model.common.enterprise.Organization;
 import org.openbravo.model.common.enterprise.Warehouse;
 import org.openbravo.service.db.DalConnectionProvider;
+import org.openbravo.service.json.DataResolvingMode;
+import org.openbravo.service.json.DataToJsonConverter;
 
 import javax.servlet.http.HttpServletRequest;
 import java.util.Optional;
@@ -32,16 +34,19 @@ public class LoginManager {
     private static final Logger logger = LogManager.getLogger(LoginManager.class);
     private final ConnectionProvider conn;
     private final OBDal entityProvider;
+    private final DataToJsonConverter converter;
 
     public LoginManager() {
         this.entityProvider = OBDal.getInstance();
         this.conn = new DalConnectionProvider();
+        this.converter = new DataToJsonConverter();
     }
 
     public JSONObject processLogin(HttpServletRequest request) throws Exception {
         validateSWSConfig();
 
-        return generateLoginResult(authenticate(getRequestData(request), extractToken(request)), request);
+        return generateLoginResult(authenticate(getRequestData(request), extractToken(request)),
+                                   request);
     }
 
     private JSONObject getRequestData(HttpServletRequest request) {
@@ -63,7 +68,9 @@ public class LoginManager {
             logger.warn("SWS - SWS are misconfigured");
             throw new Exception(Utility.messageBD(conn,
                                                   "SMFSWS_Misconfigured",
-                                                  OBContext.getOBContext().getLanguage().getLanguage()));
+                                                  OBContext.getOBContext()
+                                                           .getLanguage()
+                                                           .getLanguage()));
         }
     }
 
@@ -84,7 +91,9 @@ public class LoginManager {
                 logger.warn("SWS - Token is not valid");
                 throw new Exception(Utility.messageBD(conn,
                                                       "SMFSWS_InvalidToken",
-                                                      OBContext.getOBContext().getLanguage().getLanguage()));
+                                                      OBContext.getOBContext()
+                                                               .getLanguage()
+                                                               .getLanguage()));
             }
             user = entityProvider.get(User.class, decoded.getClaim("user").asString());
             role = getClaimedEntity(data, decoded, "role", Role.class);
@@ -94,7 +103,9 @@ public class LoginManager {
             logger.warn("SWS - You must specify a username and password or a valid token");
             throw new Exception(Utility.messageBD(conn,
                                                   "SMFSWS_PassOrTokenNeeded",
-                                                  OBContext.getOBContext().getLanguage().getLanguage()));
+                                                  OBContext.getOBContext()
+                                                           .getLanguage()
+                                                           .getLanguage()));
         }
 
         return new AuthData(user, role, org, warehouse);
@@ -109,7 +120,9 @@ public class LoginManager {
 
         throw new Exception(Utility.messageBD(conn,
                                               "IDENTIFICATION_FAILURE_TITLE",
-                                              OBContext.getOBContext().getLanguage().getLanguage()));
+                                              OBContext.getOBContext()
+                                                       .getLanguage()
+                                                       .getLanguage()));
     }
 
     private <T> T getEntity(JSONObject data, String key, Class<T> clazz) throws JSONException {
@@ -124,7 +137,7 @@ public class LoginManager {
         return entityProvider.get(clazz, id);
     }
 
-    private JSONObject generateLoginResult(AuthData authData, HttpServletRequest request) throws Exception {
+    private JSONObject generateLoginResult(AuthData authData, HttpServletRequest ignoredRequest) throws Exception {
         JSONObject result = new JSONObject();
         try {
             if (authData.role == null) {
@@ -132,7 +145,9 @@ public class LoginManager {
             }
 
             String roleId = authData.role != null ? authData.role.getId() : null;
-            LoginUtils.RoleDefaults defaults = LoginUtils.getLoginDefaults(authData.user.getId(), roleId, conn);
+            LoginUtils.RoleDefaults defaults = LoginUtils.getLoginDefaults(authData.user.getId(),
+                                                                           roleId,
+                                                                           conn);
 
             if (authData.org == null) {
                 authData.org = entityProvider.get(Organization.class, defaults.org);
@@ -149,19 +164,24 @@ public class LoginManager {
             result.put("status", "success");
             result.put("token", token);
 
-            if (!"false".equals(request.getParameter("showRoles"))) {
-                JSONArray rolesAndOrgs = SecureWebServicesUtils.getUserRolesAndOrg(authData.user,
-                                                                                   !"false".equals(request.getParameter(
-                                                                                           "showOrgs")),
-                                                                                   !"false".equals(request.getParameter(
-                                                                                           "showWarehouses")));
-                result.put("roleList", rolesAndOrgs);
-            }
+            JSONArray rolesAndOrgs = SecureWebServicesUtils.getUserRolesAndOrg(authData.user,
+                                                                               true,
+                                                                               true);
+            result.put("roleList", rolesAndOrgs);
+            result.put("user", converter.toJsonObject(authData.user, DataResolvingMode.FULL));
+            result.put("currentRole",
+                       converter.toJsonObject(authData.role, DataResolvingMode.FULL));
+            result.put("currentOrganization",
+                       converter.toJsonObject(authData.org, DataResolvingMode.FULL));
+            result.put("currentClient",
+                       converter.toJsonObject(authData.warehouse, DataResolvingMode.FULL));
         } catch (JWTCreationException e) {
             logger.warn("SWS - Error creating token", e);
             throw new Exception(Utility.messageBD(conn,
                                                   "SMFSWS_ErrorCreatingToken",
-                                                  OBContext.getOBContext().getLanguage().getLanguage()));
+                                                  OBContext.getOBContext()
+                                                           .getLanguage()
+                                                           .getLanguage()));
         }
         return result;
     }
