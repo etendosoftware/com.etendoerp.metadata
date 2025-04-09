@@ -12,6 +12,7 @@ import javax.servlet.ServletException;
 import javax.servlet.ServletRegistration;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.HashMap;
@@ -109,16 +110,30 @@ public class ServletService extends MetadataService {
     public void process() throws ServletException {
         try {
             String uri = getFirstSegment(request.getPathInfo().replaceAll(DELEGATED_SERVLET_PATH, ""));
-            String servletName = findMatchingServlet(uri).getClassName();
+            String servletName;
+            try {
+                servletName = findMatchingServlet(uri).getClassName();
+            } catch (NullPointerException e) {
+                servletName = findMatchingServlet(request.getPathInfo()).getClassName();
+            }
+
             HttpSecureAppServlet servlet = getOrCreateServlet(servletName);
             HttpServletRequestWrapper wrappedRequest = new HttpServletRequestWrapper(request);
             wrappedRequest.removeAttribute(STATELESS_REQUEST_PARAMETER);
             servlet.init(caller.getServletConfig());
             SessionManager.initializeSession(wrappedRequest);
 
-            findMethod(servlet, getMethodName(wrappedRequest.getMethod())).invoke(servlet, wrappedRequest, response);
+            Method method = findMethod(servlet, getMethodName(wrappedRequest.getMethod()));
+            if (method != null) {
+                method.invoke(servlet, wrappedRequest, response);
+            } else {
+                Method doPostMethod = servlet.getClass().getMethod("doPost", HttpServletRequest.class, HttpServletResponse.class);
+                doPostMethod.invoke(servlet, wrappedRequest, response);
+            }
         } catch (IllegalAccessException | InvocationTargetException e) {
             throw new NotFoundException("Invalid path: " + request.getPathInfo());
+        } catch (NoSuchMethodException e) {
+            throw new NotFoundException("Required servlet method not found: " + e.getMessage());
         }
     }
 }
