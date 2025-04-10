@@ -19,16 +19,14 @@ public abstract class MetadataService {
     protected final Logger logger = LogManager.getLogger(this.getClass());
 
     public MetadataService(HttpSecureAppServlet caller, HttpServletRequest request, HttpServletResponse response) {
-        HttpServletRequestWrapper wrapped = new HttpServletRequestWrapper(request);
-
-        callerThreadLocal.set(caller);
-        requestThreadLocal.set(wrapped);
+        requestThreadLocal.set(new HttpServletRequestWrapper(request));
         responseThreadLocal.set(response);
-
-        SessionHolder.requestInitialized(wrapped);
+        callerThreadLocal.set(caller);
     }
 
     public static void clear() {
+        HttpServletRequestWrapper.clear();
+        SessionHolder.clear();
         requestThreadLocal.remove();
         responseThreadLocal.remove();
         callerThreadLocal.remove();

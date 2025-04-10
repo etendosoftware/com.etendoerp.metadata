@@ -14,7 +14,7 @@ import java.io.IOException;
  */
 public class SessionService extends MetadataService {
     public SessionService(HttpSecureAppServlet caller, HttpServletRequest request, HttpServletResponse response) {
-        super(caller, request, response);
+       super(caller, request, response);
     }
 
     @Override

@@ -6,6 +6,7 @@ import org.openbravo.base.secureApp.HttpSecureAppServlet;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.model.ad.system.Language;
 
+import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -18,15 +19,17 @@ import static com.etendoerp.metadata.utils.Utils.getLanguage;
  * @author luuchorocha
  */
 public class MetadataServlet extends HttpSecureAppServlet {
-    private final static ServiceFactory factory = new ServiceFactory();
-
     @Override
-    public final void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException {
+    public void service(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        super.service(new HttpServletRequestWrapper(request), response);
+    }
+
+    private void process(HttpServletRequest request, HttpServletResponse response) throws IOException {
         try {
             OBContext.setAdminMode();
-            setContext(request);
             setContentHeaders(response);
-            factory.getService(this, request, response).process();
+            setContext(request);
+            ServiceFactory.getService(this, request, response).process();
         } catch (Exception e) {
             handleException(e, response);
         } finally {
@@ -35,13 +38,23 @@ public class MetadataServlet extends HttpSecureAppServlet {
     }
 
     @Override
+    public final void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        process(request, response);
+    }
+
+    @Override
     public final void doPost(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        doGet(request, response);
+        process(request, response);
+    }
+
+    @Override
+    public final void doPut(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        process(request, response);
     }
 
     @Override
     public final void doDelete(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        doGet(request, response);
+        process(request, response);
     }
 
     private void setContext(HttpServletRequest request) {

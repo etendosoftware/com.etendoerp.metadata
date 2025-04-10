@@ -20,12 +20,8 @@ import static com.etendoerp.metadata.exceptions.Utils.handleException;
  * @author luuchorocha
  */
 public class LoginServlet extends HttpBaseServlet {
-    private final LoginManager loginService = new LoginManager();
-
     @Override
-    public final void service(HttpServletRequest request, HttpServletResponse response) throws
-                                                                                        ServletException,
-                                                                                        IOException {
+    public final void service(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         try {
             super.service(new HttpServletRequestWrapper(request), response);
         } catch (Exception e) {
@@ -40,15 +36,13 @@ public class LoginServlet extends HttpBaseServlet {
 
     @Override
     public void doPost(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        JSONObject result;
+        final LoginManager loginService = new LoginManager();
+        final JSONObject result;
 
         try {
             AllowedCrossDomainsHandler.getInstance().setCORSHeaders(request, response);
             OBContext.setAdminMode(true);
             result = loginService.processLogin(request);
-        } catch (Exception e) {
-            log4j.error(e.getMessage(), e);
-            result = loginService.buildErrorResponse(e);
         } finally {
             OBContext.restorePreviousMode();
         }

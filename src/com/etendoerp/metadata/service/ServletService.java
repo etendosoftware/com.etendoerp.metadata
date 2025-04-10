@@ -1,13 +1,13 @@
 package com.etendoerp.metadata.service;
 
 import com.etendoerp.metadata.auth.SessionManager;
+import com.etendoerp.metadata.data.ServletMapping;
 import com.etendoerp.metadata.exceptions.InternalServerException;
-import com.etendoerp.metadata.exceptions.MethodNotAllowedException;
 import com.etendoerp.metadata.exceptions.NotFoundException;
 import com.etendoerp.metadata.http.HttpServletRequestWrapper;
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
-import org.openbravo.base.weld.WeldUtils;
 import org.openbravo.client.kernel.KernelServlet;
+import org.openbravo.client.kernel.RequestContext;
 
 import javax.servlet.RequestDispatcher;
 import javax.servlet.ServletContext;
@@ -15,66 +15,37 @@ import javax.servlet.ServletException;
 import javax.servlet.ServletRegistration;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import java.lang.reflect.Method;
-import java.util.HashMap;
-import java.util.List;
+import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static org.openbravo.authentication.AuthenticationManager.STATELESS_REQUEST_PARAMETER;
 import static org.openbravo.base.weld.WeldUtils.getInstanceFromStaticBeanManager;
 
 /**
  * @author luuchorocha
  */
 public class ServletService extends MetadataService {
-    private static final Map<String, HttpSecureAppServlet> SERVLET_CACHE = new ConcurrentHashMap<>();
-    private static final Map<Class<?>, Map<String, Method>> METHOD_CACHE = new ConcurrentHashMap<>();
-    private static final Map<String, ServletRegistration> SERVLET_REGISTRY = new ConcurrentHashMap<>();
-    private static final Map<String, Class<?>> CLASS_CACHE = new ConcurrentHashMap<>();
+    private static final Map<String, ServletRegistration> SERVLET_REGISTRY = buildServletRegistry();
 
     public ServletService(HttpSecureAppServlet caller, HttpServletRequest request, HttpServletResponse response) {
         super(caller, request, response);
-        initializeGlobalConfig();
-        initializeServletRegistry();
     }
 
-    private static HttpSecureAppServlet getOrCreateServlet(String servletName) {
-        return SERVLET_CACHE.computeIfAbsent(servletName, key -> {
-            try {
-                List<?> servlets = WeldUtils.getInstances(getClassCached(key));
-                return !servlets.isEmpty() ? (HttpSecureAppServlet) servlets.get(0) : createServletInstance(
-                        key);
-            } catch (Exception e) {
-                throw new RuntimeException(e);
+    private static Map<String, ServletRegistration> buildServletRegistry() {
+        final Collection<? extends ServletRegistration> servletRegistrations = getServletRegistrations();
+        final Map<String, ServletRegistration> result = new ConcurrentHashMap<>();
+
+        for (ServletRegistration sr : servletRegistrations) {
+            for (String mapping : sr.getMappings()) {
+                result.put(mapping.replace("/*", ""), sr);
             }
-        });
+        }
+
+        return result;
     }
 
-    private static HttpSecureAppServlet createServletInstance(String servletName) throws Exception {
-        return getClassCached(servletName).asSubclass(HttpSecureAppServlet.class)
-                                          .getDeclaredConstructor()
-                                          .newInstance();
-    }
-
-    private static Class<?> getClassCached(String className) {
-        return CLASS_CACHE.computeIfAbsent(className, key -> {
-            try {
-                return Class.forName(key);
-            } catch (ClassNotFoundException e) {
-                throw new RuntimeException(e);
-            }
-        });
-    }
-
-    public static Method findMethod(HttpSecureAppServlet servlet, String methodName) throws MethodNotAllowedException {
-        return METHOD_CACHE.computeIfAbsent(servlet.getClass(), cls -> {
-            Map<String, Method> methods = new HashMap<>();
-            for (Method method : cls.getDeclaredMethods()) {
-                methods.put(method.getName(), method);
-            }
-            return methods;
-        }).getOrDefault(methodName, null);
+    private static Collection<? extends ServletRegistration> getServletRegistrations() {
+        return RequestContext.getServletContext().getServletRegistrations().values();
     }
 
     public static String getFirstSegment(String path) {
@@ -87,21 +58,14 @@ public class ServletService extends MetadataService {
         return path.substring(0, secondSlash);
     }
 
+    @Deprecated
     private void initializeGlobalConfig() {
         if (KernelServlet.getGlobalParameters() == null) {
             getInstanceFromStaticBeanManager(KernelServlet.class).init(getCaller().getServletConfig());
         }
     }
 
-    private void initializeServletRegistry() {
-        getRequest().getServletContext().getServletRegistrations().values().forEach(sr -> {
-            for (String mapping : sr.getMappings()) {
-                SERVLET_REGISTRY.put(mapping.replace("/*", ""), sr);
-            }
-        });
-    }
-
-    private String findMatchingServlet() {
+    private ServletMapping findMatchingServlet() {
         String uri = getRequest().getPathInfo();
 
         if (uri == null || uri.isBlank()) {
@@ -111,13 +75,13 @@ public class ServletService extends MetadataService {
         ServletRegistration servlet = SERVLET_REGISTRY.get(uri);
 
         if (servlet != null) {
-            return uri;
+            return new ServletMapping(servlet, uri);
         }
 
         servlet = SERVLET_REGISTRY.get(getFirstSegment(uri));
 
         if (servlet != null) {
-            return uri;
+            return new ServletMapping(servlet, uri);
         }
 
         throw new NotFoundException("Invalid path: " + uri);
@@ -129,10 +93,9 @@ public class ServletService extends MetadataService {
             HttpServletRequestWrapper request = getRequest();
             HttpSecureAppServlet caller = getCaller();
             HttpServletResponse response = getResponse();
-            request.removeAttribute(STATELESS_REQUEST_PARAMETER);
             SessionManager.initializeSession(request);
             ServletContext context = caller.getServletContext();
-            RequestDispatcher dispatcher = context.getRequestDispatcher(findMatchingServlet());
+            RequestDispatcher dispatcher = context.getRequestDispatcher(findMatchingServlet().getMapping());
             dispatcher.forward(request, response);
         } catch (Exception e) {
             throw new InternalServerException(e.getMessage());
