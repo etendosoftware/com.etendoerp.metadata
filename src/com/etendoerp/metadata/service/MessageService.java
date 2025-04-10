@@ -24,14 +24,15 @@ public class MessageService extends MetadataService {
             response.setHeader("Access-Control-Allow-Origin", origin);
             response.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
             response.setHeader("Access-Control-Allow-Credentials", "true");
-            response.setHeader("Access-Control-Allow-Headers", "Content-Type, origin, accept, X-Requested-With");
+            response.setHeader("Access-Control-Allow-Headers",
+                               "Content-Type, origin, accept, X-Requested-With");
             response.setHeader("Access-Control-Max-Age", "1000");
         }
     }
 
     @Override
     public void process() throws IOException {
-        final VariablesSecureApp vars = new VariablesSecureApp(request);
+        final VariablesSecureApp vars = new VariablesSecureApp(getRequest());
         OBError error = vars.getMessage("186");
         vars.setMessage("186", null);
         JSONObject jsonResponse = new JSONObject();
@@ -43,7 +44,7 @@ public class MessageService extends MetadataService {
             } else {
                 jsonResponse.put("message", "");
             }
-            setCORSHeaders(request, response);
+            setCORSHeaders(getRequest(), getResponse());
         } catch (Exception e) {
             throw new OBException("Error while processing message", e);
         }

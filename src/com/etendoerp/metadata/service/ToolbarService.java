@@ -17,7 +17,7 @@ public class ToolbarService extends MetadataService {
 
     @Override
     public void process() throws IOException {
-        String path = request.getPathInfo();
+        String path = getRequest().getPathInfo();
         String[] pathParts = path.split("/");
 
         if (pathParts.length < 3) {

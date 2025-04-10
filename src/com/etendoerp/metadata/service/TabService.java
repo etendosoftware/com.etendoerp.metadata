@@ -19,7 +19,7 @@ public class TabService extends MetadataService {
 
     @Override
     public void process() throws IOException {
-        String tabId = request.getPathInfo().substring(5);
+        String tabId = getRequest().getPathInfo().substring(5);
         Tab tab = OBDal.getInstance().get(Tab.class, tabId);
         write(new TabBuilder(tab, null).toJSON());
     }

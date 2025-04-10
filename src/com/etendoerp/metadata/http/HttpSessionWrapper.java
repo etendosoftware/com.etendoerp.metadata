@@ -10,17 +10,21 @@ import java.util.Vector;
  * @author luuchorocha
  */
 public class HttpSessionWrapper extends RequestContext.HttpSessionWrapper {
-    private volatile Enumeration<String> attributeNames = null;
+    private static final ThreadLocal<Enumeration<String>> attributeNames = new ThreadLocal<>();
+
+    public static void clear() {
+        attributeNames.remove();
+    }
 
     @Override
     public Enumeration<String> getAttributeNames() {
-        if (attributeNames == null) {
-            synchronized (this) {
-                if (attributeNames == null) {
-                    attributeNames = new Vector<>(Collections.list(super.getAttributeNames())).elements();
-                }
-            }
+        Enumeration<String> localAttributes = attributeNames.get();
+
+        if (localAttributes == null) {
+            localAttributes = new Vector<>(Collections.list(super.getAttributeNames())).elements();
+            attributeNames.set(localAttributes);
         }
-        return attributeNames;
+
+        return localAttributes;
     }
 }

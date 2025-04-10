@@ -13,23 +13,41 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 
 public abstract class MetadataService {
+    private static final ThreadLocal<HttpServletRequestWrapper> requestThreadLocal = new ThreadLocal<>();
+    private static final ThreadLocal<HttpServletResponse> responseThreadLocal = new ThreadLocal<>();
+    private static final ThreadLocal<HttpSecureAppServlet> callerThreadLocal = new ThreadLocal<>();
     protected final Logger logger = LogManager.getLogger(this.getClass());
-    protected final HttpServletRequestWrapper request;
-    protected final HttpServletResponse response;
-    protected final HttpSecureAppServlet caller;
 
     public MetadataService(HttpSecureAppServlet caller, HttpServletRequest request, HttpServletResponse response) {
         HttpServletRequestWrapper wrapped = new HttpServletRequestWrapper(request);
 
-        this.caller = caller;
-        this.request = wrapped;
-        this.response = response;
+        callerThreadLocal.set(caller);
+        requestThreadLocal.set(wrapped);
+        responseThreadLocal.set(response);
 
-        SessionHolder.requestInitialized(this.request);
+        SessionHolder.requestInitialized(wrapped);
+    }
+
+    public static void clear() {
+        requestThreadLocal.remove();
+        responseThreadLocal.remove();
+        callerThreadLocal.remove();
+    }
+
+    protected HttpServletRequestWrapper getRequest() {
+        return requestThreadLocal.get();
+    }
+
+    protected HttpServletResponse getResponse() {
+        return responseThreadLocal.get();
+    }
+
+    protected HttpSecureAppServlet getCaller() {
+        return callerThreadLocal.get();
     }
 
     protected void write(JSONObject data) throws IOException {
-        response.getWriter().write(data.toString());
+        getResponse().getWriter().write(data.toString());
     }
 
     public abstract void process() throws IOException, ServletException;

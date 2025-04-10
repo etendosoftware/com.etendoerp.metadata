@@ -17,7 +17,7 @@ public class WindowService extends MetadataService {
 
     @Override
     public void process() throws IOException {
-        String id = request.getPathInfo().substring(8);
+        String id = getRequest().getPathInfo().substring(8);
         write(new WindowBuilder(id).toJSON());
     }
 }

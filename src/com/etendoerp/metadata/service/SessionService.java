@@ -19,7 +19,7 @@ public class SessionService extends MetadataService {
 
     @Override
     public void process() throws IOException {
-        RequestVariables vars = SessionManager.initializeSession(request);
+        RequestVariables vars = SessionManager.initializeSession(getRequest());
         write(new SessionBuilder(vars).toJSON());
     }
 }

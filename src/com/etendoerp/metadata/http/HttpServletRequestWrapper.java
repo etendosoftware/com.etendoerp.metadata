@@ -15,7 +15,7 @@ public class HttpServletRequestWrapper extends RequestContext.HttpServletRequest
         super(request);
     }
 
-    public static void clearSession() {
+    public static void clear() {
         sessionHolder.remove();
     }
 
@@ -27,5 +27,16 @@ public class HttpServletRequestWrapper extends RequestContext.HttpServletRequest
     @Override
     public HttpSession getSession(boolean f) {
         return sessionHolder.get();
+    }
+
+    @Override
+    public String getServletPath() {
+        String result = super.getServletPath();
+
+        if (!result.startsWith("/meta")) {
+            result = "/meta".concat(result);
+        }
+
+        return result;
     }
 }
