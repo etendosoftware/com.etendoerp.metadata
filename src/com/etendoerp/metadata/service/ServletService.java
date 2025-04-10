@@ -88,7 +88,7 @@ public class ServletService extends MetadataService {
     }
 
     @Override
-    public void process() throws ServletException {
+    public void process() {
         try {
             HttpServletRequestWrapper request = getRequest();
             HttpSecureAppServlet caller = getCaller();

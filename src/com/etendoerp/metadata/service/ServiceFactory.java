@@ -1,20 +1,27 @@
 package com.etendoerp.metadata.service;
 
-import com.etendoerp.metadata.exceptions.NotFoundException;
-import org.openbravo.base.secureApp.HttpSecureAppServlet;
+import static com.etendoerp.metadata.utils.Constants.LANGUAGE_PATH;
+import static com.etendoerp.metadata.utils.Constants.MENU_PATH;
+import static com.etendoerp.metadata.utils.Constants.MESSAGE_PATH;
+import static com.etendoerp.metadata.utils.Constants.SESSION_PATH;
+import static com.etendoerp.metadata.utils.Constants.TAB_PATH;
+import static com.etendoerp.metadata.utils.Constants.TOOLBAR_PATH;
+import static com.etendoerp.metadata.utils.Constants.WINDOW_PATH;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static com.etendoerp.metadata.utils.Constants.*;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
-/*+
+import org.openbravo.base.secureApp.HttpSecureAppServlet;
+
+import com.etendoerp.metadata.exceptions.NotFoundException;
+
+/**
  * @author luuchorocha
  */
-
 public class ServiceFactory {
     private static final Map<String, Delegation> delegationCache = new ConcurrentHashMap<>();
 

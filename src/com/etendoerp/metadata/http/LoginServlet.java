@@ -21,7 +21,7 @@ import static com.etendoerp.metadata.exceptions.Utils.handleException;
  */
 public class LoginServlet extends HttpBaseServlet {
     @Override
-    public final void service(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+    public final void service(HttpServletRequest request, HttpServletResponse response) throws IOException {
         try {
             super.service(new HttpServletRequestWrapper(request), response);
         } catch (Exception e) {

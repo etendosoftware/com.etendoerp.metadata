@@ -9,26 +9,11 @@ import org.openbravo.erpCommon.utility.Utility;
 import org.openbravo.model.ad.ui.Field;
 import org.openbravo.service.json.DataResolvingMode;
 
-import static com.etendoerp.metadata.builders.FieldBuilder.getListInfo;
-import static com.etendoerp.metadata.builders.FieldBuilder.getSelectorInfo;
-import static com.etendoerp.metadata.utils.Constants.LIST_REFERENCE_ID;
-import static com.etendoerp.metadata.utils.Constants.SELECTOR_REFERENCES;
-
 public class ProcessDefinitionBuilder extends Builder {
     private final Process process;
 
     public ProcessDefinitionBuilder(Process process) {
         this.process = process;
-    }
-
-    private static boolean isSelectorParameter(Parameter parameter) {
-        return parameter != null && parameter.getReference() != null &&
-               SELECTOR_REFERENCES.contains(parameter.getReference().getId());
-    }
-
-    private static boolean isListParameter(Parameter parameter) {
-        return parameter != null && parameter.getReference() != null &&
-               LIST_REFERENCE_ID.contains(parameter.getReference().getId());
     }
 
     public static JSONObject getFieldProcess(Field field) throws JSONException {
@@ -51,19 +36,6 @@ public class ProcessDefinitionBuilder extends Builder {
         return processJson;
     }
 
-    private JSONObject buildParameterJSON(Parameter param) throws JSONException {
-        JSONObject paramJSON = converter.toJsonObject(param, DataResolvingMode.FULL_TRANSLATABLE);
-
-        if (isSelectorParameter(param)) {
-            paramJSON.put("selector", getSelectorInfo(param.getId(), param.getReferenceSearchKey()));
-        }
-        if (isListParameter(param)) {
-            paramJSON.put("refList", getListInfo(param.getReferenceSearchKey()));
-        }
-
-        return paramJSON;
-    }
-
     @Override
     public JSONObject toJSON() throws JSONException {
         JSONObject processJSON = converter.toJsonObject(process, DataResolvingMode.FULL_TRANSLATABLE);
@@ -71,7 +43,7 @@ public class ProcessDefinitionBuilder extends Builder {
 
         for (Parameter param : process.getOBUIAPPParameterList()) {
             if (param != null) {
-                parameters.put(buildParameterJSON(param));
+                parameters.put(new ParameterBuilder(param).toJSON());
             }
         }
 

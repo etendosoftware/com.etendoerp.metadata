@@ -1,11 +1,13 @@
 package com.etendoerp.metadata.service;
 
-import com.etendoerp.metadata.builders.WindowBuilder;
-import org.openbravo.base.secureApp.HttpSecureAppServlet;
+import java.io.IOException;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import java.io.IOException;
+
+import org.openbravo.base.secureApp.HttpSecureAppServlet;
+
+import com.etendoerp.metadata.builders.WindowBuilder;
 
 /**
  * @author luuchorocha

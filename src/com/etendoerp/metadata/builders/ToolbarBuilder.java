@@ -1,7 +1,12 @@
 package com.etendoerp.metadata.builders;
 
-import com.etendoerp.metadata.data.ButtonConfig;
-import com.etendoerp.metadata.exceptions.InternalServerException;
+import static com.etendoerp.metadata.utils.Utils.formatMessage;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.codehaus.jettison.json.JSONArray;
@@ -14,15 +19,10 @@ import org.openbravo.erpCommon.utility.Utility;
 import org.openbravo.model.ad.ui.Field;
 import org.openbravo.model.ad.ui.Tab;
 import org.openbravo.model.ad.ui.Window;
-import org.openbravo.service.json.DataResolvingMode;
 import org.openbravo.service.json.DataToJsonConverter;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
-
-import static com.etendoerp.metadata.utils.Utils.formatMessage;
+import com.etendoerp.metadata.data.ButtonConfig;
+import com.etendoerp.metadata.exceptions.InternalServerException;
 
 public class ToolbarBuilder {
     private static final Logger logger = LogManager.getLogger(ToolbarBuilder.class);

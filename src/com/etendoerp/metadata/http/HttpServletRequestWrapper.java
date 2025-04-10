@@ -1,10 +1,10 @@
 package com.etendoerp.metadata.http;
 
-import org.jboss.weld.module.web.servlet.SessionHolder;
-import org.openbravo.client.kernel.RequestContext;
-
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
+
+import org.jboss.weld.module.web.servlet.SessionHolder;
+import org.openbravo.client.kernel.RequestContext;
 
 /**
  * @author luuchorocha
@@ -20,6 +20,7 @@ public class HttpServletRequestWrapper extends RequestContext.HttpServletRequest
 
     public static void clear() {
         session.remove();
+        SessionHolder.clear();
     }
 
     public static HttpSessionWrapper getCurrentSession() {
