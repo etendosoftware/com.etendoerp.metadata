@@ -1,19 +1,23 @@
 package com.etendoerp.metadata.http;
 
-import com.etendoerp.metadata.service.ServiceFactory;
+import static com.etendoerp.metadata.exceptions.Utils.handleException;
+import static com.etendoerp.metadata.utils.Utils.getLanguage;
+import static com.etendoerp.metadata.utils.Utils.initializeGlobalConfig;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+
+import javax.servlet.ServletConfig;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
 import org.apache.http.entity.ContentType;
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.model.ad.system.Language;
 
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-
-import static com.etendoerp.metadata.exceptions.Utils.handleException;
-import static com.etendoerp.metadata.utils.Utils.getLanguage;
+import com.etendoerp.metadata.service.ServiceFactory;
 
 /**
  * @author luuchorocha
@@ -73,5 +77,10 @@ public class MetadataServlet extends HttpSecureAppServlet {
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
     }
 
+    @Override
+    public void init(ServletConfig config) {
+        super.init(config);
+        initializeGlobalConfig(config);
+    }
 }
 

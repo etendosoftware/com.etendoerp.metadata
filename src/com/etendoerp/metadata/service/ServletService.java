@@ -58,13 +58,6 @@ public class ServletService extends MetadataService {
         return path.substring(0, secondSlash);
     }
 
-    @Deprecated
-    private void initializeGlobalConfig() {
-        if (KernelServlet.getGlobalParameters() == null) {
-            getInstanceFromStaticBeanManager(KernelServlet.class).init(getCaller().getServletConfig());
-        }
-    }
-
     private ServletMapping findMatchingServlet() {
         String uri = getRequest().getPathInfo();
 
