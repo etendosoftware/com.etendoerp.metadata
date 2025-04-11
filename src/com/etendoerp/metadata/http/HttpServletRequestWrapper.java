@@ -14,7 +14,8 @@ public class HttpServletRequestWrapper extends RequestContext.HttpServletRequest
 
     public HttpServletRequestWrapper(HttpServletRequest request) {
         super(request);
-        SessionHolder.requestInitialized(this);
+        session.set(new HttpSessionWrapper());
+        SessionHolder.sessionCreated(session.get());
     }
 
     public static void clear() {
