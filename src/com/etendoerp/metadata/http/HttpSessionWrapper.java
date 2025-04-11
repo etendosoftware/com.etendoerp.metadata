@@ -10,14 +10,14 @@ import org.openbravo.client.kernel.RequestContext;
  * @author luuchorocha
  */
 public class HttpSessionWrapper extends RequestContext.HttpSessionWrapper {
-    private final Enumeration<String> attributeNames;
-
-    {
-        attributeNames = new Vector<>(Collections.list(super.getAttributeNames())).elements();
-    }
+    private Enumeration<String> attributeNames;
 
     @Override
     public Enumeration<String> getAttributeNames() {
+        if (attributeNames == null) {
+            attributeNames = new Vector<>(Collections.list(super.getAttributeNames())).elements();
+        }
+
         return attributeNames;
     }
 }

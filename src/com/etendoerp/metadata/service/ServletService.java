@@ -57,17 +57,17 @@ public class ServletService extends MetadataService {
         return path.substring(0, secondSlash);
     }
 
-    private static HttpSecureAppServlet getOrCreateServlet(String servletName) {
+    private HttpSecureAppServlet getOrCreateServlet(String servletName) {
         try {
             Class<?> klazz = Class.forName(servletName);
             List<?> servlets = WeldUtils.getInstances(klazz);
             return !servlets.isEmpty() ? (HttpSecureAppServlet) servlets.get(0) : createServletInstance(klazz);
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            throw new NotFoundException(e.getMessage());
         }
     }
 
-    private static HttpSecureAppServlet createServletInstance(Class<?> klazz) {
+    private HttpSecureAppServlet createServletInstance(Class<?> klazz) {
         try {
             return klazz.asSubclass(HttpSecureAppServlet.class).getDeclaredConstructor().newInstance();
         } catch (Exception e) {
@@ -97,8 +97,7 @@ public class ServletService extends MetadataService {
         throw new NotFoundException("Invalid path: " + uri);
     }
 
-    @Override
-    public void process() throws ServletException, IOException {
+    private HttpSecureAppServlet getDelegatedServlet() {
         HttpServletRequest request = getRequest();
         HttpSecureAppServlet caller = getCaller();
         HttpServletResponse response = getResponse();
@@ -108,7 +107,13 @@ public class ServletService extends MetadataService {
             servlet.init(caller.getServletConfig());
         }
 
-        SessionManager.initializeSession(request);
-        servlet.service(request, response);
+        return servlet;
+    }
+
+    @Override
+    public void process() throws ServletException, IOException {
+        HttpSecureAppServlet servlet = getDelegatedServlet();
+        SessionManager.initializeSession(getRequest());
+        servlet.service(getRequest(), getResponse());
     }
 }
