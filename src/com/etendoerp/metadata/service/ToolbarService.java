@@ -1,14 +1,16 @@
 package com.etendoerp.metadata.service;
 
-import com.etendoerp.metadata.builders.ToolbarBuilder;
-import com.etendoerp.metadata.exceptions.UnprocessableContentException;
+import java.io.IOException;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
 import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
 import org.openbravo.dal.core.OBContext;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import java.io.IOException;
+import com.etendoerp.metadata.builders.ToolbarBuilder;
+import com.etendoerp.metadata.exceptions.UnprocessableContentException;
 
 public class ToolbarService extends MetadataService {
     public ToolbarService(HttpSecureAppServlet caller, HttpServletRequest request, HttpServletResponse response) {
@@ -17,7 +19,7 @@ public class ToolbarService extends MetadataService {
 
     @Override
     public void process() throws IOException {
-        String path = request.getPathInfo();
+        String path = getRequest().getPathInfo();
         String[] pathParts = path.split("/");
 
         if (pathParts.length < 3) {
@@ -32,8 +34,8 @@ public class ToolbarService extends MetadataService {
 
     private JSONObject fetchToolbar(String windowId, String tabId) {
         return new ToolbarBuilder(OBContext.getOBContext().getLanguage().getLanguage(),
-                                  windowId,
-                                  tabId,
-                                  false).toJSON();
+            windowId,
+            tabId,
+            false).toJSON();
     }
 }

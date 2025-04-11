@@ -1,10 +1,11 @@
 package com.etendoerp.metadata.data;
 
-import org.openbravo.base.secureApp.VariablesSecureApp;
-
-import javax.servlet.http.HttpServletRequest;
 import java.util.HashMap;
 import java.util.Map;
+
+import javax.servlet.http.HttpServletRequest;
+
+import org.openbravo.base.secureApp.VariablesSecureApp;
 
 /**
  * @author luuchorocha

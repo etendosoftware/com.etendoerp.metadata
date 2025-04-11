@@ -1,6 +1,8 @@
 package com.etendoerp.metadata.builders;
 
-import com.etendoerp.metadata.exceptions.InternalServerException;
+import java.util.List;
+import java.util.stream.Collectors;
+
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
@@ -14,8 +16,7 @@ import org.openbravo.model.ad.ui.Form;
 import org.openbravo.model.ad.ui.Menu;
 import org.openbravo.model.ad.ui.Window;
 
-import java.util.List;
-import java.util.stream.Collectors;
+import com.etendoerp.metadata.exceptions.InternalServerException;
 
 /**
  * @author luuchorocha

@@ -1,13 +1,15 @@
 package com.etendoerp.metadata.service;
 
-import com.etendoerp.metadata.builders.TabBuilder;
+import java.io.IOException;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.ui.Tab;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import java.io.IOException;
+import com.etendoerp.metadata.builders.TabBuilder;
 
 /**
  * @author luuchorocha
@@ -19,7 +21,7 @@ public class TabService extends MetadataService {
 
     @Override
     public void process() throws IOException {
-        String tabId = request.getPathInfo().substring(5);
+        String tabId = getRequest().getPathInfo().substring(5);
         Tab tab = OBDal.getInstance().get(Tab.class, tabId);
         write(new TabBuilder(tab, null).toJSON());
     }

@@ -1,7 +1,5 @@
 package com.etendoerp.metadata.builders;
 
-import com.etendoerp.metadata.data.RequestVariables;
-import com.etendoerp.metadata.exceptions.InternalServerException;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.dal.core.OBContext;
@@ -11,6 +9,9 @@ import org.openbravo.model.ad.system.Client;
 import org.openbravo.model.common.enterprise.Organization;
 import org.openbravo.model.common.enterprise.Warehouse;
 import org.openbravo.service.json.DataResolvingMode;
+
+import com.etendoerp.metadata.data.RequestVariables;
+import com.etendoerp.metadata.exceptions.InternalServerException;
 
 /**
  * @author luuchorocha

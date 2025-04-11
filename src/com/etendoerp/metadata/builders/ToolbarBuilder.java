@@ -1,7 +1,12 @@
 package com.etendoerp.metadata.builders;
 
-import com.etendoerp.metadata.data.ButtonConfig;
-import com.etendoerp.metadata.exceptions.InternalServerException;
+import static com.etendoerp.metadata.utils.Utils.formatMessage;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.codehaus.jettison.json.JSONArray;
@@ -14,15 +19,10 @@ import org.openbravo.erpCommon.utility.Utility;
 import org.openbravo.model.ad.ui.Field;
 import org.openbravo.model.ad.ui.Tab;
 import org.openbravo.model.ad.ui.Window;
-import org.openbravo.service.json.DataResolvingMode;
 import org.openbravo.service.json.DataToJsonConverter;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
-
-import static com.etendoerp.metadata.utils.Utils.formatMessage;
+import com.etendoerp.metadata.data.ButtonConfig;
+import com.etendoerp.metadata.exceptions.InternalServerException;
 
 public class ToolbarBuilder {
     private static final Logger logger = LogManager.getLogger(ToolbarBuilder.class);
@@ -61,10 +61,10 @@ public class ToolbarBuilder {
         } catch (Exception e) {
             logger.error("Error building toolbar for window: {} - tab: {}", windowId, tabId, e);
             throw new InternalServerException(formatMessage(
-                    "Error building toolbar for window: {} - tab: {} - error: {}",
-                    windowId,
-                    tabId,
-                    e));
+                "Error building toolbar for window: {} - tab: {} - error: {}",
+                windowId,
+                tabId,
+                e));
         }
     }
 
@@ -106,10 +106,10 @@ public class ToolbarBuilder {
         JSONArray buttons = new JSONArray();
 
         List<Field> processFields = tab.getADFieldList().stream().filter(field -> field.isActive() &&
-                                                                                  TabBuilder.hasAccessToProcess(field,
-                                                                                                                windowId) &&
-                                                                                  FieldBuilder.isProcessField(field))
-                                       .collect(Collectors.toList());
+                TabBuilder.hasAccessToProcess(field,
+                    windowId) &&
+                FieldBuilder.isProcessField(field))
+            .collect(Collectors.toList());
 
         for (Field field : processFields) {
             DataToJsonConverter converter = new DataToJsonConverter();
@@ -164,7 +164,7 @@ public class ToolbarBuilder {
         buttons.put("FIND", new ButtonConfig("FIND", "OBUIAPP_Find", "FIND", true, "search"));
         buttons.put("EXPORT", new ButtonConfig("EXPORT", "OBUIAPP_ExportGrid", "EXPORT", true, "download"));
         buttons.put("ATTACHMENTS",
-                    new ButtonConfig("ATTACHMENTS", "OBUIAPP_Attachments", "ATTACHMENTS", true, "paperclip"));
+            new ButtonConfig("ATTACHMENTS", "OBUIAPP_Attachments", "ATTACHMENTS", true, "paperclip"));
         buttons.put("GRID_VIEW", new ButtonConfig("GRID_VIEW", "OBUIAPP_GridView", "GRID_VIEW", true, "grid"));
 
         return buttons;

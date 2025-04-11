@@ -1,36 +1,57 @@
 package com.etendoerp.metadata.service;
 
-import com.etendoerp.metadata.http.HttpServletRequestWrapper;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-import org.codehaus.jettison.json.JSONObject;
-import org.jboss.weld.module.web.servlet.SessionHolder;
-import org.openbravo.base.secureApp.HttpSecureAppServlet;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import java.io.IOException;
 
+import org.apache.http.entity.ContentType;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.codehaus.jettison.json.JSONObject;
+import org.openbravo.base.secureApp.HttpSecureAppServlet;
+
+/**
+ * @author luuchorocha
+ */
 public abstract class MetadataService {
+    private static final ThreadLocal<HttpServletRequest> requestThreadLocal = new ThreadLocal<>();
+    private static final ThreadLocal<HttpServletResponse> responseThreadLocal = new ThreadLocal<>();
+    private static final ThreadLocal<HttpSecureAppServlet> callerThreadLocal = new ThreadLocal<>();
     protected final Logger logger = LogManager.getLogger(this.getClass());
-    protected final HttpServletRequestWrapper request;
-    protected final HttpServletResponse response;
-    protected final HttpSecureAppServlet caller;
 
     public MetadataService(HttpSecureAppServlet caller, HttpServletRequest request, HttpServletResponse response) {
-        HttpServletRequestWrapper wrapped = new HttpServletRequestWrapper(request);
+        requestThreadLocal.set(request);
+        responseThreadLocal.set(response);
+        callerThreadLocal.set(caller);
+    }
 
-        this.caller = caller;
-        this.request = wrapped;
-        this.response = response;
+    public static void clear() {
+        requestThreadLocal.remove();
+        responseThreadLocal.remove();
+        callerThreadLocal.remove();
+    }
 
-        SessionHolder.requestInitialized(this.request);
+    protected HttpServletRequest getRequest() {
+        return requestThreadLocal.get();
+    }
+
+    protected HttpServletResponse getResponse() {
+        return responseThreadLocal.get();
+    }
+
+    protected HttpSecureAppServlet getCaller() {
+        return callerThreadLocal.get();
     }
 
     protected void write(JSONObject data) throws IOException {
+        HttpServletResponse response = getResponse();
+        response.setContentType(ContentType.APPLICATION_JSON.getMimeType());
+        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         response.getWriter().write(data.toString());
     }
 
-    public abstract void process() throws IOException, ServletException;
+    public abstract void process() throws ServletException, IOException;
 }

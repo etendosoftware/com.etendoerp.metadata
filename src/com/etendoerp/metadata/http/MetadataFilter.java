@@ -1,62 +1,44 @@
 package com.etendoerp.metadata.http;
 
-import org.apache.log4j.Logger;
-import org.jboss.weld.module.web.servlet.SessionHolder;
-import org.openbravo.client.kernel.RequestContext;
-import org.openbravo.dal.core.ThreadHandler;
-
-import javax.servlet.*;
-import javax.servlet.annotation.WebFilter;
 import java.io.IOException;
 
-import static org.openbravo.authentication.AuthenticationManager.STATELESS_REQUEST_PARAMETER;
+import javax.servlet.Filter;
+import javax.servlet.FilterChain;
+import javax.servlet.FilterConfig;
+import javax.servlet.ServletException;
+import javax.servlet.ServletRequest;
+import javax.servlet.ServletResponse;
+import javax.servlet.annotation.WebFilter;
+
+import org.apache.log4j.Logger;
+
+import com.etendoerp.metadata.service.MetadataService;
 
 /**
  * @author luuchorocha
  */
-@WebFilter(urlPatterns = {"/meta", "/meta/*"})
+@WebFilter(urlPatterns = { "/meta", "/meta/*" })
 public class MetadataFilter implements Filter {
-    private static final Logger logger = Logger.getLogger(MetadataFilter.class);
+    private static final Logger log4j = Logger.getLogger(MetadataFilter.class);
 
     @Override
     public void init(FilterConfig fConfig) {
-        RequestContext.setServletContext(fConfig.getServletContext());
-        logger.info("MetadataFilter initialized");
+        log4j.info("MetadataFilter initialized");
     }
 
     @Override
-    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws
-                                                                                              IOException,
-                                                                                              ServletException {
-
-        final ThreadHandler handler = new ThreadHandler() {
-            @Override
-            public void doBefore() {
-                request.setAttribute(STATELESS_REQUEST_PARAMETER, "true");
-            }
-
-            @Override
-            protected void doAction() throws Exception {
-                chain.doFilter(request, response);
-            }
-
-            @Override
-            public void doFinal(boolean error) {
-                if (error) {
-                    logger.error("An error occurred in MetadataFilter");
-                }
-
-                RequestContext.clear();
-                SessionHolder.clear();
-                HttpServletRequestWrapper.clearSession();
-            }
-        };
-
-        handler.run();
+    public void doFilter(ServletRequest request, ServletResponse response,
+        FilterChain chain) throws IOException, ServletException {
+        try {
+            chain.doFilter(request, response);
+        } finally {
+            MetadataService.clear();
+            HttpServletRequestWrapper.clear();
+        }
     }
 
     @Override
     public void destroy() {
-        logger.info("MetadataFilter destroyed");
+        log4j.info("MetadataFilter destroyed");
     }
 }

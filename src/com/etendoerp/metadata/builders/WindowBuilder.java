@@ -1,7 +1,7 @@
 package com.etendoerp.metadata.builders;
 
-import com.etendoerp.metadata.exceptions.NotFoundException;
-import com.etendoerp.metadata.exceptions.UnauthorizedException;
+import java.util.List;
+
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
@@ -16,11 +16,12 @@ import org.openbravo.model.ad.ui.Tab;
 import org.openbravo.model.ad.ui.Window;
 import org.openbravo.service.json.DataResolvingMode;
 
-import java.util.List;
+import com.etendoerp.metadata.exceptions.NotFoundException;
+import com.etendoerp.metadata.exceptions.UnauthorizedException;
 
 public class WindowBuilder extends Builder {
     private static final String SELECTED_PROPERTIES =
-            String.join(",", Window.PROPERTY_ID, Window.PROPERTY_NAME, Window.PROPERTY_WINDOWTYPE);
+        String.join(",", Window.PROPERTY_ID, Window.PROPERTY_NAME, Window.PROPERTY_WINDOWTYPE);
     private final String id;
 
     public WindowBuilder(String id) {

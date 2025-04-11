@@ -1,11 +1,13 @@
 package com.etendoerp.metadata.service;
 
-import com.etendoerp.metadata.builders.WindowBuilder;
-import org.openbravo.base.secureApp.HttpSecureAppServlet;
+import java.io.IOException;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import java.io.IOException;
+
+import org.openbravo.base.secureApp.HttpSecureAppServlet;
+
+import com.etendoerp.metadata.builders.WindowBuilder;
 
 /**
  * @author luuchorocha
@@ -17,7 +19,7 @@ public class WindowService extends MetadataService {
 
     @Override
     public void process() throws IOException {
-        String id = request.getPathInfo().substring(8);
+        String id = getRequest().getPathInfo().substring(8);
         write(new WindowBuilder(id).toJSON());
     }
 }

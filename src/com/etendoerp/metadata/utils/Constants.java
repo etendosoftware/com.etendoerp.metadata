@@ -7,12 +7,6 @@ import java.util.List;
  * @author luuchorocha
  */
 public class Constants {
-    public static final String HTTP_METHOD_GET = "GET";
-    public static final String HTTP_METHOD_POST = "POST";
-    public static final String HTTP_METHOD_DELETE = "DELETE";
-    public static final String SERVLET_DO_POST_METHOD = "doPost";
-    public static final String SERVLET_DO_GET_METHOD = "doGet";
-    public static final String SERVLET_DO_DELETE_METHOD = "doDelete";
     public static final String TOOLBAR_PATH = "/toolbar";
     public static final String SESSION_PATH = "/session";
     public static final String MENU_PATH = "/menu";
@@ -20,7 +14,6 @@ public class Constants {
     public static final String TAB_PATH = "/tab/";
     public static final String LANGUAGE_PATH = "/language";
     public static final String MESSAGE_PATH = "/message";
-    public static final String DELEGATED_SERVLET_PATH = "/servlets";
     public static final boolean DEFAULT_CHECKON_SAVE = true;
     public static final boolean DEFAULT_EDITABLE_FIELD = true;
     public static final String LIST_REFERENCE_ID = "17";
@@ -37,9 +30,6 @@ public class Constants {
     private static final String TABLE_DIR_REFERENCE_ID = "19";
     private static final String TABLE_REFERENCE_ID = "18";
     private static final String TREE_REFERENCE_ID = "8C57A4A2E05F4261A1FADF47C30398AD";
-    public static final List<String> SELECTOR_REFERENCES = Arrays.asList(TABLE_REFERENCE_ID,
-                                                                         TABLE_DIR_REFERENCE_ID,
-                                                                         SEARCH_REFERENCE_ID,
-                                                                         SELECTOR_REFERENCE_ID,
-                                                                         TREE_REFERENCE_ID);
+    public static final List<String> SELECTOR_REFERENCES = Arrays.asList(TABLE_REFERENCE_ID, TABLE_DIR_REFERENCE_ID,
+        SEARCH_REFERENCE_ID, SELECTOR_REFERENCE_ID, TREE_REFERENCE_ID);
 }

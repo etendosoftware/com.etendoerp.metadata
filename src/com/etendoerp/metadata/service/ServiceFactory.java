@@ -1,37 +1,43 @@
 package com.etendoerp.metadata.service;
 
-import com.etendoerp.metadata.exceptions.NotFoundException;
-import org.openbravo.base.secureApp.HttpSecureAppServlet;
+import static com.etendoerp.metadata.utils.Constants.LANGUAGE_PATH;
+import static com.etendoerp.metadata.utils.Constants.MENU_PATH;
+import static com.etendoerp.metadata.utils.Constants.MESSAGE_PATH;
+import static com.etendoerp.metadata.utils.Constants.SESSION_PATH;
+import static com.etendoerp.metadata.utils.Constants.TAB_PATH;
+import static com.etendoerp.metadata.utils.Constants.TOOLBAR_PATH;
+import static com.etendoerp.metadata.utils.Constants.WINDOW_PATH;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import java.util.List;
 
-import static com.etendoerp.metadata.utils.Constants.*;
+import org.openbravo.base.secureApp.HttpSecureAppServlet;
 
 /**
  * @author luuchorocha
  */
 public class ServiceFactory {
-    private final List<Delegation> delegations;
-
-    public ServiceFactory() {
-        delegations = List.of(new Delegation(path -> path.startsWith(WINDOW_PATH), WindowService::new),
-                              new Delegation(path -> path.startsWith(TAB_PATH), TabService::new),
-                              new Delegation(path -> path.startsWith(TOOLBAR_PATH), ToolbarService::new),
-                              new Delegation(path -> path.startsWith(LANGUAGE_PATH), LanguageService::new),
-                              new Delegation(path -> path.equals(MENU_PATH), MenuService::new),
-                              new Delegation(path -> path.equals(SESSION_PATH), SessionService::new),
-                              new Delegation(path -> path.equals(MESSAGE_PATH), MessageService::new),
-                              new Delegation(path -> true, ServletService::new));
-    }
-
-    public MetadataService getService(final HttpSecureAppServlet servlet, final HttpServletRequest req,
-                                      final HttpServletResponse res) {
+    public static MetadataService getService(final HttpSecureAppServlet servlet, final HttpServletRequest req,
+        final HttpServletResponse res) {
         final String path = req.getPathInfo();
 
-        return delegations.stream().filter(entry -> entry.matches(path)).findFirst()
-                          .map(entry -> entry.create(servlet, req, res))
-                          .orElseThrow(() -> new NotFoundException("Invalid URL: " + path));
+        if (path.equals(SESSION_PATH)) {
+            return new SessionService(servlet, req, res);
+        } else if (path.equals(MENU_PATH)) {
+            return new MenuService(servlet, req, res);
+        } else if (path.startsWith(WINDOW_PATH)) {
+            return new WindowService(servlet, req, res);
+        } else if (path.startsWith(TAB_PATH)) {
+            return new TabService(servlet, req, res);
+        } else if (path.startsWith(TOOLBAR_PATH)) {
+            return new ToolbarService(servlet, req, res);
+        } else if (path.startsWith(LANGUAGE_PATH)) {
+            return new LanguageService(servlet, req, res);
+        } else if (path.equals(MESSAGE_PATH)) {
+            return new MessageService(servlet, req, res);
+        } else {
+            return new ServletService(servlet, req, res);
+        }
     }
 }
+
