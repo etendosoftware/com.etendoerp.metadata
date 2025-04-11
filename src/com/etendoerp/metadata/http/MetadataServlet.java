@@ -4,14 +4,13 @@ import static com.etendoerp.metadata.exceptions.Utils.getResponseStatus;
 import static org.openbravo.service.json.JsonUtils.convertExceptionToJson;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.apache.http.entity.ContentType;
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
+import org.openbravo.dal.core.OBContext;
 
 import com.etendoerp.metadata.service.ServiceFactory;
 
@@ -32,8 +31,16 @@ public class MetadataServlet extends HttpSecureAppServlet {
 
     private void process(HttpServletRequest request,
         HttpServletResponse response) throws IOException, ServletException {
-        setContentHeaders(response);
-        ServiceFactory.getService(this, request, response).process();
+        try {
+            OBContext.setAdminMode();
+            ServiceFactory.getService(this, request, response).process();
+        } finally {
+            OBContext context = OBContext.getOBContext();
+
+            if (context != null && context.isInAdministratorMode()) {
+                OBContext.restorePreviousMode();
+            }
+        }
     }
 
     @Override
@@ -58,11 +65,6 @@ public class MetadataServlet extends HttpSecureAppServlet {
     public final void doDelete(HttpServletRequest request,
         HttpServletResponse response) throws IOException, ServletException {
         process(request, response);
-    }
-
-    private void setContentHeaders(HttpServletResponse response) {
-        response.setContentType(ContentType.APPLICATION_JSON.getMimeType());
-        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
     }
 
 }

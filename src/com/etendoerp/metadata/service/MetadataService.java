@@ -1,16 +1,17 @@
 package com.etendoerp.metadata.service;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.apache.http.entity.ContentType;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
-import org.openbravo.dal.core.OBContext;
 
 /**
  * @author luuchorocha
@@ -25,20 +26,12 @@ public abstract class MetadataService {
         requestThreadLocal.set(request);
         responseThreadLocal.set(response);
         callerThreadLocal.set(caller);
-
-        OBContext.setAdminMode();
     }
 
     public static void clear() {
         requestThreadLocal.remove();
         responseThreadLocal.remove();
         callerThreadLocal.remove();
-
-        OBContext context = OBContext.getOBContext();
-
-        if (context != null && context.isInAdministratorMode()) {
-            OBContext.restorePreviousMode();
-        }
     }
 
     protected HttpServletRequest getRequest() {
@@ -54,7 +47,10 @@ public abstract class MetadataService {
     }
 
     protected void write(JSONObject data) throws IOException {
-        getResponse().getWriter().write(data.toString());
+        HttpServletResponse response = getResponse();
+        response.setContentType(ContentType.APPLICATION_JSON.getMimeType());
+        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+        response.getWriter().write(data.toString());
     }
 
     public abstract void process() throws ServletException, IOException;
