@@ -1,13 +1,8 @@
 package com.etendoerp.metadata.exceptions;
 
-import static org.openbravo.service.json.JsonUtils.convertExceptionToJson;
-
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-
-import javax.servlet.http.HttpServletResponse;
 
 import org.apache.http.HttpStatus;
 import org.apache.logging.log4j.LogManager;
@@ -29,24 +24,7 @@ public class Utils {
         EXCEPTION_STATUS_MAP.put(NotFoundException.class, HttpStatus.SC_NOT_FOUND);
     }
 
-    private static int getResponseStatus(Exception e) {
-        return Optional.ofNullable(findMappedStatus(e.getClass())).orElse(HttpStatus.SC_INTERNAL_SERVER_ERROR);
+    public static int getResponseStatus(Exception e) {
+        return Optional.of(EXCEPTION_STATUS_MAP.get(e.getClass())).orElse(HttpStatus.SC_INTERNAL_SERVER_ERROR);
     }
-
-    private static Integer findMappedStatus(Class<?> exceptionClass) {
-        for (Map.Entry<Class<? extends Exception>, Integer> entry : EXCEPTION_STATUS_MAP.entrySet()) {
-            if (entry.getKey().isAssignableFrom(exceptionClass)) {
-                return entry.getValue();
-            }
-        }
-
-        return null;
-    }
-
-    public static void handleException(Exception e, HttpServletResponse response) throws IOException {
-        log4j.error(e.getMessage(), e);
-        response.setStatus(getResponseStatus(e));
-        response.getWriter().write(convertExceptionToJson(e));
-    }
-
 }

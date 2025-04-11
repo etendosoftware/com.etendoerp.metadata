@@ -14,7 +14,6 @@ public class HttpServletRequestWrapper extends RequestContext.HttpServletRequest
 
     public HttpServletRequestWrapper(HttpServletRequest request) {
         super(request);
-        session.set(new HttpSessionWrapper());
         SessionHolder.requestInitialized(this);
     }
 
@@ -34,6 +33,10 @@ public class HttpServletRequestWrapper extends RequestContext.HttpServletRequest
 
     @Override
     public HttpSession getSession(boolean f) {
+        if (session.get() == null && f) {
+            session.set(new HttpSessionWrapper());
+        }
+
         return session.get();
     }
 

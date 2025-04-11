@@ -1,10 +1,10 @@
 package com.etendoerp.metadata.http;
 
-import org.openbravo.client.kernel.RequestContext;
-
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.Vector;
+
+import org.openbravo.client.kernel.RequestContext;
 
 /**
  * @author luuchorocha

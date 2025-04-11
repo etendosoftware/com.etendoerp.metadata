@@ -1,8 +1,8 @@
 package com.etendoerp.metadata.builders;
 
-import com.etendoerp.etendorx.utils.DataSourceUtils;
-import com.etendoerp.metadata.data.ReferenceSelectors;
-import com.etendoerp.metadata.utils.Constants;
+import java.util.List;
+import java.util.stream.Collectors;
+
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
@@ -35,8 +35,9 @@ import org.openbravo.service.json.JsonConstants;
 import org.openbravo.userinterface.selector.Selector;
 import org.openbravo.userinterface.selector.SelectorField;
 
-import java.util.List;
-import java.util.stream.Collectors;
+import com.etendoerp.etendorx.utils.DataSourceUtils;
+import com.etendoerp.metadata.data.ReferenceSelectors;
+import com.etendoerp.metadata.utils.Constants;
 
 /**
  * @author luuchorocha
@@ -56,7 +57,7 @@ public class FieldBuilder extends Builder {
     public static boolean isProcessField(Field field) {
         Process processAction = field.getColumn().getProcess();
         org.openbravo.client.application.Process processDefinition = field.getColumn()
-                                                                          .getOBUIAPPProcess();
+            .getOBUIAPPProcess();
 
         return (processAction != null || processDefinition != null);
     }
@@ -115,15 +116,15 @@ public class FieldBuilder extends Builder {
         selectorInfo.put("treeReferenceId", treeSelector.getId());
         if (treeSelector.getDisplayfield() != null) {
             selectorInfo.put(JsonConstants.SORTBY_PARAMETER,
-                             treeSelector.getDisplayfield().getProperty());
+                treeSelector.getDisplayfield().getProperty());
             selectorInfo.put(Constants.DISPLAY_FIELD_PROPERTY,
-                             treeSelector.getDisplayfield().getProperty());
+                treeSelector.getDisplayfield().getProperty());
         }
         selectorInfo.put(JsonConstants.TEXTMATCH_PARAMETER, JsonConstants.TEXTMATCH_SUBSTRING);
         selectorInfo.put(JsonConstants.NOCOUNT_PARAMETER, true);
         selectorInfo.put(Constants.FIELD_ID_PROPERTY, fieldId);
         selectorInfo.put(Constants.VALUE_FIELD_PROPERTY,
-                         treeSelector.getValuefield().getProperty());
+            treeSelector.getValuefield().getProperty());
         selectorInfo.put(JsonConstants.SELECTEDPROPERTIES_PARAMETER, JsonConstants.ID);
         selectorInfo.put(JsonConstants.ADDITIONAL_PROPERTIES_PARAMETER, JsonConstants.ID + ",");
 
@@ -145,14 +146,14 @@ public class FieldBuilder extends Builder {
         selectorInfo.put(Constants.DATASOURCE_PROPERTY, dataSourceId);
         selectorInfo.put(Constants.SELECTOR_DEFINITION_PROPERTY, selector.getId());
         selectorInfo.put("filterClass",
-                         "org.openbravo.userinterface.selector.SelectorDataSourceFilter");
+            "org.openbravo.userinterface.selector.SelectorDataSourceFilter");
 
         if (selector.getDisplayfield() != null) {
             selectorInfo.put(JsonConstants.SORTBY_PARAMETER,
-                             selector.getDisplayfield().getDisplayColumnAlias() !=
-                             null ? selector.getDisplayfield()
-                                            .getDisplayColumnAlias() : selector.getDisplayfield()
-                                                                               .getProperty());
+                selector.getDisplayfield().getDisplayColumnAlias() !=
+                    null ? selector.getDisplayfield()
+                    .getDisplayColumnAlias() : selector.getDisplayfield()
+                    .getProperty());
         } else {
             selectorInfo.put(JsonConstants.SORTBY_PARAMETER, JsonConstants.IDENTIFIER);
         }
@@ -162,9 +163,9 @@ public class FieldBuilder extends Builder {
         selectorInfo.put(JsonConstants.TEXTMATCH_PARAMETER, selector.getSuggestiontextmatchstyle());
 
         setSelectorProperties(selector.getOBUISELSelectorFieldList(),
-                              selector.getDisplayfield(),
-                              selector.getValuefield(),
-                              selectorInfo);
+            selector.getDisplayfield(),
+            selector.getValuefield(),
+            selectorInfo);
 
         selectorInfo.put("extraSearchFields", getExtraSearchFields(selector));
         selectorInfo.put(Constants.DISPLAY_FIELD_PROPERTY, getDisplayField(selector));
@@ -173,11 +174,12 @@ public class FieldBuilder extends Builder {
         return selectorInfo;
     }
 
-    private static void setSelectorProperties(List<SelectorField> fields, SelectorField displayField, SelectorField valueField, JSONObject selectorInfo) throws JSONException {
+    private static void setSelectorProperties(List<SelectorField> fields, SelectorField displayField,
+        SelectorField valueField, JSONObject selectorInfo) throws JSONException {
         String valueFieldProperty = valueField !=
-                                    null ? getValueField(valueField.getObuiselSelector()) : JsonConstants.IDENTIFIER;
+            null ? getValueField(valueField.getObuiselSelector()) : JsonConstants.IDENTIFIER;
         String displayFieldProperty = displayField !=
-                                      null ? getDisplayField(displayField.getObuiselSelector()) : JsonConstants.IDENTIFIER;
+            null ? getDisplayField(displayField.getObuiselSelector()) : JsonConstants.IDENTIFIER;
 
         StringBuilder selectedProperties = new StringBuilder(JsonConstants.ID);
         StringBuilder derivedProperties = new StringBuilder();
@@ -208,8 +210,8 @@ public class FieldBuilder extends Builder {
             }
 
             if ((!field.isOutfield() || (displayField == null || fieldName.equals(
-                    displayFieldProperty))) && (valueField == null || fieldName.equals(
-                    valueFieldProperty))) {
+                displayFieldProperty))) && (valueField == null || fieldName.equals(
+                valueFieldProperty))) {
                 if (field.isOutfield()) {
                     extraProperties.append(",").append(fieldName);
                 }
@@ -218,7 +220,7 @@ public class FieldBuilder extends Builder {
 
         selectorInfo.put(JsonConstants.SELECTEDPROPERTIES_PARAMETER, selectedProperties.toString());
         selectorInfo.put(JsonConstants.ADDITIONAL_PROPERTIES_PARAMETER,
-                         extraProperties + "," + derivedProperties);
+            extraProperties + "," + derivedProperties);
     }
 
     public static JSONArray getListInfo(Reference refList) throws JSONException {
@@ -238,7 +240,7 @@ public class FieldBuilder extends Builder {
         final String displayField = getDisplayField(selector);
         final StringBuilder sb = new StringBuilder();
         for (SelectorField selectorField : selector.getOBUISELSelectorFieldList().stream().filter(
-                SelectorField::isActive).collect(Collectors.toList())) {
+            SelectorField::isActive).collect(Collectors.toList())) {
             String fieldName = getPropertyOrDataSourceField(selectorField);
             if (fieldName.equals(displayField)) {
                 continue;
@@ -314,7 +316,7 @@ public class FieldBuilder extends Builder {
         if (domainType instanceof PrimitiveDomainType) {
             PrimitiveDomainType primitiveDomainType = (PrimitiveDomainType) domainType;
             return boolean.class == primitiveDomainType.getPrimitiveType() ||
-                   Boolean.class == primitiveDomainType.getPrimitiveType();
+                Boolean.class == primitiveDomainType.getPrimitiveType();
         }
         return false;
     }
@@ -325,14 +327,14 @@ public class FieldBuilder extends Builder {
             final String entityName = selectorField.getObuiselSelector().getTable().getName();
             final Entity entity = ModelProvider.getInstance().getEntity(entityName);
             final Property property = DalUtil.getPropertyFromPath(entity,
-                                                                  selectorField.getProperty());
+                selectorField.getProperty());
             Check.isNotNull(property,
-                            "Property " + selectorField.getProperty() + " not found in Entity " +
-                            entity);
+                "Property " + selectorField.getProperty() + " not found in Entity " +
+                    entity);
             return property.getDomainType();
         } else if (selectorField.getObuiselSelector().getTable() != null &&
-                   selectorField.getObuiselSelector().isCustomQuery() &&
-                   selectorField.getReference() != null) {
+            selectorField.getObuiselSelector().isCustomQuery() &&
+            selectorField.getReference() != null) {
             return getDomainType(selectorField.getReference().getId());
         } else if (selectorField.getObserdsDatasourceField().getReference() != null) {
             return getDomainType(selectorField.getObserdsDatasourceField().getReference().getId());
@@ -342,7 +344,7 @@ public class FieldBuilder extends Builder {
 
     private static DomainType getDomainType(String referenceId) {
         final org.openbravo.base.model.Reference reference = ModelProvider.getInstance()
-                                                                          .getReference(referenceId);
+            .getReference(referenceId);
         Check.isNotNull(reference, "No reference found for referenceid " + referenceId);
         return reference.getDomainType();
     }
@@ -357,7 +359,7 @@ public class FieldBuilder extends Builder {
             result = selectorField.getObserdsDatasourceField().getName();
         } else {
             throw new IllegalStateException("Selector field " + selectorField +
-                                            " has a null datasource and a null property");
+                " has a null datasource and a null property");
         }
         return result.replace(DalUtil.DOT, DalUtil.FIELDSEPARATOR);
     }
@@ -367,11 +369,11 @@ public class FieldBuilder extends Builder {
         Table table = OBDal.getInstance().get(Table.class, tableId);
 
         return (Tab) OBDal.getInstance()
-                          .createCriteria(Tab.class)
-                          .add(Restrictions.eq(Tab.PROPERTY_TABLE, table))
-                          .add(Restrictions.eq(Tab.PROPERTY_ACTIVE, true))
-                          .setMaxResults(1)
-                          .uniqueResult();
+            .createCriteria(Tab.class)
+            .add(Restrictions.eq(Tab.PROPERTY_TABLE, table))
+            .add(Restrictions.eq(Tab.PROPERTY_ACTIVE, true))
+            .setMaxResults(1)
+            .uniqueResult();
     }
 
     @Override
@@ -391,9 +393,9 @@ public class FieldBuilder extends Builder {
 
     private void addAccessProperties(FieldAccess access) throws JSONException {
         boolean checkOnSave =
-                access != null ? access.isCheckonsave() : Constants.DEFAULT_CHECKON_SAVE;
+            access != null ? access.isCheckonsave() : Constants.DEFAULT_CHECKON_SAVE;
         boolean editableField =
-                access != null ? access.isEditableField() : Constants.DEFAULT_EDITABLE_FIELD;
+            access != null ? access.isEditableField() : Constants.DEFAULT_EDITABLE_FIELD;
         boolean fieldIsReadOnly = field.isReadOnly();
         boolean isColUpdatable = field.getColumn() != null ? field.getColumn().isUpdatable() : true;
         boolean readOnly = fieldIsReadOnly || (access != null && !access.isEditableField());
@@ -409,7 +411,7 @@ public class FieldBuilder extends Builder {
         boolean mandatory = column.isMandatory();
         boolean isParentRecordProperty = isParentRecordProperty(field, field.getTab());
         JSONObject columnJson = converter.toJsonObject(field.getColumn(),
-                                                       DataResolvingMode.FULL_TRANSLATABLE);
+            DataResolvingMode.FULL_TRANSLATABLE);
         String inputName = DataSourceUtils.getInpName(column);
         String hqlName = DataSourceUtils.getHQLColumnName(field)[0];
         String columnName = column.getDBColumnName();
@@ -429,10 +431,10 @@ public class FieldBuilder extends Builder {
             String tableId = referenced.getEntity().getTableId();
             Table table = OBDal.getInstance().get(Table.class, tableId);
             Tab referencedTab = (Tab) OBDal.getInstance()
-                                           .createCriteria(Tab.class)
-                                           .add(Restrictions.eq(Tab.PROPERTY_TABLE, table))
-                                           .setMaxResults(1)
-                                           .uniqueResult();
+                .createCriteria(Tab.class)
+                .add(Restrictions.eq(Tab.PROPERTY_TABLE, table))
+                .setMaxResults(1)
+                .uniqueResult();
             Window referencedWindow = referencedTab != null ? referencedTab.getWindow() : null;
             String tabId = referencedTab != null ? referencedTab.getId() : null;
             String windowId = referencedWindow != null ? referencedWindow.getId() : null;
@@ -453,9 +455,9 @@ public class FieldBuilder extends Builder {
             // See issue https://issues.openbravo.com/view.php?id=29667
             if (parentTab != null &&
                 ApplicationConstants.TABLEBASEDTABLE.equals(parentTab.getTable()
-                                                                     .getDataOriginType())) {
+                    .getDataOriginType())) {
                 parentEntity = ModelProvider.getInstance().getEntityByTableName(parentTab.getTable()
-                                                                                         .getDBTableName());
+                    .getDBTableName());
             }
 
             Property property = KernelUtils.getProperty(field);
@@ -483,7 +485,7 @@ public class FieldBuilder extends Builder {
     private void addComboSelectInfo(Field field) throws JSONException {
         if (isSelectorField(field)) {
             json.put("selector",
-                     getSelectorInfo(field.getId(), field.getColumn().getReferenceSearchKey()));
+                getSelectorInfo(field.getId(), field.getColumn().getReferenceSearchKey()));
         }
     }
 
@@ -497,7 +499,7 @@ public class FieldBuilder extends Builder {
         if (isProcessField(field)) {
             Process processAction = field.getColumn().getProcess();
             org.openbravo.client.application.Process processDefinition = field.getColumn()
-                                                                              .getOBUIAPPProcess();
+                .getOBUIAPPProcess();
 
             if (processDefinition != null) {
                 json.put("processDefinition", ProcessDefinitionBuilder.getFieldProcess(field));
@@ -514,8 +516,8 @@ public class FieldBuilder extends Builder {
 
         if (displayLogic != null && !displayLogic.isBlank()) {
             DynamicExpressionParser parser = new DynamicExpressionParser(displayLogic,
-                                                                         field.getTab(),
-                                                                         field);
+                field.getTab(),
+                field);
             json.put("displayLogicExpression", parser.getJSExpression());
         }
     }
@@ -525,8 +527,8 @@ public class FieldBuilder extends Builder {
 
         if (readOnlyLogic != null && !readOnlyLogic.isBlank()) {
             DynamicExpressionParser parser = new DynamicExpressionParser(readOnlyLogic,
-                                                                         field.getTab(),
-                                                                         field);
+                field.getTab(),
+                field);
             json.put("readOnlyLogicExpression", parser.getJSExpression());
         }
     }
@@ -541,6 +543,6 @@ public class FieldBuilder extends Builder {
         Column column = field.getColumn();
 
         return column != null && Constants.SELECTOR_REFERENCES.contains(column.getReference()
-                                                                              .getId());
+            .getId());
     }
 }

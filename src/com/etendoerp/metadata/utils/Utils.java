@@ -1,12 +1,10 @@
 package com.etendoerp.metadata.utils;
 
-import static org.openbravo.base.weld.WeldUtils.getInstanceFromStaticBeanManager;
 import static org.openbravo.client.application.DynamicExpressionParser.replaceSystemPreferencesInDisplayLogic;
 
 import java.util.Arrays;
 
 import javax.script.ScriptException;
-import javax.servlet.ServletConfig;
 import javax.servlet.http.HttpServletRequest;
 
 import org.apache.logging.log4j.LogManager;
@@ -42,7 +40,7 @@ public class Utils {
 
     public static Language getLanguage(HttpServletRequest request) {
         try {
-            String[] providedLanguages = {request.getParameter("language"), request.getHeader("language")};
+            String[] providedLanguages = { request.getParameter("language"), request.getHeader("language") };
             String languageCode = Arrays.stream(providedLanguages).filter(
                 language -> language != null && !language.isEmpty()).findFirst().orElse(null);
 
@@ -83,12 +81,6 @@ public class Utils {
     public static void readNumberFormat(VariablesSecureApp vars) {
         if (KernelServlet.getGlobalParameters() != null) {
             LoginUtils.readNumberFormat(vars, KernelServlet.getGlobalParameters().getFormatPath());
-        }
-    }
-
-    public static void initializeGlobalConfig(ServletConfig config) {
-        if (KernelServlet.getGlobalParameters() == null) {
-            getInstanceFromStaticBeanManager(KernelServlet.class).init(config);
         }
     }
 }

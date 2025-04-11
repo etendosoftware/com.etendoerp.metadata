@@ -1,14 +1,12 @@
 package com.etendoerp.metadata.auth;
 
-import com.auth0.jwt.exceptions.JWTCreationException;
-import com.auth0.jwt.interfaces.DecodedJWT;
-import com.etendoerp.metadata.data.AuthData;
-import com.etendoerp.metadata.exceptions.InternalServerException;
-import com.etendoerp.metadata.exceptions.UnauthorizedException;
-import com.etendoerp.metadata.exceptions.UnprocessableContentException;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.smf.securewebservices.SWSConfig;
-import com.smf.securewebservices.utils.SecureWebServicesUtils;
+import java.io.UnsupportedEncodingException;
+import java.security.NoSuchAlgorithmException;
+import java.security.spec.InvalidKeySpecException;
+import java.util.Optional;
+
+import javax.servlet.http.HttpServletRequest;
+
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.codehaus.jettison.json.JSONArray;
@@ -28,11 +26,15 @@ import org.openbravo.service.db.DalConnectionProvider;
 import org.openbravo.service.json.DataResolvingMode;
 import org.openbravo.service.json.DataToJsonConverter;
 
-import javax.servlet.http.HttpServletRequest;
-import java.io.UnsupportedEncodingException;
-import java.security.NoSuchAlgorithmException;
-import java.security.spec.InvalidKeySpecException;
-import java.util.Optional;
+import com.auth0.jwt.exceptions.JWTCreationException;
+import com.auth0.jwt.interfaces.DecodedJWT;
+import com.etendoerp.metadata.data.AuthData;
+import com.etendoerp.metadata.exceptions.InternalServerException;
+import com.etendoerp.metadata.exceptions.UnauthorizedException;
+import com.etendoerp.metadata.exceptions.UnprocessableContentException;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.smf.securewebservices.SWSConfig;
+import com.smf.securewebservices.utils.SecureWebServicesUtils;
 
 /**
  * @author luuchorocha
@@ -88,11 +90,13 @@ public class LoginManager {
         SWSConfig config = SWSConfig.getInstance();
         if (config.getPrivateKey() == null) {
             logger.warn("SWS - SWS are misconfigured");
-            throw new InternalServerException(Utility.messageBD(conn, "SMFSWS_Misconfigured", OBContext.getOBContext().getLanguage().getLanguage()));
+            throw new InternalServerException(
+                Utility.messageBD(conn, "SMFSWS_Misconfigured", OBContext.getOBContext().getLanguage().getLanguage()));
         }
     }
 
-    private AuthData authenticate(JSONObject data, String token) throws JSONException, UnsupportedEncodingException, NoSuchAlgorithmException, InvalidKeySpecException, JsonProcessingException {
+    private AuthData authenticate(JSONObject data,
+        String token) throws JSONException, UnsupportedEncodingException, NoSuchAlgorithmException, InvalidKeySpecException, JsonProcessingException {
         User user;
         Role role;
         Organization org;
@@ -107,7 +111,8 @@ public class LoginManager {
             DecodedJWT decoded = SecureWebServicesUtils.decodeToken(token);
             if (decoded == null) {
                 logger.warn("SWS - Token is not valid");
-                throw new UnauthorizedException(Utility.messageBD(conn, "SMFSWS_InvalidToken", OBContext.getOBContext().getLanguage().getLanguage()));
+                throw new UnauthorizedException(Utility.messageBD(conn, "SMFSWS_InvalidToken",
+                    OBContext.getOBContext().getLanguage().getLanguage()));
             }
             user = entityProvider.get(User.class, decoded.getClaim("user").asString());
             role = getClaimedEntity(data, decoded, "role", Role.class);
@@ -115,7 +120,8 @@ public class LoginManager {
             warehouse = getClaimedEntity(data, decoded, "warehouse", Warehouse.class);
         } else {
             logger.warn("SWS - You must specify a username and password or a valid token");
-            throw new UnauthorizedException(Utility.messageBD(conn, "SMFSWS_PassOrTokenNeeded", OBContext.getOBContext().getLanguage().getLanguage()));
+            throw new UnauthorizedException(Utility.messageBD(conn, "SMFSWS_PassOrTokenNeeded",
+                OBContext.getOBContext().getLanguage().getLanguage()));
         }
 
         return new AuthData(user, role, org, warehouse);
@@ -130,7 +136,8 @@ public class LoginManager {
             if (opUser.isPresent()) {
                 return opUser.get();
             } else {
-                throw new UnauthorizedException(Utility.messageBD(conn, "IDENTIFICATION_FAILURE_TITLE", OBContext.getOBContext().getLanguage().getLanguage()));
+                throw new UnauthorizedException(Utility.messageBD(conn, "IDENTIFICATION_FAILURE_TITLE",
+                    OBContext.getOBContext().getLanguage().getLanguage()));
             }
         } catch (JSONException e) {
             throw new UnprocessableContentException(e.getMessage());
@@ -166,7 +173,8 @@ public class LoginManager {
                 authData.warehouse = entityProvider.get(Warehouse.class, defaults.warehouse);
             }
 
-            String token = SecureWebServicesUtils.generateToken(authData.user, authData.role, authData.org, authData.warehouse);
+            String token = SecureWebServicesUtils.generateToken(authData.user, authData.role, authData.org,
+                authData.warehouse);
 
             result.put("status", "success");
             result.put("token", token);
@@ -179,7 +187,8 @@ public class LoginManager {
             result.put("currentClient", converter.toJsonObject(authData.warehouse, DataResolvingMode.FULL));
         } catch (JWTCreationException e) {
             logger.warn("SWS - Error creating token", e);
-            throw new Exception(Utility.messageBD(conn, "SMFSWS_ErrorCreatingToken", OBContext.getOBContext().getLanguage().getLanguage()));
+            throw new Exception(Utility.messageBD(conn, "SMFSWS_ErrorCreatingToken",
+                OBContext.getOBContext().getLanguage().getLanguage()));
         }
         return result;
     }
@@ -188,7 +197,9 @@ public class LoginManager {
         JSONObject result = new JSONObject();
         try {
             result.put("status", "error");
-            result.put("message", e.getMessage() != null ? e.getMessage() : Utility.messageBD(conn, "SMFSWS_GenericErrorLog", OBContext.getOBContext().getLanguage().getLanguage()));
+            result.put("message",
+                e.getMessage() != null ? e.getMessage() : Utility.messageBD(conn, "SMFSWS_GenericErrorLog",
+                    OBContext.getOBContext().getLanguage().getLanguage()));
         } catch (JSONException jsonException) {
             logger.error("Error building error response", jsonException);
         }

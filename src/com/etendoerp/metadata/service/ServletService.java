@@ -1,13 +1,9 @@
 package com.etendoerp.metadata.service;
 
-import com.etendoerp.metadata.auth.SessionManager;
-import com.etendoerp.metadata.data.ServletMapping;
-import com.etendoerp.metadata.exceptions.InternalServerException;
-import com.etendoerp.metadata.exceptions.NotFoundException;
-import com.etendoerp.metadata.http.HttpServletRequestWrapper;
-import org.openbravo.base.secureApp.HttpSecureAppServlet;
-import org.openbravo.client.kernel.KernelServlet;
-import org.openbravo.client.kernel.RequestContext;
+import java.io.IOException;
+import java.util.Collection;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import javax.servlet.RequestDispatcher;
 import javax.servlet.ServletContext;
@@ -15,11 +11,14 @@ import javax.servlet.ServletException;
 import javax.servlet.ServletRegistration;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import java.util.Collection;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
-import static org.openbravo.base.weld.WeldUtils.getInstanceFromStaticBeanManager;
+import org.openbravo.base.secureApp.HttpSecureAppServlet;
+import org.openbravo.client.kernel.RequestContext;
+
+import com.etendoerp.metadata.auth.SessionManager;
+import com.etendoerp.metadata.data.ServletMapping;
+import com.etendoerp.metadata.exceptions.NotFoundException;
+
 
 /**
  * @author luuchorocha
@@ -81,17 +80,13 @@ public class ServletService extends MetadataService {
     }
 
     @Override
-    public void process() {
-        try {
-            HttpServletRequestWrapper request = getRequest();
-            HttpSecureAppServlet caller = getCaller();
-            HttpServletResponse response = getResponse();
-            SessionManager.initializeSession(request);
-            ServletContext context = caller.getServletContext();
-            RequestDispatcher dispatcher = context.getRequestDispatcher(findMatchingServlet().getMapping());
-            dispatcher.forward(request, response);
-        } catch (Exception e) {
-            throw new InternalServerException(e.getMessage());
-        }
+    public void process() throws ServletException, IOException {
+        HttpServletRequest request = getRequest();
+        HttpSecureAppServlet caller = getCaller();
+        HttpServletResponse response = getResponse();
+        SessionManager.initializeSession(request);
+        ServletContext context = caller.getServletContext();
+        RequestDispatcher dispatcher = context.getRequestDispatcher(findMatchingServlet().getMapping());
+        dispatcher.forward(request, response);
     }
 }

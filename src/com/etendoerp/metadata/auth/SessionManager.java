@@ -12,7 +12,6 @@ import org.openbravo.service.db.DalConnectionProvider;
 
 import com.etendoerp.metadata.data.RequestVariables;
 import com.etendoerp.metadata.exceptions.InternalServerException;
-import com.etendoerp.metadata.http.HttpServletRequestWrapper;
 import com.etendoerp.metadata.utils.Utils;
 
 /**
@@ -21,7 +20,7 @@ import com.etendoerp.metadata.utils.Utils;
 public class SessionManager {
     private final static Logger logger = LogManager.getLogger(SessionManager.class);
 
-    public static RequestVariables initializeSession(HttpServletRequestWrapper request) {
+    public static RequestVariables initializeSession(HttpServletRequest request) {
         try {
             OBContext context = OBContext.getOBContext();
 

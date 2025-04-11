@@ -1,32 +1,29 @@
 package com.etendoerp.metadata.http;
 
-import com.etendoerp.metadata.auth.LoginManager;
+import java.io.IOException;
+import java.io.Writer;
+import java.nio.charset.StandardCharsets;
+
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
 import org.apache.http.entity.ContentType;
 import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.base.HttpBaseServlet;
 import org.openbravo.base.secureApp.AllowedCrossDomainsHandler;
 import org.openbravo.dal.core.OBContext;
 
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import java.io.IOException;
-import java.io.Writer;
-import java.nio.charset.StandardCharsets;
-
-import static com.etendoerp.metadata.exceptions.Utils.handleException;
+import com.etendoerp.metadata.auth.LoginManager;
 
 /**
  * @author luuchorocha
  */
 public class LoginServlet extends HttpBaseServlet {
     @Override
-    public final void service(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        try {
-            super.service(new HttpServletRequestWrapper(request), response);
-        } catch (Exception e) {
-            handleException(e, response);
-        }
+    public final void service(HttpServletRequest request,
+        HttpServletResponse response) throws IOException, ServletException {
+        super.service(new HttpServletRequestWrapper(request), response);
     }
 
     @Override
@@ -36,18 +33,17 @@ public class LoginServlet extends HttpBaseServlet {
 
     @Override
     public void doPost(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        final LoginManager loginService = new LoginManager();
-        final JSONObject result;
+        AllowedCrossDomainsHandler.getInstance().setCORSHeaders(request, response);
 
         try {
-            AllowedCrossDomainsHandler.getInstance().setCORSHeaders(request, response);
             OBContext.setAdminMode(true);
-            result = loginService.processLogin(request);
+            final LoginManager loginService = new LoginManager();
+            final JSONObject result;
+            writeResponse(response, loginService.processLogin(request));
         } finally {
             OBContext.restorePreviousMode();
         }
 
-        writeResponse(response, result);
     }
 
     private void writeResponse(HttpServletResponse response, JSONObject result) throws IOException {

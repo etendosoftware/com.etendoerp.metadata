@@ -10,32 +10,38 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
-
-import com.etendoerp.metadata.http.HttpServletRequestWrapper;
+import org.openbravo.dal.core.OBContext;
 
 /**
  * @author luuchorocha
  */
 public abstract class MetadataService {
-    private static final ThreadLocal<HttpServletRequestWrapper> requestThreadLocal = new ThreadLocal<>();
+    private static final ThreadLocal<HttpServletRequest> requestThreadLocal = new ThreadLocal<>();
     private static final ThreadLocal<HttpServletResponse> responseThreadLocal = new ThreadLocal<>();
     private static final ThreadLocal<HttpSecureAppServlet> callerThreadLocal = new ThreadLocal<>();
     protected final Logger logger = LogManager.getLogger(this.getClass());
 
     public MetadataService(HttpSecureAppServlet caller, HttpServletRequest request, HttpServletResponse response) {
-        requestThreadLocal.set(new HttpServletRequestWrapper(request));
+        requestThreadLocal.set(request);
         responseThreadLocal.set(response);
         callerThreadLocal.set(caller);
+
+        OBContext.setAdminMode();
     }
 
     public static void clear() {
-        HttpServletRequestWrapper.clear();
         requestThreadLocal.remove();
         responseThreadLocal.remove();
         callerThreadLocal.remove();
+
+        OBContext context = OBContext.getOBContext();
+
+        if (context != null && context.isInAdministratorMode()) {
+            OBContext.restorePreviousMode();
+        }
     }
 
-    protected HttpServletRequestWrapper getRequest() {
+    protected HttpServletRequest getRequest() {
         return requestThreadLocal.get();
     }
 
@@ -51,5 +57,5 @@ public abstract class MetadataService {
         getResponse().getWriter().write(data.toString());
     }
 
-    public abstract void process() throws IOException;
+    public abstract void process() throws ServletException, IOException;
 }
