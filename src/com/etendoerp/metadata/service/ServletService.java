@@ -15,6 +15,7 @@ import org.openbravo.base.secureApp.HttpSecureAppServlet;
 import org.openbravo.base.weld.WeldUtils;
 import org.openbravo.client.kernel.RequestContext;
 
+import com.etendoerp.metadata.auth.SessionManager;
 import com.etendoerp.metadata.data.ServletMapping;
 import com.etendoerp.metadata.exceptions.NotFoundException;
 
@@ -101,13 +102,13 @@ public class ServletService extends MetadataService {
         HttpServletRequest request = getRequest();
         HttpSecureAppServlet caller = getCaller();
         HttpServletResponse response = getResponse();
-        // SessionManager.initializeSession(request);
         HttpSecureAppServlet servlet = getOrCreateServlet(findMatchingServlet().getRegistration().getClassName());
 
         if (servlet.getServletConfig() == null) {
             servlet.init(caller.getServletConfig());
         }
 
+        SessionManager.initializeSession(request);
         servlet.service(request, response);
     }
 }
