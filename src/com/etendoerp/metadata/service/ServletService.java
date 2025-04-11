@@ -6,7 +6,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import javax.servlet.ServletContext;
 import javax.servlet.ServletException;
 import javax.servlet.ServletRegistration;
 import javax.servlet.http.HttpServletRequest;
@@ -16,7 +15,6 @@ import org.openbravo.base.secureApp.HttpSecureAppServlet;
 import org.openbravo.base.weld.WeldUtils;
 import org.openbravo.client.kernel.RequestContext;
 
-import com.etendoerp.metadata.auth.SessionManager;
 import com.etendoerp.metadata.data.ServletMapping;
 import com.etendoerp.metadata.exceptions.NotFoundException;
 
@@ -103,10 +101,13 @@ public class ServletService extends MetadataService {
         HttpServletRequest request = getRequest();
         HttpSecureAppServlet caller = getCaller();
         HttpServletResponse response = getResponse();
-        SessionManager.initializeSession(request);
-        ServletContext context = caller.getServletContext();
+        // SessionManager.initializeSession(request);
         HttpSecureAppServlet servlet = getOrCreateServlet(findMatchingServlet().getRegistration().getClassName());
-        servlet.init(caller);
+
+        if (servlet.getServletConfig() == null) {
+            servlet.init(caller.getServletConfig());
+        }
+
         servlet.service(request, response);
     }
 }
