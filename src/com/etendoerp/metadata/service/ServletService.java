@@ -2,10 +2,10 @@ package com.etendoerp.metadata.service;
 
 import java.io.IOException;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import javax.servlet.RequestDispatcher;
 import javax.servlet.ServletContext;
 import javax.servlet.ServletException;
 import javax.servlet.ServletRegistration;
@@ -13,6 +13,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
+import org.openbravo.base.weld.WeldUtils;
 import org.openbravo.client.kernel.RequestContext;
 
 import com.etendoerp.metadata.auth.SessionManager;
@@ -57,6 +58,24 @@ public class ServletService extends MetadataService {
         return path.substring(0, secondSlash);
     }
 
+    private static HttpSecureAppServlet getOrCreateServlet(String servletName) {
+        try {
+            Class<?> klazz = Class.forName(servletName);
+            List<?> servlets = WeldUtils.getInstances(klazz);
+            return !servlets.isEmpty() ? (HttpSecureAppServlet) servlets.get(0) : createServletInstance(klazz);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static HttpSecureAppServlet createServletInstance(Class<?> klazz) {
+        try {
+            return klazz.asSubclass(HttpSecureAppServlet.class).getDeclaredConstructor().newInstance();
+        } catch (Exception e) {
+            throw new NotFoundException(e.getMessage());
+        }
+    }
+
     private ServletMapping findMatchingServlet() {
         String uri = getRequest().getPathInfo();
 
@@ -86,7 +105,8 @@ public class ServletService extends MetadataService {
         HttpServletResponse response = getResponse();
         SessionManager.initializeSession(request);
         ServletContext context = caller.getServletContext();
-        RequestDispatcher dispatcher = context.getRequestDispatcher(findMatchingServlet().getMapping());
-        dispatcher.forward(request, response);
+        HttpSecureAppServlet servlet = getOrCreateServlet(findMatchingServlet().getRegistration().getClassName());
+        servlet.init(caller);
+        servlet.service(request, response);
     }
 }

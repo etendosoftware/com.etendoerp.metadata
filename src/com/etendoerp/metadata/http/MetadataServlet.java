@@ -1,10 +1,12 @@
 package com.etendoerp.metadata.http;
 
 import static com.etendoerp.metadata.exceptions.Utils.getResponseStatus;
+import static com.etendoerp.metadata.utils.Utils.initializeGlobalConfig;
 import static org.openbravo.service.json.JsonUtils.convertExceptionToJson;
 
 import java.io.IOException;
 
+import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -67,4 +69,9 @@ public class MetadataServlet extends HttpSecureAppServlet {
         process(request, response);
     }
 
+    @Override
+    public void init(ServletConfig config) {
+        super.init(config);
+        initializeGlobalConfig(config);
+    }
 }

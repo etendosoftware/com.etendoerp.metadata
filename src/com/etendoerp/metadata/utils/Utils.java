@@ -5,6 +5,7 @@ import static org.openbravo.client.application.DynamicExpressionParser.replaceSy
 import java.util.Arrays;
 
 import javax.script.ScriptException;
+import javax.servlet.ServletConfig;
 import javax.servlet.http.HttpServletRequest;
 
 import org.apache.logging.log4j.LogManager;
@@ -15,6 +16,7 @@ import org.hibernate.criterion.Restrictions;
 import org.openbravo.base.expression.OBScriptEngine;
 import org.openbravo.base.secureApp.LoginUtils;
 import org.openbravo.base.secureApp.VariablesSecureApp;
+import org.openbravo.base.weld.WeldUtils;
 import org.openbravo.client.application.DynamicExpressionParser;
 import org.openbravo.client.kernel.KernelServlet;
 import org.openbravo.dal.service.OBDal;
@@ -81,6 +83,12 @@ public class Utils {
     public static void readNumberFormat(VariablesSecureApp vars) {
         if (KernelServlet.getGlobalParameters() != null) {
             LoginUtils.readNumberFormat(vars, KernelServlet.getGlobalParameters().getFormatPath());
+        }
+    }
+
+    public static void initializeGlobalConfig(ServletConfig config) {
+        if (KernelServlet.getGlobalParameters() == null) {
+            WeldUtils.getInstanceFromStaticBeanManager(KernelServlet.class).init(config);
         }
     }
 }
