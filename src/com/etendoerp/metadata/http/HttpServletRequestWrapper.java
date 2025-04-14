@@ -23,10 +23,6 @@ public class HttpServletRequestWrapper extends RequestContext.HttpServletRequest
         SessionHolder.clear();
     }
 
-    public static HttpSessionWrapper getCurrentSession() {
-        return session.get();
-    }
-
     @Override
     public HttpSession getSession() {
         return session.get();

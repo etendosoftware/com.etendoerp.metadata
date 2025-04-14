@@ -12,7 +12,6 @@ import org.openbravo.service.db.DalConnectionProvider;
 
 import com.etendoerp.metadata.data.RequestVariables;
 import com.etendoerp.metadata.exceptions.InternalServerException;
-import com.etendoerp.metadata.utils.Utils;
 
 /**
  * @author luuchorocha
@@ -42,7 +41,6 @@ public class SessionManager {
                 clientId, orgId, warehouseId);
 
             if (sessionFilled) {
-                Utils.readNumberFormat(vars);
                 bypassCSRF(request, userId);
                 setRequestContext(request, vars);
 

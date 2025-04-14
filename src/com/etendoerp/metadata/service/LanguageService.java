@@ -6,6 +6,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
+import org.openbravo.dal.core.OBContext;
 
 import com.etendoerp.metadata.builders.LanguageBuilder;
 
@@ -19,6 +20,11 @@ public class LanguageService extends MetadataService {
 
     @Override
     public void process() throws IOException {
-        write(new LanguageBuilder().toJSON());
+        try {
+            OBContext.setAdminMode();
+            write(new LanguageBuilder().toJSON());
+        } finally {
+            OBContext.restorePreviousMode();
+        }
     }
 }

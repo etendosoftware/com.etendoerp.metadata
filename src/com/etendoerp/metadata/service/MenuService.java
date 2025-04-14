@@ -6,6 +6,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
+import org.openbravo.dal.core.OBContext;
 
 import com.etendoerp.metadata.builders.MenuBuilder;
 
@@ -19,6 +20,11 @@ public class MenuService extends MetadataService {
 
     @Override
     public void process() throws IOException {
-        write(new MenuBuilder().toJSON());
+        try {
+            OBContext.setAdminMode();
+            write(new MenuBuilder().toJSON());
+        } finally {
+            OBContext.restorePreviousMode();
+        }
     }
 }
