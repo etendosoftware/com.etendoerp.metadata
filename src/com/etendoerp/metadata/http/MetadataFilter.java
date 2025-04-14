@@ -10,8 +10,6 @@ import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
 import javax.servlet.annotation.WebFilter;
 
-import org.apache.log4j.Logger;
-
 import com.etendoerp.metadata.service.MetadataService;
 
 /**
@@ -19,11 +17,8 @@ import com.etendoerp.metadata.service.MetadataService;
  */
 @WebFilter(urlPatterns = { "/meta", "/meta/*" })
 public class MetadataFilter implements Filter {
-    private static final Logger log4j = Logger.getLogger(MetadataFilter.class);
-
     @Override
     public void init(FilterConfig fConfig) {
-        log4j.info("MetadataFilter initialized");
     }
 
     @Override
@@ -39,6 +34,5 @@ public class MetadataFilter implements Filter {
 
     @Override
     public void destroy() {
-        log4j.info("MetadataFilter destroyed");
     }
 }
