@@ -19,23 +19,26 @@ public class ToolbarService extends MetadataService {
 
     @Override
     public void process() throws IOException {
-        String path = getRequest().getPathInfo();
-        String[] pathParts = path.split("/");
+        try {
+            OBContext.setAdminMode();
+            String path = getRequest().getPathInfo();
+            String[] pathParts = path.split("/");
 
-        if (pathParts.length < 3) {
-            throw new UnprocessableContentException("Invalid toolbar path");
+            if (pathParts.length < 3) {
+                throw new UnprocessableContentException("Invalid toolbar path");
+            }
+
+            String windowId = pathParts[2];
+            String tabId = (pathParts.length >= 4 && !"undefined".equals(pathParts[3])) ? pathParts[3] : null;
+            JSONObject toolbar = fetchToolbar(windowId, tabId);
+            write(toolbar);
+        } finally {
+            OBContext.restorePreviousMode();
         }
-
-        String windowId = pathParts[2];
-        String tabId = (pathParts.length >= 4 && !"undefined".equals(pathParts[3])) ? pathParts[3] : null;
-        JSONObject toolbar = fetchToolbar(windowId, tabId);
-        write(toolbar);
     }
 
     private JSONObject fetchToolbar(String windowId, String tabId) {
-        return new ToolbarBuilder(OBContext.getOBContext().getLanguage().getLanguage(),
-            windowId,
-            tabId,
+        return new ToolbarBuilder(OBContext.getOBContext().getLanguage().getLanguage(), windowId, tabId,
             false).toJSON();
     }
 }

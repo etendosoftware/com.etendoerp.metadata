@@ -6,6 +6,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
+import org.openbravo.dal.core.OBContext;
 
 import com.etendoerp.metadata.builders.WindowBuilder;
 
@@ -20,6 +21,12 @@ public class WindowService extends MetadataService {
     @Override
     public void process() throws IOException {
         String id = getRequest().getPathInfo().substring(8);
-        write(new WindowBuilder(id).toJSON());
+
+        try {
+            OBContext.setAdminMode();
+            write(new WindowBuilder(id).toJSON());
+        } finally {
+            OBContext.restorePreviousMode();
+        }
     }
 }

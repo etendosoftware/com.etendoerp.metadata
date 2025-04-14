@@ -6,6 +6,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
+import org.openbravo.dal.core.OBContext;
 
 import com.etendoerp.metadata.auth.SessionManager;
 import com.etendoerp.metadata.builders.SessionBuilder;
@@ -21,7 +22,12 @@ public class SessionService extends MetadataService {
 
     @Override
     public void process() throws IOException {
-        RequestVariables vars = SessionManager.initializeSession(getRequest());
-        write(new SessionBuilder(vars).toJSON());
+        try {
+            OBContext.setAdminMode();
+            RequestVariables vars = SessionManager.initializeSession(getRequest());
+            write(new SessionBuilder(vars).toJSON());
+        } finally {
+            OBContext.restorePreviousMode();
+        }
     }
 }

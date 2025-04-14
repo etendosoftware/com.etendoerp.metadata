@@ -6,6 +6,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
+import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.ui.Tab;
 
@@ -21,8 +22,13 @@ public class TabService extends MetadataService {
 
     @Override
     public void process() throws IOException {
-        String tabId = getRequest().getPathInfo().substring(5);
-        Tab tab = OBDal.getInstance().get(Tab.class, tabId);
-        write(new TabBuilder(tab, null).toJSON());
+        try {
+            OBContext.setAdminMode();
+            String tabId = getRequest().getPathInfo().substring(5);
+            Tab tab = OBDal.getInstance().get(Tab.class, tabId);
+            write(new TabBuilder(tab, null).toJSON());
+        } finally {
+            OBContext.restorePreviousMode();
+        }
     }
 }
