@@ -9,7 +9,6 @@ import java.util.stream.Collectors;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
-import org.hibernate.criterion.Restrictions;
 import org.openbravo.base.model.Entity;
 import org.openbravo.base.model.ModelProvider;
 import org.openbravo.base.model.Property;
@@ -19,11 +18,8 @@ import org.openbravo.base.model.domaintype.PrimitiveDomainType;
 import org.openbravo.base.util.Check;
 import org.openbravo.client.application.Parameter;
 import org.openbravo.dal.core.DalUtil;
-import org.openbravo.dal.service.OBDal;
-import org.openbravo.model.ad.datamodel.Table;
 import org.openbravo.model.ad.domain.Reference;
 import org.openbravo.model.ad.domain.ReferencedTree;
-import org.openbravo.model.ad.ui.Tab;
 import org.openbravo.service.datasource.DataSource;
 import org.openbravo.service.datasource.DatasourceField;
 import org.openbravo.service.json.DataResolvingMode;
@@ -39,12 +35,10 @@ import com.etendoerp.metadata.utils.Constants;
  */
 public class ParameterBuilder extends Builder {
     private final Parameter parameter;
-    private final JSONObject json;
 
     public ParameterBuilder(Parameter parameter) {
         super();
         this.parameter = parameter;
-        this.json = converter.toJsonObject(parameter, DataResolvingMode.FULL_TRANSLATABLE);
     }
 
     public static JSONObject getSelectorInfo(String fieldId, Reference ref) throws JSONException {
@@ -140,8 +134,7 @@ public class ParameterBuilder extends Builder {
         selectorInfo.put(JsonConstants.TEXTMATCH_PARAMETER, selector.getSuggestiontextmatchstyle());
 
         setSelectorProperties(selector.getOBUISELSelectorFieldList(), selector.getDisplayfield(),
-            selector.getValuefield(),
-            selectorInfo);
+            selector.getValuefield(), selectorInfo);
 
         selectorInfo.put("extraSearchFields", getExtraSearchFields(selector));
         selectorInfo.put(Constants.DISPLAY_FIELD_PROPERTY, getDisplayField(selector));
@@ -328,14 +321,6 @@ public class ParameterBuilder extends Builder {
         return result.replace(DalUtil.DOT, DalUtil.FIELDSEPARATOR);
     }
 
-    private static Tab getReferencedTab(Property referenced) {
-        String tableId = referenced.getEntity().getTableId();
-        Table table = OBDal.getInstance().get(Table.class, tableId);
-
-        return (Tab) OBDal.getInstance().createCriteria(Tab.class).add(Restrictions.eq(Tab.PROPERTY_TABLE, table)).add(
-            Restrictions.eq(Tab.PROPERTY_ACTIVE, true)).setMaxResults(1).uniqueResult();
-    }
-
     private static boolean isSelectorParameter(Parameter parameter) {
         return parameter != null && parameter.getReference() != null && SELECTOR_REFERENCES.contains(
             parameter.getReference().getId());
@@ -348,9 +333,12 @@ public class ParameterBuilder extends Builder {
 
     @Override
     public JSONObject toJSON() throws JSONException {
+        JSONObject json = converter.toJsonObject(parameter, DataResolvingMode.FULL_TRANSLATABLE);
+
         if (isSelectorParameter(parameter)) {
             json.put("selector", getSelectorInfo(parameter.getId(), parameter.getReferenceSearchKey()));
         }
+
         if (isListParameter(parameter)) {
             json.put("refList", getListInfo(parameter.getReferenceSearchKey()));
         }

@@ -1,5 +1,7 @@
 package com.etendoerp.metadata.service;
 
+import static com.etendoerp.metadata.utils.Constants.TAB_ID;
+
 import java.io.IOException;
 
 import javax.servlet.http.HttpServletRequest;
@@ -13,13 +15,11 @@ import org.openbravo.erpCommon.utility.OBError;
 import com.etendoerp.metadata.data.RequestVariables;
 
 public class MessageService extends MetadataService {
-
     public MessageService(HttpServletRequest request, HttpServletResponse response) {
         super(request, response);
     }
 
     protected void setCORSHeaders(HttpServletRequest request, HttpServletResponse response) {
-
         String origin = request.getHeader("Origin");
 
         if (origin != null && !origin.isEmpty()) {
@@ -33,11 +33,17 @@ public class MessageService extends MetadataService {
 
     @Override
     public void process() throws IOException {
-        final VariablesSecureApp vars = new RequestVariables(getRequest());
-        OBError error = vars.getMessage("186");
-        vars.setMessage("186", null);
-        JSONObject jsonResponse = new JSONObject();
+        final HttpServletRequest req = getRequest();
+        final HttpServletResponse res = getResponse();
+        final VariablesSecureApp vars = new RequestVariables(req);
+        final JSONObject jsonResponse = new JSONObject();
+
+        final String tabId = req.getParameter(TAB_ID);
+        final OBError error = vars.getMessage(tabId);
+
         try {
+            vars.removeMessage(tabId);
+
             if (error != null) {
                 jsonResponse.put("message", error.getMessage());
                 jsonResponse.put("type", error.getType());
@@ -45,10 +51,12 @@ public class MessageService extends MetadataService {
             } else {
                 jsonResponse.put("message", "");
             }
-            setCORSHeaders(getRequest(), getResponse());
+
+            setCORSHeaders(req, getResponse());
         } catch (Exception e) {
             throw new OBException("Error while processing message", e);
         }
+
         write(jsonResponse);
     }
 }

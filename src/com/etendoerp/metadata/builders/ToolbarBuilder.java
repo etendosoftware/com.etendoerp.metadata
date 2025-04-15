@@ -23,6 +23,7 @@ import org.openbravo.service.json.DataToJsonConverter;
 
 import com.etendoerp.metadata.data.ButtonConfig;
 import com.etendoerp.metadata.exceptions.InternalServerException;
+import com.etendoerp.metadata.utils.Utils;
 
 public class ToolbarBuilder {
     private static final Logger logger = LogManager.getLogger(ToolbarBuilder.class);
@@ -124,7 +125,7 @@ public class ToolbarBuilder {
             button.put("buttonText", field.getColumn().getName());
 
             if (processDefinition != null) {
-                button.put("processDefinition", ProcessDefinitionBuilder.getFieldProcess(field));
+                button.put("processDefinition", Utils.getFieldProcess(field));
             }
 
             if (processAction != null) {
