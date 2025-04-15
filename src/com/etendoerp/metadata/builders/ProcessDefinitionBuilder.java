@@ -39,9 +39,7 @@ public class ProcessDefinitionBuilder extends Builder {
         JSONObject parameters = new JSONObject();
 
         for (Parameter param : process.getOBUIAPPParameterList()) {
-            if (param != null) {
-                parameters.put(param.getDBColumnName(), new ParameterBuilder(param).toJSON());
-            }
+            parameters.put(param.getDBColumnName(), new ParameterBuilder(param).toJSON());
         }
 
         processJSON.put("parameters", parameters);
