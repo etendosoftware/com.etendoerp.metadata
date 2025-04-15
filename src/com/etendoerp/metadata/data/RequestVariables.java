@@ -16,7 +16,7 @@ public class RequestVariables extends VariablesSecureApp {
     private final Map<String, Object> casedSessionAttributes = new HashMap<>();
 
     public RequestVariables(HttpServletRequest request) {
-        super(request instanceof HttpServletRequestWrapper ? request : new HttpServletRequestWrapper(request));
+        super(HttpServletRequestWrapper.wrap(request));
     }
 
     @Override

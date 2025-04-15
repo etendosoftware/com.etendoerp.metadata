@@ -18,6 +18,14 @@ public class HttpServletRequestWrapper extends RequestContext.HttpServletRequest
         SessionHolder.sessionCreated(session.get());
     }
 
+    public static HttpServletRequest wrap(HttpServletRequest request) {
+        if (request instanceof HttpServletRequestWrapper) {
+            return request;
+        } else {
+            return new HttpServletRequestWrapper(request);
+        }
+    }
+
     public static void clear() {
         session.remove();
         SessionHolder.clear();

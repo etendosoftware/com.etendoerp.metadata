@@ -4,7 +4,6 @@ import static com.etendoerp.metadata.exceptions.Utils.getResponseStatus;
 import static com.etendoerp.metadata.utils.Utils.initializeGlobalConfig;
 
 import java.io.IOException;
-import java.io.Writer;
 
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
@@ -21,19 +20,24 @@ import com.etendoerp.metadata.service.ServiceFactory;
  */
 public class MetadataServlet extends HttpSecureAppServlet {
     @Override
-    public void service(HttpServletRequest req, HttpServletResponse res) throws IOException, ServletException {
+    public void service(HttpServletRequest req, HttpServletResponse res) throws IOException {
         try {
-            super.service(req instanceof HttpServletRequestWrapper ? req : new HttpServletRequestWrapper(req), res);
+            super.service(HttpServletRequestWrapper.wrap(req), res);
         } catch (Exception e) {
+            log4j.error(e.getMessage(), e);
             res.setStatus(getResponseStatus(e));
-            Writer writer = res.getWriter();
-            writer.write(JsonUtils.convertExceptionToJson(e));
-            writer.close();
+            res.getWriter().write(JsonUtils.convertExceptionToJson(e));
         }
     }
 
-    private void process(HttpServletRequest req, HttpServletResponse res) throws IOException, ServletException {
-        ServiceFactory.getService(req, res).process();
+    private void process(HttpServletRequest req, HttpServletResponse res) throws IOException {
+        try {
+            ServiceFactory.getService(req, res).process();
+        } catch (Exception e) {
+            log4j.error(e.getMessage(), e);
+            res.setStatus(getResponseStatus(e));
+            res.getWriter().write(JsonUtils.convertExceptionToJson(e));
+        }
     }
 
     @Override

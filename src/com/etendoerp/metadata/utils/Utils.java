@@ -48,7 +48,7 @@ public class Utils {
         Table table = dal.get(Table.class, tableId);
 
         return (Tab) dal.createCriteria(Tab.class).add(Restrictions.eq(Tab.PROPERTY_TABLE, table)).add(
-            Restrictions.eq(Tab.PROPERTY_ACTIVE, true)).uniqueResult();
+            Restrictions.eq(Tab.PROPERTY_ACTIVE, true)).setMaxResults(1).uniqueResult();
     }
 
 
