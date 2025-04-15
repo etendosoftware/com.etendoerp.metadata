@@ -24,8 +24,8 @@ import com.etendoerp.metadata.exceptions.NotFoundException;
 public class ServletService extends MetadataService {
     private static final Map<String, ServletRegistration> SERVLET_REGISTRY = buildServletRegistry();
 
-    public ServletService(HttpSecureAppServlet caller, HttpServletRequest request, HttpServletResponse response) {
-        super(caller, request, response);
+    public ServletService(HttpServletRequest request, HttpServletResponse response) {
+        super(request, response);
     }
 
     private static Map<String, ServletRegistration> buildServletRegistry() {

@@ -14,8 +14,8 @@ import com.etendoerp.metadata.builders.MenuBuilder;
  * @author luuchorocha
  */
 public class MenuService extends MetadataService {
-    public MenuService(HttpSecureAppServlet caller, HttpServletRequest request, HttpServletResponse response) {
-        super(caller, request, response);
+    public MenuService(HttpServletRequest request, HttpServletResponse response) {
+        super(request, response);
     }
 
     @Override

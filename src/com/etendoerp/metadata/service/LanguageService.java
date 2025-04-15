@@ -14,8 +14,8 @@ import com.etendoerp.metadata.builders.LanguageBuilder;
  * @author luuchorocha
  */
 public class LanguageService extends MetadataService {
-    public LanguageService(HttpSecureAppServlet caller, HttpServletRequest request, HttpServletResponse response) {
-        super(caller, request, response);
+    public LanguageService(HttpServletRequest request, HttpServletResponse response) {
+        super(request, response);
     }
 
     @Override

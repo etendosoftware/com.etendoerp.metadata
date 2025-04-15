@@ -5,7 +5,6 @@ import java.io.IOException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.openbravo.base.secureApp.HttpSecureAppServlet;
 import org.openbravo.dal.core.OBContext;
 
 import com.etendoerp.metadata.auth.SessionManager;
@@ -16,8 +15,8 @@ import com.etendoerp.metadata.data.RequestVariables;
  * @author luuchorocha
  */
 public class SessionService extends MetadataService {
-    public SessionService(HttpSecureAppServlet caller, HttpServletRequest request, HttpServletResponse response) {
-        super(caller, request, response);
+    public SessionService(HttpServletRequest request, HttpServletResponse response) {
+        super(request, response);
     }
 
     @Override

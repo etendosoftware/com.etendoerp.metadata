@@ -7,6 +7,7 @@ import java.util.List;
  * @author luuchorocha
  */
 public class Constants {
+    public static final String SERVLET_PATH = "/servlet";
     public static final String TOOLBAR_PATH = "/toolbar";
     public static final String SESSION_PATH = "/session";
     public static final String MENU_PATH = "/menu";
@@ -25,6 +26,7 @@ public class Constants {
     public static final String FIELD_ID_PROPERTY = "fieldId";
     public static final String DISPLAY_FIELD_PROPERTY = "displayField";
     public static final String VALUE_FIELD_PROPERTY = "valueField";
+    public static final String TAB_ID = "tabId";
     private static final String SELECTOR_REFERENCE_ID = "95E2A8B50A254B2AAE6774B8C2F28120";
     private static final String SEARCH_REFERENCE_ID = "30";
     private static final String TABLE_DIR_REFERENCE_ID = "19";
