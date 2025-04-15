@@ -7,6 +7,7 @@ import java.util.List;
  * @author luuchorocha
  */
 public class Constants {
+    public static final String SERVLET_PATH = "/servlet";
     public static final String TOOLBAR_PATH = "/toolbar";
     public static final String SESSION_PATH = "/session";
     public static final String MENU_PATH = "/menu";

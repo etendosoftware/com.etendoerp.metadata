@@ -16,8 +16,8 @@ import com.etendoerp.metadata.builders.TabBuilder;
  * @author luuchorocha
  */
 public class TabService extends MetadataService {
-    public TabService(HttpSecureAppServlet caller, HttpServletRequest request, HttpServletResponse response) {
-        super(caller, request, response);
+    public TabService(HttpServletRequest request, HttpServletResponse response) {
+        super(request, response);
     }
 
     @Override

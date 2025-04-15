@@ -23,7 +23,7 @@ public class MetadataServlet extends HttpSecureAppServlet {
     }
 
     private void process(HttpServletRequest req, HttpServletResponse res) throws IOException, ServletException {
-        ServiceFactory.getService(this, req, res).process();
+        ServiceFactory.getService(req, res).process();
     }
 
     @Override

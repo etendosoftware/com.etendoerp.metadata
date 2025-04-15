@@ -14,8 +14,8 @@ import com.etendoerp.metadata.builders.WindowBuilder;
  * @author luuchorocha
  */
 public class WindowService extends MetadataService {
-    public WindowService(HttpSecureAppServlet caller, HttpServletRequest request, HttpServletResponse response) {
-        super(caller, request, response);
+    public WindowService(HttpServletRequest request, HttpServletResponse response) {
+        super(request, response);
     }
 
     @Override
