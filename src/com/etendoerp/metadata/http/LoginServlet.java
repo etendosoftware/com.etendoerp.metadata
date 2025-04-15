@@ -23,7 +23,8 @@ public class LoginServlet extends HttpBaseServlet {
     @Override
     public final void service(HttpServletRequest request,
         HttpServletResponse response) throws IOException, ServletException {
-        super.service(new HttpServletRequestWrapper(request), response);
+        super.service(request instanceof HttpServletRequestWrapper ? request : new HttpServletRequestWrapper(request),
+            response);
     }
 
     @Override

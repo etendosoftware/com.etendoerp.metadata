@@ -52,7 +52,7 @@ public class MessageService extends MetadataService {
                 jsonResponse.put("message", "");
             }
 
-            setCORSHeaders(req, getResponse());
+            setCORSHeaders(req, res);
         } catch (Exception e) {
             throw new OBException("Error while processing message", e);
         }
