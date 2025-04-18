@@ -1,5 +1,7 @@
 package com.etendoerp.metadata.auth;
 
+import static com.etendoerp.metadata.exceptions.Utils.getJsonObject;
+
 import java.io.UnsupportedEncodingException;
 import java.security.NoSuchAlgorithmException;
 import java.security.spec.InvalidKeySpecException;
@@ -23,8 +25,6 @@ import org.openbravo.model.ad.access.User;
 import org.openbravo.model.common.enterprise.Organization;
 import org.openbravo.model.common.enterprise.Warehouse;
 import org.openbravo.service.db.DalConnectionProvider;
-import org.openbravo.service.json.DataResolvingMode;
-import org.openbravo.service.json.DataToJsonConverter;
 
 import com.auth0.jwt.exceptions.JWTCreationException;
 import com.auth0.jwt.interfaces.DecodedJWT;
@@ -43,12 +43,10 @@ public class LoginManager {
     private static final Logger logger = LogManager.getLogger(LoginManager.class);
     private final ConnectionProvider conn;
     private final OBDal entityProvider;
-    private final DataToJsonConverter converter;
 
     public LoginManager() {
         this.entityProvider = OBDal.getInstance();
         this.conn = new DalConnectionProvider();
-        this.converter = new DataToJsonConverter();
     }
 
     public JSONObject processLogin(HttpServletRequest request) {
@@ -163,13 +161,13 @@ public class LoginManager {
                 authData.role = authData.user.getDefaultRole();
             }
 
-            String roleId = authData.role != null ? authData.role.getId() : null;
+            String roleId = authData.role != null ? authData.role.getId() : "";
             LoginUtils.RoleDefaults defaults = LoginUtils.getLoginDefaults(authData.user.getId(), roleId, conn);
 
-            if (authData.org == null) {
+            if (authData.org == null && defaults.org != null) {
                 authData.org = entityProvider.get(Organization.class, defaults.org);
             }
-            if (authData.warehouse == null) {
+            if (authData.warehouse == null && defaults.warehouse != null) {
                 authData.warehouse = entityProvider.get(Warehouse.class, defaults.warehouse);
             }
 
@@ -181,10 +179,10 @@ public class LoginManager {
 
             JSONArray rolesAndOrgs = SecureWebServicesUtils.getUserRolesAndOrg(authData.user, true, true);
             result.put("roleList", rolesAndOrgs);
-            result.put("user", converter.toJsonObject(authData.user, DataResolvingMode.FULL));
-            result.put("currentRole", converter.toJsonObject(authData.role, DataResolvingMode.FULL));
-            result.put("currentOrganization", converter.toJsonObject(authData.org, DataResolvingMode.FULL));
-            result.put("currentClient", converter.toJsonObject(authData.warehouse, DataResolvingMode.FULL));
+            result.put("user", getJsonObject(authData.user));
+            result.put("currentRole", getJsonObject(authData.role));
+            result.put("currentOrganization", getJsonObject(authData.org));
+            result.put("currentClient", getJsonObject(authData.warehouse));
         } catch (JWTCreationException e) {
             logger.warn("SWS - Error creating token", e);
             throw new Exception(Utility.messageBD(conn, "SMFSWS_ErrorCreatingToken",

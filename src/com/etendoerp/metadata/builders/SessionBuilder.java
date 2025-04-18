@@ -1,5 +1,7 @@
 package com.etendoerp.metadata.builders;
 
+import static com.etendoerp.metadata.exceptions.Utils.getJsonObject;
+
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.dal.core.OBContext;
@@ -8,7 +10,6 @@ import org.openbravo.model.ad.access.User;
 import org.openbravo.model.ad.system.Client;
 import org.openbravo.model.common.enterprise.Organization;
 import org.openbravo.model.common.enterprise.Warehouse;
-import org.openbravo.service.json.DataResolvingMode;
 
 import com.etendoerp.metadata.data.RequestVariables;
 import com.etendoerp.metadata.exceptions.InternalServerException;
@@ -34,11 +35,11 @@ public class SessionBuilder extends Builder {
             Client client = context.getCurrentClient();
             Warehouse warehouse = context.getWarehouse();
 
-            json.put("user", converter.toJsonObject(user, DataResolvingMode.FULL_TRANSLATABLE));
-            json.put("currentRole", converter.toJsonObject(role, DataResolvingMode.FULL_TRANSLATABLE));
-            json.put("currentOrganization", converter.toJsonObject(organization, DataResolvingMode.FULL_TRANSLATABLE));
-            json.put("currentClient", converter.toJsonObject(client, DataResolvingMode.FULL_TRANSLATABLE));
-            json.put("currentWarehouse", converter.toJsonObject(warehouse, DataResolvingMode.FULL_TRANSLATABLE));
+            json.put("user", getJsonObject(user));
+            json.put("currentRole", getJsonObject(role));
+            json.put("currentOrganization", getJsonObject(organization));
+            json.put("currentClient", getJsonObject(client));
+            json.put("currentWarehouse", getJsonObject(warehouse));
             json.put("languages", new LanguageBuilder().toJSON());
             json.put("attributes", vars.getCasedSessionAttributes());
 

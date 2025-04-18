@@ -4,13 +4,18 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.http.HttpStatus;
+import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.base.exception.OBSecurityException;
+import org.openbravo.base.structure.BaseOBObject;
+import org.openbravo.service.json.DataResolvingMode;
+import org.openbravo.service.json.DataToJsonConverter;
 
 /**
  * @author luuchorocha
  */
 public class Utils {
     private static final Map<String, Integer> EXCEPTION_STATUS_MAP = new HashMap<>();
+    private static final DataToJsonConverter CONVERTER = new DataToJsonConverter();
 
     static {
         EXCEPTION_STATUS_MAP.put(OBSecurityException.class.getName(), HttpStatus.SC_UNAUTHORIZED);
@@ -27,6 +32,14 @@ public class Utils {
             return result;
         } else {
             return HttpStatus.SC_INTERNAL_SERVER_ERROR;
+        }
+    }
+
+    public static JSONObject getJsonObject(BaseOBObject object) {
+        if (object != null) {
+            return CONVERTER.toJsonObject(object, DataResolvingMode.FULL_TRANSLATABLE);
+        } else {
+            return null;
         }
     }
 }
