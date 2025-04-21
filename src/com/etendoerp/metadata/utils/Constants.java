@@ -27,6 +27,8 @@ public class Constants {
     public static final String DISPLAY_FIELD_PROPERTY = "displayField";
     public static final String VALUE_FIELD_PROPERTY = "valueField";
     public static final String TAB_ID = "tabId";
+    public static final String SWS_SWS_ARE_MISCONFIGURED = "SWS - SWS are misconfigured";
+    public static final String SWS_INVALID_CREDENTIALS = "SWS - You must specify a username and password or a valid token";
     private static final String SELECTOR_REFERENCE_ID = "95E2A8B50A254B2AAE6774B8C2F28120";
     private static final String SEARCH_REFERENCE_ID = "30";
     private static final String TABLE_DIR_REFERENCE_ID = "19";

@@ -20,13 +20,10 @@ import com.etendoerp.metadata.exceptions.NotFoundException;
 import com.etendoerp.metadata.exceptions.UnauthorizedException;
 
 public class WindowBuilder extends Builder {
-    private static final String SELECTED_PROPERTIES =
-        String.join(",", Window.PROPERTY_ID, Window.PROPERTY_NAME, Window.PROPERTY_WINDOWTYPE);
     private final String id;
 
     public WindowBuilder(String id) {
         this.id = id;
-        this.converter.setSelectedProperties(SELECTED_PROPERTIES);
     }
 
     public JSONObject toJSON() {

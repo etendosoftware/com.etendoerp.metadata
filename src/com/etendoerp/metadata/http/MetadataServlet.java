@@ -6,7 +6,6 @@ import static com.etendoerp.metadata.utils.Utils.initializeGlobalConfig;
 import java.io.IOException;
 
 import javax.servlet.ServletConfig;
-import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
@@ -41,22 +40,22 @@ public class MetadataServlet extends HttpSecureAppServlet {
     }
 
     @Override
-    public final void doGet(HttpServletRequest req, HttpServletResponse res) throws IOException, ServletException {
+    public final void doGet(HttpServletRequest req, HttpServletResponse res) throws IOException {
         process(req, res);
     }
 
     @Override
-    public final void doPost(HttpServletRequest req, HttpServletResponse res) throws IOException, ServletException {
+    public final void doPost(HttpServletRequest req, HttpServletResponse res) throws IOException {
         process(req, res);
     }
 
     @Override
-    public final void doPut(HttpServletRequest req, HttpServletResponse res) throws IOException, ServletException {
+    public final void doPut(HttpServletRequest req, HttpServletResponse res) throws IOException {
         process(req, res);
     }
 
     @Override
-    public final void doDelete(HttpServletRequest req, HttpServletResponse res) throws IOException, ServletException {
+    public final void doDelete(HttpServletRequest req, HttpServletResponse res) throws IOException {
         process(req, res);
     }
 

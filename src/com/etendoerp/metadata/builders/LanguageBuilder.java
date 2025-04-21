@@ -1,5 +1,7 @@
 package com.etendoerp.metadata.builders;
 
+import java.util.List;
+
 import org.codehaus.jettison.json.JSONObject;
 import org.hibernate.criterion.Restrictions;
 import org.openbravo.dal.service.OBDal;
@@ -14,10 +16,10 @@ public class LanguageBuilder extends Builder {
         JSONObject json = new JSONObject();
 
         try {
-            for (Language lang : OBDal.getInstance()
-                .createCriteria(Language.class)
-                .add(Restrictions.eq(Language.PROPERTY_SYSTEMLANGUAGE, true))
-                .list()) {
+            List<Language> languages = OBDal.getReadOnlyInstance().createCriteria(Language.class).add(
+                Restrictions.eq(Language.PROPERTY_SYSTEMLANGUAGE, true)).list();
+
+            for (Language lang : languages) {
                 json.put(lang.getLanguage(), converter.toJsonObject(lang, DataResolvingMode.FULL_TRANSLATABLE));
             }
         } catch (Exception e) {

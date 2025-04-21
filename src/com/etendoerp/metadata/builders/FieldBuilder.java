@@ -51,7 +51,6 @@ public class FieldBuilder extends Builder {
     private final JSONObject json;
 
     public FieldBuilder(Field field, FieldAccess fieldAccess) {
-        super();
         this.field = field;
         this.fieldAccess = fieldAccess;
         this.json = converter.toJsonObject(field, DataResolvingMode.FULL_TRANSLATABLE);

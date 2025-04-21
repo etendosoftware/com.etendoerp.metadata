@@ -13,6 +13,7 @@ import org.openbravo.model.common.enterprise.Warehouse;
 
 import com.etendoerp.metadata.data.RequestVariables;
 import com.etendoerp.metadata.exceptions.InternalServerException;
+import com.smf.securewebservices.utils.SecureWebServicesUtils;
 
 /**
  * @author luuchorocha
@@ -21,7 +22,6 @@ public class SessionBuilder extends Builder {
     private final RequestVariables vars;
 
     public SessionBuilder(RequestVariables vars) {
-        super();
         this.vars = vars;
     }
 
@@ -42,6 +42,7 @@ public class SessionBuilder extends Builder {
             json.put("currentWarehouse", getJsonObject(warehouse));
             json.put("languages", new LanguageBuilder().toJSON());
             json.put("attributes", vars.getCasedSessionAttributes());
+            json.put("roleList", SecureWebServicesUtils.getUserRolesAndOrg(user, true, true));
 
             return json;
         } catch (JSONException e) {

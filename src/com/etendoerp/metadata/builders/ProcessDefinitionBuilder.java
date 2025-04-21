@@ -10,7 +10,6 @@ public class ProcessDefinitionBuilder extends Builder {
     private final Process process;
 
     public ProcessDefinitionBuilder(Process process) {
-        super();
         this.process = process;
     }
 

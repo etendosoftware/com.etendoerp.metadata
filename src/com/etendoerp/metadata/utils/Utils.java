@@ -4,6 +4,7 @@ import static org.openbravo.client.application.DynamicExpressionParser.replaceSy
 
 import javax.script.ScriptException;
 import javax.servlet.ServletConfig;
+import javax.servlet.http.HttpServletRequest;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -97,5 +98,13 @@ public class Utils {
         processJson.put("reference", field.getColumn().getReference().getId());
 
         return processJson;
+    }
+
+    public static JSONObject getRequestData(HttpServletRequest request) {
+        try {
+            return new JSONObject(request.getReader().lines().reduce("", String::concat));
+        } catch (Exception e) {
+            return new JSONObject();
+        }
     }
 }

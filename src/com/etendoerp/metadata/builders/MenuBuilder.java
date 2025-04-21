@@ -1,12 +1,9 @@
 package com.etendoerp.metadata.builders;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
-import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
-import org.openbravo.client.application.GlobalMenu;
 import org.openbravo.client.application.MenuManager;
 import org.openbravo.client.application.MenuManager.MenuOption;
 import org.openbravo.client.application.Process;
@@ -16,25 +13,17 @@ import org.openbravo.model.ad.ui.Form;
 import org.openbravo.model.ad.ui.Menu;
 import org.openbravo.model.ad.ui.Window;
 
-import com.etendoerp.metadata.exceptions.InternalServerException;
-
 /**
  * @author luuchorocha
  */
 public class MenuBuilder extends Builder {
-    private final MenuOption menu;
-    private final Language language;
-
-    public MenuBuilder() {
-        MenuManager manager = new MenuManager();
-        manager.setGlobalMenuOptions(new GlobalMenu());
-        menu = manager.getMenu();
-        language = OBContext.getOBContext().getLanguage();
-    }
+    private final MenuOption menu = new MenuManager().getMenu();
 
     private JSONObject toJSON(MenuOption entry) {
+        JSONObject json = new JSONObject();
+
         try {
-            JSONObject json = new JSONObject();
+            Language language = OBContext.getOBContext().getLanguage();
             Menu menu = entry.getMenu();
             String id = menu.getId();
             Window window = menu.getWindow();
@@ -56,31 +45,19 @@ public class MenuBuilder extends Builder {
             if (null != processDefinition) json.put("processDefinitionId", processDefinition.getId());
             if (null != form) json.put("formId", form.getId());
 
-            if (!children.isEmpty())
-                json.put("children", children.stream().map(this::toJSON).collect(Collectors.toList()));
+            if (!children.isEmpty()) json.put("children", children.stream().map(this::toJSON));
 
-            return json;
         } catch (JSONException e) {
-            logger.error(e.getMessage());
-
-            throw new InternalServerException();
+            logger.error(e.getMessage(), e);
         }
+
+        return json;
     }
 
     @Override
-    public JSONObject toJSON() {
+    public JSONObject toJSON() throws JSONException {
         JSONObject result = new JSONObject();
-        JSONArray items = new JSONArray();
-
-        for (MenuOption item : this.menu.getChildren()) {
-            items.put(toJSON(item));
-        }
-
-        try {
-            result.put("menu", items);
-        } catch (JSONException e) {
-            throw new InternalServerException(e.getMessage());
-        }
+        result.put("menu", menu.getChildren().stream().map(this::toJSON));
 
         return result;
     }
