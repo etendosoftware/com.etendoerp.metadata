@@ -6,7 +6,6 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.codehaus.jettison.json.JSONObject;
-import org.openbravo.base.secureApp.HttpSecureAppServlet;
 import org.openbravo.dal.core.OBContext;
 
 import com.etendoerp.metadata.builders.ToolbarBuilder;

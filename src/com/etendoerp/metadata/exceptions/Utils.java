@@ -2,6 +2,7 @@ package com.etendoerp.metadata.exceptions;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 import org.apache.http.HttpStatus;
 import org.codehaus.jettison.json.JSONObject;
@@ -28,18 +29,14 @@ public class Utils {
     public static int getResponseStatus(Exception e) {
         Integer result = EXCEPTION_STATUS_MAP.get(e.getClass().getName());
 
-        if (result != null) {
-            return result;
-        } else {
-            return HttpStatus.SC_INTERNAL_SERVER_ERROR;
-        }
+        return Objects.requireNonNullElse(result, HttpStatus.SC_INTERNAL_SERVER_ERROR);
     }
 
     public static JSONObject getJsonObject(BaseOBObject object) {
         if (object != null) {
             return CONVERTER.toJsonObject(object, DataResolvingMode.FULL_TRANSLATABLE);
         } else {
-            return null;
+            return (JSONObject) JSONObject.NULL;
         }
     }
 }
