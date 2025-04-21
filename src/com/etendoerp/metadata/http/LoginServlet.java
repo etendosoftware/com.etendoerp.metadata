@@ -1,5 +1,7 @@
 package com.etendoerp.metadata.http;
 
+import static com.etendoerp.metadata.exceptions.Utils.getResponseStatus;
+
 import java.io.IOException;
 import java.io.Writer;
 import java.nio.charset.StandardCharsets;
@@ -13,6 +15,7 @@ import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.base.HttpBaseServlet;
 import org.openbravo.base.secureApp.AllowedCrossDomainsHandler;
 import org.openbravo.dal.core.OBContext;
+import org.openbravo.service.json.JsonUtils;
 
 import com.etendoerp.metadata.auth.LoginManager;
 
@@ -37,9 +40,11 @@ public class LoginServlet extends HttpBaseServlet {
 
         try {
             OBContext.setAdminMode(true);
-            final LoginManager loginService = new LoginManager();
-            final JSONObject result;
-            writeResponse(response, loginService.processLogin(request));
+            writeResponse(response, new LoginManager().processLogin(request));
+        } catch (Exception e) {
+            log4j.error(e.getMessage(), e);
+            response.setStatus(getResponseStatus(e));
+            response.getWriter().write(JsonUtils.convertExceptionToJson(e));
         } finally {
             OBContext.restorePreviousMode();
         }

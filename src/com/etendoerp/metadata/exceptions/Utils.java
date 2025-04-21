@@ -36,7 +36,7 @@ public class Utils {
         if (object != null) {
             return CONVERTER.toJsonObject(object, DataResolvingMode.FULL_TRANSLATABLE);
         } else {
-            return (JSONObject) JSONObject.NULL;
+            return null;
         }
     }
 }
