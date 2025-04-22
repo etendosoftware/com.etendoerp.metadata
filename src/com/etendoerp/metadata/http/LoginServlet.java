@@ -11,6 +11,7 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.apache.http.entity.ContentType;
 import org.openbravo.base.HttpBaseServlet;
+import org.openbravo.base.secureApp.AllowedCrossDomainsHandler;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.service.json.JsonUtils;
 
@@ -31,7 +32,14 @@ public class LoginServlet extends HttpBaseServlet {
     }
 
     @Override
+    public final void doOptions(HttpServletRequest req, HttpServletResponse res) {
+        AllowedCrossDomainsHandler.getInstance().setCORSHeaders(req, res);
+    }
+
+    @Override
     public void doPost(HttpServletRequest req, HttpServletResponse res) throws IOException {
+        AllowedCrossDomainsHandler.getInstance().setCORSHeaders(req, res);
+
         try {
             OBContext.setAdminMode(true);
             validateConfig();

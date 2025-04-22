@@ -14,10 +14,7 @@ import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.authentication.hashing.PasswordHash;
 import org.openbravo.base.secureApp.DefaultValidationException;
 import org.openbravo.base.secureApp.LoginUtils;
-import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
-import org.openbravo.database.ConnectionProvider;
-import org.openbravo.erpCommon.utility.Utility;
 import org.openbravo.model.ad.access.Role;
 import org.openbravo.model.ad.access.User;
 import org.openbravo.model.common.enterprise.Organization;
@@ -39,26 +36,25 @@ import com.smf.securewebservices.utils.SecureWebServicesUtils;
 public class LoginManager {
     private final Logger logger = LogManager.getLogger(LoginManager.class);
     private final OBDal entityProvider = OBDal.getReadOnlyInstance();
-    private final ConnectionProvider conn = DalConnectionProvider.getReadOnlyConnectionProvider();
+    private final DalConnectionProvider conn = new DalConnectionProvider();
 
     public JSONObject processLogin(HttpServletRequest request) throws Exception {
-        return generateLoginResult(authenticate(request));
+        return generateLoginResult(addDefaults(authenticate(request)));
     }
 
     private String extractToken(String authorization) {
         return authorization != null ? authorization.substring(7) : null;
     }
 
-    private AuthData authenticate(HttpServletRequest request) throws Exception {
+    private AuthData authenticate(HttpServletRequest request) {
         JSONObject data = Utils.getRequestData(request);
         AuthData result;
 
         if (hasCredentials(data)) {
-            return addDefaults(getAuthData(data));
+            return getAuthData(data);
         }
 
         String token = extractToken(request.getHeader("Authorization"));
-
 
         if (token != null) {
             result = getAuthData(data, token);
@@ -66,7 +62,7 @@ public class LoginManager {
             throw new UnauthorizedException(Constants.SWS_INVALID_CREDENTIALS);
         }
 
-        return addDefaults(result);
+        return result;
     }
 
     private AuthData getAuthData(JSONObject data) {
@@ -103,9 +99,7 @@ public class LoginManager {
     private User authenticateUser(JSONObject data) {
         String username = data.optString("username", null);
         String pass = data.optString("password", null);
-        return PasswordHash.getUserWithPassword(username, pass).orElseThrow(() -> new UnauthorizedException(
-            Utility.messageBD(conn, "IDENTIFICATION_FAILURE_TITLE",
-                OBContext.getOBContext().getLanguage().getLanguage())));
+        return PasswordHash.getUserWithPassword(username, pass).orElseThrow(UnauthorizedException::new);
     }
 
     private <T> T getEntity(JSONObject data, String key, Class<T> clazz) {
@@ -147,7 +141,8 @@ public class LoginManager {
         }
 
         String roleId = authData.role != null ? authData.role.getId() : "";
-        LoginUtils.RoleDefaults defaults = LoginUtils.getLoginDefaults(authData.user.getId(), roleId, conn);
+        LoginUtils.RoleDefaults defaults = LoginUtils.getLoginDefaults(authData.user.getId(), roleId,
+            DalConnectionProvider.getReadOnlyConnectionProvider());
 
         if (authData.org == null && defaults.org != null) {
             authData.org = entityProvider.get(Organization.class, defaults.org);
