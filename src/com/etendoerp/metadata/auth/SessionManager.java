@@ -48,7 +48,7 @@ public class SessionManager {
             Warehouse warehouse = context.getWarehouse();
             String warehouseId = warehouse != null ? warehouse.getId() : "";
 
-            boolean sessionFilled = LoginUtils.fillSessionArguments(conn, vars, userId, languageCode, isRTL, roleId,
+           boolean sessionFilled = LoginUtils.fillSessionArguments(conn, vars, userId, languageCode, isRTL, roleId,
                 clientId, orgId, warehouseId);
 
             if (sessionFilled) {

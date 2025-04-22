@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
+import org.openbravo.client.application.GlobalMenu;
 import org.openbravo.client.application.MenuManager;
 import org.openbravo.client.application.MenuManager.MenuOption;
 import org.openbravo.client.application.Process;
@@ -17,7 +18,13 @@ import org.openbravo.model.ad.ui.Window;
  * @author luuchorocha
  */
 public class MenuBuilder extends Builder {
-    private final MenuOption menu = new MenuManager().getMenu();
+    private static final MenuManager manager = new MenuManager();
+
+    public MenuBuilder() {
+        if (manager.getMenu() == null) {
+            manager.setGlobalMenuOptions(new GlobalMenu());
+        }
+    }
 
     private JSONObject toJSON(MenuOption entry) {
         JSONObject json = new JSONObject();
@@ -57,7 +64,7 @@ public class MenuBuilder extends Builder {
     @Override
     public JSONObject toJSON() throws JSONException {
         JSONObject result = new JSONObject();
-        result.put("menu", menu.getChildren().stream().map(this::toJSON));
+        result.put("menu", manager.getMenu().getChildren().stream().map(this::toJSON));
 
         return result;
     }

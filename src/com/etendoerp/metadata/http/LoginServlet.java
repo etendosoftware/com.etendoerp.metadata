@@ -3,11 +3,13 @@ package com.etendoerp.metadata.http;
 import static com.etendoerp.metadata.exceptions.Utils.getResponseStatus;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.apache.http.entity.ContentType;
 import org.openbravo.base.HttpBaseServlet;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.service.json.JsonUtils;
@@ -21,6 +23,8 @@ import com.smf.securewebservices.SWSConfig;
  * @author luuchorocha
  */
 public class LoginServlet extends HttpBaseServlet {
+    private final LoginManager manager = new LoginManager();
+
     @Override
     public final void service(HttpServletRequest req, HttpServletResponse res) throws IOException, ServletException {
         super.service(HttpServletRequestWrapper.wrap(req), res);
@@ -29,9 +33,11 @@ public class LoginServlet extends HttpBaseServlet {
     @Override
     public void doPost(HttpServletRequest req, HttpServletResponse res) throws IOException {
         try {
-            validateConfig();
             OBContext.setAdminMode(true);
-            res.getWriter().write(new LoginManager().processLogin(req).toString());
+            validateConfig();
+            res.setContentType(ContentType.APPLICATION_JSON.getMimeType());
+            res.setCharacterEncoding(StandardCharsets.UTF_8.name());
+            res.getWriter().write(manager.processLogin(HttpServletRequestWrapper.wrap(req)).toString());
         } catch (Exception e) {
             log4j.error(e.getMessage(), e);
             res.setStatus(getResponseStatus(e));

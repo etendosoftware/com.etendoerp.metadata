@@ -10,6 +10,8 @@ import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
 import javax.servlet.annotation.WebFilter;
 
+import org.openbravo.client.kernel.RequestContext;
+
 import com.etendoerp.metadata.service.MetadataService;
 
 /**
@@ -19,6 +21,7 @@ import com.etendoerp.metadata.service.MetadataService;
 public class MetadataFilter implements Filter {
     @Override
     public void init(FilterConfig fConfig) {
+        RequestContext.setServletContext(fConfig.getServletContext());
     }
 
     @Override

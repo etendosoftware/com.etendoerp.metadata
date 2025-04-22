@@ -37,7 +37,7 @@ import com.smf.securewebservices.utils.SecureWebServicesUtils;
  * @author luuchorocha
  */
 public class LoginManager {
-    private static final Logger logger = LogManager.getLogger(LoginManager.class);
+    private final Logger logger = LogManager.getLogger(LoginManager.class);
     private final OBDal entityProvider = OBDal.getReadOnlyInstance();
     private final ConnectionProvider conn = DalConnectionProvider.getReadOnlyConnectionProvider();
 
@@ -49,18 +49,24 @@ public class LoginManager {
         return authorization != null ? authorization.substring(7) : null;
     }
 
-    private AuthData authenticate(HttpServletRequest request) {
-        AuthData result;
+    private AuthData authenticate(HttpServletRequest request) throws Exception {
         JSONObject data = Utils.getRequestData(request);
-        String token = extractToken(request.getHeader("Authorization"));
+        AuthData result;
 
         if (hasCredentials(data)) {
-            return getAuthData(data);
-        } else if (token != null) {
-            return getAuthData(data, token);
+            return addDefaults(getAuthData(data));
+        }
+
+        String token = extractToken(request.getHeader("Authorization"));
+
+
+        if (token != null) {
+            result = getAuthData(data, token);
         } else {
             throw new UnauthorizedException(Constants.SWS_INVALID_CREDENTIALS);
         }
+
+        return addDefaults(result);
     }
 
     private AuthData getAuthData(JSONObject data) {
@@ -125,8 +131,6 @@ public class LoginManager {
     private JSONObject generateLoginResult(AuthData authData) throws Exception {
         try {
             JSONObject result = new JSONObject();
-
-            result.put("status", "success");
             result.put("token", generateToken(authData.user, authData.role, authData.org, authData.warehouse));
 
             return result;
@@ -137,13 +141,7 @@ public class LoginManager {
         }
     }
 
-    private String getToken(AuthData authData) throws Exception {
-        addDefaults(authData);
-
-        return generateToken(authData.user, authData.role, authData.org, authData.warehouse);
-    }
-
-    private void addDefaults(AuthData authData) throws ServletException, DefaultValidationException {
+    private AuthData addDefaults(AuthData authData) throws ServletException, DefaultValidationException {
         if (authData.role == null) {
             authData.role = authData.user.getDefaultRole();
         }
@@ -157,5 +155,7 @@ public class LoginManager {
         if (authData.warehouse == null && defaults.warehouse != null) {
             authData.warehouse = entityProvider.get(Warehouse.class, defaults.warehouse);
         }
+
+        return authData;
     }
 }

@@ -12,12 +12,15 @@ import static com.etendoerp.metadata.utils.Constants.WINDOW_PATH;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.openbravo.authentication.AuthenticationManager;
+
 /**
  * @author luuchorocha
  */
 public class ServiceFactory {
     public static MetadataService getService(final HttpServletRequest req, final HttpServletResponse res) {
         final String path = req.getPathInfo();
+        req.removeAttribute(AuthenticationManager.STATELESS_REQUEST_PARAMETER);
 
         if (path.startsWith(SERVLET_PATH)) {
             return new ServletService(req, res);
