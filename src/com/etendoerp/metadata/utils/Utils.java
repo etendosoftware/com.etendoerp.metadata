@@ -2,6 +2,8 @@ package com.etendoerp.metadata.utils;
 
 import static org.openbravo.client.application.DynamicExpressionParser.replaceSystemPreferencesInDisplayLogic;
 
+import java.util.Arrays;
+
 import javax.script.ScriptException;
 import javax.servlet.ServletConfig;
 import javax.servlet.http.HttpServletRequest;
@@ -19,8 +21,10 @@ import org.openbravo.base.weld.WeldUtils;
 import org.openbravo.client.application.DynamicExpressionParser;
 import org.openbravo.client.application.Process;
 import org.openbravo.client.kernel.KernelServlet;
+import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.datamodel.Table;
+import org.openbravo.model.ad.system.Language;
 import org.openbravo.model.ad.ui.Field;
 import org.openbravo.model.ad.ui.Tab;
 
@@ -106,5 +110,27 @@ public class Utils {
         } catch (Exception e) {
             return new JSONObject();
         }
+    }
+
+    public static void setContext(HttpServletRequest request) {
+        OBContext context = OBContext.getOBContext();
+        Language language = getLanguage(request);
+
+        if (language != null) {
+            context.setLanguage(language);
+        }
+
+        OBContext.setOBContextInSession(request, context);
+    }
+
+    private static Language getLanguage(HttpServletRequest request) {
+        String[] providedLanguages = { request.getParameter("language"), request.getHeader("language") };
+        String languageCode = Arrays.stream(providedLanguages).filter(
+            language -> language != null && !language.isEmpty()).findFirst().orElse(null);
+
+        return (Language) OBDal.getInstance().createCriteria(Language.class).add(
+            Restrictions.eq(Language.PROPERTY_SYSTEMLANGUAGE, true)).add(
+            Restrictions.eq(Language.PROPERTY_ACTIVE, true)).add(
+            Restrictions.eq(Language.PROPERTY_LANGUAGE, languageCode)).uniqueResult();
     }
 }
