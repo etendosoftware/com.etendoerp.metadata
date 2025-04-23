@@ -15,7 +15,7 @@ public class HttpServletRequestWrapper extends RequestContext.HttpServletRequest
     public HttpServletRequestWrapper(HttpServletRequest request) {
         super(request);
         session.set(new HttpSessionWrapper());
-        // SessionHolder.requestInitialized(this);
+        SessionHolder.requestInitialized(this);
     }
 
     public static HttpServletRequestWrapper wrap(HttpServletRequest request) {
@@ -41,14 +41,14 @@ public class HttpServletRequestWrapper extends RequestContext.HttpServletRequest
         return session.get();
     }
 
-//    @Override
-//    public String getServletPath() {
-//        String result = super.getServletPath();
-//
-//        if (!result.startsWith("/meta")) {
-//            result = "/meta".concat(result);
-//        }
-//
-//        return result;
-//    }
+    @Override
+    public String getServletPath() {
+        String result = super.getServletPath();
+
+        if (!result.startsWith("/meta")) {
+            result = "/meta".concat(result);
+        }
+
+        return result;
+    }
 }

@@ -2,6 +2,7 @@ package com.etendoerp.metadata.builders;
 
 import static org.openbravo.model.ad.system.Language.PROPERTY_ID;
 import static org.openbravo.model.ad.system.Language.PROPERTY_LANGUAGE;
+import static org.openbravo.model.ad.system.Language.PROPERTY_NAME;
 
 import java.util.List;
 
@@ -9,12 +10,13 @@ import org.codehaus.jettison.json.JSONObject;
 import org.hibernate.criterion.Restrictions;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.system.Language;
+import org.openbravo.service.json.DataResolvingMode;
 
 /**
  * @author luuchorocha
  */
 public class LanguageBuilder extends Builder {
-    private static final String PROPERTIES = String.join(",", PROPERTY_ID, PROPERTY_LANGUAGE);
+    private static final String PROPERTIES = String.join(",", PROPERTY_ID, PROPERTY_LANGUAGE, PROPERTY_NAME);
 
     public LanguageBuilder() {
         converter.setSelectedProperties(PROPERTIES);
@@ -30,7 +32,7 @@ public class LanguageBuilder extends Builder {
 
         try {
             for (Language lang : getLanguages()) {
-                json.put(lang.getLanguage(), converter.toJsonObject(lang, null));
+                json.put(lang.getLanguage(), converter.toJsonObject(lang, DataResolvingMode.FULL_TRANSLATABLE));
             }
         } catch (Exception e) {
             logger.error(e.getMessage(), e);

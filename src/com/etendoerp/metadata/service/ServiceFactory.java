@@ -9,18 +9,23 @@ import static com.etendoerp.metadata.utils.Constants.TAB_PATH;
 import static com.etendoerp.metadata.utils.Constants.TOOLBAR_PATH;
 import static com.etendoerp.metadata.utils.Constants.WINDOW_PATH;
 
+import java.util.Arrays;
+
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.openbravo.authentication.AuthenticationManager;
+import org.hibernate.criterion.Restrictions;
+import org.openbravo.dal.core.OBContext;
+import org.openbravo.dal.service.OBDal;
+import org.openbravo.model.ad.system.Language;
 
 /**
  * @author luuchorocha
  */
 public class ServiceFactory {
     public static MetadataService getService(final HttpServletRequest req, final HttpServletResponse res) {
+        setContext(req);
         final String path = req.getPathInfo();
-        req.removeAttribute(AuthenticationManager.STATELESS_REQUEST_PARAMETER);
 
         if (path.startsWith(SERVLET_PATH)) {
             return new ServletService(req, res);
@@ -42,5 +47,28 @@ public class ServiceFactory {
             return new ServletService(req, res);
         }
     }
+
+    private static void setContext(HttpServletRequest request) {
+        OBContext context = OBContext.getOBContext();
+        Language language = getLanguage(request);
+
+        if (language != null) {
+            context.setLanguage(language);
+        }
+
+        OBContext.setOBContextInSession(request, context);
+    }
+
+    private static Language getLanguage(HttpServletRequest request) {
+        String[] providedLanguages = { request.getParameter("language"), request.getHeader("language") };
+        String languageCode = Arrays.stream(providedLanguages).filter(
+            language -> language != null && !language.isEmpty()).findFirst().orElse(null);
+
+        return (Language) OBDal.getInstance().createCriteria(Language.class).add(
+            Restrictions.eq(Language.PROPERTY_SYSTEMLANGUAGE, true)).add(
+            Restrictions.eq(Language.PROPERTY_ACTIVE, true)).add(
+            Restrictions.eq(Language.PROPERTY_LANGUAGE, languageCode)).uniqueResult();
+    }
+
 }
 

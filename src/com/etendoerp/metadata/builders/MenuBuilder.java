@@ -1,6 +1,7 @@
 package com.etendoerp.metadata.builders;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
@@ -21,7 +22,9 @@ public class MenuBuilder extends Builder {
     private static final MenuManager manager = new MenuManager();
 
     public MenuBuilder() {
-        if (manager.getMenu() == null) {
+        try {
+            manager.getMenu();
+        } catch (NullPointerException e) {
             manager.setGlobalMenuOptions(new GlobalMenu());
         }
     }
@@ -52,7 +55,9 @@ public class MenuBuilder extends Builder {
             if (null != processDefinition) json.put("processDefinitionId", processDefinition.getId());
             if (null != form) json.put("formId", form.getId());
 
-            if (!children.isEmpty()) json.put("children", children.stream().map(this::toJSON));
+            if (!children.isEmpty()) {
+                json.put("children", children.stream().map(this::toJSON).collect(Collectors.toList()));
+            }
 
         } catch (JSONException e) {
             logger.error(e.getMessage(), e);
@@ -64,7 +69,7 @@ public class MenuBuilder extends Builder {
     @Override
     public JSONObject toJSON() throws JSONException {
         JSONObject result = new JSONObject();
-        result.put("menu", manager.getMenu().getChildren().stream().map(this::toJSON));
+        result.put("menu", manager.getMenu().getChildren().stream().map(this::toJSON).collect(Collectors.toList()));
 
         return result;
     }

@@ -36,7 +36,7 @@ import com.smf.securewebservices.utils.SecureWebServicesUtils;
 public class LoginManager {
     private final Logger logger = LogManager.getLogger(LoginManager.class);
     private final OBDal entityProvider = OBDal.getReadOnlyInstance();
-    private final DalConnectionProvider conn = new DalConnectionProvider();
+    private final DalConnectionProvider conn = DalConnectionProvider.getReadOnlyConnectionProvider();
 
     public JSONObject processLogin(HttpServletRequest request) throws Exception {
         return generateLoginResult(addDefaults(authenticate(request)));
@@ -141,8 +141,7 @@ public class LoginManager {
         }
 
         String roleId = authData.role != null ? authData.role.getId() : "";
-        LoginUtils.RoleDefaults defaults = LoginUtils.getLoginDefaults(authData.user.getId(), roleId,
-            DalConnectionProvider.getReadOnlyConnectionProvider());
+        LoginUtils.RoleDefaults defaults = LoginUtils.getLoginDefaults(authData.user.getId(), roleId, conn);
 
         if (authData.org == null && defaults.org != null) {
             authData.org = entityProvider.get(Organization.class, defaults.org);
