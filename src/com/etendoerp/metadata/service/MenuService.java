@@ -5,10 +5,11 @@ import java.io.IOException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.openbravo.base.secureApp.HttpSecureAppServlet;
+import org.codehaus.jettison.json.JSONException;
 import org.openbravo.dal.core.OBContext;
 
 import com.etendoerp.metadata.builders.MenuBuilder;
+import com.etendoerp.metadata.exceptions.InternalServerException;
 
 /**
  * @author luuchorocha
@@ -23,8 +24,11 @@ public class MenuService extends MetadataService {
         try {
             OBContext.setAdminMode();
             write(new MenuBuilder().toJSON());
+        } catch (JSONException e) {
+            throw new InternalServerException(e.getMessage());
         } finally {
             OBContext.restorePreviousMode();
         }
     }
 }
+

@@ -2,15 +2,21 @@ package com.etendoerp.metadata.exceptions;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 import org.apache.http.HttpStatus;
+import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.base.exception.OBSecurityException;
+import org.openbravo.base.structure.BaseOBObject;
+import org.openbravo.service.json.DataResolvingMode;
+import org.openbravo.service.json.DataToJsonConverter;
 
 /**
  * @author luuchorocha
  */
 public class Utils {
     private static final Map<String, Integer> EXCEPTION_STATUS_MAP = new HashMap<>();
+    private static final DataToJsonConverter CONVERTER = new DataToJsonConverter();
 
     static {
         EXCEPTION_STATUS_MAP.put(OBSecurityException.class.getName(), HttpStatus.SC_UNAUTHORIZED);
@@ -23,10 +29,14 @@ public class Utils {
     public static int getResponseStatus(Exception e) {
         Integer result = EXCEPTION_STATUS_MAP.get(e.getClass().getName());
 
-        if (result != null) {
-            return result;
+        return Objects.requireNonNullElse(result, HttpStatus.SC_INTERNAL_SERVER_ERROR);
+    }
+
+    public static JSONObject getJsonObject(BaseOBObject object) {
+        if (object != null) {
+            return CONVERTER.toJsonObject(object, DataResolvingMode.FULL_TRANSLATABLE);
         } else {
-            return HttpStatus.SC_INTERNAL_SERVER_ERROR;
+            return null;
         }
     }
 }

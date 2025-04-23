@@ -12,6 +12,8 @@ import static com.etendoerp.metadata.utils.Constants.WINDOW_PATH;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import com.etendoerp.metadata.utils.Utils;
+
 /**
  * @author luuchorocha
  */
@@ -40,4 +42,3 @@ public class ServiceFactory {
         }
     }
 }
-

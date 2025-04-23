@@ -15,12 +15,12 @@ public class HttpServletRequestWrapper extends RequestContext.HttpServletRequest
     public HttpServletRequestWrapper(HttpServletRequest request) {
         super(request);
         session.set(new HttpSessionWrapper());
-        SessionHolder.sessionCreated(session.get());
+        SessionHolder.requestInitialized(this);
     }
 
-    public static HttpServletRequest wrap(HttpServletRequest request) {
-        if (request instanceof HttpServletRequestWrapper) {
-            return request;
+    public static HttpServletRequestWrapper wrap(HttpServletRequest request) {
+        if (request.getClass().equals(HttpServletRequestWrapper.class)) {
+            return (HttpServletRequestWrapper) request;
         } else {
             return new HttpServletRequestWrapper(request);
         }
@@ -38,10 +38,6 @@ public class HttpServletRequestWrapper extends RequestContext.HttpServletRequest
 
     @Override
     public HttpSession getSession(boolean f) {
-        if (session.get() == null && f) {
-            session.set(new HttpSessionWrapper());
-        }
-
         return session.get();
     }
 

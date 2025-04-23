@@ -1,209 +1,155 @@
 package com.etendoerp.metadata.auth;
 
-import java.io.UnsupportedEncodingException;
-import java.security.NoSuchAlgorithmException;
-import java.security.spec.InvalidKeySpecException;
+import static com.smf.securewebservices.utils.SecureWebServicesUtils.generateToken;
+
 import java.util.Optional;
 
+import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.authentication.hashing.PasswordHash;
+import org.openbravo.base.secureApp.DefaultValidationException;
 import org.openbravo.base.secureApp.LoginUtils;
-import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
-import org.openbravo.database.ConnectionProvider;
-import org.openbravo.erpCommon.utility.Utility;
 import org.openbravo.model.ad.access.Role;
 import org.openbravo.model.ad.access.User;
 import org.openbravo.model.common.enterprise.Organization;
 import org.openbravo.model.common.enterprise.Warehouse;
 import org.openbravo.service.db.DalConnectionProvider;
-import org.openbravo.service.json.DataResolvingMode;
-import org.openbravo.service.json.DataToJsonConverter;
 
 import com.auth0.jwt.exceptions.JWTCreationException;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.etendoerp.metadata.data.AuthData;
 import com.etendoerp.metadata.exceptions.InternalServerException;
 import com.etendoerp.metadata.exceptions.UnauthorizedException;
-import com.etendoerp.metadata.exceptions.UnprocessableContentException;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.smf.securewebservices.SWSConfig;
+import com.etendoerp.metadata.utils.Constants;
+import com.etendoerp.metadata.utils.Utils;
 import com.smf.securewebservices.utils.SecureWebServicesUtils;
 
 /**
  * @author luuchorocha
  */
 public class LoginManager {
-    private static final Logger logger = LogManager.getLogger(LoginManager.class);
-    private final ConnectionProvider conn;
-    private final OBDal entityProvider;
-    private final DataToJsonConverter converter;
+    private final Logger logger = LogManager.getLogger(LoginManager.class);
+    private final OBDal entityProvider = OBDal.getReadOnlyInstance();
+    private final DalConnectionProvider conn = DalConnectionProvider.getReadOnlyConnectionProvider();
 
-    public LoginManager() {
-        this.entityProvider = OBDal.getInstance();
-        this.conn = new DalConnectionProvider();
-        this.converter = new DataToJsonConverter();
+    public JSONObject processLogin(HttpServletRequest request) throws Exception {
+        return generateLoginResult(addDefaults(authenticate(request)));
     }
 
-    public JSONObject processLogin(HttpServletRequest request) {
-        try {
-            validateSWSConfig();
-        } catch (Exception e) {
-            throw new InternalServerException(e.getMessage());
-        }
-
-        AuthData authentication;
-
-        try {
-            authentication = authenticate(getRequestData(request), extractToken(request));
-        } catch (Exception e) {
-            throw new UnauthorizedException(e.getMessage());
-        }
-
-        try {
-            return generateLoginResult(authentication, request);
-        } catch (Exception e) {
-            throw new InternalServerException(e.getMessage());
-        }
+    private String extractToken(String authorization) {
+        return authorization != null ? authorization.substring(7) : null;
     }
 
-    private JSONObject getRequestData(HttpServletRequest request) {
-        try {
-            return new JSONObject(request.getReader().lines().reduce("", String::concat));
-        } catch (Exception e) {
-            return new JSONObject();
+    private AuthData authenticate(HttpServletRequest request) {
+        JSONObject data = Utils.getRequestData(request);
+        AuthData result;
+
+        if (hasCredentials(data)) {
+            return getAuthData(data);
         }
-    }
 
-    private String extractToken(HttpServletRequest request) {
-        String authStr = request.getHeader("Authorization");
-        return (authStr != null && authStr.startsWith("Bearer ")) ? authStr.substring(7) : null;
-    }
+        String token = extractToken(request.getHeader("Authorization"));
 
-    private void validateSWSConfig() {
-        SWSConfig config = SWSConfig.getInstance();
-        if (config.getPrivateKey() == null) {
-            logger.warn("SWS - SWS are misconfigured");
-            throw new InternalServerException(
-                Utility.messageBD(conn, "SMFSWS_Misconfigured", OBContext.getOBContext().getLanguage().getLanguage()));
-        }
-    }
-
-    private AuthData authenticate(JSONObject data,
-        String token) throws JSONException, UnsupportedEncodingException, NoSuchAlgorithmException, InvalidKeySpecException, JsonProcessingException {
-        User user;
-        Role role;
-        Organization org;
-        Warehouse warehouse;
-
-        if (data.has("username") && data.has("password")) {
-            user = authenticateWithCredentials(data);
-            role = getEntity(data, "role", Role.class);
-            org = getEntity(data, "organization", Organization.class);
-            warehouse = getEntity(data, "warehouse", Warehouse.class);
-        } else if (token != null) {
-            DecodedJWT decoded = SecureWebServicesUtils.decodeToken(token);
-            if (decoded == null) {
-                logger.warn("SWS - Token is not valid");
-                throw new UnauthorizedException(Utility.messageBD(conn, "SMFSWS_InvalidToken",
-                    OBContext.getOBContext().getLanguage().getLanguage()));
-            }
-            user = entityProvider.get(User.class, decoded.getClaim("user").asString());
-            role = getClaimedEntity(data, decoded, "role", Role.class);
-            org = getClaimedEntity(data, decoded, "organization", Organization.class);
-            warehouse = getClaimedEntity(data, decoded, "warehouse", Warehouse.class);
+        if (token != null) {
+            result = getAuthData(data, token);
         } else {
-            logger.warn("SWS - You must specify a username and password or a valid token");
-            throw new UnauthorizedException(Utility.messageBD(conn, "SMFSWS_PassOrTokenNeeded",
-                OBContext.getOBContext().getLanguage().getLanguage()));
+            throw new UnauthorizedException(Constants.SWS_INVALID_CREDENTIALS);
         }
+
+        return result;
+    }
+
+    private AuthData getAuthData(JSONObject data) {
+        User user = authenticateUser(data);
+        Role role = getEntity(data, "role", Role.class);
+        Organization org = getEntity(data, "organization", Organization.class);
+        Warehouse warehouse = getEntity(data, "warehouse", Warehouse.class);
 
         return new AuthData(user, role, org, warehouse);
     }
 
-    private User authenticateWithCredentials(JSONObject data) {
-        try {
-            String username = data.getString("username");
-            String pass = data.getString("password");
-            Optional<User> opUser = PasswordHash.getUserWithPassword(username, pass);
+    private AuthData getAuthData(JSONObject data, String token) {
+        DecodedJWT decoded = getDecodedJWT(token);
+        User user = getClaimedEntity(data, decoded, "user", User.class);
+        Role role = getClaimedEntity(data, decoded, "role", Role.class);
+        Organization org = getClaimedEntity(data, decoded, "organization", Organization.class);
+        Warehouse warehouse = getClaimedEntity(data, decoded, "warehouse", Warehouse.class);
 
-            if (opUser.isPresent()) {
-                return opUser.get();
-            } else {
-                throw new UnauthorizedException(Utility.messageBD(conn, "IDENTIFICATION_FAILURE_TITLE",
-                    OBContext.getOBContext().getLanguage().getLanguage()));
-            }
+        return new AuthData(user, role, org, warehouse);
+    }
+
+    private DecodedJWT getDecodedJWT(String token) {
+        try {
+            return Optional.of(SecureWebServicesUtils.decodeToken(token)).orElseThrow(UnauthorizedException::new);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private boolean hasCredentials(JSONObject data) {
+        return data.has("username") && data.has("password");
+    }
+
+    private User authenticateUser(JSONObject data) {
+        String username = data.optString("username", null);
+        String pass = data.optString("password", null);
+        return PasswordHash.getUserWithPassword(username, pass).orElseThrow(UnauthorizedException::new);
+    }
+
+    private <T> T getEntity(JSONObject data, String key, Class<T> clazz) {
+        try {
+            return data.has(key) ? entityProvider.get(clazz, data.getString(key)) : null;
         } catch (JSONException e) {
-            throw new UnprocessableContentException(e.getMessage());
+            logger.error(e.getMessage(), e);
+
+            return null;
         }
     }
 
-    private <T> T getEntity(JSONObject data, String key, Class<T> clazz) throws JSONException {
-        if (data.has(key)) {
-            return entityProvider.get(clazz, data.getString(key));
-        }
-        return null;
-    }
-
-    private <T> T getClaimedEntity(JSONObject data, DecodedJWT token, String key, Class<T> clazz) throws JSONException {
-        String id = data.has(key) ? data.getString(key) : token.getClaim(key).asString();
-        return entityProvider.get(clazz, id);
-    }
-
-    private JSONObject generateLoginResult(AuthData authData, HttpServletRequest ignoredRequest) throws Exception {
-        JSONObject result = new JSONObject();
+    private <T> T getClaimedEntity(JSONObject data, DecodedJWT token, String key, Class<T> clazz) {
         try {
-            if (authData.role == null) {
-                authData.role = authData.user.getDefaultRole();
-            }
+            return entityProvider.get(clazz, data.has(key) ? data.getString(key) : token.getClaim(key).asString());
+        } catch (JSONException e) {
+            logger.error(e.getMessage(), e);
 
-            String roleId = authData.role != null ? authData.role.getId() : null;
-            LoginUtils.RoleDefaults defaults = LoginUtils.getLoginDefaults(authData.user.getId(), roleId, conn);
+            return null;
+        }
+    }
 
-            if (authData.org == null) {
-                authData.org = entityProvider.get(Organization.class, defaults.org);
-            }
-            if (authData.warehouse == null) {
-                authData.warehouse = entityProvider.get(Warehouse.class, defaults.warehouse);
-            }
+    private JSONObject generateLoginResult(AuthData authData) throws Exception {
+        try {
+            JSONObject result = new JSONObject();
+            result.put("token", generateToken(authData.user, authData.role, authData.org, authData.warehouse));
 
-            String token = SecureWebServicesUtils.generateToken(authData.user, authData.role, authData.org,
-                authData.warehouse);
-
-            result.put("status", "success");
-            result.put("token", token);
-
-            JSONArray rolesAndOrgs = SecureWebServicesUtils.getUserRolesAndOrg(authData.user, true, true);
-            result.put("roleList", rolesAndOrgs);
-            result.put("user", converter.toJsonObject(authData.user, DataResolvingMode.FULL));
-            result.put("currentRole", converter.toJsonObject(authData.role, DataResolvingMode.FULL));
-            result.put("currentOrganization", converter.toJsonObject(authData.org, DataResolvingMode.FULL));
-            result.put("currentClient", converter.toJsonObject(authData.warehouse, DataResolvingMode.FULL));
+            return result;
         } catch (JWTCreationException e) {
             logger.warn("SWS - Error creating token", e);
-            throw new Exception(Utility.messageBD(conn, "SMFSWS_ErrorCreatingToken",
-                OBContext.getOBContext().getLanguage().getLanguage()));
+
+            throw new InternalServerException(e.getMessage());
         }
-        return result;
     }
 
-    public JSONObject buildErrorResponse(Exception e) {
-        JSONObject result = new JSONObject();
-        try {
-            result.put("status", "error");
-            result.put("message",
-                e.getMessage() != null ? e.getMessage() : Utility.messageBD(conn, "SMFSWS_GenericErrorLog",
-                    OBContext.getOBContext().getLanguage().getLanguage()));
-        } catch (JSONException jsonException) {
-            logger.error("Error building error response", jsonException);
+    private AuthData addDefaults(AuthData authData) throws ServletException, DefaultValidationException {
+        if (authData.role == null) {
+            authData.role = authData.user.getDefaultRole();
         }
-        logger.error("Login failed", e);
-        return result;
+
+        String roleId = authData.role != null ? authData.role.getId() : "";
+        LoginUtils.RoleDefaults defaults = LoginUtils.getLoginDefaults(authData.user.getId(), roleId, conn);
+
+        if (authData.org == null && defaults.org != null) {
+            authData.org = entityProvider.get(Organization.class, defaults.org);
+        }
+        if (authData.warehouse == null && defaults.warehouse != null) {
+            authData.warehouse = entityProvider.get(Warehouse.class, defaults.warehouse);
+        }
+
+        return authData;
     }
 }

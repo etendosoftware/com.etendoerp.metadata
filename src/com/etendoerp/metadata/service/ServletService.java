@@ -12,7 +12,6 @@ import javax.servlet.ServletRegistration;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.openbravo.base.secureApp.HttpSecureAppServlet;
 import org.openbravo.client.kernel.RequestContext;
 
 import com.etendoerp.metadata.exceptions.NotFoundException;

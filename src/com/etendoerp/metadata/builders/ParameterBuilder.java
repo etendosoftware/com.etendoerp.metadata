@@ -37,7 +37,6 @@ public class ParameterBuilder extends Builder {
     private final Parameter parameter;
 
     public ParameterBuilder(Parameter parameter) {
-        super();
         this.parameter = parameter;
     }
 

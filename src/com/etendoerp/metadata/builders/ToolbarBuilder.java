@@ -162,11 +162,11 @@ public class ToolbarBuilder {
         buttons.put("SAVE", new ButtonConfig("SAVE", "OBUIAPP_SaveRow", "SAVE", true, "save"));
         buttons.put("DELETE", new ButtonConfig("DELETE", "OBUIAPP_DeleteRow", "DELETE", !isNew, "trash"));
         buttons.put("REFRESH", new ButtonConfig("REFRESH", "OBUIAPP_RefreshData", "REFRESH", true, "refresh-cw"));
-        buttons.put("FIND", new ButtonConfig("FIND", "OBUIAPP_Find", "FIND", true, "search"));
-        buttons.put("EXPORT", new ButtonConfig("EXPORT", "OBUIAPP_ExportGrid", "EXPORT", true, "download"));
+        buttons.put("FIND", new ButtonConfig("FIND", "OBUIAPP_Find", "FIND", false, "search"));
+        buttons.put("EXPORT", new ButtonConfig("EXPORT", "OBUIAPP_ExportGrid", "EXPORT", false, "download"));
         buttons.put("ATTACHMENTS",
-            new ButtonConfig("ATTACHMENTS", "OBUIAPP_Attachments", "ATTACHMENTS", true, "paperclip"));
-        buttons.put("GRID_VIEW", new ButtonConfig("GRID_VIEW", "OBUIAPP_GridView", "GRID_VIEW", true, "grid"));
+            new ButtonConfig("ATTACHMENTS", "OBUIAPP_Attachments", "ATTACHMENTS", false, "paperclip"));
+        buttons.put("GRID_VIEW", new ButtonConfig("GRID_VIEW", "OBUIAPP_GridView", "GRID_VIEW", false, "grid"));
 
         return buttons;
     }

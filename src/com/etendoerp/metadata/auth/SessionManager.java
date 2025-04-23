@@ -8,6 +8,11 @@ import org.apache.log4j.Logger;
 import org.openbravo.base.secureApp.LoginUtils;
 import org.openbravo.client.kernel.RequestContext;
 import org.openbravo.dal.core.OBContext;
+import org.openbravo.model.ad.access.Role;
+import org.openbravo.model.ad.system.Client;
+import org.openbravo.model.ad.system.Language;
+import org.openbravo.model.common.enterprise.Organization;
+import org.openbravo.model.common.enterprise.Warehouse;
 import org.openbravo.service.db.DalConnectionProvider;
 
 import com.etendoerp.metadata.data.RequestVariables;
@@ -29,15 +34,21 @@ public class SessionManager {
 
             RequestVariables vars = new RequestVariables(request);
             DalConnectionProvider conn = new DalConnectionProvider();
-            String userId = context.getUser().getId();
-            String language = context.getLanguage().getLanguage();
-            String isRTL = context.isRTL() ? "Y" : "N";
-            String clientId = context.getCurrentClient().getId();
-            String roleId = context.getRole().getId();
-            String orgId = context.getCurrentOrganization().getId();
-            String warehouseId = context.getWarehouse().getId();
 
-            boolean sessionFilled = LoginUtils.fillSessionArguments(conn, vars, userId, language, isRTL, roleId,
+            String userId = context.getUser().getId();
+            Language language = context.getLanguage();
+            String languageCode = language != null ? language.getLanguage() : "";
+            String isRTL = context.isRTL() ? "Y" : "N";
+            Client client = context.getCurrentClient();
+            String clientId = client != null ? client.getId() : "";
+            Role role = context.getRole();
+            String roleId = role != null ? role.getId() : "";
+            Organization organization = context.getCurrentOrganization();
+            String orgId = organization != null ? organization.getId() : "";
+            Warehouse warehouse = context.getWarehouse();
+            String warehouseId = warehouse != null ? warehouse.getId() : "";
+
+           boolean sessionFilled = LoginUtils.fillSessionArguments(conn, vars, userId, languageCode, isRTL, roleId,
                 clientId, orgId, warehouseId);
 
             if (sessionFilled) {
