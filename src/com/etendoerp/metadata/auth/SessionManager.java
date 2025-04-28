@@ -6,6 +6,8 @@ import javax.servlet.http.HttpSession;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import org.openbravo.base.secureApp.LoginUtils;
+import org.openbravo.base.secureApp.VariablesSecureApp;
+import org.openbravo.client.kernel.KernelServlet;
 import org.openbravo.client.kernel.RequestContext;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.model.ad.access.Role;
@@ -48,11 +50,12 @@ public class SessionManager {
             Warehouse warehouse = context.getWarehouse();
             String warehouseId = warehouse != null ? warehouse.getId() : "";
 
-           boolean sessionFilled = LoginUtils.fillSessionArguments(conn, vars, userId, languageCode, isRTL, roleId,
+            boolean sessionFilled = LoginUtils.fillSessionArguments(conn, vars, userId, languageCode, isRTL, roleId,
                 clientId, orgId, warehouseId);
 
             if (sessionFilled) {
                 bypassCSRF(request, userId);
+                readNumberFormat(vars);
                 setRequestContext(request, vars);
 
                 return vars;
@@ -70,6 +73,12 @@ public class SessionManager {
         RequestContext requestContext = RequestContext.get();
         requestContext.setRequest(request);
         requestContext.setVariableSecureApp(vars);
+    }
+
+    public static void readNumberFormat(VariablesSecureApp vars) {
+        if (KernelServlet.getGlobalParameters() != null) {
+            LoginUtils.readNumberFormat(vars, KernelServlet.getGlobalParameters().getFormatPath());
+        }
     }
 
     private static void bypassCSRF(HttpServletRequest request, String userId) {
