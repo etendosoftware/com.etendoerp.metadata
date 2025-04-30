@@ -8,6 +8,7 @@ import static com.etendoerp.metadata.utils.Constants.SELECTOR_REFERENCES;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
+import org.openbravo.dal.core.OBContext;
 import org.openbravo.erpCommon.utility.Utility;
 import org.openbravo.model.ad.ui.Field;
 import org.openbravo.model.ad.ui.Process;
@@ -58,7 +59,7 @@ public class ProcessActionBuilder extends Builder {
             paramJSON.put("selector", getSelectorInfo(param.getId(), param.getReferenceSearchKey()));
         }
         if (isListParameter(param)) {
-            paramJSON.put("refList", getListInfo(param.getReferenceSearchKey()));
+            paramJSON.put("refList", getListInfo(param.getReferenceSearchKey(), OBContext.getOBContext().getLanguage()));
         }
 
         return paramJSON;
