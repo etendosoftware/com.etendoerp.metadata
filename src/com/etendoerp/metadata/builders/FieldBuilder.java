@@ -20,12 +20,14 @@ import org.openbravo.client.application.ApplicationConstants;
 import org.openbravo.client.application.DynamicExpressionParser;
 import org.openbravo.client.kernel.KernelUtils;
 import org.openbravo.dal.core.DalUtil;
+import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.access.FieldAccess;
 import org.openbravo.model.ad.datamodel.Column;
 import org.openbravo.model.ad.datamodel.Table;
 import org.openbravo.model.ad.domain.Reference;
 import org.openbravo.model.ad.domain.ReferencedTree;
+import org.openbravo.model.ad.system.Language;
 import org.openbravo.model.ad.ui.Field;
 import org.openbravo.model.ad.ui.Process;
 import org.openbravo.model.ad.ui.Tab;
@@ -49,11 +51,13 @@ public class FieldBuilder extends Builder {
     private final Field field;
     private final FieldAccess fieldAccess;
     private final JSONObject json;
+    private final Language language;
 
     public FieldBuilder(Field field, FieldAccess fieldAccess) {
         this.field = field;
         this.fieldAccess = fieldAccess;
         this.json = converter.toJsonObject(field, DataResolvingMode.FULL_TRANSLATABLE);
+        this.language = OBContext.getOBContext().getLanguage();
     }
 
     public static boolean isProcessField(Field field) {
@@ -213,17 +217,20 @@ public class FieldBuilder extends Builder {
         selectorInfo.put(JsonConstants.ADDITIONAL_PROPERTIES_PARAMETER, extraProperties + "," + derivedProperties);
     }
 
-    public static JSONArray getListInfo(Reference refList) throws JSONException {
-        JSONArray refListValues = new JSONArray();
+    public static JSONArray getListInfo(Reference refList, Language language) throws JSONException {
+        JSONArray result = new JSONArray();
 
-        for (org.openbravo.model.ad.domain.List listValue : refList.getADListList()) {
-            JSONObject jsonListValue = new JSONObject();
-            jsonListValue.put("id", listValue.getId());
-            jsonListValue.put("label", listValue.getName());
-            jsonListValue.put("value", listValue.getSearchKey());
-            refListValues.put(jsonListValue);
+        for (org.openbravo.model.ad.domain.List list : refList.getADListList()) {
+            JSONObject listJson = new JSONObject();
+
+            listJson.put("id", list.getId());
+            listJson.put("value", list.getSearchKey());
+            listJson.put("label", list.get(org.openbravo.model.ad.domain.List.PROPERTY_NAME, language, list.getId()));
+
+            result.put(listJson);
         }
-        return refListValues;
+
+        return result;
     }
 
     public static String getExtraSearchFields(Selector selector) {
@@ -450,7 +457,7 @@ public class FieldBuilder extends Builder {
 
     private void addSelectorReferenceList(Field field) throws JSONException {
         if (isRefListField(field)) {
-            json.put("refList", getListInfo(field.getColumn().getReferenceSearchKey()));
+            json.put("refList", getListInfo(field.getColumn().getReferenceSearchKey(), language));
         }
     }
 
