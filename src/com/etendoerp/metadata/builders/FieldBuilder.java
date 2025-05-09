@@ -80,7 +80,7 @@ public class FieldBuilder extends Builder {
         }
     }
 
-    private static ReferenceSelectors getReferenceSelectors(Reference ref) {
+    public static ReferenceSelectors getReferenceSelectors(Reference ref) {
         Selector selector = null;
         ReferencedTree treeSelector = null;
 
@@ -330,13 +330,13 @@ public class FieldBuilder extends Builder {
         return null;
     }
 
-    private static DomainType getDomainType(String referenceId) {
+    public static DomainType getDomainType(String referenceId) {
         final org.openbravo.base.model.Reference reference = ModelProvider.getInstance().getReference(referenceId);
         Check.isNotNull(reference, "No reference found for referenceid " + referenceId);
         return reference.getDomainType();
     }
 
-    private static String getPropertyOrDataSourceField(SelectorField selectorField) {
+    public static String getPropertyOrDataSourceField(SelectorField selectorField) {
         final String result;
         if (selectorField.getProperty() != null) {
             result = selectorField.getProperty();

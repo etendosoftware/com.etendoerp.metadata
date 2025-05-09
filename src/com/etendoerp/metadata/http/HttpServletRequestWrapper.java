@@ -40,15 +40,4 @@ public class HttpServletRequestWrapper extends RequestContext.HttpServletRequest
     public HttpSession getSession(boolean f) {
         return session.get();
     }
-
-    @Override
-    public String getServletPath() {
-        String result = super.getServletPath();
-
-        if (!result.startsWith("/meta")) {
-            result = "/meta".concat(result);
-        }
-
-        return result;
-    }
 }

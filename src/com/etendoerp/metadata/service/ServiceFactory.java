@@ -12,33 +12,34 @@ import static com.etendoerp.metadata.utils.Constants.WINDOW_PATH;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import com.etendoerp.metadata.utils.Utils;
+import org.openbravo.base.secureApp.HttpSecureAppServlet;
 
 /**
  * @author luuchorocha
  */
 public class ServiceFactory {
-    public static MetadataService getService(final HttpServletRequest req, final HttpServletResponse res) {
+    public static MetadataService getService(HttpSecureAppServlet caller, final HttpServletRequest req,
+        final HttpServletResponse res) {
         final String path = req.getPathInfo();
 
         if (path.startsWith(SERVLET_PATH)) {
-            return new ServletService(req, res);
+            return new ServletService(caller, req, res);
         } else if (path.equals(SESSION_PATH)) {
-            return new SessionService(req, res);
+            return new SessionService(caller, req, res);
         } else if (path.equals(MENU_PATH)) {
-            return new MenuService(req, res);
+            return new MenuService(caller, req, res);
         } else if (path.startsWith(WINDOW_PATH)) {
-            return new WindowService(req, res);
+            return new WindowService(caller, req, res);
         } else if (path.startsWith(TAB_PATH)) {
-            return new TabService(req, res);
+            return new TabService(caller, req, res);
         } else if (path.startsWith(TOOLBAR_PATH)) {
-            return new ToolbarService(req, res);
+            return new ToolbarService(caller, req, res);
         } else if (path.startsWith(LANGUAGE_PATH)) {
-            return new LanguageService(req, res);
+            return new LanguageService(caller, req, res);
         } else if (path.equals(MESSAGE_PATH)) {
-            return new MessageService(req, res);
+            return new MessageService(caller, req, res);
         } else {
-            return new ServletService(req, res);
+            return new ServletService(caller, req, res);
         }
     }
 }

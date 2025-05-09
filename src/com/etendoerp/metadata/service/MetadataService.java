@@ -11,6 +11,7 @@ import org.apache.http.entity.ContentType;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.codehaus.jettison.json.JSONObject;
+import org.openbravo.base.secureApp.HttpSecureAppServlet;
 
 import com.etendoerp.metadata.utils.Utils;
 
@@ -20,17 +21,20 @@ import com.etendoerp.metadata.utils.Utils;
 public abstract class MetadataService {
     private static final ThreadLocal<HttpServletRequest> requestThreadLocal = new ThreadLocal<>();
     private static final ThreadLocal<HttpServletResponse> responseThreadLocal = new ThreadLocal<>();
+    private static final ThreadLocal<HttpSecureAppServlet> callerThreadLocal = new ThreadLocal<>();
     protected final Logger logger = LogManager.getLogger(this.getClass());
 
-    public MetadataService(HttpServletRequest request, HttpServletResponse response) {
+    public MetadataService(HttpSecureAppServlet caller, HttpServletRequest request, HttpServletResponse response) {
         requestThreadLocal.set(request);
         responseThreadLocal.set(response);
+        callerThreadLocal.set(caller);
         Utils.setContext(request);
     }
 
     public static void clear() {
         requestThreadLocal.remove();
         responseThreadLocal.remove();
+        callerThreadLocal.remove();
     }
 
     protected HttpServletRequest getRequest() {
@@ -39,6 +43,10 @@ public abstract class MetadataService {
 
     protected HttpServletResponse getResponse() {
         return responseThreadLocal.get();
+    }
+
+    protected HttpSecureAppServlet getCaller() {
+        return callerThreadLocal.get();
     }
 
     protected void write(JSONObject data) throws IOException {

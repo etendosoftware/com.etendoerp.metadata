@@ -1,5 +1,8 @@
 package com.etendoerp.metadata.auth;
 
+import static org.openbravo.base.secureApp.LoginUtils.fillSessionArguments;
+
+import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
 
@@ -26,53 +29,36 @@ import com.etendoerp.metadata.exceptions.InternalServerException;
 public class SessionManager {
     private final static Logger logger = LogManager.getLogger(SessionManager.class);
 
-    public static RequestVariables initializeSession(HttpServletRequest request) {
+    public static RequestVariables initializeSession() {
+        OBContext context = OBContext.getOBContext();
+
+        if (context == null) {
+            throw new InternalServerException("OBContext not initialized for this thread");
+        }
+
+        RequestContext requestContext = RequestContext.get();
+        String userId = context.getUser().getId();
+        Language language = context.getLanguage();
+        String languageCode = language != null ? language.getLanguage() : "";
+        String isRTL = context.isRTL() ? "Y" : "N";
+        Client client = context.getCurrentClient();
+        String clientId = client != null ? client.getId() : "";
+        Role role = context.getRole();
+        String roleId = role != null ? role.getId() : "";
+        Organization organization = context.getCurrentOrganization();
+        String orgId = organization != null ? organization.getId() : "";
+        Warehouse warehouse = context.getWarehouse();
+        String warehouseId = warehouse != null ? warehouse.getId() : "";
+
         try {
-            OBContext context = OBContext.getOBContext();
-
-            if (context == null) {
-                throw new InternalServerException("OBContext not initialized for this thread");
-            }
-
-            RequestVariables vars = new RequestVariables(request);
-            DalConnectionProvider conn = new DalConnectionProvider();
-
-            String userId = context.getUser().getId();
-            Language language = context.getLanguage();
-            String languageCode = language != null ? language.getLanguage() : "";
-            String isRTL = context.isRTL() ? "Y" : "N";
-            Client client = context.getCurrentClient();
-            String clientId = client != null ? client.getId() : "";
-            Role role = context.getRole();
-            String roleId = role != null ? role.getId() : "";
-            Organization organization = context.getCurrentOrganization();
-            String orgId = organization != null ? organization.getId() : "";
-            Warehouse warehouse = context.getWarehouse();
-            String warehouseId = warehouse != null ? warehouse.getId() : "";
-
-            boolean sessionFilled = LoginUtils.fillSessionArguments(conn, vars, userId, languageCode, isRTL, roleId,
-                clientId, orgId, warehouseId);
-
-            if (sessionFilled) {
-                bypassCSRF(request, userId);
-                readNumberFormat(vars);
-                setRequestContext(request, vars);
-
-                return vars;
-            } else {
-                throw new InternalServerException("Could not initialize a session");
-            }
-        } catch (Exception e) {
-            logger.error(e.getMessage(), e);
-
+            fillSessionArguments(new DalConnectionProvider(), requestContext.getVariablesSecureApp(), userId,
+                languageCode, isRTL, roleId, clientId, orgId, warehouseId);
+            bypassCSRF(requestContext.getRequest(), userId);
+        } catch (ServletException e) {
             throw new InternalServerException(e.getMessage());
         }
-    }
 
-    private static void setRequestContext(HttpServletRequest request, RequestVariables vars) {
-        RequestContext requestContext = RequestContext.get();
-        requestContext.setRequest(request);
-        requestContext.setVariableSecureApp(vars);
+        return (RequestVariables) requestContext.getVariablesSecureApp();
     }
 
     public static void readNumberFormat(VariablesSecureApp vars) {
@@ -89,5 +75,4 @@ public class SessionManager {
             session.setAttribute("#CSRF_Token", userId);
         }
     }
-
 }

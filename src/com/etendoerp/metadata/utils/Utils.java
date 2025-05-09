@@ -23,6 +23,7 @@ import org.openbravo.client.application.Process;
 import org.openbravo.client.kernel.KernelServlet;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
+import org.openbravo.model.ad.datamodel.Column;
 import org.openbravo.model.ad.datamodel.Table;
 import org.openbravo.model.ad.system.Language;
 import org.openbravo.model.ad.ui.Field;
@@ -93,13 +94,15 @@ public class Utils {
         }
 
         JSONObject processJson = new ProcessDefinitionBuilder(process).toJSON();
+        Language language = OBContext.getOBContext().getLanguage();
+        Column column = field.getColumn();
 
         processJson.put("fieldId", field.getId());
-        processJson.put("columnId", field.getColumn().getId());
+        processJson.put("columnId", column.getId());
         processJson.put("displayLogic", field.getDisplayLogic());
-        processJson.put("buttonText", field.getColumn().getName());
-        processJson.put("fieldName", field.getName());
-        processJson.put("reference", field.getColumn().getReference().getId());
+        processJson.put("buttonText", column.get(Column.PROPERTY_NAME, language, column.getId()));
+        processJson.put("fieldName", field.get(Field.PROPERTY_NAME, language, field.getId()));
+        processJson.put("reference", column.getReference().getId());
 
         return processJson;
     }
@@ -113,14 +116,19 @@ public class Utils {
     }
 
     public static void setContext(HttpServletRequest request) {
-        OBContext context = OBContext.getOBContext();
-        Language language = getLanguage(request);
+        try {
+            OBContext.setAdminMode(true);
+            OBContext context = OBContext.getOBContext();
+            Language language = getLanguage(request);
 
-        if (language != null) {
-            context.setLanguage(language);
+            if (language != null) {
+                context.setLanguage(language);
+            }
+
+            OBContext.setOBContextInSession(request, context);
+        } finally {
+            OBContext.restorePreviousMode();
         }
-
-        OBContext.setOBContextInSession(request, context);
     }
 
     private static Language getLanguage(HttpServletRequest request) {
@@ -131,6 +139,6 @@ public class Utils {
         return (Language) OBDal.getInstance().createCriteria(Language.class).add(
             Restrictions.eq(Language.PROPERTY_SYSTEMLANGUAGE, true)).add(
             Restrictions.eq(Language.PROPERTY_ACTIVE, true)).add(
-            Restrictions.eq(Language.PROPERTY_LANGUAGE, languageCode)).uniqueResult();
+            Restrictions.eq(Language.PROPERTY_LANGUAGE, languageCode)).setMaxResults(1).uniqueResult();
     }
 }

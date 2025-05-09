@@ -5,6 +5,7 @@ import java.io.IOException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.openbravo.base.secureApp.HttpSecureAppServlet;
 import org.openbravo.dal.core.OBContext;
 
 import com.etendoerp.metadata.builders.WindowBuilder;
@@ -13,8 +14,8 @@ import com.etendoerp.metadata.builders.WindowBuilder;
  * @author luuchorocha
  */
 public class WindowService extends MetadataService {
-    public WindowService(HttpServletRequest request, HttpServletResponse response) {
-        super(request, response);
+    public WindowService(HttpSecureAppServlet caller, HttpServletRequest request, HttpServletResponse response) {
+        super(caller, request, response);
     }
 
     @Override
@@ -22,7 +23,7 @@ public class WindowService extends MetadataService {
         String id = getRequest().getPathInfo().substring(8);
 
         try {
-            OBContext.setAdminMode();
+            OBContext.setAdminMode(true);
             write(new WindowBuilder(id).toJSON());
         } finally {
             OBContext.restorePreviousMode();
