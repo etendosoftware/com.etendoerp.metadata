@@ -5,7 +5,6 @@ import static org.openbravo.client.application.DynamicExpressionParser.replaceSy
 import java.util.Arrays;
 
 import javax.script.ScriptException;
-import javax.servlet.ServletConfig;
 import javax.servlet.http.HttpServletRequest;
 
 import org.apache.logging.log4j.LogManager;
@@ -17,10 +16,8 @@ import org.codehaus.jettison.json.JSONObject;
 import org.hibernate.criterion.Restrictions;
 import org.openbravo.base.expression.OBScriptEngine;
 import org.openbravo.base.model.Property;
-import org.openbravo.base.weld.WeldUtils;
 import org.openbravo.client.application.DynamicExpressionParser;
 import org.openbravo.client.application.Process;
-import org.openbravo.client.kernel.KernelServlet;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.datamodel.Column;
@@ -78,12 +75,6 @@ public class Utils {
         }
 
         return result;
-    }
-
-    public static void initializeGlobalConfig(ServletConfig config) {
-        if (KernelServlet.getGlobalParameters() == null) {
-            WeldUtils.getInstanceFromStaticBeanManager(KernelServlet.class).init(config);
-        }
     }
 
     public static JSONObject getFieldProcess(Field field) throws JSONException {

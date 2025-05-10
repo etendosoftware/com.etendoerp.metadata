@@ -3,7 +3,6 @@ package com.etendoerp.metadata.service;
 import static com.etendoerp.metadata.utils.Constants.LANGUAGE_PATH;
 import static com.etendoerp.metadata.utils.Constants.MENU_PATH;
 import static com.etendoerp.metadata.utils.Constants.MESSAGE_PATH;
-import static com.etendoerp.metadata.utils.Constants.SERVLET_PATH;
 import static com.etendoerp.metadata.utils.Constants.SESSION_PATH;
 import static com.etendoerp.metadata.utils.Constants.TAB_PATH;
 import static com.etendoerp.metadata.utils.Constants.TOOLBAR_PATH;
@@ -12,34 +11,31 @@ import static com.etendoerp.metadata.utils.Constants.WINDOW_PATH;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.openbravo.base.secureApp.HttpSecureAppServlet;
+import com.etendoerp.metadata.exceptions.NotFoundException;
 
 /**
  * @author luuchorocha
  */
 public class ServiceFactory {
-    public static MetadataService getService(HttpSecureAppServlet caller, final HttpServletRequest req,
-        final HttpServletResponse res) {
+    public static MetadataService getService(final HttpServletRequest req, final HttpServletResponse res) {
         final String path = req.getPathInfo();
 
-        if (path.startsWith(SERVLET_PATH)) {
-            return new ServletService(caller, req, res);
-        } else if (path.equals(SESSION_PATH)) {
-            return new SessionService(caller, req, res);
+        if (path.equals(SESSION_PATH)) {
+            return new SessionService(req, res);
         } else if (path.equals(MENU_PATH)) {
-            return new MenuService(caller, req, res);
+            return new MenuService(req, res);
         } else if (path.startsWith(WINDOW_PATH)) {
-            return new WindowService(caller, req, res);
+            return new WindowService(req, res);
         } else if (path.startsWith(TAB_PATH)) {
-            return new TabService(caller, req, res);
+            return new TabService(req, res);
         } else if (path.startsWith(TOOLBAR_PATH)) {
-            return new ToolbarService(caller, req, res);
+            return new ToolbarService(req, res);
         } else if (path.startsWith(LANGUAGE_PATH)) {
-            return new LanguageService(caller, req, res);
+            return new LanguageService(req, res);
         } else if (path.equals(MESSAGE_PATH)) {
-            return new MessageService(caller, req, res);
+            return new MessageService(req, res);
         } else {
-            return new ServletService(caller, req, res);
+            throw new NotFoundException();
         }
     }
 }

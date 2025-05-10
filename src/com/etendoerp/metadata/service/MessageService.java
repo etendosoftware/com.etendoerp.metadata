@@ -9,15 +9,14 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.base.exception.OBException;
-import org.openbravo.base.secureApp.HttpSecureAppServlet;
 import org.openbravo.base.secureApp.VariablesSecureApp;
 import org.openbravo.erpCommon.utility.OBError;
 
 import com.etendoerp.metadata.data.RequestVariables;
 
 public class MessageService extends MetadataService {
-    public MessageService(HttpSecureAppServlet caller, HttpServletRequest request, HttpServletResponse response) {
-        super(caller, request, response);
+    public MessageService(HttpServletRequest request, HttpServletResponse response) {
+        super(request, response);
     }
 
     protected void setCORSHeaders(HttpServletRequest request, HttpServletResponse response) {

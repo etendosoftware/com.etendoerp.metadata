@@ -1,7 +1,5 @@
 package com.etendoerp.metadata.http;
 
-import static com.etendoerp.metadata.auth.SessionManager.initializeSession;
-
 import java.io.IOException;
 
 import javax.servlet.ServletException;
@@ -19,15 +17,9 @@ import com.etendoerp.metadata.utils.ServletRegistry;
 public class ForwarderServlet extends BaseServlet {
     @Override
     public void service(HttpServletRequest req, HttpServletResponse res) throws IOException, ServletException {
-        super.service(req, res);
+        super.service(req, res, false);
 
-        HttpSecureAppServlet servlet = ServletRegistry.getDelegatedServlet(req);
-
-        if (servlet.getServletConfig() == null) {
-            servlet.init(getServletConfig());
-        }
-
-        setSessionProperties();
+        HttpSecureAppServlet servlet = ServletRegistry.getDelegatedServlet(this, req.getPathInfo());
         initializeSession();
         servlet.service(RequestContext.get().getRequest(), RequestContext.get().getResponse());
     }

@@ -3,7 +3,6 @@ package com.etendoerp.metadata.service;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
-import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
@@ -24,10 +23,9 @@ public abstract class MetadataService {
     private static final ThreadLocal<HttpSecureAppServlet> callerThreadLocal = new ThreadLocal<>();
     protected final Logger logger = LogManager.getLogger(this.getClass());
 
-    public MetadataService(HttpSecureAppServlet caller, HttpServletRequest request, HttpServletResponse response) {
+    public MetadataService(HttpServletRequest request, HttpServletResponse response) {
         requestThreadLocal.set(request);
         responseThreadLocal.set(response);
-        callerThreadLocal.set(caller);
         Utils.setContext(request);
     }
 
@@ -56,5 +54,5 @@ public abstract class MetadataService {
         response.getWriter().write(data.toString());
     }
 
-    public abstract void process() throws ServletException, IOException;
+    public abstract void process() throws IOException;
 }

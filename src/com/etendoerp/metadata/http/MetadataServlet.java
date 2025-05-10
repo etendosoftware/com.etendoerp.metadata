@@ -21,27 +21,27 @@ public class MetadataServlet extends BaseServlet {
         super.serviceInitialized(RequestContext.get().getRequest(), RequestContext.get().getResponse());
     }
 
-    private void process(HttpServletRequest req, HttpServletResponse res) throws IOException, ServletException {
-        ServiceFactory.getService(this, req, res).process();
+    private void process(HttpServletRequest req, HttpServletResponse res) throws IOException {
+        ServiceFactory.getService(req, res).process();
     }
 
     @Override
-    public final void doGet(HttpServletRequest req, HttpServletResponse res) throws IOException, ServletException {
+    public final void doGet(HttpServletRequest req, HttpServletResponse res) throws IOException {
         process(req, res);
     }
 
     @Override
-    public final void doPost(HttpServletRequest req, HttpServletResponse res) throws IOException, ServletException {
+    public final void doPost(HttpServletRequest req, HttpServletResponse res) throws IOException {
         process(req, res);
     }
 
     @Override
-    public final void doPut(HttpServletRequest req, HttpServletResponse res) throws IOException, ServletException {
+    public final void doPut(HttpServletRequest req, HttpServletResponse res) throws IOException {
         process(req, res);
     }
 
     @Override
-    public final void doDelete(HttpServletRequest req, HttpServletResponse res) throws IOException, ServletException {
+    public final void doDelete(HttpServletRequest req, HttpServletResponse res) throws IOException {
         process(req, res);
     }
 }

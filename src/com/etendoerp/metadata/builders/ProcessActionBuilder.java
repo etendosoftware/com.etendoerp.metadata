@@ -59,7 +59,8 @@ public class ProcessActionBuilder extends Builder {
             paramJSON.put("selector", getSelectorInfo(param.getId(), param.getReferenceSearchKey()));
         }
         if (isListParameter(param)) {
-            paramJSON.put("refList", getListInfo(param.getReferenceSearchKey(), OBContext.getOBContext().getLanguage()));
+            paramJSON.put("refList",
+                getListInfo(param.getReferenceSearchKey(), OBContext.getOBContext().getLanguage()));
         }
 
         return paramJSON;

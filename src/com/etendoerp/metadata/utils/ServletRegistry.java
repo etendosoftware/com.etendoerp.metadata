@@ -5,10 +5,10 @@ import static com.etendoerp.metadata.utils.Constants.SERVLET_PATH;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 import javax.servlet.ServletRegistration;
-import javax.servlet.http.HttpServletRequest;
 
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
 import org.openbravo.base.weld.WeldUtils;
@@ -37,20 +37,18 @@ public class ServletRegistry {
     }
 
     private static String getFirstSegment(String path) {
-        int firstSlash = path.indexOf("/");
-        int secondSlash = path.indexOf("/", firstSlash + 1);
+        int secondSlash = path.indexOf("/", 1);
 
-        if (firstSlash == -1) return path;
-        if (secondSlash == -1) return path;
-
-        return path.substring(0, secondSlash);
+        return secondSlash == -1 ? path : path.substring(0, secondSlash);
     }
 
-    private static HttpSecureAppServlet getOrCreateServlet(String servletName) {
+    private static HttpSecureAppServlet getOrCreateServlet(String uri) {
         try {
+            String servletName = findMatchingServlet(uri).getClassName();
             Class<?> klazz = Class.forName(servletName);
             List<?> servlets = WeldUtils.getInstances(klazz);
-            return !servlets.isEmpty() ? (HttpSecureAppServlet) servlets.get(0) : createServletInstance(klazz);
+
+            return servlets.isEmpty() ? createServletInstance(klazz) : (HttpSecureAppServlet) servlets.get(0);
         } catch (Exception e) {
             throw new NotFoundException(e.getMessage());
         }
@@ -64,30 +62,31 @@ public class ServletRegistry {
         }
     }
 
-    private static ServletRegistration findMatchingServlet(HttpServletRequest req) {
-        String uri = req.getPathInfo();
+    private static ServletRegistration findMatchingServlet(String uri) {
+        ServletRegistration servlet = SERVLET_REGISTRY.get(uri);
 
+        if (servlet == null) {
+            servlet = Optional.of(SERVLET_REGISTRY.get(getFirstSegment(uri))).orElseThrow(NotFoundException::new);
+        }
+
+        return servlet;
+    }
+
+    private static String getMappingPath(String uri) {
         if (uri == null || uri.isBlank()) {
             throw new NotFoundException("Missing path info in request");
         }
 
-        uri = uri.replace(SERVLET_PATH, "");
-        ServletRegistration servlet = SERVLET_REGISTRY.get(uri);
-
-        if (servlet != null) {
-            return servlet;
-        }
-
-        servlet = SERVLET_REGISTRY.get(getFirstSegment(uri));
-
-        if (servlet != null) {
-            return servlet;
-        }
-
-        throw new NotFoundException("Invalid path: " + uri);
+        return uri.replaceFirst(SERVLET_PATH, "");
     }
 
-    public static HttpSecureAppServlet getDelegatedServlet(HttpServletRequest req) {
-        return getOrCreateServlet(findMatchingServlet(req).getClassName());
+    public static HttpSecureAppServlet getDelegatedServlet(HttpSecureAppServlet caller, String uri) {
+        HttpSecureAppServlet servlet = getOrCreateServlet(getMappingPath(uri));
+
+        if (servlet.getServletConfig() == null) {
+            servlet.init(caller.getServletConfig());
+        }
+
+        return servlet;
     }
 }

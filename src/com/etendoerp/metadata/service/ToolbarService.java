@@ -6,15 +6,14 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.codehaus.jettison.json.JSONObject;
-import org.openbravo.base.secureApp.HttpSecureAppServlet;
 import org.openbravo.dal.core.OBContext;
 
 import com.etendoerp.metadata.builders.ToolbarBuilder;
 import com.etendoerp.metadata.exceptions.UnprocessableContentException;
 
 public class ToolbarService extends MetadataService {
-    public ToolbarService(HttpSecureAppServlet caller, HttpServletRequest request, HttpServletResponse response) {
-        super(caller, request, response);
+    public ToolbarService(HttpServletRequest request, HttpServletResponse response) {
+        super(request, response);
     }
 
     @Override
