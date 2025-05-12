@@ -22,7 +22,7 @@ public class ForwarderServlet extends BaseServlet {
     public void service(HttpServletRequest req, HttpServletResponse res) throws IOException, ServletException {
         try {
             // Call the base service method to handle pre-processing and set RequestContext
-            super.service(req, res, false);
+            super.service(req, res, false, true);
 
             // Use the wrapped request and response
             HttpServletRequest request = RequestContext.get().getRequest();

@@ -101,21 +101,25 @@ public class BaseServlet extends HttpSecureAppServlet {
     public void service(HttpServletRequest req, HttpServletResponse res, boolean callSuper,
         boolean initializeSession) throws IOException {
         try {
-            HttpServletRequestWrapper request = HttpServletRequestWrapper.wrap(req);
-            AllowedCrossDomainsHandler.getInstance().setCORSHeaders(request, res);
-            RequestVariables vars = new RequestVariables(request);
+            req = HttpServletRequestWrapper.wrap(req);
+            doOptions(req, res);
+
+            if (req.getMethod().equalsIgnoreCase("options")) {
+                return;
+            }
+            RequestVariables vars = new RequestVariables(req);
             RequestContext requestContext = RequestContext.get();
-            requestContext.setRequest(request);
+            requestContext.setRequest(req);
             requestContext.setVariableSecureApp(vars);
             requestContext.setResponse(res);
-            authenticationManager.authenticate(request, res);
+            String userId = authenticationManager.authenticate(req, res);
 
             if (initializeSession) {
                 initializeSession();
             }
 
             if (callSuper) {
-                super.serviceInitialized(request, res);
+                super.serviceInitialized(req, res);
             }
         } catch (Exception e) {
             log4j.error(e.getMessage(), e);
@@ -125,5 +129,10 @@ public class BaseServlet extends HttpSecureAppServlet {
                 res.getWriter().write(Utils.convertToJson(e).toString());
             }
         }
+    }
+
+    @Override
+    public final void doOptions(HttpServletRequest req, HttpServletResponse res) {
+        AllowedCrossDomainsHandler.getInstance().setCORSHeaders(req, res);
     }
 }
