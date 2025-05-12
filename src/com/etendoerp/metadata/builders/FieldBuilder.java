@@ -22,6 +22,7 @@ import org.openbravo.client.kernel.KernelUtils;
 import org.openbravo.dal.core.DalUtil;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
+import org.openbravo.data.Sqlc;
 import org.openbravo.model.ad.access.FieldAccess;
 import org.openbravo.model.ad.datamodel.Column;
 import org.openbravo.model.ad.datamodel.Table;
@@ -351,6 +352,26 @@ public class FieldBuilder extends Builder {
         return result.replace(DalUtil.DOT, DalUtil.FIELDSEPARATOR);
     }
 
+    private static String getInputName(Column column) {
+        try {
+            return DataSourceUtils.getInpName(column);
+        } catch (Exception e) {
+            logger.warn(e.getMessage(), e);
+
+            return "inp" + Sqlc.TransformaNombreColumna(column.getDBColumnName());
+        }
+    }
+
+    private static String getHqlName(Field field) {
+        try {
+            return DataSourceUtils.getHQLColumnName(field)[0];
+        } catch (Exception e) {
+            logger.warn(e.getMessage(), e);
+
+            return field.getName();
+        }
+    }
+
     @Override
     public JSONObject toJSON() throws JSONException {
         addAccessProperties(fieldAccess);
@@ -384,8 +405,8 @@ public class FieldBuilder extends Builder {
         boolean mandatory = column.isMandatory();
         boolean isParentRecordProperty = isParentRecordProperty(field, field.getTab());
         JSONObject columnJson = converter.toJsonObject(field.getColumn(), DataResolvingMode.FULL_TRANSLATABLE);
-        String inputName = DataSourceUtils.getInpName(column);
-        String hqlName = DataSourceUtils.getHQLColumnName(field)[0];
+        String inputName = getInputName(column);
+        String hqlName = getHqlName(field);
         String columnName = column.getDBColumnName();
 
         json.put("hqlName", hqlName);
