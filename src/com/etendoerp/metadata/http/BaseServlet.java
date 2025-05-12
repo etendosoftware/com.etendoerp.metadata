@@ -11,8 +11,8 @@ import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 
 import org.openbravo.authentication.AuthenticationManager;
+import org.openbravo.base.secureApp.AllowedCrossDomainsHandler;
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
-import org.openbravo.base.secureApp.VariablesSecureApp;
 import org.openbravo.base.weld.WeldUtils;
 import org.openbravo.client.kernel.KernelServlet;
 import org.openbravo.client.kernel.RequestContext;
@@ -32,21 +32,29 @@ import com.etendoerp.metadata.utils.Utils;
 /**
  * @author luuchorocha
  */
-@SuppressWarnings("RedundantThrows")
 public class BaseServlet extends HttpSecureAppServlet {
     private static AuthenticationManager authenticationManager = null;
 
-    public static RequestVariables initializeSession() {
+    private void bypassCSRF(HttpServletRequest request, String userId) {
+        HttpSession session = request.getSession(false);
+
+        if (session != null) {
+            session.setAttribute("#CSRF_TOKEN", userId);
+            session.setAttribute("#CSRF_Token", userId);
+        }
+    }
+
+    public void initializeSession() {
         OBContext context = OBContext.getOBContext();
 
         if (context == null) {
             throw new InternalServerException("OBContext not initialized for this thread");
         }
 
-        return getVars(context);
+        initializeSession(context);
     }
 
-    private static RequestVariables getVars(OBContext context) {
+    private void initializeSession(OBContext context) {
         RequestContext requestContext = RequestContext.get();
         HttpServletRequest request = requestContext.getRequest();
         RequestVariables vars = (RequestVariables) requestContext.getVariablesSecureApp();
@@ -66,20 +74,11 @@ public class BaseServlet extends HttpSecureAppServlet {
 
         try {
             fillSessionArguments(conn, vars, userId, languageCode, isRTL, roleId, clientId, orgId, warehouseId);
+            readNumberFormat(vars, KernelServlet.getGlobalParameters().getFormatPath());
+            readProperties(vars);
             bypassCSRF(request, userId);
         } catch (ServletException e) {
             throw new InternalServerException(e.getMessage());
-        }
-
-        return vars;
-    }
-
-    private static void bypassCSRF(HttpServletRequest request, String userId) {
-        HttpSession session = request.getSession(false);
-
-        if (session != null) {
-            session.setAttribute("#CSRF_TOKEN", userId);
-            session.setAttribute("#CSRF_Token", userId);
         }
     }
 
@@ -96,25 +95,27 @@ public class BaseServlet extends HttpSecureAppServlet {
 
     @Override
     public void service(HttpServletRequest req, HttpServletResponse res) throws IOException, ServletException {
-        service(req, res, true);
+        service(req, res, true, true);
     }
 
-    public void service(HttpServletRequest req, HttpServletResponse res, boolean callSuper) throws IOException {
+    public void service(HttpServletRequest req, HttpServletResponse res, boolean callSuper,
+        boolean initializeSession) throws IOException {
         try {
-
             HttpServletRequestWrapper request = HttpServletRequestWrapper.wrap(req);
+            AllowedCrossDomainsHandler.getInstance().setCORSHeaders(request, res);
             RequestVariables vars = new RequestVariables(request);
             RequestContext requestContext = RequestContext.get();
             requestContext.setRequest(request);
             requestContext.setVariableSecureApp(vars);
             requestContext.setResponse(res);
             authenticationManager.authenticate(request, res);
-            setSessionProperties(vars);
+
+            if (initializeSession) {
+                initializeSession();
+            }
 
             if (callSuper) {
                 super.serviceInitialized(request, res);
-            } else {
-                initializeSession();
             }
         } catch (Exception e) {
             log4j.error(e.getMessage(), e);
@@ -124,10 +125,5 @@ public class BaseServlet extends HttpSecureAppServlet {
                 res.getWriter().write(Utils.convertToJson(e).toString());
             }
         }
-    }
-
-    private void setSessionProperties(VariablesSecureApp vars) {
-        readNumberFormat(vars, KernelServlet.getGlobalParameters().getFormatPath());
-        readProperties(vars);
     }
 }

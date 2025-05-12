@@ -7,6 +7,7 @@ import java.util.List;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
+import org.openbravo.client.kernel.RequestContext;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.model.ad.access.Role;
 import org.openbravo.model.ad.access.RoleOrganization;
@@ -24,11 +25,7 @@ import com.etendoerp.metadata.exceptions.InternalServerException;
  * @author luuchorocha
  */
 public class SessionBuilder extends Builder {
-    private final RequestVariables vars;
-
-    public SessionBuilder(RequestVariables vars) {
-        this.vars = vars;
-    }
+    private final RequestVariables vars = (RequestVariables) RequestContext.get().getVariablesSecureApp();
 
     public JSONObject toJSON() {
         try {

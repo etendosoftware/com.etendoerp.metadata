@@ -1,7 +1,5 @@
 package com.etendoerp.metadata.service;
 
-import static com.etendoerp.metadata.http.BaseServlet.initializeSession;
-
 import java.io.IOException;
 
 import javax.servlet.http.HttpServletRequest;
@@ -23,7 +21,7 @@ public class SessionService extends MetadataService {
     public void process() throws IOException {
         try {
             OBContext.setAdminMode(true);
-            write(new SessionBuilder(initializeSession()).toJSON());
+            write(new SessionBuilder().toJSON());
         } finally {
             OBContext.restorePreviousMode();
         }
