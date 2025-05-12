@@ -1,12 +1,20 @@
 package com.etendoerp.metadata.utils;
 
+import static org.apache.http.HttpStatus.SC_INTERNAL_SERVER_ERROR;
+import static org.apache.http.HttpStatus.SC_METHOD_NOT_ALLOWED;
+import static org.apache.http.HttpStatus.SC_UNAUTHORIZED;
+import static org.apache.http.HttpStatus.SC_UNPROCESSABLE_ENTITY;
 import static org.openbravo.client.application.DynamicExpressionParser.replaceSystemPreferencesInDisplayLogic;
 
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
 
 import javax.script.ScriptException;
 import javax.servlet.http.HttpServletRequest;
 
+import org.apache.http.HttpStatus;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.message.MessageFactory;
@@ -14,8 +22,10 @@ import org.apache.logging.log4j.message.ParameterizedMessageFactory;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.hibernate.criterion.Restrictions;
+import org.openbravo.base.exception.OBSecurityException;
 import org.openbravo.base.expression.OBScriptEngine;
 import org.openbravo.base.model.Property;
+import org.openbravo.base.structure.BaseOBObject;
 import org.openbravo.client.application.DynamicExpressionParser;
 import org.openbravo.client.application.Process;
 import org.openbravo.dal.core.OBContext;
@@ -25,8 +35,14 @@ import org.openbravo.model.ad.datamodel.Table;
 import org.openbravo.model.ad.system.Language;
 import org.openbravo.model.ad.ui.Field;
 import org.openbravo.model.ad.ui.Tab;
+import org.openbravo.service.json.DataResolvingMode;
+import org.openbravo.service.json.DataToJsonConverter;
 
 import com.etendoerp.metadata.builders.ProcessDefinitionBuilder;
+import com.etendoerp.metadata.exceptions.MethodNotAllowedException;
+import com.etendoerp.metadata.exceptions.NotFoundException;
+import com.etendoerp.metadata.exceptions.UnauthorizedException;
+import com.etendoerp.metadata.exceptions.UnprocessableContentException;
 
 /**
  * @author luuchorocha
@@ -34,6 +50,20 @@ import com.etendoerp.metadata.builders.ProcessDefinitionBuilder;
 public class Utils {
     private static final Logger logger = LogManager.getLogger(Utils.class);
     private static final MessageFactory messageFactory = new ParameterizedMessageFactory();
+    private static final Map<String, Integer> exceptionStatusMap = buildExceptionMap();
+    private static final DataToJsonConverter converter = new DataToJsonConverter();
+
+    private static Map<String, Integer> buildExceptionMap() {
+        final Map<String, Integer> map = new HashMap<>();
+
+        map.put(OBSecurityException.class.getName(), SC_UNAUTHORIZED);
+        map.put(UnauthorizedException.class.getName(), SC_UNAUTHORIZED);
+        map.put(MethodNotAllowedException.class.getName(), SC_METHOD_NOT_ALLOWED);
+        map.put(UnprocessableContentException.class.getName(), SC_UNPROCESSABLE_ENTITY);
+        map.put(NotFoundException.class.getName(), HttpStatus.SC_NOT_FOUND);
+
+        return map;
+    }
 
     public static String formatMessage(String message, Object... params) {
         try {
@@ -131,5 +161,35 @@ public class Utils {
             Restrictions.eq(Language.PROPERTY_SYSTEMLANGUAGE, true)).add(
             Restrictions.eq(Language.PROPERTY_ACTIVE, true)).add(
             Restrictions.eq(Language.PROPERTY_LANGUAGE, languageCode)).setMaxResults(1).uniqueResult();
+    }
+
+    public static int getHttpStatusFor(Throwable t) {
+        Integer result = exceptionStatusMap.get(t.getClass().getName());
+
+        return Objects.requireNonNullElse(exceptionStatusMap.get(t.getClass().getName()), SC_INTERNAL_SERVER_ERROR);
+    }
+
+    public static JSONObject convertToJson(Throwable t) {
+        JSONObject json = new JSONObject();
+
+        if (t.getCause() != null) {
+            t = t.getCause();
+        }
+
+        try {
+            json.put("error", t.getMessage());
+        } catch (JSONException e) {
+            logger.warn(e.getMessage(), e);
+        }
+
+        return json;
+    }
+
+    public static JSONObject getJsonObject(BaseOBObject object) {
+        if (object != null) {
+            return converter.toJsonObject(object, DataResolvingMode.FULL_TRANSLATABLE);
+        } else {
+            return null;
+        }
     }
 }

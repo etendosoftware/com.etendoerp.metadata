@@ -1,9 +1,9 @@
 package com.etendoerp.metadata.utils;
 
 import static com.etendoerp.metadata.utils.Constants.SERVLET_PATH;
+import static com.etendoerp.metadata.utils.Constants.SERVLET_PATH_LENGTH;
 
 import java.util.Collection;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -44,22 +44,21 @@ public class ServletRegistry {
 
     private static HttpSecureAppServlet getOrCreateServlet(String uri) {
         try {
-            String servletName = findMatchingServlet(uri).getClassName();
-            Class<?> klazz = Class.forName(servletName);
-            List<?> servlets = WeldUtils.getInstances(klazz);
+            Class<? extends HttpSecureAppServlet> klazz = getServletClass(uri);
+            HttpSecureAppServlet servlet = WeldUtils.getInstanceFromStaticBeanManager(klazz);
 
-            return servlets.isEmpty() ? createServletInstance(klazz) : (HttpSecureAppServlet) servlets.get(0);
+            if (servlet == null) {
+                servlet = klazz.getDeclaredConstructor().newInstance();
+            }
+
+            return servlet;
         } catch (Exception e) {
             throw new NotFoundException(e.getMessage());
         }
     }
 
-    private static HttpSecureAppServlet createServletInstance(Class<?> klazz) {
-        try {
-            return klazz.asSubclass(HttpSecureAppServlet.class).getDeclaredConstructor().newInstance();
-        } catch (Exception e) {
-            throw new NotFoundException(e.getMessage());
-        }
+    private static Class<? extends HttpSecureAppServlet> getServletClass(String uri) throws ClassNotFoundException {
+        return Class.forName(findMatchingServlet(uri).getClassName()).asSubclass(HttpSecureAppServlet.class);
     }
 
     private static ServletRegistration findMatchingServlet(String uri) {
@@ -73,11 +72,11 @@ public class ServletRegistry {
     }
 
     private static String getMappingPath(String uri) {
-        if (uri == null || uri.isBlank()) {
+        if (uri == null) {
             throw new NotFoundException("Missing path info in request");
         }
 
-        return uri.replaceFirst(SERVLET_PATH, "");
+        return uri.startsWith(SERVLET_PATH) ? uri.substring(SERVLET_PATH_LENGTH) : uri;
     }
 
     public static HttpSecureAppServlet getDelegatedServlet(HttpSecureAppServlet caller, String uri) {

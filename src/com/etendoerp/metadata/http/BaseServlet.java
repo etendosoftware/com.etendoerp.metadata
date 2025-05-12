@@ -27,10 +27,12 @@ import org.openbravo.service.db.DalConnectionProvider;
 
 import com.etendoerp.metadata.data.RequestVariables;
 import com.etendoerp.metadata.exceptions.InternalServerException;
+import com.etendoerp.metadata.utils.Utils;
 
 /**
  * @author luuchorocha
  */
+@SuppressWarnings("RedundantThrows")
 public class BaseServlet extends HttpSecureAppServlet {
     private static AuthenticationManager authenticationManager = null;
 
@@ -41,6 +43,10 @@ public class BaseServlet extends HttpSecureAppServlet {
             throw new InternalServerException("OBContext not initialized for this thread");
         }
 
+        return getVars(context);
+    }
+
+    private static RequestVariables getVars(OBContext context) {
         RequestContext requestContext = RequestContext.get();
         HttpServletRequest request = requestContext.getRequest();
         RequestVariables vars = (RequestVariables) requestContext.getVariablesSecureApp();
@@ -93,19 +99,30 @@ public class BaseServlet extends HttpSecureAppServlet {
         service(req, res, true);
     }
 
-    public void service(HttpServletRequest req, HttpServletResponse res,
-        boolean callSuper) throws IOException, ServletException {
-        HttpServletRequestWrapper request = HttpServletRequestWrapper.wrap(req);
-        RequestVariables vars = new RequestVariables(request);
-        RequestContext requestContext = RequestContext.get();
-        requestContext.setRequest(request);
-        requestContext.setVariableSecureApp(vars);
-        requestContext.setResponse(res);
-        authenticationManager.authenticate(req, res);
-        setSessionProperties(vars);
+    public void service(HttpServletRequest req, HttpServletResponse res, boolean callSuper) throws IOException {
+        try {
 
-        if (callSuper) {
-            super.serviceInitialized(req, res);
+            HttpServletRequestWrapper request = HttpServletRequestWrapper.wrap(req);
+            RequestVariables vars = new RequestVariables(request);
+            RequestContext requestContext = RequestContext.get();
+            requestContext.setRequest(request);
+            requestContext.setVariableSecureApp(vars);
+            requestContext.setResponse(res);
+            authenticationManager.authenticate(request, res);
+            setSessionProperties(vars);
+
+            if (callSuper) {
+                super.serviceInitialized(request, res);
+            } else {
+                initializeSession();
+            }
+        } catch (Exception e) {
+            log4j.error(e.getMessage(), e);
+
+            if (!res.isCommitted()) {
+                res.setStatus(Utils.getHttpStatusFor(e));
+                res.getWriter().write(Utils.convertToJson(e).toString());
+            }
         }
     }
 

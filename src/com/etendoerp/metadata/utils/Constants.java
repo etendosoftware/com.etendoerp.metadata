@@ -29,6 +29,7 @@ public class Constants {
     public static final String TAB_ID = "tabId";
     public static final String SWS_SWS_ARE_MISCONFIGURED = "SWS - SWS are misconfigured";
     public static final String SWS_INVALID_CREDENTIALS = "SWS - You must specify a username and password or a valid token";
+    public static final int SERVLET_PATH_LENGTH = SERVLET_PATH.length();
     private static final String SELECTOR_REFERENCE_ID = "95E2A8B50A254B2AAE6774B8C2F28120";
     private static final String SEARCH_REFERENCE_ID = "30";
     private static final String TABLE_DIR_REFERENCE_ID = "19";
@@ -36,4 +37,5 @@ public class Constants {
     private static final String TREE_REFERENCE_ID = "8C57A4A2E05F4261A1FADF47C30398AD";
     public static final List<String> SELECTOR_REFERENCES = Arrays.asList(TABLE_REFERENCE_ID, TABLE_DIR_REFERENCE_ID,
         SEARCH_REFERENCE_ID, SELECTOR_REFERENCE_ID, TREE_REFERENCE_ID);
+
 }

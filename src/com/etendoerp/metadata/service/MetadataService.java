@@ -1,6 +1,7 @@
 package com.etendoerp.metadata.service;
 
 import java.io.IOException;
+import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 
 import javax.servlet.http.HttpServletRequest;
@@ -10,7 +11,6 @@ import org.apache.http.entity.ContentType;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.codehaus.jettison.json.JSONObject;
-import org.openbravo.base.secureApp.HttpSecureAppServlet;
 
 import com.etendoerp.metadata.utils.Utils;
 
@@ -20,7 +20,6 @@ import com.etendoerp.metadata.utils.Utils;
 public abstract class MetadataService {
     private static final ThreadLocal<HttpServletRequest> requestThreadLocal = new ThreadLocal<>();
     private static final ThreadLocal<HttpServletResponse> responseThreadLocal = new ThreadLocal<>();
-    private static final ThreadLocal<HttpSecureAppServlet> callerThreadLocal = new ThreadLocal<>();
     protected final Logger logger = LogManager.getLogger(this.getClass());
 
     public MetadataService(HttpServletRequest request, HttpServletResponse response) {
@@ -32,7 +31,6 @@ public abstract class MetadataService {
     public static void clear() {
         requestThreadLocal.remove();
         responseThreadLocal.remove();
-        callerThreadLocal.remove();
     }
 
     protected HttpServletRequest getRequest() {
@@ -43,15 +41,18 @@ public abstract class MetadataService {
         return responseThreadLocal.get();
     }
 
-    protected HttpSecureAppServlet getCaller() {
-        return callerThreadLocal.get();
-    }
-
     protected void write(JSONObject data) throws IOException {
         HttpServletResponse response = getResponse();
         response.setContentType(ContentType.APPLICATION_JSON.getMimeType());
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-        response.getWriter().write(data.toString());
+
+        try (Writer writer = response.getWriter()) {
+            writer.write(data.toString());
+        } catch (IOException e) {
+            logger.warn(e.getMessage(), e);
+
+            throw e;
+        }
     }
 
     public abstract void process() throws IOException;

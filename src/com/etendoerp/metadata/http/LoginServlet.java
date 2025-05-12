@@ -1,6 +1,6 @@
 package com.etendoerp.metadata.http;
 
-import static com.etendoerp.metadata.exceptions.Utils.getResponseStatus;
+import static com.etendoerp.metadata.utils.Utils.getHttpStatusFor;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -48,7 +48,7 @@ public class LoginServlet extends HttpBaseServlet {
             res.getWriter().write(manager.processLogin(HttpServletRequestWrapper.wrap(req)).toString());
         } catch (Exception e) {
             log4j.error(e.getMessage(), e);
-            res.setStatus(getResponseStatus(e));
+            res.setStatus(getHttpStatusFor(e));
             res.getWriter().write(JsonUtils.convertExceptionToJson(e));
         } finally {
             OBContext.restorePreviousMode();

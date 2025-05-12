@@ -1,6 +1,6 @@
 package com.etendoerp.metadata.builders;
 
-import static com.etendoerp.metadata.exceptions.Utils.getJsonObject;
+import static com.etendoerp.metadata.utils.Utils.getJsonObject;
 
 import java.util.List;
 
