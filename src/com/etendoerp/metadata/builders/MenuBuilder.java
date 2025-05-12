@@ -19,13 +19,13 @@ import org.openbravo.model.ad.ui.Window;
  * @author luuchorocha
  */
 public class MenuBuilder extends Builder {
-    private static final MenuManager manager = new MenuManager();
+    private static final ThreadLocal<MenuManager> manager = ThreadLocal.withInitial(MenuManager::new);
 
     public MenuBuilder() {
         try {
-            manager.getMenu();
+            manager.get().getMenu();
         } catch (NullPointerException e) {
-            manager.setGlobalMenuOptions(new GlobalMenu());
+            manager.get().setGlobalMenuOptions(new GlobalMenu());
         }
     }
 
@@ -69,7 +69,8 @@ public class MenuBuilder extends Builder {
     @Override
     public JSONObject toJSON() throws JSONException {
         JSONObject result = new JSONObject();
-        result.put("menu", manager.getMenu().getChildren().stream().map(this::toJSON).collect(Collectors.toList()));
+        MenuOption menu = manager.get().getMenu();
+        result.put("menu", menu.getChildren().stream().map(this::toJSON).collect(Collectors.toList()));
 
         return result;
     }
