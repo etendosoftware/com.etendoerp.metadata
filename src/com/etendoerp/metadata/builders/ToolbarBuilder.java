@@ -3,8 +3,6 @@ package com.etendoerp.metadata.builders;
 import static com.etendoerp.metadata.utils.Utils.formatMessage;
 
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 import org.apache.logging.log4j.LogManager;
@@ -27,21 +25,18 @@ import com.etendoerp.metadata.utils.Utils;
 
 public class ToolbarBuilder extends Builder {
     private static final Logger logger = LogManager.getLogger(ToolbarBuilder.class);
-    private static final Map<String, ButtonConfig> standardButtons = new ConcurrentHashMap<>();
-
-    static {
-        standardButtons.put("NEW", new ButtonConfig("NEW", "OBUIAPP_NewDoc", "NEW", true, "plus"));
-        standardButtons.put("SAVE", new ButtonConfig("SAVE", "OBUIAPP_SaveRow", "SAVE", true, "save"));
-        standardButtons.put("DELETE", new ButtonConfig("DELETE", "OBUIAPP_DeleteRow", "DELETE", true, "trash"));
-        standardButtons.put("CANCEL", new ButtonConfig("CANCEL", "OBUIAPP_CancelEdit", "CANCEL", true, "cancel"));
-        standardButtons.put("REFRESH",
-            new ButtonConfig("REFRESH", "OBUIAPP_RefreshData", "REFRESH", true, "refresh-cw"));
-        standardButtons.put("FIND", new ButtonConfig("FIND", "OBUIAPP_Find", "FIND", false, "search"));
-        standardButtons.put("EXPORT", new ButtonConfig("EXPORT", "OBUIAPP_ExportGrid", "EXPORT", false, "download"));
-        standardButtons.put("ATTACHMENTS",
-            new ButtonConfig("ATTACHMENTS", "OBUIAPP_AttachmentPrompt", "ATTACHMENTS", false, "paperclip"));
-        standardButtons.put("GRID_VIEW", new ButtonConfig("GRID_VIEW", "OBUIAPP_GridView", "GRID_VIEW", false, "grid"));
-    }
+    private static final ButtonConfig[] standardButtons = {
+        new ButtonConfig("NEW", "OBUIAPP_NewDoc", "NEW", true, "plus"),
+        new ButtonConfig("SAVE", "OBUIAPP_SaveRow", "SAVE", true, "save"),
+        new ButtonConfig("DELETE", "OBUIAPP_DeleteRow", "DELETE", true, "trash"),
+        new ButtonConfig("CANCEL", "OBUIAPP_CancelEdit", "CANCEL", true, "cancel"),
+        new ButtonConfig("REFRESH", "OBUIAPP_RefreshData", "REFRESH", true, "refresh-cw"),
+        new ButtonConfig("FILTER", "OBUIAPP_GridFilterImplicitToolTip", "FILTER", true, "filter"),
+        new ButtonConfig("FIND", "OBUIAPP_Find", "FIND", false, "search"),
+        new ButtonConfig("EXPORT", "OBUIAPP_ExportGrid", "EXPORT", false, "download"),
+        new ButtonConfig("ATTACHMENTS", "OBUIAPP_AttachmentPrompt", "ATTACHMENTS", false, "paperclip"),
+        new ButtonConfig("GRID_VIEW", "OBUIAPP_GridView", "GRID_VIEW", false, "grid"),
+    };
 
     private final String windowId;
     private final String tabId;
@@ -83,7 +78,7 @@ public class ToolbarBuilder extends Builder {
         JSONObject response = new JSONObject();
         JSONArray buttons = new JSONArray();
 
-        for (ButtonConfig config : standardButtons.values()) {
+        for (ButtonConfig config : standardButtons) {
             buttons.put(createButtonJSON(config));
         }
 
