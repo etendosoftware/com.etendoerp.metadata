@@ -1,12 +1,13 @@
 package com.etendoerp.metadata.builders;
 
-import static com.etendoerp.metadata.exceptions.Utils.getJsonObject;
+import static com.etendoerp.metadata.utils.Utils.getJsonObject;
 
 import java.util.List;
 
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
+import org.openbravo.client.kernel.RequestContext;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.model.ad.access.Role;
 import org.openbravo.model.ad.access.RoleOrganization;
@@ -24,11 +25,7 @@ import com.etendoerp.metadata.exceptions.InternalServerException;
  * @author luuchorocha
  */
 public class SessionBuilder extends Builder {
-    private final RequestVariables vars;
-
-    public SessionBuilder(RequestVariables vars) {
-        this.vars = vars;
-    }
+    private final RequestVariables vars = (RequestVariables) RequestContext.get().getVariablesSecureApp();
 
     public JSONObject toJSON() {
         try {
@@ -58,67 +55,66 @@ public class SessionBuilder extends Builder {
     }
 
     private JSONArray getRoles(User user) {
-        JSONArray result = new JSONArray();
+        JSONArray roles = new JSONArray();
 
         try {
             List<UserRoles> userRoleList = user.getADUserRolesList();
 
             for (UserRoles userRole : userRoleList) {
-                JSONObject role = new JSONObject();
+                JSONObject json = new JSONObject();
+                Role role = userRole.getRole();
 
-                role.put("id", userRole.getRole().getId());
-                role.put("name", userRole.getRole().getName());
-                role.put("organizations", getOrganizations(userRole.getRole()));
+                json.put("id", role.getId());
+                json.put("name", role.get(Role.PROPERTY_NAME, language, role.getId()));
+                json.put("organizations", getOrganizations(role));
 
-                result.put(role);
+                roles.put(json);
             }
         } catch (Exception e) {
             logger.error(e.getMessage(), e);
         }
 
-        return result;
+        return roles;
     }
 
     private JSONArray getOrganizations(Role role) {
-        JSONArray result = new JSONArray();
+        JSONArray organizations = new JSONArray();
 
         try {
-            List<RoleOrganization> roleOrgList = role.getADRoleOrganizationList();
+            for (RoleOrganization roleOrg : role.getADRoleOrganizationList()) {
+                JSONObject json = new JSONObject();
+                Organization organization = roleOrg.getOrganization();
 
-            for (RoleOrganization roleOrg : roleOrgList) {
-                JSONObject org = new JSONObject();
+                json.put("id", organization.getId());
+                json.put("name", organization.get(Organization.PROPERTY_NAME, language, organization.getId()));
+                json.put("warehouses", getWarehouses(organization));
 
-                org.put("id", roleOrg.getOrganization().getId());
-                org.put("name", roleOrg.getOrganization().getName());
-                org.put("warehouses", getWarehouses(roleOrg.getOrganization()));
-
-                result.put(org);
+                organizations.put(json);
             }
         } catch (Exception e) {
             logger.error(e.getMessage(), e);
         }
 
-        return result;
+        return organizations;
     }
 
     private JSONArray getWarehouses(Organization organization) {
-        JSONArray result = new JSONArray();
+        JSONArray warehouses = new JSONArray();
 
         try {
-            List<OrgWarehouse> orgWarehouses = organization.getOrganizationWarehouseList();
+            for (OrgWarehouse orgWarehouse : organization.getOrganizationWarehouseList()) {
+                JSONObject json = new JSONObject();
+                Warehouse warehouse = orgWarehouse.getWarehouse();
 
-            for (OrgWarehouse orgWarehouse : orgWarehouses) {
-                JSONObject org = new JSONObject();
+                json.put("id", warehouse.getId());
+                json.put("name", warehouse.get(Warehouse.PROPERTY_NAME, language, warehouse.getId()));
 
-                org.put("id", orgWarehouse.getWarehouse().getId());
-                org.put("name", orgWarehouse.getWarehouse().getName());
-
-                result.put(org);
+                warehouses.put(json);
             }
         } catch (Exception e) {
             logger.error(e.getMessage(), e);
         }
 
-        return result;
+        return warehouses;
     }
 }

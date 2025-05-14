@@ -20,7 +20,7 @@ public class LanguageService extends MetadataService {
     @Override
     public void process() throws IOException {
         try {
-            OBContext.setAdminMode();
+            OBContext.setAdminMode(true);
             write(new LanguageBuilder().toJSON());
         } finally {
             OBContext.restorePreviousMode();

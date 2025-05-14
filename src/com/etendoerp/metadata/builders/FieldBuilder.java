@@ -22,6 +22,7 @@ import org.openbravo.client.kernel.KernelUtils;
 import org.openbravo.dal.core.DalUtil;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
+import org.openbravo.data.Sqlc;
 import org.openbravo.model.ad.access.FieldAccess;
 import org.openbravo.model.ad.datamodel.Column;
 import org.openbravo.model.ad.datamodel.Table;
@@ -80,7 +81,7 @@ public class FieldBuilder extends Builder {
         }
     }
 
-    private static ReferenceSelectors getReferenceSelectors(Reference ref) {
+    public static ReferenceSelectors getReferenceSelectors(Reference ref) {
         Selector selector = null;
         ReferencedTree treeSelector = null;
 
@@ -330,13 +331,13 @@ public class FieldBuilder extends Builder {
         return null;
     }
 
-    private static DomainType getDomainType(String referenceId) {
+    public static DomainType getDomainType(String referenceId) {
         final org.openbravo.base.model.Reference reference = ModelProvider.getInstance().getReference(referenceId);
         Check.isNotNull(reference, "No reference found for referenceid " + referenceId);
         return reference.getDomainType();
     }
 
-    private static String getPropertyOrDataSourceField(SelectorField selectorField) {
+    public static String getPropertyOrDataSourceField(SelectorField selectorField) {
         final String result;
         if (selectorField.getProperty() != null) {
             result = selectorField.getProperty();
@@ -349,6 +350,26 @@ public class FieldBuilder extends Builder {
                 "Selector field " + selectorField + " has a null datasource and a null property");
         }
         return result.replace(DalUtil.DOT, DalUtil.FIELDSEPARATOR);
+    }
+
+    private static String getInputName(Column column) {
+        try {
+            return DataSourceUtils.getInpName(column);
+        } catch (Exception e) {
+            logger.warn(e.getMessage(), e);
+
+            return "inp" + Sqlc.TransformaNombreColumna(column.getDBColumnName());
+        }
+    }
+
+    private static String getHqlName(Field field) {
+        try {
+            return DataSourceUtils.getHQLColumnName(field)[0];
+        } catch (Exception e) {
+            logger.warn(e.getMessage(), e);
+
+            return field.getName();
+        }
     }
 
     @Override
@@ -384,8 +405,8 @@ public class FieldBuilder extends Builder {
         boolean mandatory = column.isMandatory();
         boolean isParentRecordProperty = isParentRecordProperty(field, field.getTab());
         JSONObject columnJson = converter.toJsonObject(field.getColumn(), DataResolvingMode.FULL_TRANSLATABLE);
-        String inputName = DataSourceUtils.getInpName(column);
-        String hqlName = DataSourceUtils.getHQLColumnName(field)[0];
+        String inputName = getInputName(column);
+        String hqlName = getHqlName(field);
         String columnName = column.getDBColumnName();
 
         json.put("hqlName", hqlName);

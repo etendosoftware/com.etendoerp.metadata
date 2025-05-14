@@ -7,9 +7,7 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.openbravo.dal.core.OBContext;
 
-import com.etendoerp.metadata.auth.SessionManager;
 import com.etendoerp.metadata.builders.SessionBuilder;
-import com.etendoerp.metadata.data.RequestVariables;
 
 /**
  * @author luuchorocha
@@ -22,9 +20,8 @@ public class SessionService extends MetadataService {
     @Override
     public void process() throws IOException {
         try {
-            OBContext.setAdminMode();
-            RequestVariables vars = SessionManager.initializeSession(getRequest());
-            write(new SessionBuilder(vars).toJSON());
+            OBContext.setAdminMode(true);
+            write(new SessionBuilder().toJSON());
         } finally {
             OBContext.restorePreviousMode();
         }

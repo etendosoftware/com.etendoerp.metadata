@@ -22,7 +22,7 @@ public class TabService extends MetadataService {
     @Override
     public void process() throws IOException {
         try {
-            OBContext.setAdminMode();
+            OBContext.setAdminMode(true);
             String tabId = getRequest().getPathInfo().substring(5);
             Tab tab = OBDal.getInstance().get(Tab.class, tabId);
             write(new TabBuilder(tab, null).toJSON());

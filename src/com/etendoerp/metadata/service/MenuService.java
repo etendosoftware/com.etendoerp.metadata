@@ -22,7 +22,7 @@ public class MenuService extends MetadataService {
     @Override
     public void process() throws IOException {
         try {
-            OBContext.setAdminMode();
+            OBContext.setAdminMode(true);
             write(new MenuBuilder().toJSON());
         } catch (JSONException e) {
             throw new InternalServerException(e.getMessage());

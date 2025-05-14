@@ -1,9 +1,9 @@
 package com.etendoerp.metadata.service;
 
 import java.io.IOException;
+import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 
-import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
@@ -45,8 +45,15 @@ public abstract class MetadataService {
         HttpServletResponse response = getResponse();
         response.setContentType(ContentType.APPLICATION_JSON.getMimeType());
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-        response.getWriter().write(data.toString());
+
+        try (Writer writer = response.getWriter()) {
+            writer.write(data.toString());
+        } catch (IOException e) {
+            logger.warn(e.getMessage(), e);
+
+            throw e;
+        }
     }
 
-    public abstract void process() throws ServletException, IOException;
+    public abstract void process() throws IOException;
 }

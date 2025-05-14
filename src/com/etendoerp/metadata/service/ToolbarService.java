@@ -19,7 +19,7 @@ public class ToolbarService extends MetadataService {
     @Override
     public void process() throws IOException {
         try {
-            OBContext.setAdminMode();
+            OBContext.setAdminMode(true);
             String path = getRequest().getPathInfo();
             String[] pathParts = path.split("/");
 

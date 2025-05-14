@@ -22,7 +22,7 @@ public class WindowService extends MetadataService {
         String id = getRequest().getPathInfo().substring(8);
 
         try {
-            OBContext.setAdminMode();
+            OBContext.setAdminMode(true);
             write(new WindowBuilder(id).toJSON());
         } finally {
             OBContext.restorePreviousMode();
