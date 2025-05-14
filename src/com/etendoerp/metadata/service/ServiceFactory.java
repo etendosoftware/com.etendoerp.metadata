@@ -1,5 +1,6 @@
 package com.etendoerp.metadata.service;
 
+import static com.etendoerp.metadata.utils.Constants.LABELS_PATH;
 import static com.etendoerp.metadata.utils.Constants.LANGUAGE_PATH;
 import static com.etendoerp.metadata.utils.Constants.MENU_PATH;
 import static com.etendoerp.metadata.utils.Constants.MESSAGE_PATH;
@@ -34,6 +35,8 @@ public class ServiceFactory {
             return new LanguageService(req, res);
         } else if (path.equals(MESSAGE_PATH)) {
             return new MessageService(req, res);
+        } else if (path.equals(LABELS_PATH)) {
+            return new LabelsService(req, res);
         } else {
             throw new NotFoundException();
         }
