@@ -1,21 +1,18 @@
 package com.etendoerp.metadata.builders;
 
-import static com.etendoerp.metadata.builders.FieldBuilder.getListInfo;
-import static com.etendoerp.metadata.builders.FieldBuilder.getSelectorInfo;
-import static com.etendoerp.metadata.utils.Constants.LIST_REFERENCE_ID;
-import static com.etendoerp.metadata.utils.Constants.SELECTOR_REFERENCES;
-import static com.etendoerp.metadata.utils.Constants.WINDOW_REFERENCE_ID;
+import org.codehaus.jettison.json.JSONException;
+import org.codehaus.jettison.json.JSONObject;
+import org.openbravo.client.application.DynamicExpressionParser;
+import org.openbravo.client.application.Parameter;
+import org.openbravo.client.application.RefWindow;
+import org.openbravo.model.ad.domain.Reference;
+import org.openbravo.service.json.DataResolvingMode;
 
 import java.util.List;
 
-import org.codehaus.jettison.json.JSONException;
-import org.codehaus.jettison.json.JSONObject;
-import org.openbravo.client.application.Parameter;
-import org.openbravo.client.application.RefWindow;
-import org.openbravo.dal.core.OBContext;
-import org.openbravo.model.ad.domain.Reference;
-import org.openbravo.model.ad.system.Language;
-import org.openbravo.service.json.DataResolvingMode;
+import static com.etendoerp.metadata.builders.FieldBuilder.getListInfo;
+import static com.etendoerp.metadata.builders.FieldBuilder.getSelectorInfo;
+import static com.etendoerp.metadata.utils.Constants.*;
 
 /**
  * @author luuchorocha
@@ -42,10 +39,25 @@ public class ParameterBuilder extends Builder {
             parameter.getReference().getId());
     }
 
+
+    private String getReadOnlyLogic(Parameter parameter) {
+        String readOnlyLogic = parameter.getReadOnlyLogic();
+
+        if (readOnlyLogic != null && !readOnlyLogic.isBlank()) {
+            DynamicExpressionParser parser = new DynamicExpressionParser(readOnlyLogic, parameter, true);
+            return parser.getJSExpression();
+        }
+
+        return null;
+    }
+
     @Override
     public JSONObject toJSON() throws JSONException {
-        OBContext context = OBContext.getOBContext();
         JSONObject json = converter.toJsonObject(parameter, DataResolvingMode.FULL_TRANSLATABLE);
+
+        if (hasReadOnlyLogic(parameter)) {
+            json.put("readOnlyLogicExpression", getReadOnlyLogic(parameter));
+        }
 
         if (isSelectorParameter(parameter)) {
             json.put("selector", getSelectorInfo(parameter.getId(), parameter.getReferenceSearchKey()));
@@ -56,13 +68,17 @@ public class ParameterBuilder extends Builder {
         }
 
         if (isWindowReference(parameter)) {
-            json.put("window", getWindowInfo(parameter.getReferenceSearchKey(), language));
+            json.put("window", getWindowInfo(parameter.getReferenceSearchKey()));
         }
 
         return json;
     }
 
-    private JSONObject getWindowInfo(Reference referenceSearchKey, Language language) {
+    private boolean hasReadOnlyLogic(Parameter parameter) {
+        return parameter.getReadOnlyLogic() != null && !parameter.getReadOnlyLogic().isBlank();
+    }
+
+    private JSONObject getWindowInfo(Reference referenceSearchKey) {
         List<RefWindow> refWindows = referenceSearchKey.getOBUIAPPRefWindowList();
 
         if (!refWindows.isEmpty()) {
