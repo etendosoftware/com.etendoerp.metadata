@@ -27,10 +27,10 @@ public class ToolbarBuilder extends Builder {
     private static final Logger logger = LogManager.getLogger(ToolbarBuilder.class);
     private static final ButtonConfig[] standardButtons = {
         new ButtonConfig("NEW", "OBUIAPP_NewDoc", "NEW", true, "plus"),
+        new ButtonConfig("REFRESH", "OBUIAPP_RefreshData", "REFRESH", true, "refresh-cw"),
         new ButtonConfig("SAVE", "OBUIAPP_SaveRow", "SAVE", true, "save"),
         new ButtonConfig("DELETE", "OBUIAPP_DeleteRow", "DELETE", true, "trash"),
         new ButtonConfig("CANCEL", "OBUIAPP_CancelEdit", "CANCEL", true, "cancel"),
-        new ButtonConfig("REFRESH", "OBUIAPP_RefreshData", "REFRESH", true, "refresh-cw"),
         new ButtonConfig("FILTER", "OBUIAPP_GridFilterImplicitToolTip", "FILTER", true, "filter"),
         new ButtonConfig("FIND", "OBUIAPP_Find", "FIND", false, "search"),
         new ButtonConfig("EXPORT", "OBUIAPP_ExportGrid", "EXPORT", false, "download"),
