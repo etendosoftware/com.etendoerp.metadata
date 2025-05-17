@@ -16,28 +16,28 @@ import org.openbravo.service.json.DataResolvingMode;
  * @author luuchorocha
  */
 public class LanguageBuilder extends Builder {
-    private static final String PROPERTIES = String.join(",", PROPERTY_ID, PROPERTY_LANGUAGE, PROPERTY_NAME);
+  private static final String PROPERTIES = String.join(",", PROPERTY_ID, PROPERTY_LANGUAGE, PROPERTY_NAME);
 
-    public LanguageBuilder() {
-        converter.setSelectedProperties(PROPERTIES);
+  public LanguageBuilder() {
+    converter.setSelectedProperties(PROPERTIES);
+  }
+
+  private List<Language> getLanguages() {
+    return OBDal.getReadOnlyInstance().createCriteria(Language.class).add(
+        Restrictions.eq(Language.PROPERTY_SYSTEMLANGUAGE, true)).list();
+  }
+
+  public JSONObject toJSON() {
+    JSONObject json = new JSONObject();
+
+    try {
+      for (Language lang : getLanguages()) {
+        json.put(lang.getLanguage(), converter.toJsonObject(lang, DataResolvingMode.FULL_TRANSLATABLE));
+      }
+    } catch (Exception e) {
+      logger.error(e.getMessage(), e);
     }
 
-    private List<Language> getLanguages() {
-        return OBDal.getReadOnlyInstance().createCriteria(Language.class).add(
-            Restrictions.eq(Language.PROPERTY_SYSTEMLANGUAGE, true)).list();
-    }
-
-    public JSONObject toJSON() {
-        JSONObject json = new JSONObject();
-
-        try {
-            for (Language lang : getLanguages()) {
-                json.put(lang.getLanguage(), converter.toJsonObject(lang, DataResolvingMode.FULL_TRANSLATABLE));
-            }
-        } catch (Exception e) {
-            logger.error(e.getMessage(), e);
-        }
-
-        return json;
-    }
+    return json;
+  }
 }

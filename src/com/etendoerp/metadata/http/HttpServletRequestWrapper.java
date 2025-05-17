@@ -10,34 +10,34 @@ import org.openbravo.client.kernel.RequestContext;
  * @author luuchorocha
  */
 public class HttpServletRequestWrapper extends RequestContext.HttpServletRequestWrapper {
-    private static final ThreadLocal<HttpSessionWrapper> session = new ThreadLocal<>();
+  private static final ThreadLocal<HttpSessionWrapper> session = new ThreadLocal<>();
 
-    public HttpServletRequestWrapper(HttpServletRequest request) {
-        super(request);
-        session.set(new HttpSessionWrapper());
-        SessionHolder.requestInitialized(this);
-    }
+  public HttpServletRequestWrapper(HttpServletRequest request) {
+    super(request);
+    session.set(new HttpSessionWrapper());
+    SessionHolder.requestInitialized(this);
+  }
 
-    public static HttpServletRequestWrapper wrap(HttpServletRequest request) {
-        if (request.getClass().equals(HttpServletRequestWrapper.class)) {
-            return (HttpServletRequestWrapper) request;
-        } else {
-            return new HttpServletRequestWrapper(request);
-        }
+  public static HttpServletRequestWrapper wrap(HttpServletRequest request) {
+    if (request.getClass().equals(HttpServletRequestWrapper.class)) {
+      return (HttpServletRequestWrapper) request;
+    } else {
+      return new HttpServletRequestWrapper(request);
     }
+  }
 
-    public static void clear() {
-        session.remove();
-        SessionHolder.clear();
-    }
+  public static void clear() {
+    session.remove();
+    SessionHolder.clear();
+  }
 
-    @Override
-    public HttpSession getSession() {
-        return session.get();
-    }
+  @Override
+  public HttpSession getSession() {
+    return session.get();
+  }
 
-    @Override
-    public HttpSession getSession(boolean f) {
-        return session.get();
-    }
+  @Override
+  public HttpSession getSession(boolean f) {
+    return session.get();
+  }
 }

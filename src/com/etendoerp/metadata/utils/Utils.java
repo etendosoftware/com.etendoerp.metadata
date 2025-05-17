@@ -48,148 +48,155 @@ import com.etendoerp.metadata.exceptions.UnprocessableContentException;
  * @author luuchorocha
  */
 public class Utils {
-    private static final Logger logger = LogManager.getLogger(Utils.class);
-    private static final MessageFactory messageFactory = new ParameterizedMessageFactory();
-    private static final Map<String, Integer> exceptionStatusMap = buildExceptionMap();
-    private static final DataToJsonConverter converter = new DataToJsonConverter();
+  private static final Logger logger = LogManager.getLogger(Utils.class);
+  private static final MessageFactory messageFactory = new ParameterizedMessageFactory();
+  private static final Map<String, Integer> exceptionStatusMap = buildExceptionMap();
+  private static final DataToJsonConverter converter = new DataToJsonConverter();
 
-    private static Map<String, Integer> buildExceptionMap() {
-        final Map<String, Integer> map = new HashMap<>();
+  private static Map<String, Integer> buildExceptionMap() {
+    final Map<String, Integer> map = new HashMap<>();
 
-        map.put(OBSecurityException.class.getName(), SC_UNAUTHORIZED);
-        map.put(UnauthorizedException.class.getName(), SC_UNAUTHORIZED);
-        map.put(MethodNotAllowedException.class.getName(), SC_METHOD_NOT_ALLOWED);
-        map.put(UnprocessableContentException.class.getName(), SC_UNPROCESSABLE_ENTITY);
-        map.put(NotFoundException.class.getName(), HttpStatus.SC_NOT_FOUND);
+    map.put(OBSecurityException.class.getName(), SC_UNAUTHORIZED);
+    map.put(UnauthorizedException.class.getName(), SC_UNAUTHORIZED);
+    map.put(MethodNotAllowedException.class.getName(), SC_METHOD_NOT_ALLOWED);
+    map.put(UnprocessableContentException.class.getName(), SC_UNPROCESSABLE_ENTITY);
+    map.put(NotFoundException.class.getName(), HttpStatus.SC_NOT_FOUND);
 
-        return map;
+    return map;
+  }
+
+  public static String formatMessage(String message, Object... params) {
+    try {
+      return messageFactory.newMessage(message, params).getFormattedMessage();
+    } catch (Exception e) {
+      logger.error(e);
+
+      return message;
+    }
+  }
+
+  public static Tab getReferencedTab(Property referenced) {
+    OBDal dal = OBDal.getReadOnlyInstance();
+    String tableId = referenced.getEntity().getTableId();
+    Table table = dal.get(Table.class, tableId);
+
+    return (Tab) dal.createCriteria(Tab.class).add(Restrictions.eq(Tab.PROPERTY_TABLE, table)).add(
+        Restrictions.eq(Tab.PROPERTY_ACTIVE, true)).setMaxResults(1).uniqueResult();
+  }
+
+
+  public static boolean evaluateDisplayLogicAtServerLevel(Field field) {
+    boolean result;
+    try {
+      String displayLogicEvaluatedInTheServer = field.getDisplayLogicEvaluatedInTheServer();
+
+      if (displayLogicEvaluatedInTheServer == null) {
+        return true;
+      }
+
+      String translatedDisplayLogic = replaceSystemPreferencesInDisplayLogic(displayLogicEvaluatedInTheServer);
+      DynamicExpressionParser parser = new DynamicExpressionParser(translatedDisplayLogic, field.getTab());
+
+      result = (Boolean) OBScriptEngine.getInstance().eval(parser.getJSExpression());
+    } catch (ScriptException e) {
+      logger.error(e);
+
+      result = true;
     }
 
-    public static String formatMessage(String message, Object... params) {
-        try {
-            return messageFactory.newMessage(message, params).getFormattedMessage();
-        } catch (Exception e) {
-            logger.error(e);
+    return result;
+  }
 
-            return message;
-        }
+  public static JSONObject getFieldProcess(Field field) throws JSONException {
+    Process process = field.getColumn().getOBUIAPPProcess();
+
+    if (process == null) {
+      return new JSONObject();
     }
 
-    public static Tab getReferencedTab(Property referenced) {
-        OBDal dal = OBDal.getReadOnlyInstance();
-        String tableId = referenced.getEntity().getTableId();
-        Table table = dal.get(Table.class, tableId);
+    JSONObject processJson = new ProcessDefinitionBuilder(process).toJSON();
+    Language language = OBContext.getOBContext().getLanguage();
+    Column column = field.getColumn();
 
-        return (Tab) dal.createCriteria(Tab.class).add(Restrictions.eq(Tab.PROPERTY_TABLE, table)).add(
-            Restrictions.eq(Tab.PROPERTY_ACTIVE, true)).setMaxResults(1).uniqueResult();
+    processJson.put("fieldId", field.getId());
+    processJson.put("columnId", column.getId());
+    processJson.put("displayLogic", field.getDisplayLogic());
+    processJson.put("buttonText", column.get(Column.PROPERTY_NAME, language, column.getId()));
+    processJson.put("fieldName", field.get(Field.PROPERTY_NAME, language, field.getId()));
+    processJson.put("reference", column.getReference().getId());
+
+    return processJson;
+  }
+
+  public static JSONObject getRequestData(HttpServletRequest request) {
+    try {
+      return new JSONObject(request.getReader().lines().reduce("", String::concat));
+    } catch (Exception e) {
+      return new JSONObject();
+    }
+  }
+
+  public static void setContext(HttpServletRequest request) {
+    try {
+      OBContext.setAdminMode(true);
+      OBContext context = OBContext.getOBContext();
+      Language language = getLanguage(request);
+
+      if (language != null) {
+        context.setLanguage(language);
+      }
+
+      /* Recreating the OBContext, because OBContext.setLanguage
+       * does not update langID, only languageCode
+       */
+      OBContext.setOBContext(context.getUser().getId(), context.getRole().getId(),
+          context.getCurrentClient().getId(), context.getCurrentOrganization().getId(),
+          context.getLanguage().getLanguage(), context.getWarehouse().getId());
+
+      OBContext.setOBContextInSession(request, OBContext.getOBContext());
+    } finally {
+      OBContext.restorePreviousMode();
+    }
+  }
+
+  private static Language getLanguage(HttpServletRequest request) {
+    String[] providedLanguages = { request.getParameter("language"), request.getHeader("language") };
+    String languageCode = Arrays.stream(providedLanguages).filter(
+        language -> language != null && !language.isEmpty()).findFirst().orElse(null);
+
+    return (Language) OBDal.getInstance().createCriteria(Language.class).add(
+        Restrictions.eq(Language.PROPERTY_SYSTEMLANGUAGE, true)).add(
+        Restrictions.eq(Language.PROPERTY_ACTIVE, true)).add(
+        Restrictions.eq(Language.PROPERTY_LANGUAGE, languageCode)).setMaxResults(1).uniqueResult();
+  }
+
+  public static int getHttpStatusFor(Throwable t) {
+    Integer result = exceptionStatusMap.get(t.getClass().getName());
+
+    return Objects.requireNonNullElse(exceptionStatusMap.get(t.getClass().getName()), SC_INTERNAL_SERVER_ERROR);
+  }
+
+  public static JSONObject convertToJson(Throwable t) {
+    JSONObject json = new JSONObject();
+
+    if (t.getCause() != null) {
+      t = t.getCause();
     }
 
-
-    public static boolean evaluateDisplayLogicAtServerLevel(Field field) {
-        boolean result;
-        try {
-            String displayLogicEvaluatedInTheServer = field.getDisplayLogicEvaluatedInTheServer();
-
-            if (displayLogicEvaluatedInTheServer == null) {
-                return true;
-            }
-
-            String translatedDisplayLogic = replaceSystemPreferencesInDisplayLogic(displayLogicEvaluatedInTheServer);
-            DynamicExpressionParser parser = new DynamicExpressionParser(translatedDisplayLogic, field.getTab());
-
-            result = (Boolean) OBScriptEngine.getInstance().eval(parser.getJSExpression());
-        } catch (ScriptException e) {
-            logger.error(e);
-
-            result = true;
-        }
-
-        return result;
+    try {
+      json.put("error", t.getMessage());
+    } catch (JSONException e) {
+      logger.warn(e.getMessage(), e);
     }
 
-    public static JSONObject getFieldProcess(Field field) throws JSONException {
-        Process process = field.getColumn().getOBUIAPPProcess();
+    return json;
+  }
 
-        if (process == null) {
-            return new JSONObject();
-        }
-
-        JSONObject processJson = new ProcessDefinitionBuilder(process).toJSON();
-        Language language = OBContext.getOBContext().getLanguage();
-        Column column = field.getColumn();
-
-        processJson.put("fieldId", field.getId());
-        processJson.put("columnId", column.getId());
-        processJson.put("displayLogic", field.getDisplayLogic());
-        processJson.put("buttonText", column.get(Column.PROPERTY_NAME, language, column.getId()));
-        processJson.put("fieldName", field.get(Field.PROPERTY_NAME, language, field.getId()));
-        processJson.put("reference", column.getReference().getId());
-
-        return processJson;
+  public static JSONObject getJsonObject(BaseOBObject object) {
+    if (object != null) {
+      return converter.toJsonObject(object, DataResolvingMode.FULL_TRANSLATABLE);
+    } else {
+      return null;
     }
-
-    public static JSONObject getRequestData(HttpServletRequest request) {
-        try {
-            return new JSONObject(request.getReader().lines().reduce("", String::concat));
-        } catch (Exception e) {
-            return new JSONObject();
-        }
-    }
-
-    public static void setContext(HttpServletRequest request) {
-        try {
-            OBContext.setAdminMode(true);
-            OBContext context = OBContext.getOBContext();
-            Language language = getLanguage(request);
-
-            if (language != null) {
-                context.setLanguage(language);
-            }
-
-            OBContext.setOBContextInSession(request, context);
-        } finally {
-            OBContext.restorePreviousMode();
-        }
-    }
-
-    private static Language getLanguage(HttpServletRequest request) {
-        String[] providedLanguages = { request.getParameter("language"), request.getHeader("language") };
-        String languageCode = Arrays.stream(providedLanguages).filter(
-            language -> language != null && !language.isEmpty()).findFirst().orElse(null);
-
-        return (Language) OBDal.getInstance().createCriteria(Language.class).add(
-            Restrictions.eq(Language.PROPERTY_SYSTEMLANGUAGE, true)).add(
-            Restrictions.eq(Language.PROPERTY_ACTIVE, true)).add(
-            Restrictions.eq(Language.PROPERTY_LANGUAGE, languageCode)).setMaxResults(1).uniqueResult();
-    }
-
-    public static int getHttpStatusFor(Throwable t) {
-        Integer result = exceptionStatusMap.get(t.getClass().getName());
-
-        return Objects.requireNonNullElse(exceptionStatusMap.get(t.getClass().getName()), SC_INTERNAL_SERVER_ERROR);
-    }
-
-    public static JSONObject convertToJson(Throwable t) {
-        JSONObject json = new JSONObject();
-
-        if (t.getCause() != null) {
-            t = t.getCause();
-        }
-
-        try {
-            json.put("error", t.getMessage());
-        } catch (JSONException e) {
-            logger.warn(e.getMessage(), e);
-        }
-
-        return json;
-    }
-
-    public static JSONObject getJsonObject(BaseOBObject object) {
-        if (object != null) {
-            return converter.toJsonObject(object, DataResolvingMode.FULL_TRANSLATABLE);
-        } else {
-            return null;
-        }
-    }
+  }
 }
