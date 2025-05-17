@@ -20,7 +20,6 @@ import org.openbravo.client.application.ApplicationConstants;
 import org.openbravo.client.application.DynamicExpressionParser;
 import org.openbravo.client.kernel.KernelUtils;
 import org.openbravo.dal.core.DalUtil;
-import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.data.Sqlc;
 import org.openbravo.model.ad.access.FieldAccess;
@@ -40,7 +39,7 @@ import org.openbravo.service.json.JsonConstants;
 import org.openbravo.userinterface.selector.Selector;
 import org.openbravo.userinterface.selector.SelectorField;
 
-import com.etendoerp.etendorx.utils.DataSourceUtils;
+import org.openbravo.dal.core.OBContext;
 import com.etendoerp.metadata.data.ReferenceSelectors;
 import com.etendoerp.metadata.utils.Constants;
 import com.etendoerp.metadata.utils.Utils;
@@ -353,23 +352,15 @@ public class FieldBuilder extends Builder {
     }
 
     private static String getInputName(Column column) {
-        try {
-            return DataSourceUtils.getInpName(column);
-        } catch (Exception e) {
-            logger.warn(e.getMessage(), e);
-
-            return "inp" + Sqlc.TransformaNombreColumna(column.getDBColumnName());
-        }
+        return Constants.INPUT_NAME_PREFIX + Sqlc.TransformaNombreColumna(column.getDBColumnName());
     }
 
     private static String getHqlName(Field field) {
-        try {
-            return DataSourceUtils.getHQLColumnName(field)[0];
-        } catch (Exception e) {
-            logger.warn(e.getMessage(), e);
+        Property property = KernelUtils.getProperty(field);
 
-            return field.getName();
-        }
+        if (property == null) return null;
+
+        return property.getName();
     }
 
     @Override
@@ -403,7 +394,6 @@ public class FieldBuilder extends Builder {
     private void addBasicProperties(Field field) throws JSONException {
         Column column = field.getColumn();
         boolean mandatory = column.isMandatory();
-        boolean isParentRecordProperty = isParentRecordProperty(field, field.getTab());
         JSONObject columnJson = converter.toJsonObject(field.getColumn(), DataResolvingMode.FULL_TRANSLATABLE);
         String inputName = getInputName(column);
         String hqlName = getHqlName(field);
@@ -414,7 +404,6 @@ public class FieldBuilder extends Builder {
         json.put("column", columnJson);
         json.put("isMandatory", mandatory);
         json.put("inputName", inputName);
-        json.put("isParentRecordProperty", isParentRecordProperty);
     }
 
     private void addReferencedProperty(Field field) throws JSONException {

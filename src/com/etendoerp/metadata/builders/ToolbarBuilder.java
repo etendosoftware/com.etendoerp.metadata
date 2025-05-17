@@ -20,6 +20,7 @@ import org.openbravo.model.ad.ui.Window;
 import org.openbravo.service.json.DataToJsonConverter;
 
 import com.etendoerp.metadata.data.ButtonConfig;
+import com.etendoerp.metadata.data.TabProcessor;
 import com.etendoerp.metadata.exceptions.InternalServerException;
 import com.etendoerp.metadata.utils.Utils;
 
@@ -111,7 +112,7 @@ public class ToolbarBuilder extends Builder {
         JSONArray buttons = new JSONArray();
 
         List<Field> processFields = tab.getADFieldList().stream().filter(
-            field -> field.isActive() && TabBuilder.hasAccessToProcess(field, windowId) && FieldBuilder.isProcessField(
+            field -> field.isActive() && TabProcessor.hasAccessToProcess(field, windowId) && FieldBuilder.isProcessField(
                 field)).collect(Collectors.toList());
 
         for (Field field : processFields) {

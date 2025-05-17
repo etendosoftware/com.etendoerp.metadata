@@ -5,9 +5,8 @@ import java.io.IOException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.openbravo.dal.core.OBContext;
-
 import com.etendoerp.metadata.builders.SessionBuilder;
+import org.openbravo.dal.core.OBContext;
 
 /**
  * @author luuchorocha
