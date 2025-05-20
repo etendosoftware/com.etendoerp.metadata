@@ -4,7 +4,6 @@ import static org.openbravo.client.application.process.BaseProcessActionHandler.
 
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
@@ -19,10 +18,13 @@ import org.openbravo.model.ad.ui.Field;
 import org.openbravo.model.ad.ui.Tab;
 
 import com.etendoerp.metadata.builders.FieldBuilder;
+import com.etendoerp.redis.interfaces.CachedConcurrentMap;
 
 public class TabProcessor {
-    private static final Map<String, CachedList<Field>> fieldCache = new ConcurrentHashMap<>();
-    private static final Map<String, CachedList<FieldAccess>> fieldAccessCache = new ConcurrentHashMap<>();
+    private static final String FIELD_CACHE = "FIELDS_METADATA";
+    private static final String FIELD_ACCESS_CACHE = "FIELD_ACCESS_METADATA";
+    private static final CachedConcurrentMap<String, CachedList<Field>> fieldCache = new CachedConcurrentMap<>(FIELD_CACHE);
+    private static final CachedConcurrentMap<String, CachedList<FieldAccess>> fieldAccessCache = new CachedConcurrentMap<>(FIELD_ACCESS_CACHE);
 
     private static boolean isFieldAccessible(Field field) {
         return field.isActive() && hasAccessToProcess(field, field.getTab().getWindow().getId());
