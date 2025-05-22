@@ -364,12 +364,14 @@ public class FieldBuilder extends Builder {
 
     private static String getHqlName(Field field) {
         try {
-            return DataSourceUtils.getHQLColumnName(field)[0];
+            var entity = DataSourceUtils.getHQLColumnName(field);
+            if(entity.length > 0) {
+                return entity[0];
+            }
         } catch (Exception e) {
             logger.warn(e.getMessage(), e);
-
-            return field.getName();
         }
+        return field.getName();
     }
 
     @Override
