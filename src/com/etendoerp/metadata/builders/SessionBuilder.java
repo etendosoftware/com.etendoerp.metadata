@@ -63,10 +63,12 @@ public class SessionBuilder extends Builder {
             for (UserRoles userRole : userRoleList) {
                 JSONObject json = new JSONObject();
                 Role role = userRole.getRole();
+                Client client = role.getClient();
 
                 json.put("id", role.getId());
                 json.put("name", role.get(Role.PROPERTY_NAME, language, role.getId()));
                 json.put("organizations", getOrganizations(role));
+                json.put("client", client.get(Client.PROPERTY_NAME, language, client.getId()));
 
                 roles.put(json);
             }

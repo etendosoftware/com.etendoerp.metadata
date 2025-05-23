@@ -6,7 +6,6 @@ import static com.etendoerp.metadata.utils.Constants.MENU_PATH;
 import static com.etendoerp.metadata.utils.Constants.MESSAGE_PATH;
 import static com.etendoerp.metadata.utils.Constants.SESSION_PATH;
 import static com.etendoerp.metadata.utils.Constants.TAB_PATH;
-import static com.etendoerp.metadata.utils.Constants.TOOLBAR_PATH;
 import static com.etendoerp.metadata.utils.Constants.WINDOW_PATH;
 
 import javax.servlet.http.HttpServletRequest;
@@ -29,8 +28,6 @@ public class ServiceFactory {
             return new WindowService(req, res);
         } else if (path.startsWith(TAB_PATH)) {
             return new TabService(req, res);
-        } else if (path.startsWith(TOOLBAR_PATH)) {
-            return new ToolbarService(req, res);
         } else if (path.startsWith(LANGUAGE_PATH)) {
             return new LanguageService(req, res);
         } else if (path.equals(MESSAGE_PATH)) {
