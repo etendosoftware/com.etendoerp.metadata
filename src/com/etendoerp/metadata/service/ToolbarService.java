@@ -12,32 +12,31 @@ import com.etendoerp.metadata.builders.ToolbarBuilder;
 import com.etendoerp.metadata.exceptions.UnprocessableContentException;
 
 public class ToolbarService extends MetadataService {
-    public ToolbarService(HttpServletRequest request, HttpServletResponse response) {
-        super(request, response);
+  public ToolbarService(HttpServletRequest request, HttpServletResponse response) {
+    super(request, response);
+  }
+
+  @Override
+  public void process() throws IOException {
+    try {
+      OBContext.setAdminMode(true);
+      String path = getRequest().getPathInfo();
+      String[] pathParts = path.split("/");
+
+      if (pathParts.length < 3) {
+        throw new UnprocessableContentException("Invalid toolbar path");
+      }
+
+      String windowId = pathParts[2];
+      String tabId = (pathParts.length >= 4 && !"undefined".equals(pathParts[3])) ? pathParts[3] : null;
+      JSONObject toolbar = fetchToolbar(windowId, tabId);
+      write(toolbar);
+    } finally {
+      OBContext.restorePreviousMode();
     }
+  }
 
-    @Override
-    public void process() throws IOException {
-        try {
-            OBContext.setAdminMode(true);
-            String path = getRequest().getPathInfo();
-            String[] pathParts = path.split("/");
-
-            if (pathParts.length < 3) {
-                throw new UnprocessableContentException("Invalid toolbar path");
-            }
-
-            String windowId = pathParts[2];
-            String tabId = (pathParts.length >= 4 && !"undefined".equals(pathParts[3])) ? pathParts[3] : null;
-            JSONObject toolbar = fetchToolbar(windowId, tabId);
-            write(toolbar);
-        } finally {
-            OBContext.restorePreviousMode();
-        }
-    }
-
-    private JSONObject fetchToolbar(String windowId, String tabId) {
-        return new ToolbarBuilder(OBContext.getOBContext().getLanguage().getLanguage(), windowId, tabId,
-            false).toJSON();
-    }
+  private JSONObject fetchToolbar(String windowId, String tabId) {
+    return new ToolbarBuilder(windowId, tabId, false).toJSON();
+  }
 }

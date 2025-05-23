@@ -16,10 +16,10 @@ import org.openbravo.base.model.domaintype.DomainType;
 import org.openbravo.base.model.domaintype.ForeignKeyDomainType;
 import org.openbravo.base.model.domaintype.PrimitiveDomainType;
 import org.openbravo.base.util.Check;
-import org.openbravo.client.application.ApplicationConstants;
 import org.openbravo.client.application.DynamicExpressionParser;
 import org.openbravo.client.kernel.KernelUtils;
 import org.openbravo.dal.core.DalUtil;
+import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.data.Sqlc;
 import org.openbravo.model.ad.access.FieldAccess;
@@ -39,7 +39,6 @@ import org.openbravo.service.json.JsonConstants;
 import org.openbravo.userinterface.selector.Selector;
 import org.openbravo.userinterface.selector.SelectorField;
 
-import org.openbravo.dal.core.OBContext;
 import com.etendoerp.metadata.data.ReferenceSelectors;
 import com.etendoerp.metadata.utils.Constants;
 import com.etendoerp.metadata.utils.Utils;
@@ -48,471 +47,450 @@ import com.etendoerp.metadata.utils.Utils;
  * @author luuchorocha
  */
 public class FieldBuilder extends Builder {
-    private final Field field;
-    private final FieldAccess fieldAccess;
-    private final JSONObject json;
-    private final Language language;
+  private final Field field;
+  private final FieldAccess fieldAccess;
+  private final JSONObject json;
+  private final Language language;
 
-    public FieldBuilder(Field field, FieldAccess fieldAccess) {
-        this.field = field;
-        this.fieldAccess = fieldAccess;
-        this.json = converter.toJsonObject(field, DataResolvingMode.FULL_TRANSLATABLE);
-        this.language = OBContext.getOBContext().getLanguage();
+  public FieldBuilder(Field field, FieldAccess fieldAccess) {
+    this.field = OBDal.getReadOnlyInstance().get(Field.class, field.getId());
+    this.fieldAccess = fieldAccess != null ? OBDal.getReadOnlyInstance().get(FieldAccess.class,
+        fieldAccess.getId()) : null;
+    this.json = converter.toJsonObject(this.field, DataResolvingMode.FULL_TRANSLATABLE);
+    this.language = OBContext.getOBContext().getLanguage();
+  }
+
+  public static boolean isProcessField(Field field) {
+    Process processAction = field.getColumn().getProcess();
+    org.openbravo.client.application.Process processDefinition = field.getColumn().getOBUIAPPProcess();
+
+    return (processAction != null || processDefinition != null);
+  }
+
+
+  public static JSONObject getSelectorInfo(String fieldId, Reference ref) throws JSONException {
+    ReferenceSelectors result = getReferenceSelectors(ref);
+
+    if (result.selector != null) {
+      return addSelectorInfo(fieldId, result.selector);
+    } else if (result.treeSelector != null) {
+      return addTreeSelectorInfo(fieldId, result.treeSelector);
+    } else {
+      return addComboTableSelectorInfo(fieldId);
+    }
+  }
+
+  public static ReferenceSelectors getReferenceSelectors(Reference ref) {
+    Selector selector = null;
+    ReferencedTree treeSelector = null;
+
+    if (ref != null) {
+      if (!ref.getOBUISELSelectorList().isEmpty()) {
+        selector = ref.getOBUISELSelectorList().get(0);
+      }
+      if (!ref.getADReferencedTreeList().isEmpty()) {
+        treeSelector = ref.getADReferencedTreeList().get(0);
+      }
     }
 
-    public static boolean isProcessField(Field field) {
-        Process processAction = field.getColumn().getProcess();
-        org.openbravo.client.application.Process processDefinition = field.getColumn().getOBUIAPPProcess();
+    return new ReferenceSelectors(selector, treeSelector);
+  }
 
-        return (processAction != null || processDefinition != null);
+  private static JSONObject addComboTableSelectorInfo(String fieldId) throws JSONException {
+    JSONObject selectorInfo = new JSONObject();
+
+    selectorInfo.put(Constants.SELECTOR_DEFINITION_PROPERTY, (Object) null);
+    selectorInfo.put(JsonConstants.SORTBY_PARAMETER, JsonConstants.IDENTIFIER);
+    selectorInfo.put(JsonConstants.TEXTMATCH_PARAMETER, JsonConstants.TEXTMATCH_SUBSTRING);
+    selectorInfo.put(Constants.DATASOURCE_PROPERTY, Constants.TABLE_DATASOURCE);
+    selectorInfo.put(JsonConstants.NOCOUNT_PARAMETER, true);
+    selectorInfo.put(Constants.FIELD_ID_PROPERTY, fieldId);
+    selectorInfo.put(Constants.DISPLAY_FIELD_PROPERTY, JsonConstants.IDENTIFIER);
+    selectorInfo.put(Constants.VALUE_FIELD_PROPERTY, JsonConstants.ID);
+    selectorInfo.put(JsonConstants.SELECTEDPROPERTIES_PARAMETER, JsonConstants.ID);
+    selectorInfo.put(JsonConstants.ADDITIONAL_PROPERTIES_PARAMETER, JsonConstants.ID + ",");
+
+    return selectorInfo;
+  }
+
+  private static JSONObject addTreeSelectorInfo(String fieldId, ReferencedTree treeSelector) throws JSONException {
+    JSONObject selectorInfo = new JSONObject();
+
+    selectorInfo.put(Constants.DATASOURCE_PROPERTY, Constants.TREE_DATASOURCE);
+    selectorInfo.put(Constants.SELECTOR_DEFINITION_PROPERTY, treeSelector.getId());
+    selectorInfo.put("treeReferenceId", treeSelector.getId());
+    if (treeSelector.getDisplayfield() != null) {
+      selectorInfo.put(JsonConstants.SORTBY_PARAMETER, treeSelector.getDisplayfield().getProperty());
+      selectorInfo.put(Constants.DISPLAY_FIELD_PROPERTY, treeSelector.getDisplayfield().getProperty());
+    }
+    selectorInfo.put(JsonConstants.TEXTMATCH_PARAMETER, JsonConstants.TEXTMATCH_SUBSTRING);
+    selectorInfo.put(JsonConstants.NOCOUNT_PARAMETER, true);
+    selectorInfo.put(Constants.FIELD_ID_PROPERTY, fieldId);
+    selectorInfo.put(Constants.VALUE_FIELD_PROPERTY, treeSelector.getValuefield().getProperty());
+    selectorInfo.put(JsonConstants.SELECTEDPROPERTIES_PARAMETER, JsonConstants.ID);
+    selectorInfo.put(JsonConstants.ADDITIONAL_PROPERTIES_PARAMETER, JsonConstants.ID + ",");
+
+    return selectorInfo;
+  }
+
+  private static JSONObject addSelectorInfo(String fieldId, Selector selector) throws JSONException {
+    String dataSourceId;
+    JSONObject selectorInfo = new JSONObject();
+
+    if (selector.getObserdsDatasource() != null) {
+      dataSourceId = selector.getObserdsDatasource().getId();
+    } else if (selector.isCustomQuery()) {
+      dataSourceId = Constants.CUSTOM_QUERY_DS;
+    } else {
+      dataSourceId = selector.getTable().getName();
     }
 
+    selectorInfo.put(Constants.DATASOURCE_PROPERTY, dataSourceId);
+    selectorInfo.put(Constants.SELECTOR_DEFINITION_PROPERTY, selector.getId());
+    selectorInfo.put("filterClass", "org.openbravo.userinterface.selector.SelectorDataSourceFilter");
 
-    public static JSONObject getSelectorInfo(String fieldId, Reference ref) throws JSONException {
-        ReferenceSelectors result = getReferenceSelectors(ref);
+    if (selector.getDisplayfield() != null) {
+      selectorInfo.put(JsonConstants.SORTBY_PARAMETER,
+          selector.getDisplayfield().getDisplayColumnAlias() != null ? selector.getDisplayfield().getDisplayColumnAlias() : selector.getDisplayfield().getProperty());
+    } else {
+      selectorInfo.put(JsonConstants.SORTBY_PARAMETER, JsonConstants.IDENTIFIER);
+    }
+    selectorInfo.put(JsonConstants.NOCOUNT_PARAMETER, true);
+    selectorInfo.put(Constants.FIELD_ID_PROPERTY, fieldId);
+    // For now we only support suggestion style search (only drop down)
+    selectorInfo.put(JsonConstants.TEXTMATCH_PARAMETER, selector.getSuggestiontextmatchstyle());
 
-        if (result.selector != null) {
-            return addSelectorInfo(fieldId, result.selector);
-        } else if (result.treeSelector != null) {
-            return addTreeSelectorInfo(fieldId, result.treeSelector);
+    setSelectorProperties(selector.getOBUISELSelectorFieldList(), selector.getDisplayfield(), selector.getValuefield(),
+        selectorInfo);
+
+    selectorInfo.put("extraSearchFields", getExtraSearchFields(selector));
+    selectorInfo.put(Constants.DISPLAY_FIELD_PROPERTY, getDisplayField(selector));
+    selectorInfo.put(Constants.VALUE_FIELD_PROPERTY, getValueField(selector));
+
+    return selectorInfo;
+  }
+
+  private static void setSelectorProperties(List<SelectorField> fields, SelectorField displayField,
+      SelectorField valueField, JSONObject selectorInfo) throws JSONException {
+    String valueFieldProperty = valueField != null ? getValueField(
+        valueField.getObuiselSelector()) : JsonConstants.IDENTIFIER;
+    String displayFieldProperty = displayField != null ? getDisplayField(
+        displayField.getObuiselSelector()) : JsonConstants.IDENTIFIER;
+
+    StringBuilder selectedProperties = new StringBuilder(JsonConstants.ID);
+    StringBuilder derivedProperties = new StringBuilder();
+    StringBuilder extraProperties = new StringBuilder(valueFieldProperty);
+
+    // get extra properties
+    if (displayField != null && !JsonConstants.IDENTIFIER.equals(displayFieldProperty)) {
+      extraProperties.append(",").append(displayFieldProperty);
+      selectedProperties.append(",").append(displayFieldProperty);
+    }
+
+    // get selected and derived properties
+    for (SelectorField field : fields) {
+      String fieldName = getPropertyOrDataSourceField(field);
+
+      if (fieldName.equals(JsonConstants.ID) || fieldName.equals(JsonConstants.IDENTIFIER)) {
+        continue;
+      }
+
+      if (fieldName.contains(JsonConstants.FIELD_SEPARATOR)) {
+        if (derivedProperties.length() == 0) {
+          derivedProperties = new StringBuilder(fieldName);
         } else {
-            return addComboTableSelectorInfo(fieldId);
+          derivedProperties.append(',').append(fieldName);
         }
+      } else {
+        selectedProperties.append(",").append(fieldName);
+      }
+
+      if ((!field.isOutfield() || (displayField == null || fieldName.equals(
+          displayFieldProperty))) && (valueField == null || fieldName.equals(valueFieldProperty))) {
+        if (field.isOutfield()) {
+          extraProperties.append(",").append(fieldName);
+        }
+      }
     }
 
-    public static ReferenceSelectors getReferenceSelectors(Reference ref) {
-        Selector selector = null;
-        ReferencedTree treeSelector = null;
+    selectorInfo.put(JsonConstants.SELECTEDPROPERTIES_PARAMETER, selectedProperties.toString());
+    selectorInfo.put(JsonConstants.ADDITIONAL_PROPERTIES_PARAMETER, extraProperties + "," + derivedProperties);
+  }
 
-        if (ref != null) {
-            if (!ref.getOBUISELSelectorList().isEmpty()) {
-                selector = ref.getOBUISELSelectorList().get(0);
-            }
-            if (!ref.getADReferencedTreeList().isEmpty()) {
-                treeSelector = ref.getADReferencedTreeList().get(0);
-            }
-        }
+  public static JSONArray getListInfo(Reference refList, Language language) throws JSONException {
+    JSONArray result = new JSONArray();
 
-        return new ReferenceSelectors(selector, treeSelector);
+    for (org.openbravo.model.ad.domain.List list : refList.getADListList()) {
+      JSONObject listJson = new JSONObject();
+
+      listJson.put("id", list.getId());
+      listJson.put("value", list.getSearchKey());
+      listJson.put("label", list.get(org.openbravo.model.ad.domain.List.PROPERTY_NAME, language, list.getId()));
+
+      result.put(listJson);
     }
 
-    private static JSONObject addComboTableSelectorInfo(String fieldId) throws JSONException {
-        JSONObject selectorInfo = new JSONObject();
+    return result;
+  }
 
-        selectorInfo.put(Constants.SELECTOR_DEFINITION_PROPERTY, (Object) null);
-        selectorInfo.put(JsonConstants.SORTBY_PARAMETER, JsonConstants.IDENTIFIER);
-        selectorInfo.put(JsonConstants.TEXTMATCH_PARAMETER, JsonConstants.TEXTMATCH_SUBSTRING);
-        selectorInfo.put(Constants.DATASOURCE_PROPERTY, Constants.TABLE_DATASOURCE);
-        selectorInfo.put(JsonConstants.NOCOUNT_PARAMETER, true);
-        selectorInfo.put(Constants.FIELD_ID_PROPERTY, fieldId);
-        selectorInfo.put(Constants.DISPLAY_FIELD_PROPERTY, JsonConstants.IDENTIFIER);
-        selectorInfo.put(Constants.VALUE_FIELD_PROPERTY, JsonConstants.ID);
-        selectorInfo.put(JsonConstants.SELECTEDPROPERTIES_PARAMETER, JsonConstants.ID);
-        selectorInfo.put(JsonConstants.ADDITIONAL_PROPERTIES_PARAMETER, JsonConstants.ID + ",");
+  public static String getExtraSearchFields(Selector selector) {
+    final String displayField = getDisplayField(selector);
+    final StringBuilder sb = new StringBuilder();
+    for (SelectorField selectorField : selector.getOBUISELSelectorFieldList().stream().filter(
+        SelectorField::isActive).collect(Collectors.toList())) {
+      String fieldName = getPropertyOrDataSourceField(selectorField);
+      if (fieldName.equals(displayField)) {
+        continue;
+      }
+      // prevent booleans as search fields, they don't work
+      if (selectorField.isSearchinsuggestionbox() && !isBoolean(selectorField)) {
 
-        return selectorInfo;
-    }
-
-    private static JSONObject addTreeSelectorInfo(String fieldId, ReferencedTree treeSelector) throws JSONException {
-        JSONObject selectorInfo = new JSONObject();
-
-        selectorInfo.put(Constants.DATASOURCE_PROPERTY, Constants.TREE_DATASOURCE);
-        selectorInfo.put(Constants.SELECTOR_DEFINITION_PROPERTY, treeSelector.getId());
-        selectorInfo.put("treeReferenceId", treeSelector.getId());
-        if (treeSelector.getDisplayfield() != null) {
-            selectorInfo.put(JsonConstants.SORTBY_PARAMETER, treeSelector.getDisplayfield().getProperty());
-            selectorInfo.put(Constants.DISPLAY_FIELD_PROPERTY, treeSelector.getDisplayfield().getProperty());
-        }
-        selectorInfo.put(JsonConstants.TEXTMATCH_PARAMETER, JsonConstants.TEXTMATCH_SUBSTRING);
-        selectorInfo.put(JsonConstants.NOCOUNT_PARAMETER, true);
-        selectorInfo.put(Constants.FIELD_ID_PROPERTY, fieldId);
-        selectorInfo.put(Constants.VALUE_FIELD_PROPERTY, treeSelector.getValuefield().getProperty());
-        selectorInfo.put(JsonConstants.SELECTEDPROPERTIES_PARAMETER, JsonConstants.ID);
-        selectorInfo.put(JsonConstants.ADDITIONAL_PROPERTIES_PARAMETER, JsonConstants.ID + ",");
-
-        return selectorInfo;
-    }
-
-    private static JSONObject addSelectorInfo(String fieldId, Selector selector) throws JSONException {
-        String dataSourceId;
-        JSONObject selectorInfo = new JSONObject();
-
-        if (selector.getObserdsDatasource() != null) {
-            dataSourceId = selector.getObserdsDatasource().getId();
-        } else if (selector.isCustomQuery()) {
-            dataSourceId = Constants.CUSTOM_QUERY_DS;
-        } else {
-            dataSourceId = selector.getTable().getName();
-        }
-
-        selectorInfo.put(Constants.DATASOURCE_PROPERTY, dataSourceId);
-        selectorInfo.put(Constants.SELECTOR_DEFINITION_PROPERTY, selector.getId());
-        selectorInfo.put("filterClass", "org.openbravo.userinterface.selector.SelectorDataSourceFilter");
-
-        if (selector.getDisplayfield() != null) {
-            selectorInfo.put(JsonConstants.SORTBY_PARAMETER,
-                selector.getDisplayfield().getDisplayColumnAlias() != null ? selector.getDisplayfield().getDisplayColumnAlias() : selector.getDisplayfield().getProperty());
-        } else {
-            selectorInfo.put(JsonConstants.SORTBY_PARAMETER, JsonConstants.IDENTIFIER);
-        }
-        selectorInfo.put(JsonConstants.NOCOUNT_PARAMETER, true);
-        selectorInfo.put(Constants.FIELD_ID_PROPERTY, fieldId);
-        // For now we only support suggestion style search (only drop down)
-        selectorInfo.put(JsonConstants.TEXTMATCH_PARAMETER, selector.getSuggestiontextmatchstyle());
-
-        setSelectorProperties(selector.getOBUISELSelectorFieldList(), selector.getDisplayfield(),
-            selector.getValuefield(), selectorInfo);
-
-        selectorInfo.put("extraSearchFields", getExtraSearchFields(selector));
-        selectorInfo.put(Constants.DISPLAY_FIELD_PROPERTY, getDisplayField(selector));
-        selectorInfo.put(Constants.VALUE_FIELD_PROPERTY, getValueField(selector));
-
-        return selectorInfo;
-    }
-
-    private static void setSelectorProperties(List<SelectorField> fields, SelectorField displayField,
-        SelectorField valueField, JSONObject selectorInfo) throws JSONException {
-        String valueFieldProperty = valueField != null ? getValueField(
-            valueField.getObuiselSelector()) : JsonConstants.IDENTIFIER;
-        String displayFieldProperty = displayField != null ? getDisplayField(
-            displayField.getObuiselSelector()) : JsonConstants.IDENTIFIER;
-
-        StringBuilder selectedProperties = new StringBuilder(JsonConstants.ID);
-        StringBuilder derivedProperties = new StringBuilder();
-        StringBuilder extraProperties = new StringBuilder(valueFieldProperty);
-
-        // get extra properties
-        if (displayField != null && !JsonConstants.IDENTIFIER.equals(displayFieldProperty)) {
-            extraProperties.append(",").append(displayFieldProperty);
-            selectedProperties.append(",").append(displayFieldProperty);
-        }
-
-        // get selected and derived properties
-        for (SelectorField field : fields) {
-            String fieldName = getPropertyOrDataSourceField(field);
-
-            if (fieldName.equals(JsonConstants.ID) || fieldName.equals(JsonConstants.IDENTIFIER)) {
-                continue;
-            }
-
-            if (fieldName.contains(JsonConstants.FIELD_SEPARATOR)) {
-                if (derivedProperties.length() == 0) {
-                    derivedProperties = new StringBuilder(fieldName);
-                } else {
-                    derivedProperties.append(',').append(fieldName);
-                }
-            } else {
-                selectedProperties.append(",").append(fieldName);
-            }
-
-            if ((!field.isOutfield() || (displayField == null || fieldName.equals(
-                displayFieldProperty))) && (valueField == null || fieldName.equals(valueFieldProperty))) {
-                if (field.isOutfield()) {
-                    extraProperties.append(",").append(fieldName);
-                }
-            }
-        }
-
-        selectorInfo.put(JsonConstants.SELECTEDPROPERTIES_PARAMETER, selectedProperties.toString());
-        selectorInfo.put(JsonConstants.ADDITIONAL_PROPERTIES_PARAMETER, extraProperties + "," + derivedProperties);
-    }
-
-    public static JSONArray getListInfo(Reference refList, Language language) throws JSONException {
-        JSONArray result = new JSONArray();
-
-        for (org.openbravo.model.ad.domain.List list : refList.getADListList()) {
-            JSONObject listJson = new JSONObject();
-
-            listJson.put("id", list.getId());
-            listJson.put("value", list.getSearchKey());
-            listJson.put("label", list.get(org.openbravo.model.ad.domain.List.PROPERTY_NAME, language, list.getId()));
-
-            result.put(listJson);
-        }
-
-        return result;
-    }
-
-    public static String getExtraSearchFields(Selector selector) {
-        final String displayField = getDisplayField(selector);
-        final StringBuilder sb = new StringBuilder();
-        for (SelectorField selectorField : selector.getOBUISELSelectorFieldList().stream().filter(
-            SelectorField::isActive).collect(Collectors.toList())) {
-            String fieldName = getPropertyOrDataSourceField(selectorField);
-            if (fieldName.equals(displayField)) {
-                continue;
-            }
-            // prevent booleans as search fields, they don't work
-            if (selectorField.isSearchinsuggestionbox() && !isBoolean(selectorField)) {
-
-                // handle the case that the field is a foreign key
-                // in that case always show the identifier
-                final DomainType domainType = getDomainType(selectorField);
-                if (domainType instanceof ForeignKeyDomainType) {
-                    fieldName = fieldName + DalUtil.FIELDSEPARATOR + JsonConstants.IDENTIFIER;
-                }
-
-                if (!(sb.length() == 0)) {
-                    sb.append(",");
-                }
-                sb.append(fieldName);
-            }
-        }
-        return sb.toString();
-    }
-
-    public static String getDisplayField(Selector selector) {
-        if (selector.getDisplayfield() != null) {
-            return getPropertyOrDataSourceField(selector.getDisplayfield());
-        }
-
-        // try to be intelligent when there is a datasource
-        if (selector.getObserdsDatasource() != null) {
-            final DataSource dataSource = selector.getObserdsDatasource();
-            // a complete manual datasource which does not have a table
-            // and which has a field defined
-            if (dataSource.getTable() == null && !dataSource.getOBSERDSDatasourceFieldList().isEmpty()) {
-                final DatasourceField dsField = dataSource.getOBSERDSDatasourceFieldList().get(0);
-                return dsField.getName().replace(DalUtil.DOT, DalUtil.FIELDSEPARATOR);
-            }
-        }
-
-        // in all other cases use an identifier
-        return JsonConstants.IDENTIFIER;
-    }
-
-    public static String getValueField(Selector selector) {
-        if (selector.getValuefield() != null) {
-            final String valueField = getPropertyOrDataSourceField(selector.getValuefield());
-            if (!selector.isCustomQuery()) {
-                final DomainType domainType = getDomainType(selector.getValuefield());
-                if (domainType instanceof ForeignKeyDomainType) {
-                    return valueField + DalUtil.FIELDSEPARATOR + JsonConstants.ID;
-                }
-            }
-            return valueField;
-        }
-
-        if (selector.getObserdsDatasource() != null) {
-            final DataSource dataSource = selector.getObserdsDatasource();
-            // a complete manual datasource which does not have a table
-            // and which has a field defined
-            if (dataSource.getTable() == null && !dataSource.getOBSERDSDatasourceFieldList().isEmpty()) {
-                final DatasourceField dsField = dataSource.getOBSERDSDatasourceFieldList().get(0);
-                return dsField.getName();
-            }
-        }
-
-        return JsonConstants.ID;
-    }
-
-    private static boolean isBoolean(SelectorField selectorField) {
+        // handle the case that the field is a foreign key
+        // in that case always show the identifier
         final DomainType domainType = getDomainType(selectorField);
-        if (domainType instanceof PrimitiveDomainType) {
-            PrimitiveDomainType primitiveDomainType = (PrimitiveDomainType) domainType;
-            return boolean.class == primitiveDomainType.getPrimitiveType() || Boolean.class == primitiveDomainType.getPrimitiveType();
+        if (domainType instanceof ForeignKeyDomainType) {
+          fieldName = fieldName + DalUtil.FIELDSEPARATOR + JsonConstants.IDENTIFIER;
         }
-        return false;
-    }
 
-    private static DomainType getDomainType(SelectorField selectorField) {
-        if (selectorField.getObuiselSelector().getTable() != null && selectorField.getProperty() != null) {
-            final String entityName = selectorField.getObuiselSelector().getTable().getName();
-            final Entity entity = ModelProvider.getInstance().getEntity(entityName);
-            final Property property = DalUtil.getPropertyFromPath(entity, selectorField.getProperty());
-            Check.isNotNull(property, "Property " + selectorField.getProperty() + " not found in Entity " + entity);
-            return property.getDomainType();
-        } else if (selectorField.getObuiselSelector().getTable() != null && selectorField.getObuiselSelector().isCustomQuery() && selectorField.getReference() != null) {
-            return getDomainType(selectorField.getReference().getId());
-        } else if (selectorField.getObserdsDatasourceField().getReference() != null) {
-            return getDomainType(selectorField.getObserdsDatasourceField().getReference().getId());
+        if (!(sb.length() == 0)) {
+          sb.append(",");
         }
-        return null;
+        sb.append(fieldName);
+      }
+    }
+    return sb.toString();
+  }
+
+  public static String getDisplayField(Selector selector) {
+    if (selector.getDisplayfield() != null) {
+      return getPropertyOrDataSourceField(selector.getDisplayfield());
     }
 
-    public static DomainType getDomainType(String referenceId) {
-        final org.openbravo.base.model.Reference reference = ModelProvider.getInstance().getReference(referenceId);
-        Check.isNotNull(reference, "No reference found for referenceid " + referenceId);
-        return reference.getDomainType();
+    // try to be intelligent when there is a datasource
+    if (selector.getObserdsDatasource() != null) {
+      final DataSource dataSource = selector.getObserdsDatasource();
+      // a complete manual datasource which does not have a table
+      // and which has a field defined
+      if (dataSource.getTable() == null && !dataSource.getOBSERDSDatasourceFieldList().isEmpty()) {
+        final DatasourceField dsField = dataSource.getOBSERDSDatasourceFieldList().get(0);
+        return dsField.getName().replace(DalUtil.DOT, DalUtil.FIELDSEPARATOR);
+      }
     }
 
-    public static String getPropertyOrDataSourceField(SelectorField selectorField) {
-        final String result;
-        if (selectorField.getProperty() != null) {
-            result = selectorField.getProperty();
-        } else if (selectorField.getDisplayColumnAlias() != null) {
-            result = selectorField.getDisplayColumnAlias();
-        } else if (selectorField.getObserdsDatasourceField() != null) {
-            result = selectorField.getObserdsDatasourceField().getName();
-        } else {
-            throw new IllegalStateException(
-                "Selector field " + selectorField + " has a null datasource and a null property");
+    // in all other cases use an identifier
+    return JsonConstants.IDENTIFIER;
+  }
+
+  public static String getValueField(Selector selector) {
+    if (selector.getValuefield() != null) {
+      final String valueField = getPropertyOrDataSourceField(selector.getValuefield());
+      if (!selector.isCustomQuery()) {
+        final DomainType domainType = getDomainType(selector.getValuefield());
+        if (domainType instanceof ForeignKeyDomainType) {
+          return valueField + DalUtil.FIELDSEPARATOR + JsonConstants.ID;
         }
-        return result.replace(DalUtil.DOT, DalUtil.FIELDSEPARATOR);
+      }
+      return valueField;
     }
 
-    private static String getInputName(Column column) {
-        return Constants.INPUT_NAME_PREFIX + Sqlc.TransformaNombreColumna(column.getDBColumnName());
+    if (selector.getObserdsDatasource() != null) {
+      final DataSource dataSource = selector.getObserdsDatasource();
+      // a complete manual datasource which does not have a table
+      // and which has a field defined
+      if (dataSource.getTable() == null && !dataSource.getOBSERDSDatasourceFieldList().isEmpty()) {
+        final DatasourceField dsField = dataSource.getOBSERDSDatasourceFieldList().get(0);
+        return dsField.getName();
+      }
     }
 
-    private static String getHqlName(Field field) {
-        Property property = KernelUtils.getProperty(field);
+    return JsonConstants.ID;
+  }
 
-        if (property == null) return null;
-
-        return property.getName();
+  private static boolean isBoolean(SelectorField selectorField) {
+    final DomainType domainType = getDomainType(selectorField);
+    if (domainType instanceof PrimitiveDomainType) {
+      PrimitiveDomainType primitiveDomainType = (PrimitiveDomainType) domainType;
+      return boolean.class == primitiveDomainType.getPrimitiveType() || Boolean.class == primitiveDomainType.getPrimitiveType();
     }
+    return false;
+  }
 
-    @Override
-    public JSONObject toJSON() throws JSONException {
-        addAccessProperties(fieldAccess);
-        addBasicProperties(field);
-        addReferencedProperty(field);
-        addReferencedTableInfo(field);
-        addDisplayLogic(field);
-        addReadOnlyLogic(field);
-        addProcessInfo(field);
-        addSelectorReferenceList(field);
-        addComboSelectInfo(field);
-
-        return json;
+  private static DomainType getDomainType(SelectorField selectorField) {
+    if (selectorField.getObuiselSelector().getTable() != null && selectorField.getProperty() != null) {
+      final String entityName = selectorField.getObuiselSelector().getTable().getName();
+      final Entity entity = ModelProvider.getInstance().getEntity(entityName);
+      final Property property = DalUtil.getPropertyFromPath(entity, selectorField.getProperty());
+      Check.isNotNull(property, "Property " + selectorField.getProperty() + " not found in Entity " + entity);
+      return property.getDomainType();
+    } else if (selectorField.getObuiselSelector().getTable() != null && selectorField.getObuiselSelector().isCustomQuery() && selectorField.getReference() != null) {
+      return getDomainType(selectorField.getReference().getId());
+    } else if (selectorField.getObserdsDatasourceField().getReference() != null) {
+      return getDomainType(selectorField.getObserdsDatasourceField().getReference().getId());
     }
+    return null;
+  }
 
-    private void addAccessProperties(FieldAccess access) throws JSONException {
-        boolean checkOnSave = access != null ? access.isCheckonsave() : Constants.DEFAULT_CHECKON_SAVE;
-        boolean editableField = access != null ? access.isEditableField() : Constants.DEFAULT_EDITABLE_FIELD;
-        boolean fieldIsReadOnly = field.isReadOnly();
-        boolean isColUpdatable = field.getColumn() != null ? field.getColumn().isUpdatable() : true;
-        boolean readOnly = fieldIsReadOnly || (access != null && !access.isEditableField());
+  public static DomainType getDomainType(String referenceId) {
+    final org.openbravo.base.model.Reference reference = ModelProvider.getInstance().getReference(referenceId);
+    Check.isNotNull(reference, "No reference found for referenceid " + referenceId);
+    return reference.getDomainType();
+  }
 
-        json.put("checkOnSave", checkOnSave);
-        json.put("isEditable", editableField);
-        json.put("isReadOnly", readOnly);
-        json.put("isUpdatable", isColUpdatable);
+  public static String getPropertyOrDataSourceField(SelectorField selectorField) {
+    final String result;
+    if (selectorField.getProperty() != null) {
+      result = selectorField.getProperty();
+    } else if (selectorField.getDisplayColumnAlias() != null) {
+      result = selectorField.getDisplayColumnAlias();
+    } else if (selectorField.getObserdsDatasourceField() != null) {
+      result = selectorField.getObserdsDatasourceField().getName();
+    } else {
+      throw new IllegalStateException("Selector field " + selectorField + " has a null datasource and a null property");
     }
+    return result.replace(DalUtil.DOT, DalUtil.FIELDSEPARATOR);
+  }
 
-    private void addBasicProperties(Field field) throws JSONException {
-        Column column = field.getColumn();
-        boolean mandatory = column.isMandatory();
-        JSONObject columnJson = converter.toJsonObject(field.getColumn(), DataResolvingMode.FULL_TRANSLATABLE);
-        String inputName = getInputName(column);
-        String hqlName = getHqlName(field);
-        String columnName = column.getDBColumnName();
+  private static String getInputName(Column column) {
+    return Constants.INPUT_NAME_PREFIX + Sqlc.TransformaNombreColumna(column.getDBColumnName());
+  }
 
-        json.put("hqlName", hqlName);
-        json.put("columnName", columnName);
-        json.put("column", columnJson);
-        json.put("isMandatory", mandatory);
-        json.put("inputName", inputName);
+  private static String getHqlName(Field field) {
+    Property property = KernelUtils.getProperty(field);
+
+    if (property == null) return null;
+
+    return property.getName();
+  }
+
+  @Override
+  public JSONObject toJSON() throws JSONException {
+    addAccessProperties(fieldAccess);
+    addBasicProperties(field);
+    addReferencedProperty(field);
+    addReferencedTableInfo(field);
+    addDisplayLogic(field);
+    addReadOnlyLogic(field);
+    addProcessInfo(field);
+    addSelectorReferenceList(field);
+    addComboSelectInfo(field);
+
+    return json;
+  }
+
+  private void addAccessProperties(FieldAccess access) throws JSONException {
+    boolean checkOnSave = access != null ? access.isCheckonsave() : Constants.DEFAULT_CHECKON_SAVE;
+    boolean editableField = access != null ? access.isEditableField() : Constants.DEFAULT_EDITABLE_FIELD;
+    boolean fieldIsReadOnly = field.isReadOnly();
+    boolean isColUpdatable = field.getColumn() != null ? field.getColumn().isUpdatable() : true;
+    boolean readOnly = fieldIsReadOnly || (access != null && !access.isEditableField());
+
+    json.put("checkOnSave", checkOnSave);
+    json.put("isEditable", editableField);
+    json.put("isReadOnly", readOnly);
+    json.put("isUpdatable", isColUpdatable);
+  }
+
+  private void addBasicProperties(Field field) throws JSONException {
+    Column column = field.getColumn();
+    boolean mandatory = column.isMandatory();
+    JSONObject columnJson = converter.toJsonObject(column, DataResolvingMode.FULL_TRANSLATABLE);
+    String inputName = getInputName(column);
+    String hqlName = getHqlName(field);
+    String columnName = column.getDBColumnName();
+
+    json.put("hqlName", hqlName);
+    json.put("columnName", columnName);
+    json.put("column", columnJson);
+    json.put("isMandatory", mandatory);
+    json.put("inputName", inputName);
+  }
+
+  private void addReferencedProperty(Field field) throws JSONException {
+    Property referenced = KernelUtils.getProperty(field).getReferencedProperty();
+
+    if (referenced != null) {
+      String tableId = referenced.getEntity().getTableId();
+      Table table = OBDal.getInstance().get(Table.class, tableId);
+      Tab referencedTab = (Tab) OBDal.getInstance().createCriteria(Tab.class).add(
+          Restrictions.eq(Tab.PROPERTY_TABLE, table)).setMaxResults(1).uniqueResult();
+      Window referencedWindow = referencedTab != null ? referencedTab.getWindow() : null;
+      String tabId = referencedTab != null ? referencedTab.getId() : null;
+      String windowId = referencedWindow != null ? referencedWindow.getId() : null;
+
+      json.put("referencedEntity", referenced.getEntity().getName());
+      json.put("referencedWindowId", windowId);
+      json.put("referencedTabId", tabId);
     }
+  }
 
-    private void addReferencedProperty(Field field) throws JSONException {
-        Property referenced = KernelUtils.getProperty(field).getReferencedProperty();
+  private void addReferencedTableInfo(Field field) throws JSONException {
+    Property referenced = KernelUtils.getProperty(field).getReferencedProperty();
 
-        if (referenced != null) {
-            String tableId = referenced.getEntity().getTableId();
-            Table table = OBDal.getInstance().get(Table.class, tableId);
-            Tab referencedTab = (Tab) OBDal.getInstance().createCriteria(Tab.class).add(
-                Restrictions.eq(Tab.PROPERTY_TABLE, table)).setMaxResults(1).uniqueResult();
-            Window referencedWindow = referencedTab != null ? referencedTab.getWindow() : null;
-            String tabId = referencedTab != null ? referencedTab.getId() : null;
-            String windowId = referencedWindow != null ? referencedWindow.getId() : null;
+    if (referenced != null) {
+      Tab referencedTab = getReferencedTab(referenced);
 
-            json.put("referencedEntity", referenced.getEntity().getName());
-            json.put("referencedWindowId", windowId);
-            json.put("referencedTabId", tabId);
-        }
+      if (referencedTab != null) {
+        json.put("referencedEntity", referenced.getEntity().getName());
+        json.put("referencedWindowId", referencedTab.getWindow().getId());
+        json.put("referencedTabId", referencedTab.getId());
+      }
     }
+  }
 
-    private boolean isParentRecordProperty(Field field, Tab tab) {
-        Entity parentEntity = null;
-
-        if (field.getColumn().isLinkToParentColumn()) {
-            Tab parentTab = KernelUtils.getInstance().getParentTab(tab);
-            // If the parent table is not based in a db table, don't try to retrieve the record
-            // Because tables not based on db tables do not have BaseOBObjects
-            // See issue https://issues.openbravo.com/view.php?id=29667
-            if (parentTab != null && ApplicationConstants.TABLEBASEDTABLE.equals(
-                parentTab.getTable().getDataOriginType())) {
-                parentEntity = ModelProvider.getInstance().getEntityByTableName(parentTab.getTable().getDBTableName());
-            }
-
-            Property property = KernelUtils.getProperty(field);
-            Entity referencedEntity = property.getReferencedProperty().getEntity();
-            return referencedEntity.equals(parentEntity);
-        } else {
-            return false;
-        }
+  private void addComboSelectInfo(Field field) throws JSONException {
+    if (isSelectorField(field)) {
+      json.put("selector", getSelectorInfo(field.getId(), field.getColumn().getReferenceSearchKey()));
     }
+  }
 
-    private void addReferencedTableInfo(Field field) throws JSONException {
-        Property referenced = KernelUtils.getProperty(field).getReferencedProperty();
-
-        if (referenced != null) {
-            Tab referencedTab = getReferencedTab(referenced);
-
-            if (referencedTab != null) {
-                json.put("referencedEntity", referenced.getEntity().getName());
-                json.put("referencedWindowId", referencedTab.getWindow().getId());
-                json.put("referencedTabId", referencedTab.getId());
-            }
-        }
+  private void addSelectorReferenceList(Field field) throws JSONException {
+    if (isRefListField(field)) {
+      json.put("refList", getListInfo(field.getColumn().getReferenceSearchKey(), language));
     }
+  }
 
-    private void addComboSelectInfo(Field field) throws JSONException {
-        if (isSelectorField(field)) {
-            json.put("selector", getSelectorInfo(field.getId(), field.getColumn().getReferenceSearchKey()));
-        }
+  private void addProcessInfo(Field field) throws JSONException {
+    if (isProcessField(field)) {
+      Process processAction = field.getColumn().getProcess();
+      org.openbravo.client.application.Process processDefinition = field.getColumn().getOBUIAPPProcess();
+
+      if (processDefinition != null) {
+        json.put("processDefinition", Utils.getFieldProcess(field));
+      }
+
+      if (processAction != null) {
+        json.put("processAction", ProcessActionBuilder.getFieldProcess(field));
+      }
     }
+  }
 
-    private void addSelectorReferenceList(Field field) throws JSONException {
-        if (isRefListField(field)) {
-            json.put("refList", getListInfo(field.getColumn().getReferenceSearchKey(), language));
-        }
+  private void addDisplayLogic(Field field) throws JSONException {
+    String displayLogic = field.getDisplayLogic();
+
+    if (displayLogic != null && !displayLogic.isBlank()) {
+      DynamicExpressionParser parser = new DynamicExpressionParser(displayLogic, field.getTab(), field);
+      json.put("displayLogicExpression", parser.getJSExpression());
     }
+  }
 
-    private void addProcessInfo(Field field) throws JSONException {
-        if (isProcessField(field)) {
-            Process processAction = field.getColumn().getProcess();
-            org.openbravo.client.application.Process processDefinition = field.getColumn().getOBUIAPPProcess();
+  private void addReadOnlyLogic(Field field) throws JSONException {
+    String readOnlyLogic = field.getColumn().getReadOnlyLogic();
 
-            if (processDefinition != null) {
-                json.put("processDefinition", Utils.getFieldProcess(field));
-            }
-
-            if (processAction != null) {
-                json.put("processAction", ProcessActionBuilder.getFieldProcess(field));
-            }
-        }
+    if (readOnlyLogic != null && !readOnlyLogic.isBlank()) {
+      DynamicExpressionParser parser = new DynamicExpressionParser(readOnlyLogic, field.getTab(), field);
+      json.put("readOnlyLogicExpression", parser.getJSExpression());
     }
+  }
 
-    private void addDisplayLogic(Field field) throws JSONException {
-        String displayLogic = field.getDisplayLogic();
+  private boolean isRefListField(Field field) {
+    Column column = field.getColumn();
 
-        if (displayLogic != null && !displayLogic.isBlank()) {
-            DynamicExpressionParser parser = new DynamicExpressionParser(displayLogic, field.getTab(), field);
-            json.put("displayLogicExpression", parser.getJSExpression());
-        }
-    }
+    return column != null && Constants.LIST_REFERENCE_ID.equals(column.getReference().getId());
+  }
 
-    private void addReadOnlyLogic(Field field) throws JSONException {
-        String readOnlyLogic = field.getColumn().getReadOnlyLogic();
+  private boolean isSelectorField(Field field) {
+    Column column = field.getColumn();
 
-        if (readOnlyLogic != null && !readOnlyLogic.isBlank()) {
-            DynamicExpressionParser parser = new DynamicExpressionParser(readOnlyLogic, field.getTab(), field);
-            json.put("readOnlyLogicExpression", parser.getJSExpression());
-        }
-    }
-
-    private boolean isRefListField(Field field) {
-        Column column = field.getColumn();
-
-        return column != null && Constants.LIST_REFERENCE_ID.equals(column.getReference().getId());
-    }
-
-    private boolean isSelectorField(Field field) {
-        Column column = field.getColumn();
-
-        return column != null && Constants.SELECTOR_REFERENCES.contains(column.getReference().getId());
-    }
+    return column != null && Constants.SELECTOR_REFERENCES.contains(column.getReference().getId());
+  }
 }

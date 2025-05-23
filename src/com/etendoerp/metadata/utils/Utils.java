@@ -171,9 +171,7 @@ public class Utils {
     }
 
     public static int getHttpStatusFor(Throwable t) {
-        Integer result = exceptionStatusMap.get(t.getClass().getName());
-
-        return Objects.requireNonNullElse(exceptionStatusMap.get(t.getClass().getName()), SC_INTERNAL_SERVER_ERROR);
+      return Objects.requireNonNullElse(exceptionStatusMap.get(t.getClass().getName()), SC_INTERNAL_SERVER_ERROR);
     }
 
     public static JSONObject convertToJson(Throwable t) {
