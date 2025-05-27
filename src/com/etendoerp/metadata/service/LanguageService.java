@@ -13,17 +13,17 @@ import com.etendoerp.metadata.builders.LanguageBuilder;
  * @author luuchorocha
  */
 public class LanguageService extends MetadataService {
-  public LanguageService(HttpServletRequest request, HttpServletResponse response) {
-    super(request, response);
-  }
-
-  @Override
-  public void process() throws IOException {
-    try {
-      OBContext.setAdminMode(true);
-      write(new LanguageBuilder().toJSON());
-    } finally {
-      OBContext.restorePreviousMode();
+    public LanguageService(HttpServletRequest request, HttpServletResponse response) {
+        super(request, response);
     }
-  }
+
+    @Override
+    public void process() throws IOException {
+        try {
+            OBContext.setAdminMode(true);
+            write(new LanguageBuilder().toJSON());
+        } finally {
+            OBContext.restorePreviousMode();
+        }
+    }
 }

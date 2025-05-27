@@ -18,26 +18,26 @@ import org.openbravo.client.kernel.RequestContext;
  * @author luuchorocha
  */
 public class ForwarderServlet extends BaseServlet {
-  @Override
-  public void service(HttpServletRequest req, HttpServletResponse res) throws IOException, ServletException {
-    try {
-      // Call the base service method to handle pre-processing and set RequestContext
-      super.service(req, res, false, true);
+    @Override
+    public void service(HttpServletRequest req, HttpServletResponse res) throws IOException, ServletException {
+        try {
+            // Call the base service method to handle pre-processing and set RequestContext
+            super.service(req, res, false, true);
 
-      // Use the wrapped request and response
-      HttpServletRequest request = RequestContext.get().getRequest();
-      HttpServletResponse response = RequestContext.get().getResponse();
+            // Use the wrapped request and response
+            HttpServletRequest request = RequestContext.get().getRequest();
+            HttpServletResponse response = RequestContext.get().getResponse();
 
-      // Find the target servlet based on the request path
-      String path = request.getPathInfo();
-      HttpSecureAppServlet servlet = getDelegatedServlet(this, path);
+            // Find the target servlet based on the request path
+            String path = request.getPathInfo();
+            HttpSecureAppServlet servlet = getDelegatedServlet(this, path);
 
-      // Delegate the request to the target servlet
-      servlet.service(request, response);
-    } catch (IOException | ServletException e) {
-      log4j.error(e.getMessage(), e);
+            // Delegate the request to the target servlet
+            servlet.service(request, response);
+        } catch (IOException | ServletException e) {
+            log4j.error(e.getMessage(), e);
 
-      throw e;
+            throw e;
+        }
     }
-  }
 }

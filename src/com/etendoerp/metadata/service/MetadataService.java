@@ -12,6 +12,8 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.codehaus.jettison.json.JSONObject;
 
+import com.etendoerp.metadata.utils.Utils;
+
 /**
  * @author luuchorocha
  */
@@ -23,6 +25,7 @@ public abstract class MetadataService {
     public MetadataService(HttpServletRequest request, HttpServletResponse response) {
         requestThreadLocal.set(request);
         responseThreadLocal.set(response);
+        Utils.setContext(request);
     }
 
     public static void clear() {
