@@ -19,23 +19,23 @@ import com.etendoerp.metadata.service.MetadataService;
  */
 @WebFilter(urlPatterns = { "/meta", "/meta/*" })
 public class MetadataFilter implements Filter {
-    @Override
-    public void init(FilterConfig fConfig) {
-        RequestContext.setServletContext(fConfig.getServletContext());
-    }
+  @Override
+  public void init(FilterConfig fConfig) {
+    RequestContext.setServletContext(fConfig.getServletContext());
+  }
 
-    @Override
-    public void doFilter(ServletRequest request, ServletResponse response,
-        FilterChain chain) throws IOException, ServletException {
-        try {
-            chain.doFilter(request, response);
-        } finally {
-            MetadataService.clear();
-            HttpServletRequestWrapper.clear();
-        }
+  @Override
+  public void doFilter(ServletRequest request, ServletResponse response,
+      FilterChain chain) throws IOException, ServletException {
+    try {
+      chain.doFilter(request, response);
+    } finally {
+      MetadataService.clear();
+      HttpServletRequestWrapper.clear();
     }
+  }
 
-    @Override
-    public void destroy() {
-    }
+  @Override
+  public void destroy() {
+  }
 }

@@ -12,9 +12,9 @@ import org.openbravo.service.json.DataToJsonConverter;
  * @author luuchorocha
  */
 public abstract class Builder {
-    protected static final Logger logger = LogManager.getLogger(Builder.class);
-    public final Language language = OBContext.getOBContext().getLanguage();
-    protected final DataToJsonConverter converter = new DataToJsonConverter();
+  protected static final Logger logger = LogManager.getLogger(Builder.class);
+  public final Language language = OBContext.getOBContext().getLanguage();
+  protected final DataToJsonConverter converter = new DataToJsonConverter();
 
-    public abstract JSONObject toJSON() throws JSONException;
+  public abstract JSONObject toJSON() throws JSONException;
 }

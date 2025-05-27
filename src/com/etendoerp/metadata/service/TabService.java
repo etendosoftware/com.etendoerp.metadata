@@ -15,19 +15,19 @@ import com.etendoerp.metadata.builders.TabBuilder;
  * @author luuchorocha
  */
 public class TabService extends MetadataService {
-    public TabService(HttpServletRequest request, HttpServletResponse response) {
-        super(request, response);
-    }
+  public TabService(HttpServletRequest request, HttpServletResponse response) {
+    super(request, response);
+  }
 
-    @Override
-    public void process() throws IOException {
-        try {
-            OBContext.setAdminMode(true);
-            String tabId = getRequest().getPathInfo().substring(5);
-            Tab tab = OBDal.getInstance().get(Tab.class, tabId);
-            write(new TabBuilder(tab, null).toJSON());
-        } finally {
-            OBContext.restorePreviousMode();
-        }
+  @Override
+  public void process() throws IOException {
+    try {
+      OBContext.setAdminMode(true);
+      String tabId = getRequest().getPathInfo().substring(5);
+      Tab tab = OBDal.getInstance().get(Tab.class, tabId);
+      write(new TabBuilder(tab, null).toJSON());
+    } finally {
+      OBContext.restorePreviousMode();
     }
+  }
 }

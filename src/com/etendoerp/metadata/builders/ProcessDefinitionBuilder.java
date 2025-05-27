@@ -7,25 +7,25 @@ import org.openbravo.client.application.Process;
 import org.openbravo.service.json.DataResolvingMode;
 
 public class ProcessDefinitionBuilder extends Builder {
-    private final Process process;
+  private final Process process;
 
-    public ProcessDefinitionBuilder(Process process) {
-        this.process = process;
+  public ProcessDefinitionBuilder(Process process) {
+    this.process = process;
+  }
+
+  @Override
+  public JSONObject toJSON() throws JSONException {
+    JSONObject processJSON = converter.toJsonObject(process, DataResolvingMode.FULL_TRANSLATABLE);
+    JSONObject parameters = new JSONObject();
+
+    for (Parameter param : process.getOBUIAPPParameterList()) {
+      parameters.put(param.getDBColumnName(), new ParameterBuilder(param).toJSON());
     }
 
-    @Override
-    public JSONObject toJSON() throws JSONException {
-        JSONObject processJSON = converter.toJsonObject(process, DataResolvingMode.FULL_TRANSLATABLE);
-        JSONObject parameters = new JSONObject();
+    processJSON.put("parameters", parameters);
+    processJSON.put("onLoad", process.getEtmetaOnload());
+    processJSON.put("onProcess", process.getEtmetaOnprocess());
 
-        for (Parameter param : process.getOBUIAPPParameterList()) {
-            parameters.put(param.getDBColumnName(), new ParameterBuilder(param).toJSON());
-        }
-
-        processJSON.put("parameters", parameters);
-        processJSON.put("onLoad", process.getEtmetaOnload());
-        processJSON.put("onProcess", process.getEtmetaOnprocess());
-
-        return processJSON;
-    }
+    return processJSON;
+  }
 }
