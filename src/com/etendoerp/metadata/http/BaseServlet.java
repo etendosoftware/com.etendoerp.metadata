@@ -1,5 +1,6 @@
 package com.etendoerp.metadata.http;
 
+import static com.etendoerp.metadata.utils.Utils.setContext;
 import static org.openbravo.base.secureApp.LoginUtils.fillSessionArguments;
 
 import java.io.IOException;
@@ -112,7 +113,9 @@ public class BaseServlet extends HttpSecureAppServlet {
             requestContext.setRequest(req);
             requestContext.setVariableSecureApp(vars);
             requestContext.setResponse(res);
-            String userId = authenticationManager.authenticate(req, res);
+
+            authenticationManager.authenticate(req, res);
+            setContext(req);
 
             if (initializeSession) {
                 initializeSession();
