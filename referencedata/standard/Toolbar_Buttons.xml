@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?><ob:Openbravo xmlns:ob="http://www.openbravo.com" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <etmeta_Toolbar id="239556F34FE1496199CC12B1974A07C0" identifier="Save">
+    <id>239556F34FE1496199CC12B1974A07C0</id>
+    <active>true</active>
+    <name>Save</name>
+    <icon>iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAACXBIWXMAAAsTAAALEwEAmpwYAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAEsSURBVHgB3VWxbsIwEL2ECnWqYC/okolPqNKl+SPGbnTtVPWLYEL9hE5gATuIEYmYdxBLAcU2BBjIW+I7X+7dvXMcokdHUDS6cTLQRH0sW3Q+VKPZTNX/SDkJuvH7jybdp2qwkhQIkiWqbyEwksBOnGjxzyfjwJaV+Y2zMBwikG0koVnoXBZbq6Vlqz8VZlmKCuQd3m42Q+59cClBVfhInnwJjFS2/JAwEhLIlRq5hAR7Ebk6yCtyIijpJDfZ+K0dzFAZXQghQcdHvqtn4MPdCawSodUpFbT0YD/ssg1XB0znwxrrPaauL1ngOcY1GHKNCDDJlTxPb8NLINd3vlwV8h7wGidfMAZ0A+BY/S4m4/3Pq2Gc6+V89NLutNFSD+YzVYCogOTfSP5JtcEOxmd0daN6vp0AAAAASUVORK5CYII=</icon>
+    <seqno>30</seqno>
+    <description xsi:nil="true"/>
+    <etmetaActionHandler xsi:nil="true"/>
+    <nameKey id="FF808181331AD90C01331ADA2E15000C" entity-name="ADMessage" identifier="OBUIAPP_Save"/>
+    <action>SAVE</action>
+    <buttontype>ACTION</buttontype>
+    <section>left</section>
+    <module id="0" entity-name="ADModule" identifier="Core - 24.4.7 - English (USA)"/>
+  </etmeta_Toolbar>
+  <etmeta_Toolbar id="25D1FA357A484AE38A3E2382889198FE" identifier="Refresh">
+    <id>25D1FA357A484AE38A3E2382889198FE</id>
+    <active>true</active>
+    <name>Refresh</name>
+    <icon>iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAACXBIWXMAAAsTAAALEwEAmpwYAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAIhSURBVHgB5VXNbtNAEJ4ZR4YLwhE3RKIl5cCNcEMGhHvjRniChieAPkH7BqVPQHviWHgCjIQijjki8beQnqnhVmPvMGuc1nG9barm1H5S4rFn9puf9X4GuPDo9u5vdHrhd3U7Uk1+gjOCEfpyUSZNh03+FswBdetBZEwuRBiUpNojGOvPozGyecuAEQOsiGu9vhaPI+72wjVZ+ELMwBGiEXhTaGxc4BEt6y8fYjipA6XuqYy8HQbul1UkgPgGmH+UHdxBBlu1kuo3pusyYwZyiY/twJLnRO+saYmFbHXydbR1NC4Kci8dSCJbvSofJ5Nvo3Y17sgmV8g1+f5dF7mh/aHUt1IhL6q1vmrszIg6S+EQ+H/lQr6sP8W6Tm5jck5fFXTMJTPGdrPJXNrSOk6cCZDxuczdmptN5BaMpImNjA7HLtIZzmrbOaV71vZ8/6YrwWlxsAdZK+uXZrIo8pkEFSSwQBwkaGWZLk1VfxMWkkDrjxqn1R+Oa27Y89NZejhwJiixbf9y5jU4JXlxfjjfUSrsOxOQMS+LLpgjq0MwJ3KPrFwUh1Pr0bjq86o3SbKbXG1398V8LL8oaHfg997kPTgrj4Ir166/lqNTjIaJnv759VNXYxrV9EYvXBfHtINCMcnDGP76Gi6LsmaZMsY8mlFahGdNsuKUaysJNSFrhsiER7xqvw2NbjgBhT4BPJExFF8umHYlxAZxe7em/+cP/wBLmt5UWoVhggAAAABJRU5ErkJggg==</icon>
+    <seqno>10</seqno>
+    <description xsi:nil="true"/>
+    <etmetaActionHandler xsi:nil="true"/>
+    <nameKey id="FF8081812D6761CF012D678170C401EF" entity-name="ADMessage" identifier="OBUIAPP_RefreshData"/>
+    <action>REFRESH</action>
+    <buttontype>ACTION</buttontype>
+    <section>left</section>
+    <module id="0" entity-name="ADModule" identifier="Core - 24.4.7 - English (USA)"/>
+  </etmeta_Toolbar>
+  <etmeta_Toolbar id="33864F5267194AB99C14BD0CE9884FF5" identifier="Create a new record in a form">
+    <id>33864F5267194AB99C14BD0CE9884FF5</id>
+    <active>true</active>
+    <name>Create a new record in a form</name>
+    <icon>iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAACXBIWXMAAAsTAAALEwEAmpwYAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAClSURBVHgB7ZNNCsIwEIVfIpQuewFhxEuIK4+iJ9Ob6Kq3UAs9gFkWSf8m0FVbmqY/UMgHAxPI5EHmPcAzJ/vj+co1ZkbYXiS6RLn8/7hPP7H1nIQ1WQQHRgi44QUGabmB3YIQrYVqrUkUxZP7XRAcOl/LoJLkpXoFjMdL3DEFgVv6jh/Ncf0v6oPoRLmUX+4XCpobXmBTAqGCA9YCJqF1iEx55qQCofclB+/m+jAAAAAASUVORK5CYII=</icon>
+    <seqno>10</seqno>
+    <description xsi:nil="true"/>
+    <etmetaActionHandler xsi:nil="true"/>
+    <nameKey id="FF8081812DB28C2D012DB299135F002A" entity-name="ADMessage" identifier="OBUIAPP_NewDoc"/>
+    <action>NEW</action>
+    <buttontype>ACTION</buttontype>
+    <section>left</section>
+    <module id="0" entity-name="ADModule" identifier="Core - 24.4.7 - English (USA)"/>
+  </etmeta_Toolbar>
+  <etmeta_Toolbar id="3F10D0819EF34C7783EB3C129688B84E" identifier="Cancel">
+    <id>3F10D0819EF34C7783EB3C129688B84E</id>
+    <active>true</active>
+    <name>Cancel</name>
+    <icon>iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAACXBIWXMAAAsTAAALEwEAmpwYAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAIqSURBVHgBtVVdbtNAEJ4Zu+Y1B+iDg0DijfCGKiScE5QbACegN2h7AzgBcAN6ghgJVbzhRyQQXSEOkMcS5F1mdtb11mmySaqOlB97fr5vZmdmAe5YcJ2yLKuRpb+vHOJzcDCRV0FlANEAuI/ZXlGb77XZCkADL944gCN+HEGa5cnvX+enK3TD4E/Llmh2xRaxHjItHx5MWuszOuTMXgRXkxXFdJgNrgrOCmOJXv/5+aWGNSI+bDdzSmgJhGLjmDk7QJ7nBhJizFdDtniCgI34tovFTEq8BLB//+C4Yy6fK+NHVZkGqedk96adH5/fUafDLk1mfyH/OcUxXF7CurRXyf6DZxVaK1WYZ7YYe2BRtBlV3sLBmQTStO1020z8efmmAN/e8i6UCF+CPn3q094NRDrOfzusegDnvGPWQhOb7gKStbZWzvC4BwidY8x5M3TYFkTs45gEG8ju5eoBjIdMMNsERKY8jqkAqLVv/y0qgNtlElYI6DIMAOjcZ1WHbrodyKH+aDeFQfPb84IHa5QRTU1i/6jP8g6SAY0HVmaKlFU9twDvNEX7Pt4l22QSdpmwPu0mH3tGPotvwsjx4sp5twhwCmiQiQQ0fDeMOz31jGRhKSMEN2kZbKNWzPPShb/iS1KqSDDFiC1kfZxlBI35oYMowNpx3BTOVXHwtRdOLLy+T1h5DAlhG39+uS3e3lTSxKXPa9xvWs+0hGuXPjTS3mTvfdjkrO5M/gPLDWeaGzNYjwAAAABJRU5ErkJggg==</icon>
+    <seqno>10</seqno>
+    <description xsi:nil="true"/>
+    <etmetaActionHandler xsi:nil="true"/>
+    <nameKey id="EF03C1B05A0548288B31E1B624730A6D" entity-name="ADMessage" identifier="OBUIAPP_CancelEdit"/>
+    <action>CANCEL</action>
+    <buttontype>ACTION</buttontype>
+    <section>center</section>
+    <module id="0" entity-name="ADModule" identifier="Core - 24.4.7 - English (USA)"/>
+  </etmeta_Toolbar>
+  <etmeta_Toolbar id="7FD80E35DB854A949F7769AA11C94E75" identifier="Delete">
+    <id>7FD80E35DB854A949F7769AA11C94E75</id>
+    <active>true</active>
+    <name>Delete</name>
+    <icon>iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAACXBIWXMAAAsTAAALEwEAmpwYAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAEfSURBVHgB5VU7DoJAEB1WY6wMHACzWnkEg41H0s7O2sp4A72JjcYjWOFG7EVLE8RZsxoD7IARiAkvIczssO8x+5kBKBhG2gftrjMNAUZompGQj9OXnrsZU/NrNPlgjuQTNJsJYTnWNy3buJy9tY7DoAWcMwqYtUajI/Zr8RnjvM8Dxg5o+p67tXQcDAiEalmi5M8xsXuNmRTHOwO768i/4ZAPBGbVkQaLKeUAkgszCeUDX0I3j0HB+A8BeQDUIUj0KdQhG3iKr0VF9qDaAplOEV59Qfk/CxxV4dL5FMrfA+PZCvEm9YYcMkI2H2X60Vhsie4ACxSZBrebLAeQBYF6YyldRWOxnnzF/tqybAtT60FyL45BZo3ks5O7nUDZeACV5E7ANimiyQAAAABJRU5ErkJggg==</icon>
+    <seqno>0</seqno>
+    <description xsi:nil="true"/>
+    <etmetaActionHandler xsi:nil="true"/>
+    <nameKey id="FF8081812E7BA4E8012E7BABECB30008" entity-name="ADMessage" identifier="OBUIAPP_Delete"/>
+    <action>DELETE</action>
+    <buttontype>ACTION</buttontype>
+    <section>center</section>
+    <module id="0" entity-name="ADModule" identifier="Core - 24.4.7 - English (USA)"/>
+  </etmeta_Toolbar>
+  <etmeta_Toolbar id="B30CEE03CB89490487A5687C1EDC79D3" identifier="Find">
+    <id>B30CEE03CB89490487A5687C1EDC79D3</id>
+    <active>true</active>
+    <name>Find</name>
+    <icon>iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAACXBIWXMAAAsTAAALEwEAmpwYAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAIGSURBVHgB3VVNbhMxFP6enYZt9hDJaUFiR7uDAFJ6AnqDJiegN6A5QekJmt6AnqCDQIVds0SCgqVwgKyntc17TloVZjyaQe2i/aTR2OM373v/Bu46qOrQPH418CFshxAGspVvATQlwhRQR7OzTx/wPwTGPDdO6wMsFFfB6nZ7037LbEpAFZQ/6a87pU5FObPPAzBmJb3ZzxOSR2tssFkjPhOlxuX56UP+B3U8iJaLcqDDBIc6PNixNpuj1MtB50Llu6zgLW/nbMRGlScR3dX+L37Co9X+e9REt/diIv90114el51fhai79npLDBPXW769i5oQLyWUElIpiiQBgnsTX4RxKixlEFkP7MtaKi5JQKCYKO2kBJuh5f0kGldSdVcEAWF9YdFJYwJrv9rl0iQJbgvXCWw04enAoCHMsg842dMkAYXwUd4+z4doCOcRCQJRmsBrPYlC3DjSRKiJKBvwbqnlKEnw+8fnDEQZLztOn++hJrw6F+Wxf2ZnXwrDr3V9o50beR4VXG5D7kzolZVxqv3FcqfyPa6+YbRUqVGZXGGaSsK8w3GQecRWEcK+0pTZ74vylSLgPG3z+Q4WMpconazJcc2eCIlBFTiknNix8v5gKVsgqbxw4nzyF1tE6tllI0avWLEnOox5Kxr0F0klQRP8S8J3R0++31gny7jgUG1SzNt9wh/HSOSOiFjSIwAAAABJRU5ErkJggg==</icon>
+    <seqno>10</seqno>
+    <description xsi:nil="true"/>
+    <etmetaActionHandler xsi:nil="true"/>
+    <nameKey xsi:nil="true"/>
+    <action>FIND</action>
+    <buttontype>ACTION</buttontype>
+    <section>right</section>
+    <module id="0" entity-name="ADModule" identifier="Core - 24.4.7 - English (USA)"/>
+  </etmeta_Toolbar>
+  <etmeta_Toolbar id="D73C2AD100854463B3F697F3D36CDE3E" identifier="Filter">
+    <id>D73C2AD100854463B3F697F3D36CDE3E</id>
+    <active>true</active>
+    <name>Filter</name>
+    <icon>iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAACXBIWXMAAAsTAAALEwEAmpwYAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAHHSURBVHgB7VU9TwJBEJ299atSQBMLPT3hD1gqxgQ6S+zs1H+gnZ3a2amdnbZWYGUpBAVKSmIEN9wVmhg4LAVunTkBCeH4kkbjS2539mb2vd3Z2SzAbwejRvX6n7HTYLgQei6xpDRUhow65wg1imUFLUW5k/Yu2Jmee9iHATDv9R8i8RF+QhkbC9I/To1pGqZ7Ro2BhC0cBlzu+VKpaKQGIbdJOQTFYzzTELBFCvrLpEd9RTOEu9jwTC/GzEJe9EKu+tZDDOQF2RbIfT2bjNR9vDnwvainJ90qw5UEpJQhz6zv2nwTZidyTVvRJINbNCdw3rGRS540+9uer7q0egWMbaMpOOZSZKLCibyKZ0cmnt+5kUvstcYo7SZyOb7HgKVpYuWjHNa0gKtdXEXhYYqh2HbkjgJCRE3Fqm5SNWBul6u8fNoas+BdOyXfV8WMboIDuJPDrqypuRtM1Q4OV1xuFUpFPUY+qhjsDpDcxHJcdUqh4w6+d5ISeD/s1claCRLq5SgZ3+1E3lWAYDzdR518ejYegS7oKvBT/AsMV0D1+XegT/QkQJfJNiRc1h6n4Qrk8WVCld2akAZ9oO/HjNLEJBw2hP88PgEqaZpF6nO1zgAAAABJRU5ErkJggg==</icon>
+    <seqno>0</seqno>
+    <description xsi:nil="true"/>
+    <etmetaActionHandler xsi:nil="true"/>
+    <nameKey xsi:nil="true"/>
+    <action>FILTER</action>
+    <buttontype>ACTION</buttontype>
+    <section>right</section>
+    <module id="0" entity-name="ADModule" identifier="Core - 24.4.7 - English (USA)"/>
+  </etmeta_Toolbar>
+  <etmeta_Toolbar id="FF1E8D837AA840C2BF38A2B3D1BE7E66" identifier="Tab Control">
+    <id>FF1E8D837AA840C2BF38A2B3D1BE7E66</id>
+    <active>false</active>
+    <name>Tab Control</name>
+    <icon>iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAACXBIWXMAAAsTAAALEwEAmpwYAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAADQSURBVHgB7ZU9DoJAFIRnF0OsDHsADFJ5BIKX0o7O2sp4A70JjcQjWOEm2IP2im8Jf9FuAwWGqWbfZudLXrEDDF2sfZi7/jYH1mQt6CmjyGMSnzfVwGjCV3sKD8hOoS/11rOEzR5pEqoBawB+SgDLMM2FvIYSGnIcz3lxfiObJXEk1IxXl3m5Ft3w4q28yNLWK+boWb0DJt8D2/VzdKjhr2gEjIAR0AKwoiw6U/YDeAMHdCT6zE6VrxvtSQ00E7Yg4hKaraa2QOG7exwF+Bt9AOd8MZmgnu7VAAAAAElFTkSuQmCC</icon>
+    <seqno>30</seqno>
+    <description xsi:nil="true"/>
+    <etmetaActionHandler xsi:nil="true"/>
+    <nameKey xsi:nil="true"/>
+    <action>TAB_CONTROL</action>
+    <buttontype>ACTION</buttontype>
+    <section>right</section>
+    <module id="0" entity-name="ADModule" identifier="Core - 24.4.7 - English (USA)"/>
+  </etmeta_Toolbar>
+</ob:Openbravo>
