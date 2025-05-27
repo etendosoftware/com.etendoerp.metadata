@@ -59,7 +59,7 @@
 <!--2F518217F096400C9C8FDFF6844EC71D-->  <AD_CLIENT_ID><![CDATA[0]]></AD_CLIENT_ID>
 <!--2F518217F096400C9C8FDFF6844EC71D-->  <AD_ORG_ID><![CDATA[0]]></AD_ORG_ID>
 <!--2F518217F096400C9C8FDFF6844EC71D-->  <ISACTIVE><![CDATA[Y]]></ISACTIVE>
-<!--2F518217F096400C9C8FDFF6844EC71D-->  <NAME><![CDATA[Button Description]]></NAME>
+<!--2F518217F096400C9C8FDFF6844EC71D-->  <NAME><![CDATA[Description]]></NAME>
 <!--2F518217F096400C9C8FDFF6844EC71D-->  <DESCRIPTION><![CDATA[Detailed explanation of the button functionality]]></DESCRIPTION>
 <!--2F518217F096400C9C8FDFF6844EC71D-->  <HELP><![CDATA[Provides a comprehensive description of what the button does when clicked. This field is used for documentation purposes and may be displayed in extended tooltips or help systems. It should explain the button''s purpose, expected behavior, and any prerequisites for its use]]></HELP>
 <!--2F518217F096400C9C8FDFF6844EC71D-->  <ISCENTRALLYMAINTAINED><![CDATA[Y]]></ISCENTRALLYMAINTAINED>
@@ -141,7 +141,7 @@
 <!--49650EE846094558BACAC2526F5B5661-->  <AD_CLIENT_ID><![CDATA[0]]></AD_CLIENT_ID>
 <!--49650EE846094558BACAC2526F5B5661-->  <AD_ORG_ID><![CDATA[0]]></AD_ORG_ID>
 <!--49650EE846094558BACAC2526F5B5661-->  <ISACTIVE><![CDATA[Y]]></ISACTIVE>
-<!--49650EE846094558BACAC2526F5B5661-->  <NAME><![CDATA[Name Key]]></NAME>
+<!--49650EE846094558BACAC2526F5B5661-->  <NAME><![CDATA[Label]]></NAME>
 <!--49650EE846094558BACAC2526F5B5661-->  <DESCRIPTION><![CDATA[Unique identifier key for programmatic reference]]></DESCRIPTION>
 <!--49650EE846094558BACAC2526F5B5661-->  <HELP><![CDATA[A unique alphanumeric identifier used to reference this button programmatically. This key remains constant even if the display name changes, making it suitable for API calls, custom code integration, and configuration management. Should follow naming conventions using uppercase letters and underscores.]]></HELP>
 <!--49650EE846094558BACAC2526F5B5661-->  <ISCENTRALLYMAINTAINED><![CDATA[Y]]></ISCENTRALLYMAINTAINED>
@@ -198,7 +198,7 @@
 <!--57F8585B2B9B4FB1B18A0499D3719F08-->  <AD_CLIENT_ID><![CDATA[0]]></AD_CLIENT_ID>
 <!--57F8585B2B9B4FB1B18A0499D3719F08-->  <AD_ORG_ID><![CDATA[0]]></AD_ORG_ID>
 <!--57F8585B2B9B4FB1B18A0499D3719F08-->  <ISACTIVE><![CDATA[Y]]></ISACTIVE>
-<!--57F8585B2B9B4FB1B18A0499D3719F08-->  <NAME><![CDATA[Button Name]]></NAME>
+<!--57F8585B2B9B4FB1B18A0499D3719F08-->  <NAME><![CDATA[Name]]></NAME>
 <!--57F8585B2B9B4FB1B18A0499D3719F08-->  <DESCRIPTION><![CDATA[Display name for the toolbar button]]></DESCRIPTION>
 <!--57F8585B2B9B4FB1B18A0499D3719F08-->  <HELP><![CDATA[This field defines the text that will be displayed on the toolbar button. It should be concise and clearly indicate the button''s function. The name will appear as button text or tooltip depending on the button configuration]]></HELP>
 <!--57F8585B2B9B4FB1B18A0499D3719F08-->  <ISCENTRALLYMAINTAINED><![CDATA[Y]]></ISCENTRALLYMAINTAINED>
@@ -226,7 +226,7 @@
 <!--608C06F505B642F984E8AFE98423AFBB-->  <AD_CLIENT_ID><![CDATA[0]]></AD_CLIENT_ID>
 <!--608C06F505B642F984E8AFE98423AFBB-->  <AD_ORG_ID><![CDATA[0]]></AD_ORG_ID>
 <!--608C06F505B642F984E8AFE98423AFBB-->  <ISACTIVE><![CDATA[Y]]></ISACTIVE>
-<!--608C06F505B642F984E8AFE98423AFBB-->  <NAME><![CDATA[Button Action]]></NAME>
+<!--608C06F505B642F984E8AFE98423AFBB-->  <NAME><![CDATA[Action]]></NAME>
 <!--608C06F505B642F984E8AFE98423AFBB-->  <DESCRIPTION><![CDATA[Predefined action type that the button will execute]]></DESCRIPTION>
 <!--608C06F505B642F984E8AFE98423AFBB-->  <HELP><![CDATA[Specifies the standard action that will be performed when the button is clicked. Common actions include SAVE, NEW, DELETE, REFRESH, CANCEL, EXPORT, etc. This field works in conjunction with the Button Type to determine the exact behavior. Custom actions can be defined for specialized functionality.]]></HELP>
 <!--608C06F505B642F984E8AFE98423AFBB-->  <ISCENTRALLYMAINTAINED><![CDATA[Y]]></ISCENTRALLYMAINTAINED>
@@ -279,7 +279,7 @@
 <!--932C9F67BD1A4A45B1080E6FB43D7D5D-->  <AD_CLIENT_ID><![CDATA[0]]></AD_CLIENT_ID>
 <!--932C9F67BD1A4A45B1080E6FB43D7D5D-->  <AD_ORG_ID><![CDATA[0]]></AD_ORG_ID>
 <!--932C9F67BD1A4A45B1080E6FB43D7D5D-->  <ISACTIVE><![CDATA[Y]]></ISACTIVE>
-<!--932C9F67BD1A4A45B1080E6FB43D7D5D-->  <NAME><![CDATA[Button Type]]></NAME>
+<!--932C9F67BD1A4A45B1080E6FB43D7D5D-->  <NAME><![CDATA[Type]]></NAME>
 <!--932C9F67BD1A4A45B1080E6FB43D7D5D-->  <DESCRIPTION><![CDATA[Classification of button behavior and interaction pattern]]></DESCRIPTION>
 <!--932C9F67BD1A4A45B1080E6FB43D7D5D-->  <HELP><![CDATA[Defines how the button behaves when clicked and what type of user interface it presents. ACTION buttons execute immediate operations, DROPDOWN buttons show a menu of options, MODAL buttons open dialog windows, TOGGLE buttons switch between states, and CUSTOM buttons implement specialized behavior defined in the action handler.]]></HELP>
 <!--932C9F67BD1A4A45B1080E6FB43D7D5D-->  <ISCENTRALLYMAINTAINED><![CDATA[Y]]></ISCENTRALLYMAINTAINED>
@@ -388,7 +388,7 @@
 <!--B6D54235E4BC4A37B2882CE39671AB01-->  <AD_CLIENT_ID><![CDATA[0]]></AD_CLIENT_ID>
 <!--B6D54235E4BC4A37B2882CE39671AB01-->  <AD_ORG_ID><![CDATA[0]]></AD_ORG_ID>
 <!--B6D54235E4BC4A37B2882CE39671AB01-->  <ISACTIVE><![CDATA[Y]]></ISACTIVE>
-<!--B6D54235E4BC4A37B2882CE39671AB01-->  <NAME><![CDATA[AD_Module_ID]]></NAME>
+<!--B6D54235E4BC4A37B2882CE39671AB01-->  <NAME><![CDATA[Module]]></NAME>
 <!--B6D54235E4BC4A37B2882CE39671AB01-->  <ISCENTRALLYMAINTAINED><![CDATA[Y]]></ISCENTRALLYMAINTAINED>
 <!--B6D54235E4BC4A37B2882CE39671AB01-->  <AD_TAB_ID><![CDATA[74074A13A5B24CFCA2AF6ECB076C21A6]]></AD_TAB_ID>
 <!--B6D54235E4BC4A37B2882CE39671AB01-->  <AD_COLUMN_ID><![CDATA[0757F4BB11A14E2C8BF4DA6B9AEDDE57]]></AD_COLUMN_ID>
