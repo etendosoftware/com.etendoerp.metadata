@@ -146,7 +146,14 @@ public class Utils {
                 context.setLanguage(language);
             }
 
-            OBContext.setOBContextInSession(request, context);
+            /* Recreating the OBContext, because OBContext.setLanguage
+             * does not update langID, only languageCode
+             */
+            OBContext.setOBContext(context.getUser().getId(), context.getRole().getId(),
+                context.getCurrentClient().getId(), context.getCurrentOrganization().getId(),
+                context.getLanguage().getLanguage(), context.getWarehouse().getId());
+
+            OBContext.setOBContextInSession(request, OBContext.getOBContext());
         } finally {
             OBContext.restorePreviousMode();
         }
@@ -164,9 +171,7 @@ public class Utils {
     }
 
     public static int getHttpStatusFor(Throwable t) {
-        Integer result = exceptionStatusMap.get(t.getClass().getName());
-
-        return Objects.requireNonNullElse(exceptionStatusMap.get(t.getClass().getName()), SC_INTERNAL_SERVER_ERROR);
+      return Objects.requireNonNullElse(exceptionStatusMap.get(t.getClass().getName()), SC_INTERNAL_SERVER_ERROR);
     }
 
     public static JSONObject convertToJson(Throwable t) {
