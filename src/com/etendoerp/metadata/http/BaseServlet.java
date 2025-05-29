@@ -108,6 +108,7 @@ public class BaseServlet extends HttpSecureAppServlet {
             if (req.getMethod().equalsIgnoreCase("options")) {
                 return;
             }
+
             RequestVariables vars = new RequestVariables(req);
             RequestContext requestContext = RequestContext.get();
             requestContext.setRequest(req);

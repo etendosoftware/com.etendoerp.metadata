@@ -1,5 +1,7 @@
 package com.etendoerp.metadata.http;
 
+import static com.etendoerp.metadata.utils.Constants.SERVLET_FULL_PATH;
+
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
 
@@ -10,34 +12,45 @@ import org.openbravo.client.kernel.RequestContext;
  * @author luuchorocha
  */
 public class HttpServletRequestWrapper extends RequestContext.HttpServletRequestWrapper {
-    private static final ThreadLocal<HttpSessionWrapper> session = new ThreadLocal<>();
+  private static final ThreadLocal<HttpSessionWrapper> session = new ThreadLocal<>();
 
-    public HttpServletRequestWrapper(HttpServletRequest request) {
-        super(request);
-        session.set(new HttpSessionWrapper());
-        SessionHolder.requestInitialized(this);
+  public HttpServletRequestWrapper(HttpServletRequest request) {
+    super(request);
+    session.set(new HttpSessionWrapper());
+    SessionHolder.requestInitialized(this);
+  }
+
+  public static HttpServletRequestWrapper wrap(HttpServletRequest request) {
+    if (request.getClass().equals(HttpServletRequestWrapper.class)) {
+      return (HttpServletRequestWrapper) request;
+    } else {
+      return new HttpServletRequestWrapper(request);
+    }
+  }
+
+  public static void clear() {
+    session.remove();
+    SessionHolder.clear();
+  }
+
+  @Override
+  public HttpSession getSession() {
+    return session.get();
+  }
+
+  @Override
+  public HttpSession getSession(boolean f) {
+    return session.get();
+  }
+
+  @Override
+  public String getServletPath() {
+    String result = super.getServletPath();
+
+    if (!result.startsWith(SERVLET_FULL_PATH)) {
+      result = SERVLET_FULL_PATH.concat(result);
     }
 
-    public static HttpServletRequestWrapper wrap(HttpServletRequest request) {
-        if (request.getClass().equals(HttpServletRequestWrapper.class)) {
-            return (HttpServletRequestWrapper) request;
-        } else {
-            return new HttpServletRequestWrapper(request);
-        }
-    }
-
-    public static void clear() {
-        session.remove();
-        SessionHolder.clear();
-    }
-
-    @Override
-    public HttpSession getSession() {
-        return session.get();
-    }
-
-    @Override
-    public HttpSession getSession(boolean f) {
-        return session.get();
-    }
+    return result;
+  }
 }

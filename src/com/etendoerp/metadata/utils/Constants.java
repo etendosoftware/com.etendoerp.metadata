@@ -7,8 +7,9 @@ import java.util.List;
  * @author luuchorocha
  */
 public class Constants {
-    public static final String SERVLET_PATH = "/servlet";
-    public static final String TOOLBAR_PATH = "/toolbar";
+    public static final String MODULE_BASE_PATH = "/meta";
+    public static final String SERVLET_PATH = "/forward";
+    public static final String SERVLET_FULL_PATH = MODULE_BASE_PATH.concat(SERVLET_PATH);
     public static final String SESSION_PATH = "/session";
     public static final String MENU_PATH = "/menu";
     public static final String WINDOW_PATH = "/window/";
@@ -40,4 +41,5 @@ public class Constants {
     public static final List<String> SELECTOR_REFERENCES = Arrays.asList(TABLE_REFERENCE_ID, TABLE_DIR_REFERENCE_ID,
         SEARCH_REFERENCE_ID, SELECTOR_REFERENCE_ID, TREE_REFERENCE_ID);
     public static final String WINDOW_REFERENCE_ID = "FF80818132D8F0F30132D9BC395D0038";
+    public static final String FRAMESET_CLOSE_TAG = "</FRAMESET>";
 }
