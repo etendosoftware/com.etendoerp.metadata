@@ -70,6 +70,7 @@ public class HttpServletRequestWrapper extends RequestContext.HttpServletRequest
     }
     this.sessionId = decodedJWT.getClaims().get("jti").asString();
     this.userId = decodedJWT.getClaim("user").asString();
+    this.sessionAdapter = new LegacyHttpSessionAdapter(this.sessionId, getServletContext());
   }
 
   /**

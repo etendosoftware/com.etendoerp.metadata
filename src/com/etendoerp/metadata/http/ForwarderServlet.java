@@ -33,30 +33,32 @@ public class ForwarderServlet extends BaseServlet {
 
             // Use the wrapped request and response
             HttpServletResponse response = RequestContext.get().getResponse();
+            req = HttpServletRequestWrapper.wrap(req);
 
             // Find the target servlet based on the request path
-            String path = req.getPathInfo();
+           String path = req.getPathInfo();
             if(!StringUtils.endsWith(path, ".html")) {
                 HttpServletRequest request = RequestContext.get().getRequest();
-                super.service(req, res, false, true);
+
+                super.service(req, response, false, true);
                 HttpSecureAppServlet servlet = getDelegatedServlet(this, path);
-                servlet.service(request, response);
+                servlet.service(req, response);
             } else {
                 // Legacy mode
                 var responseWrapper = new HttpServletResponseLegacyWrapper(res);
-                HttpServletRequestWrapper request = new HttpServletRequestWrapper(req);
+                HttpServletRequestWrapper request = (HttpServletRequestWrapper) req;
                 if(req.getParameter("token") != null) {
                     req.getSession().setAttribute(JWT_TOKEN, req.getParameter("token"));
                 } else {
                     if(req.getSession().getAttribute(JWT_TOKEN) != null) {
                         String token = req.getSession().getAttribute(JWT_TOKEN).toString();
-                      DecodedJWT decodedJWT;
-                      try {
-                        decodedJWT = SecureWebServicesUtils.decodeToken(token);
-                      request.setSessionId(decodedJWT.getClaims().get("jti").asString());
-                      } catch (Exception e) {
-                          throw new OBException("Error decoding token", e);
-                      }
+                        DecodedJWT decodedJWT;
+                        try {
+                            decodedJWT = SecureWebServicesUtils.decodeToken(token);
+                            request.setSessionId(decodedJWT.getClaims().get("jti").asString());
+                        } catch (Exception e) {
+                            throw new OBException("Error decoding token", e);
+                        }
                     }
                 }
                 RequestVariables vars = new RequestVariables(request);

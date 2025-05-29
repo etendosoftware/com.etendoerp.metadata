@@ -102,7 +102,7 @@ public class BaseServlet extends HttpSecureAppServlet {
     public void service(HttpServletRequest req, HttpServletResponse res, boolean callSuper,
         boolean initializeSession) throws IOException {
         try {
-            req = HttpServletRequestWrapper.wrap(req);
+            //req = HttpServletRequestWrapper.wrap(req);
             doOptions(req, res);
 
             if (req.getMethod().equalsIgnoreCase("options")) {
