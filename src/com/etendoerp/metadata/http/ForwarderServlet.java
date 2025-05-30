@@ -1,5 +1,6 @@
 package com.etendoerp.metadata.http;
 
+import static com.etendoerp.metadata.utils.Constants.FRAMESET_CLOSE_TAG;
 import static com.etendoerp.metadata.utils.ServletRegistry.getDelegatedServlet;
 
 import java.io.IOException;
@@ -8,14 +9,16 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import com.auth0.jwt.interfaces.DecodedJWT;
-import com.etendoerp.metadata.data.RequestVariables;
-import com.smf.securewebservices.utils.SecureWebServicesUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.openbravo.base.exception.OBException;
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
 import org.openbravo.client.kernel.RequestContext;
 import org.openbravo.dal.core.OBContext;
+
+import com.auth0.jwt.interfaces.DecodedJWT;
+import com.etendoerp.metadata.data.ContentCaptureWrapper;
+import com.etendoerp.metadata.data.RequestVariables;
+import com.smf.securewebservices.utils.SecureWebServicesUtils;
 
 /**
  * Servlet that forwards incoming requests to specific delegated servlets based on the path.
@@ -24,65 +27,102 @@ import org.openbravo.dal.core.OBContext;
  * @author luuchorocha
  */
 public class ForwarderServlet extends BaseServlet {
-    private static final String JWT_TOKEN = "#JWT_TOKEN";
+  private static final String JWT_TOKEN = "#JWT_TOKEN";
 
-    @Override
-    public void service(HttpServletRequest req, HttpServletResponse res) throws IOException, ServletException {
-        try {
-            // Call the base service method to handle pre-processing and set RequestContext
+  @Override
+  public void service(HttpServletRequest req, HttpServletResponse res) throws IOException, ServletException {
+    try {
+      // Call the base service method to handle pre-processing and set RequestContext
 
-            // Use the wrapped request and response
-            HttpServletResponse response = RequestContext.get().getResponse();
-            HttpServletRequest originalReq = req;
-            req = HttpServletRequestWrapper.wrap(req);
+      // Use the wrapped request and response
+      HttpServletResponse response = RequestContext.get().getResponse();
+      HttpServletRequest originalReq = req;
+      req = HttpServletRequestWrapper.wrap(req);
 
-            // Find the target servlet based on the request path
-           String path = req.getPathInfo();
-            if(!StringUtils.endsWith(path, ".html")) {
-                HttpServletRequest request = RequestContext.get().getRequest();
-
-                super.service(req, response, false, true);
-                HttpSecureAppServlet servlet = getDelegatedServlet(this, path);
-                servlet.service(req, response);
-            } else {
-                // Legacy mode
-                var responseWrapper = new HttpServletResponseLegacyWrapper(res);
-                HttpServletRequestWrapper request = (HttpServletRequestWrapper) req;
-                if(originalReq.getParameter("token") != null) {
-                    originalReq.getSession().setAttribute(JWT_TOKEN, originalReq.getParameter("token"));
-                } else {
-                    if(originalReq.getSession().getAttribute(JWT_TOKEN) != null) {
-                        String token = originalReq.getSession().getAttribute(JWT_TOKEN).toString();
-                        DecodedJWT decodedJWT;
-                        try {
-                            decodedJWT = SecureWebServicesUtils.decodeToken(token);
-                            request.setSessionId(decodedJWT.getClaims().get("jti").asString());
-                        } catch (Exception e) {
-                            throw new OBException("Error decoding token", e);
-                        }
-                    }
-                }
-                RequestVariables vars = new RequestVariables(request);
-                RequestContext requestContext = RequestContext.get();
-                requestContext.setRequest(request);
-                requestContext.setVariableSecureApp(vars);
-                requestContext.setResponse(res);
-                OBContext.setOBContext(request);
-                request.getRequestDispatcher(request.getPathInfo()).include(request, responseWrapper);
-                String output = responseWrapper.getCapturedOutputAsString();
-                output = output.replace("/meta/forward", "/meta/forward" + path);
-                output = output.replace("src=\"../web/", "src=\"../../../web/");
-                output = output.replace("href=\"../web/", "href=\"../../../web/");
-                response.setContentType(responseWrapper.getContentType());
-                response.setStatus(responseWrapper.getStatus());
-                response.getWriter().write(output);
-                response.getWriter().flush();
+      // Find the target servlet based on the request path
+      String path = req.getPathInfo();
+      if (!StringUtils.endsWith(path, ".html")) {
+        super.service(req, response, false, true);
+        HttpSecureAppServlet servlet = getDelegatedServlet(this, path);
+        servlet.service(req, response);
+      } else {
+        // Legacy mode
+        var responseWrapper = new HttpServletResponseLegacyWrapper(res);
+        HttpServletRequestWrapper request = (HttpServletRequestWrapper) req;
+        if (originalReq.getParameter("token") != null) {
+          originalReq.getSession().setAttribute(JWT_TOKEN, originalReq.getParameter("token"));
+        } else {
+          if (originalReq.getSession().getAttribute(JWT_TOKEN) != null) {
+            String token = originalReq.getSession().getAttribute(JWT_TOKEN).toString();
+            DecodedJWT decodedJWT;
+            try {
+              decodedJWT = SecureWebServicesUtils.decodeToken(token);
+              request.setSessionId(decodedJWT.getClaims().get("jti").asString());
+            } catch (Exception e) {
+              throw new OBException("Error decoding token", e);
             }
-            // Delegate the request to the target servlet
-        } catch (IOException | ServletException e) {
-            log4j.error(e.getMessage(), e);
-
-            throw e;
+          }
         }
+        RequestVariables vars = new RequestVariables(request);
+        RequestContext requestContext = RequestContext.get();
+        requestContext.setRequest(request);
+        requestContext.setVariableSecureApp(vars);
+        requestContext.setResponse(res);
+        OBContext.setOBContext(request);
+        request.getRequestDispatcher(request.getPathInfo()).include(request, responseWrapper);
+        String output = responseWrapper.getCapturedOutputAsString();
+        output = output.replace("/meta/forward", "/meta/forward" + path);
+        output = output.replace("src=\"../web/", "src=\"../../../web/");
+        output = output.replace("href=\"../web/", "href=\"../../../web/");
+        response.setContentType(responseWrapper.getContentType());
+        response.setStatus(responseWrapper.getStatus());
+        response.getWriter().write(output);
+        response.getWriter().flush();
+      }
+      // Delegate the request to the target servlet
+    } catch (IOException | ServletException e) {
+      log4j.error(e.getMessage(), e);
+
+      throw e;
     }
+  }
+
+  public void service2(HttpServletRequest req, HttpServletResponse res) throws IOException, ServletException {
+    try {
+      // Call the base service method to handle pre-processing and set RequestContext
+      super.service(req, res, false, true);
+
+      // Use the wrapped request and response
+      HttpServletRequest request = RequestContext.get().getRequest();
+      HttpServletResponse response = RequestContext.get().getResponse();
+
+      // Find the target servlet based on the request path
+      String path = request.getPathInfo();
+
+      if (isLegacyRequest(path)) {
+        ContentCaptureWrapper wrappedResponse = new ContentCaptureWrapper(response);
+        request.getRequestDispatcher(path).forward(request, wrappedResponse);
+        String content = wrappedResponse.getCapturedContent();
+        String replacement = getEventEmitterCode().concat(FRAMESET_CLOSE_TAG);
+        String injectedContent = content.replace(FRAMESET_CLOSE_TAG, replacement);
+        response.getWriter().write(injectedContent);
+      } else {
+        // Delegate the request to the target servlet
+        HttpSecureAppServlet servlet = getDelegatedServlet(this, path);
+        servlet.service(request, response);
+      }
+    } catch (IOException | ServletException e) {
+      log4j.error(e.getMessage(), e);
+
+      throw e;
+    }
+  }
+
+  private String getEventEmitterCode() {
+    return "<script>window.parent.postMessage({ action: \"ALERT\", data: \"Some process message\" });</script>";
+  }
+
+  private boolean isLegacyRequest(String path) {
+    return path != null && path.toLowerCase().endsWith(".html");
+  }
 }

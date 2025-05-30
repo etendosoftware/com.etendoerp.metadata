@@ -1,5 +1,7 @@
 package com.etendoerp.metadata.http;
 
+import static com.etendoerp.metadata.utils.Constants.SERVLET_FULL_PATH;
+
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.etendoerp.metadata.http.session.LegacyHttpSessionAdapter;
 import com.smf.securewebservices.utils.SecureWebServicesUtils;
@@ -241,5 +243,16 @@ public class HttpServletRequestWrapper extends RequestContext.HttpServletRequest
    */
   public void setSessionId(String sessionId) {
     this.sessionId = sessionId;
+  }
+
+  @Override
+  public String getServletPath() {
+    String result = super.getServletPath();
+
+    if (!result.startsWith(SERVLET_FULL_PATH)) {
+      result = SERVLET_FULL_PATH.concat(result);
+    }
+
+    return result;
   }
 }
