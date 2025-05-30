@@ -33,6 +33,7 @@ public class ForwarderServlet extends BaseServlet {
 
             // Use the wrapped request and response
             HttpServletResponse response = RequestContext.get().getResponse();
+            HttpServletRequest originalReq = req;
             req = HttpServletRequestWrapper.wrap(req);
 
             // Find the target servlet based on the request path
@@ -47,11 +48,11 @@ public class ForwarderServlet extends BaseServlet {
                 // Legacy mode
                 var responseWrapper = new HttpServletResponseLegacyWrapper(res);
                 HttpServletRequestWrapper request = (HttpServletRequestWrapper) req;
-                if(req.getParameter("token") != null) {
-                    req.getSession().setAttribute(JWT_TOKEN, req.getParameter("token"));
+                if(originalReq.getParameter("token") != null) {
+                    originalReq.getSession().setAttribute(JWT_TOKEN, originalReq.getParameter("token"));
                 } else {
-                    if(req.getSession().getAttribute(JWT_TOKEN) != null) {
-                        String token = req.getSession().getAttribute(JWT_TOKEN).toString();
+                    if(originalReq.getSession().getAttribute(JWT_TOKEN) != null) {
+                        String token = originalReq.getSession().getAttribute(JWT_TOKEN).toString();
                         DecodedJWT decodedJWT;
                         try {
                             decodedJWT = SecureWebServicesUtils.decodeToken(token);
