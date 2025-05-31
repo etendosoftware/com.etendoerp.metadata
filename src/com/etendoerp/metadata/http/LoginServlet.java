@@ -28,7 +28,7 @@ public class LoginServlet extends HttpBaseServlet {
 
     @Override
     public final void service(HttpServletRequest req, HttpServletResponse res) throws IOException, ServletException {
-        super.service(HttpServletRequestWrapper.wrap(req), res);
+        super.service(req, res);
     }
 
     @Override
@@ -45,7 +45,7 @@ public class LoginServlet extends HttpBaseServlet {
             validateConfig();
             res.setContentType(ContentType.APPLICATION_JSON.getMimeType());
             res.setCharacterEncoding(StandardCharsets.UTF_8.name());
-            res.getWriter().write(manager.processLogin(HttpServletRequestWrapper.wrap(req)).toString());
+            res.getWriter().write(manager.processLogin(req).toString());
         } catch (Exception e) {
             log4j.error(e.getMessage(), e);
             res.setStatus(getHttpStatusFor(e));

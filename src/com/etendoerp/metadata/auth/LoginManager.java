@@ -6,6 +6,7 @@ import java.util.Optional;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpSession;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -39,10 +40,10 @@ public class LoginManager {
     private final DalConnectionProvider conn = DalConnectionProvider.getReadOnlyConnectionProvider();
 
     public JSONObject processLogin(HttpServletRequest request) throws Exception {
-        return generateLoginResult(addDefaults(authenticate(request)));
+        return generateLoginResult(request, addDefaults(authenticate(request)));
     }
 
-    private String extractToken(String authorization) {
+    public static String extractToken(String authorization) {
         return authorization != null ? authorization.substring(7) : null;
     }
 
@@ -122,10 +123,12 @@ public class LoginManager {
         }
     }
 
-    private JSONObject generateLoginResult(AuthData authData) throws Exception {
+    private JSONObject generateLoginResult(HttpServletRequest request, AuthData authData) throws Exception {
         try {
             JSONObject result = new JSONObject();
-            result.put("token", generateToken(authData.user, authData.role, authData.org, authData.warehouse));
+            HttpSession session = request.getSession();
+            result.put("token", generateToken(authData.user, authData.role, authData.org, authData.warehouse,
+                session.getId()));
 
             return result;
         } catch (JWTCreationException e) {
