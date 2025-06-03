@@ -22,6 +22,7 @@ import org.apache.logging.log4j.message.ParameterizedMessageFactory;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.hibernate.criterion.Restrictions;
+import org.openbravo.authentication.AuthenticationException;
 import org.openbravo.base.exception.OBSecurityException;
 import org.openbravo.base.expression.OBScriptEngine;
 import org.openbravo.base.model.Property;
@@ -56,6 +57,7 @@ public class Utils {
     private static Map<String, Integer> buildExceptionMap() {
         final Map<String, Integer> map = new HashMap<>();
 
+        map.put(AuthenticationException.class.getName(), HttpStatus.SC_UNAUTHORIZED);
         map.put(OBSecurityException.class.getName(), SC_UNAUTHORIZED);
         map.put(UnauthorizedException.class.getName(), SC_UNAUTHORIZED);
         map.put(MethodNotAllowedException.class.getName(), SC_METHOD_NOT_ALLOWED);
@@ -65,6 +67,7 @@ public class Utils {
         return map;
     }
 
+    @SuppressWarnings("unused")
     public static String formatMessage(String message, Object... params) {
         try {
             return messageFactory.newMessage(message, params).getFormattedMessage();
