@@ -22,4 +22,8 @@ public class ContentCaptureWrapper extends HttpServletResponseWrapper {
     writer.flush();
     return charArray.toString();
   }
+
+    public String replace(String framesetCloseTag, String concat) {
+        return null;
+    }
 }

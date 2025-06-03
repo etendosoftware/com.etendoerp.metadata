@@ -1,5 +1,6 @@
 package com.etendoerp.metadata.http;
 
+import static com.etendoerp.metadata.utils.Constants.FRAMESET_CLOSE_TAG;
 import static com.etendoerp.metadata.utils.ServletRegistry.getDelegatedServlet;
 
 import java.io.IOException;
@@ -10,6 +11,8 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
 import org.openbravo.client.kernel.RequestContext;
+
+import com.etendoerp.metadata.data.ContentCaptureWrapper;
 
 /**
  * Servlet that forwards incoming requests to specific delegated servlets based on the path.
@@ -32,7 +35,10 @@ public class ForwarderServlet extends BaseServlet {
             String path = req.getPathInfo();
 
             if (isLegacyRequest(path)) {
-                request.getRequestDispatcher(path).forward(request, response);
+                ContentCaptureWrapper wrappedResponse = new ContentCaptureWrapper(response);
+                request.getRequestDispatcher(path).forward(request, wrappedResponse);
+                String resultContent = getInjectedContent(wrappedResponse);
+                response.getWriter().write(resultContent);
             } else if (!isAssetRequest(path)) {
                 processForwardRequest(path, request, response);
             }
@@ -41,6 +47,15 @@ public class ForwarderServlet extends BaseServlet {
 
             throw e;
         }
+    }
+
+    private String getInjectedContent(ContentCaptureWrapper wrappedResponse) {
+        return wrappedResponse.getCapturedContent().replace(FRAMESET_CLOSE_TAG,
+            FRAMESET_CLOSE_TAG.concat(generateInjectedCode()));
+    }
+
+    private String generateInjectedCode() {
+        return "<script>alert('holi');</script>";
     }
 
     private void processForwardRequest(String path, HttpServletRequest request,
