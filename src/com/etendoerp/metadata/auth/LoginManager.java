@@ -27,6 +27,7 @@ import com.auth0.jwt.interfaces.DecodedJWT;
 import com.etendoerp.metadata.data.AuthData;
 import com.etendoerp.metadata.exceptions.InternalServerException;
 import com.etendoerp.metadata.exceptions.UnauthorizedException;
+import com.etendoerp.metadata.http.BaseServlet;
 import com.etendoerp.metadata.utils.Constants;
 import com.etendoerp.metadata.utils.Utils;
 import com.smf.securewebservices.utils.SecureWebServicesUtils;
@@ -39,12 +40,12 @@ public class LoginManager {
     private final OBDal entityProvider = OBDal.getReadOnlyInstance();
     private final DalConnectionProvider conn = DalConnectionProvider.getReadOnlyConnectionProvider();
 
-    public JSONObject processLogin(HttpServletRequest request) throws Exception {
-        return generateLoginResult(request, addDefaults(authenticate(request)));
-    }
-
     public static String extractToken(String authorization) {
         return authorization != null ? authorization.substring(7) : null;
+    }
+
+    public JSONObject processLogin(HttpServletRequest request) throws Exception {
+        return generateLoginResult(request, addDefaults(authenticate(request)));
     }
 
     private AuthData authenticate(HttpServletRequest request) {
@@ -126,7 +127,9 @@ public class LoginManager {
     private JSONObject generateLoginResult(HttpServletRequest request, AuthData authData) throws Exception {
         try {
             JSONObject result = new JSONObject();
-            HttpSession session = request.getSession();
+            HttpSession session = request.getSession(true);
+            session.setMaxInactiveInterval(3600);
+            BaseServlet.initializeSession();
             result.put("token", generateToken(authData.user, authData.role, authData.org, authData.warehouse,
                 session.getId()));
 

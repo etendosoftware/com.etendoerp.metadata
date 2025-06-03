@@ -45,7 +45,7 @@ public class BaseServlet extends HttpSecureAppServlet {
         }
     }
 
-    public void initializeSession() {
+    public static void initializeSession() {
         OBContext context = OBContext.getOBContext();
 
         if (context == null) {
@@ -55,9 +55,8 @@ public class BaseServlet extends HttpSecureAppServlet {
         initializeSession(context);
     }
 
-    private void initializeSession(OBContext context) {
+    private static void initializeSession(OBContext context) {
         RequestContext requestContext = RequestContext.get();
-        HttpServletRequest request = requestContext.getRequest();
         RequestVariables vars = (RequestVariables) requestContext.getVariablesSecureApp();
         ConnectionProvider conn = new DalConnectionProvider();
         String userId = context.getUser().getId();
@@ -75,9 +74,6 @@ public class BaseServlet extends HttpSecureAppServlet {
 
         try {
             fillSessionArguments(conn, vars, userId, languageCode, isRTL, roleId, clientId, orgId, warehouseId);
-            readNumberFormat(vars, KernelServlet.getGlobalParameters().getFormatPath());
-            readProperties(vars);
-            bypassCSRF(request, userId);
         } catch (ServletException e) {
             throw new InternalServerException(e.getMessage());
         }
@@ -115,11 +111,14 @@ public class BaseServlet extends HttpSecureAppServlet {
             requestContext.setVariableSecureApp(vars);
             requestContext.setResponse(res);
 
-            authenticationManager.authenticate(req, res);
+            String userId = authenticationManager.authenticate(req, res);
             setContext(req);
 
             if (initializeSession) {
                 initializeSession();
+                readNumberFormat(vars, KernelServlet.getGlobalParameters().getFormatPath());
+                readProperties(vars);
+                bypassCSRF(req, userId);
             }
 
             if (callSuper) {
