@@ -14,6 +14,7 @@ import javax.servlet.http.HttpSession;
 import org.openbravo.authentication.AuthenticationManager;
 import org.openbravo.base.secureApp.AllowedCrossDomainsHandler;
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
+import org.openbravo.base.secureApp.VariablesSecureApp;
 import org.openbravo.base.weld.WeldUtils;
 import org.openbravo.client.kernel.KernelServlet;
 import org.openbravo.client.kernel.RequestContext;
@@ -57,7 +58,7 @@ public class BaseServlet extends HttpSecureAppServlet {
 
     private static void initializeSession(OBContext context) {
         RequestContext requestContext = RequestContext.get();
-        RequestVariables vars = (RequestVariables) requestContext.getVariablesSecureApp();
+        VariablesSecureApp vars = requestContext.getVariablesSecureApp();
         ConnectionProvider conn = new DalConnectionProvider();
         String userId = context.getUser().getId();
         Language language = context.getLanguage();

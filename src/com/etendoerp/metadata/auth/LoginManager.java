@@ -130,8 +130,8 @@ public class LoginManager {
             HttpSession session = request.getSession(true);
             session.setMaxInactiveInterval(3600);
             BaseServlet.initializeSession();
-            result.put("token", generateToken(authData.user, authData.role, authData.org, authData.warehouse,
-                session.getId()));
+            result.put("token",
+                generateToken(authData.user, authData.role, authData.org, authData.warehouse, session.getId()));
 
             return result;
         } catch (JWTCreationException e) {
