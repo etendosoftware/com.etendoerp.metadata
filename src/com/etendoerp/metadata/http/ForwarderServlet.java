@@ -1,6 +1,8 @@
 package com.etendoerp.metadata.http;
 
+import static com.etendoerp.metadata.utils.Constants.FORM_CLOSE_TAG;
 import static com.etendoerp.metadata.utils.Constants.FRAMESET_CLOSE_TAG;
+import static com.etendoerp.metadata.utils.Constants.HEAD_CLOSE_TAG;
 import static com.etendoerp.metadata.utils.ServletRegistry.getDelegatedServlet;
 
 import java.io.IOException;
@@ -50,12 +52,22 @@ public class ForwarderServlet extends BaseServlet {
     }
 
     private String getInjectedContent(ContentCaptureWrapper wrappedResponse) {
-        return wrappedResponse.getCapturedContent().replace(FRAMESET_CLOSE_TAG,
-            FRAMESET_CLOSE_TAG.concat(generateInjectedCode()));
+        String responseString = wrappedResponse.getCapturedContent();
+        if (responseString.contains(FRAMESET_CLOSE_TAG)) {
+            return responseString.replace(HEAD_CLOSE_TAG, (generateReceiveAndPostMessageScript()).concat(HEAD_CLOSE_TAG));
+        }
+        if (responseString.contains(FORM_CLOSE_TAG)) {
+            return responseString.replace(FORM_CLOSE_TAG, FORM_CLOSE_TAG.concat(generatePostMessageScript()));
+        }
+        return responseString;
     }
 
-    private String generateInjectedCode() {
-        return "<script>alert('holi');</script>";
+    private String generateReceiveAndPostMessageScript() {
+        return "<script>window.addEventListener(\"message\", (event) => {if (event.data?.type === \"fromForm\" && window.parent) {window.parent.postMessage({ type: \"fromIframe\", action: event.data.action }, \"*\");}});</script>";
+    }
+
+    private String generatePostMessageScript() {
+        return "<script>const button = document.getElementById('buttonCancel');button.addEventListener('click', async () => {if (window.parent) {window.parent.postMessage({ type: \"fromForm\", action: \"closeModal\", }, \"*\");}});</script>";
     }
 
     private void processForwardRequest(String path, HttpServletRequest request,

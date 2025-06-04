@@ -41,5 +41,7 @@ public class Constants {
     public static final List<String> SELECTOR_REFERENCES = Arrays.asList(TABLE_REFERENCE_ID, TABLE_DIR_REFERENCE_ID,
         SEARCH_REFERENCE_ID, SELECTOR_REFERENCE_ID, TREE_REFERENCE_ID);
     public static final String WINDOW_REFERENCE_ID = "FF80818132D8F0F30132D9BC395D0038";
+    public static final String FORM_CLOSE_TAG = "</FORM>";
     public static final String FRAMESET_CLOSE_TAG = "</FRAMESET>";
+    public static final String HEAD_CLOSE_TAG = "</HEAD>";
 }
