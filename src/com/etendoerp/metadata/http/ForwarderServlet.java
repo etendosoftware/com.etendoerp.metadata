@@ -6,6 +6,8 @@ import static com.etendoerp.metadata.utils.Constants.HEAD_CLOSE_TAG;
 import static com.etendoerp.metadata.utils.ServletRegistry.getDelegatedServlet;
 
 import java.io.IOException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
@@ -54,10 +56,20 @@ public class ForwarderServlet extends BaseServlet {
     private String getInjectedContent(ContentCaptureWrapper wrappedResponse) {
         String responseString = wrappedResponse.getCapturedContent();
         if (responseString.contains(FRAMESET_CLOSE_TAG)) {
+            // Script to manage the messages between the client and the form's html
             return responseString.replace(HEAD_CLOSE_TAG, (generateReceiveAndPostMessageScript()).concat(HEAD_CLOSE_TAG));
         }
         if (responseString.contains(FORM_CLOSE_TAG)) {
-            return responseString.replace(FORM_CLOSE_TAG, FORM_CLOSE_TAG.concat(generatePostMessageScript()));
+            // Script to manage the buttons from the form
+            String resWithNewScript = responseString.replace(FORM_CLOSE_TAG, FORM_CLOSE_TAG.concat(generatePostMessageScript()));
+
+            // Modified js code to add a call to the new function from the script added
+            return injectCodeAfterFunctionCall(
+                    injectCodeAfterFunctionCall(resWithNewScript, "submitThisPage\\(([^)]+)\\);", "sendMessage('processOrder');", true),
+                    "closeThisPage();",
+                    "sendMessage('closeModal');",
+                    false
+            );
         }
         return responseString;
     }
@@ -67,7 +79,26 @@ public class ForwarderServlet extends BaseServlet {
     }
 
     private String generatePostMessageScript() {
-        return "<script>const button = document.getElementById('buttonCancel');button.addEventListener('click', async () => {if (window.parent) {window.parent.postMessage({ type: \"fromForm\", action: \"closeModal\", }, \"*\");}});</script>";
+        return "<script>const sendMessage = (action) => {if (window.parent) {window.parent.postMessage({ type: \"fromForm\", action: action, }, \"*\");}}</script>";
+    }
+
+    private String injectCodeAfterFunctionCall(String originalRes, String originalFunctionCall, String newFunctionCall, Boolean isRegex) {
+        Pattern pattern = isRegex
+                ? Pattern.compile(originalFunctionCall)
+                : Pattern.compile(Pattern.quote(originalFunctionCall));
+        Matcher matcher = pattern.matcher(originalRes);
+
+        StringBuilder result = new StringBuilder();
+
+        while (matcher.find()) {
+            String originalSubmitButtonAction = matcher.group(0);
+            String modifiedSubmitButtonAction = originalSubmitButtonAction + newFunctionCall;
+            matcher.appendReplacement(result, Matcher.quoteReplacement(modifiedSubmitButtonAction));
+        }
+
+        matcher.appendTail(result);
+
+        return result.toString();
     }
 
     private void processForwardRequest(String path, HttpServletRequest request,
