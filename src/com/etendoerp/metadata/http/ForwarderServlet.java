@@ -63,6 +63,10 @@ public class ForwarderServlet extends BaseServlet {
             // Script to manage the buttons from the form
             String resWithNewScript = responseString.replace(FORM_CLOSE_TAG, FORM_CLOSE_TAG.concat(generatePostMessageScript()));
 
+            // Changes on script calls to find the correct paths
+            resWithNewScript = resWithNewScript.replace("src=\"../web/", "src=\"../../../web/");
+            resWithNewScript = resWithNewScript.replace("href=\"../web/", "href=\"../../../web/");
+
             // Modified js code to add a call to the new function from the script added
             return injectCodeAfterFunctionCall(
                     injectCodeAfterFunctionCall(resWithNewScript, "submitThisPage\\(([^)]+)\\);", "sendMessage('processOrder');", true),
