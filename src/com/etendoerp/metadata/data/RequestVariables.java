@@ -7,8 +7,6 @@ import javax.servlet.http.HttpServletRequest;
 
 import org.openbravo.base.secureApp.VariablesSecureApp;
 
-import com.etendoerp.metadata.http.HttpServletRequestWrapper;
-
 /**
  * @author luuchorocha
  */
@@ -16,7 +14,7 @@ public class RequestVariables extends VariablesSecureApp {
     private final Map<String, Object> casedSessionAttributes = new HashMap<>();
 
     public RequestVariables(HttpServletRequest request) {
-        super(HttpServletRequestWrapper.wrap(request));
+        super(request);
     }
 
     @Override

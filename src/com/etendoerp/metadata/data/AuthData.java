@@ -9,15 +9,15 @@ import org.openbravo.model.common.enterprise.Warehouse;
  * @author luuchorocha
  */
 public class AuthData {
-    public final User user;
-    public Role role;
-    public Organization org;
-    public Warehouse warehouse;
+  public final User user;
+  public Role role;
+  public Organization org;
+  public Warehouse warehouse;
 
-    public AuthData(User user, Role role, Organization org, Warehouse warehouse) {
-        this.user = user;
-        this.role = role;
-        this.org = org;
-        this.warehouse = warehouse;
-    }
+  public AuthData(User user, Role role, Organization org, Warehouse warehouse) {
+    this.user = user;
+    this.role = role;
+    this.org = org;
+    this.warehouse = warehouse;
+  }
 }

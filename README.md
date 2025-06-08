@@ -36,7 +36,8 @@ This module relies on the following EtendoERP components:
 To enable authentication for the new UI, you must configure the correct authentication manager in your `Openbravo.properties` file:
 
 ```properties
-authentication.class=com.etendoerp.etendorx.auth.SWSAuthenticationManager
+
+authentication.class=com.etendoerp.metadata.auth.AuthenticationManager
 ```
 
 This is required for token-based authentication to work properly with the new frontend.
