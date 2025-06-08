@@ -93,7 +93,7 @@ public class BaseServlet extends HttpSecureAppServlet {
 
     @Override
     public void service(HttpServletRequest req, HttpServletResponse res) throws IOException, ServletException {
-        service(req, res, true, true);
+        service(HttpServletRequestWrapper.wrap(req), res, true, true);
     }
 
     public void service(HttpServletRequest req, HttpServletResponse res, boolean callSuper,

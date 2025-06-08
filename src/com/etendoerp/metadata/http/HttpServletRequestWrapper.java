@@ -11,8 +11,14 @@ import org.openbravo.client.kernel.RequestContext;
  * @author luuchorocha
  */
 public class HttpServletRequestWrapper extends RequestContext.HttpServletRequestWrapper {
-    public HttpServletRequestWrapper(HttpServletRequest request) {
+    private static final ThreadLocal<HttpSession> session = ThreadLocal.withInitial(HttpSessionWrapper::new);
+
+    private HttpServletRequestWrapper(HttpServletRequest request) {
         super(request);
+    }
+
+    public static void clear() {
+        session.remove();
     }
 
     public static HttpServletRequestWrapper wrap(HttpServletRequest request) {
@@ -25,12 +31,12 @@ public class HttpServletRequestWrapper extends RequestContext.HttpServletRequest
 
     @Override
     public HttpSession getSession() {
-        return super.getSession();
+        return session.get();
     }
 
     @Override
     public HttpSession getSession(boolean f) {
-        return super.getSession(f);
+        return session.get();
     }
 
     @Override

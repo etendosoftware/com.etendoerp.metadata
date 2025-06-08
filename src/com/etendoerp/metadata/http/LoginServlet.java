@@ -28,7 +28,7 @@ public class LoginServlet extends HttpBaseServlet {
 
     @Override
     public final void service(HttpServletRequest req, HttpServletResponse res) throws IOException, ServletException {
-        super.service(req, res);
+        super.service(HttpServletRequestWrapper.wrap(req), res);
     }
 
     @Override
@@ -38,9 +38,8 @@ public class LoginServlet extends HttpBaseServlet {
 
     @Override
     public void doPost(HttpServletRequest req, HttpServletResponse res) throws IOException {
-        AllowedCrossDomainsHandler.getInstance().setCORSHeaders(req, res);
-
         try {
+            AllowedCrossDomainsHandler.getInstance().setCORSHeaders(req, res);
             OBContext.setAdminMode(true);
             validateConfig();
             res.setContentType(ContentType.APPLICATION_JSON.getMimeType());

@@ -44,4 +44,10 @@ public class Constants {
     public static final String FORM_CLOSE_TAG = "</FORM>";
     public static final String FRAMESET_CLOSE_TAG = "</FRAMESET>";
     public static final String HEAD_CLOSE_TAG = "</HEAD>";
+    public static final String OPTIONS = "OPTIONS";
+    public static final String GET = "GET";
+    public static final String POST = "POST";
+    public static final String PUT = "PUT";
+    public static final String PATCH = "PATCH";
+    public static final String DELETE = "DELETE";
 }
