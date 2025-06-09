@@ -1,5 +1,6 @@
 package com.etendoerp.metadata.auth;
 
+import static com.etendoerp.metadata.auth.Utils.decodeToken;
 import static com.etendoerp.metadata.auth.Utils.generateToken;
 
 import java.util.Optional;
@@ -30,7 +31,6 @@ import com.etendoerp.metadata.exceptions.UnauthorizedException;
 import com.etendoerp.metadata.http.BaseServlet;
 import com.etendoerp.metadata.utils.Constants;
 import com.etendoerp.metadata.utils.Utils;
-import com.smf.securewebservices.utils.SecureWebServicesUtils;
 
 /**
  * @author luuchorocha
@@ -88,7 +88,7 @@ public class LoginManager {
 
   private DecodedJWT getDecodedJWT(String token) {
     try {
-      return Optional.of(SecureWebServicesUtils.decodeToken(token)).orElseThrow(UnauthorizedException::new);
+      return Optional.of(decodeToken(token)).orElseThrow(UnauthorizedException::new);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
