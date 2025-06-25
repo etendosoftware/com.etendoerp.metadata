@@ -45,8 +45,8 @@ public class TabProcessor {
   }
 
   public static <T> JSONObject getFields(String id, String updated, List<T> data, Predicate<T> accessPredicate,
-      Function<T, Column> columnExtractor, Function<T, JSONObject> jsonMapper,
-      ConcurrentMap<String, JSONObject> cache) {
+                                         Function<T, Column> columnExtractor, Function<T, JSONObject> jsonMapper,
+                                         ConcurrentMap<String, JSONObject> cache) {
     String cacheKey = getCacheKey(id, updated);
     JSONObject list = cache.get(cacheKey);
     if (list != null) return list;
@@ -56,10 +56,21 @@ public class TabProcessor {
     for (T fieldLike : data) {
       try {
         if (accessPredicate.test(fieldLike)) {
-          result.put(getEntityColumnName(columnExtractor.apply(fieldLike)), jsonMapper.apply(fieldLike));
+          Column column = columnExtractor.apply(fieldLike);
+          if (column != null) {
+            String entityColumnName = getEntityColumnName(column);
+            if (entityColumnName != null) {
+              result.put(entityColumnName, jsonMapper.apply(fieldLike));
+            } else {
+              logger.warn("Could not determine entity column name for column: {} - skipping field",
+                      column.getDBColumnName());
+            }
+          } else {
+            logger.warn("Field has null column - skipping field: {}", fieldLike);
+          }
         }
       } catch (JSONException e) {
-        logger.warn(e.getMessage(), e);
+        logger.warn("Error processing field: {} - {}", fieldLike, e.getMessage(), e);
       }
     }
 
@@ -79,23 +90,34 @@ public class TabProcessor {
   }
 
   public static String getEntityColumnName(Column column) {
+    if (column == null) {
+      logger.warn("Column parameter is null in getEntityColumnName");
+      return null;
+    }
+
+    if (column.getTable() == null) {
+      logger.warn("Column has null table: {}", column.getDBColumnName());
+      return null;
+    }
+
     String tableName = column.getTable().getName();
     String columnName = column.getDBColumnName();
     Entity entity = ModelProvider.getInstance().getEntity(tableName);
 
     if (entity == null) {
+      logger.warn("No entity found for table: {}", tableName);
       return null;
     }
 
     Property property = entity.getPropertyByColumnName(columnName);
 
     if (property == null) {
+      logger.warn("No property found for column: {} in table: {}", columnName, tableName);
       return null;
     }
 
     return property.getName();
   }
-
   public static JSONObject getJSONField(Field field) {
     try {
       return new FieldBuilder(field, null).toJSON();
