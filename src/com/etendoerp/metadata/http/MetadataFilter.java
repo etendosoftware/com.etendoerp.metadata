@@ -31,7 +31,6 @@ public class MetadataFilter implements Filter {
             chain.doFilter(request, response);
         } finally {
             MetadataService.clear();
-            HttpServletRequestWrapper.clear();
         }
     }
 

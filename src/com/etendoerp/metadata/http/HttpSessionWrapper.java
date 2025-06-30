@@ -12,6 +12,10 @@ import org.openbravo.client.kernel.RequestContext;
 public class HttpSessionWrapper extends RequestContext.HttpSessionWrapper {
     private Enumeration<String> attributeNames;
 
+    public HttpSessionWrapper() {
+        super();
+    }
+
     @Override
     public Enumeration<String> getAttributeNames() {
         if (attributeNames == null) {

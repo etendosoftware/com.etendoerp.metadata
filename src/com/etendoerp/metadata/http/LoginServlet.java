@@ -24,40 +24,39 @@ import com.smf.securewebservices.SWSConfig;
  * @author luuchorocha
  */
 public class LoginServlet extends HttpBaseServlet {
-    private final LoginManager manager = new LoginManager();
+  private final LoginManager manager = new LoginManager();
 
-    @Override
-    public final void service(HttpServletRequest req, HttpServletResponse res) throws IOException, ServletException {
-        super.service(HttpServletRequestWrapper.wrap(req), res);
+  @Override
+  public final void service(HttpServletRequest req, HttpServletResponse res) throws IOException, ServletException {
+    super.service(req, res);
+  }
+
+  @Override
+  public final void doOptions(HttpServletRequest req, HttpServletResponse res) {
+    AllowedCrossDomainsHandler.getInstance().setCORSHeaders(req, res);
+  }
+
+  @Override
+  public void doPost(HttpServletRequest req, HttpServletResponse res) throws IOException {
+    try {
+      AllowedCrossDomainsHandler.getInstance().setCORSHeaders(req, res);
+      OBContext.setAdminMode(true);
+      validateConfig();
+      res.setContentType(ContentType.APPLICATION_JSON.getMimeType());
+      res.setCharacterEncoding(StandardCharsets.UTF_8.name());
+      res.getWriter().write(manager.processLogin(req).toString());
+    } catch (Exception e) {
+      log4j.error(e.getMessage(), e);
+      res.setStatus(getHttpStatusFor(e));
+      res.getWriter().write(JsonUtils.convertExceptionToJson(e));
+    } finally {
+      OBContext.restorePreviousMode();
     }
+  }
 
-    @Override
-    public final void doOptions(HttpServletRequest req, HttpServletResponse res) {
-        AllowedCrossDomainsHandler.getInstance().setCORSHeaders(req, res);
+  private void validateConfig() {
+    if (SWSConfig.getInstance().getPrivateKey() == null) {
+      throw new InternalServerException(Constants.SWS_SWS_ARE_MISCONFIGURED);
     }
-
-    @Override
-    public void doPost(HttpServletRequest req, HttpServletResponse res) throws IOException {
-        AllowedCrossDomainsHandler.getInstance().setCORSHeaders(req, res);
-
-        try {
-            OBContext.setAdminMode(true);
-            validateConfig();
-            res.setContentType(ContentType.APPLICATION_JSON.getMimeType());
-            res.setCharacterEncoding(StandardCharsets.UTF_8.name());
-            res.getWriter().write(manager.processLogin(HttpServletRequestWrapper.wrap(req)).toString());
-        } catch (Exception e) {
-            log4j.error(e.getMessage(), e);
-            res.setStatus(getHttpStatusFor(e));
-            res.getWriter().write(JsonUtils.convertExceptionToJson(e));
-        } finally {
-            OBContext.restorePreviousMode();
-        }
-    }
-
-    private void validateConfig() {
-        if (SWSConfig.getInstance().getPrivateKey() == null) {
-            throw new InternalServerException(Constants.SWS_SWS_ARE_MISCONFIGURED);
-        }
-    }
+  }
 }

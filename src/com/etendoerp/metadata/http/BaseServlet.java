@@ -14,6 +14,7 @@ import javax.servlet.http.HttpSession;
 import org.openbravo.authentication.AuthenticationManager;
 import org.openbravo.base.secureApp.AllowedCrossDomainsHandler;
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
+import org.openbravo.base.secureApp.VariablesSecureApp;
 import org.openbravo.base.weld.WeldUtils;
 import org.openbravo.client.kernel.KernelServlet;
 import org.openbravo.client.kernel.RequestContext;
@@ -45,7 +46,7 @@ public class BaseServlet extends HttpSecureAppServlet {
         }
     }
 
-    public void initializeSession() {
+    public static void initializeSession() {
         OBContext context = OBContext.getOBContext();
 
         if (context == null) {
@@ -55,10 +56,9 @@ public class BaseServlet extends HttpSecureAppServlet {
         initializeSession(context);
     }
 
-    private void initializeSession(OBContext context) {
+    private static void initializeSession(OBContext context) {
         RequestContext requestContext = RequestContext.get();
-        HttpServletRequest request = requestContext.getRequest();
-        RequestVariables vars = (RequestVariables) requestContext.getVariablesSecureApp();
+        VariablesSecureApp vars = requestContext.getVariablesSecureApp();
         ConnectionProvider conn = new DalConnectionProvider();
         String userId = context.getUser().getId();
         Language language = context.getLanguage();
@@ -75,9 +75,6 @@ public class BaseServlet extends HttpSecureAppServlet {
 
         try {
             fillSessionArguments(conn, vars, userId, languageCode, isRTL, roleId, clientId, orgId, warehouseId);
-            readNumberFormat(vars, KernelServlet.getGlobalParameters().getFormatPath());
-            readProperties(vars);
-            bypassCSRF(request, userId);
         } catch (ServletException e) {
             throw new InternalServerException(e.getMessage());
         }
@@ -96,7 +93,7 @@ public class BaseServlet extends HttpSecureAppServlet {
 
     @Override
     public void service(HttpServletRequest req, HttpServletResponse res) throws IOException, ServletException {
-        service(req, res, true, true);
+        service(HttpServletRequestWrapper.wrap(req), res, true, true);
     }
 
     public void service(HttpServletRequest req, HttpServletResponse res, boolean callSuper,
@@ -108,17 +105,21 @@ public class BaseServlet extends HttpSecureAppServlet {
             if (req.getMethod().equalsIgnoreCase("options")) {
                 return;
             }
+
             RequestVariables vars = new RequestVariables(req);
             RequestContext requestContext = RequestContext.get();
             requestContext.setRequest(req);
             requestContext.setVariableSecureApp(vars);
             requestContext.setResponse(res);
 
-            authenticationManager.authenticate(req, res);
+            String userId = authenticationManager.authenticate(req, res);
             setContext(req);
 
             if (initializeSession) {
                 initializeSession();
+                readNumberFormat(vars, KernelServlet.getGlobalParameters().getFormatPath());
+                readProperties(vars);
+                bypassCSRF(req, userId);
             }
 
             if (callSuper) {

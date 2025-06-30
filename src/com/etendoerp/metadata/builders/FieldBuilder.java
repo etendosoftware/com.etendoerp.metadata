@@ -22,7 +22,6 @@ import org.openbravo.client.kernel.KernelUtils;
 import org.openbravo.dal.core.DalUtil;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
-import org.openbravo.data.Sqlc;
 import org.openbravo.model.ad.access.FieldAccess;
 import org.openbravo.model.ad.datamodel.Column;
 import org.openbravo.model.ad.datamodel.Table;
@@ -353,23 +352,24 @@ public class FieldBuilder extends Builder {
     }
 
     private static String getInputName(Column column) {
-        try {
-            return DataSourceUtils.getInpName(column);
-        } catch (Exception e) {
-            logger.warn(e.getMessage(), e);
-
-            return "inp" + Sqlc.TransformaNombreColumna(column.getDBColumnName());
-        }
+        return DataSourceUtils.getInpName(column);
     }
 
     private static String getHqlName(Field field) {
         try {
-            return DataSourceUtils.getHQLColumnName(field)[0];
+            Column fieldColumn = field.getColumn();
+            String dbTableName = fieldColumn.getTable().getDBTableName();
+            String dbColumnName = fieldColumn.getDBColumnName();
+            String[] names = DataSourceUtils.getHQLColumnName(true, dbTableName, dbColumnName);
+
+            if (names.length > 0) {
+                return names[0];
+            }
         } catch (Exception e) {
             logger.warn(e.getMessage(), e);
-
-            return field.getName();
         }
+
+        return field.getName();
     }
 
     @Override
