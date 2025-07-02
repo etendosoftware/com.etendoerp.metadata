@@ -1,64 +1,77 @@
 package com.etendoerp.metadata.builders;
 
-import com.etendoerp.metadata.exceptions.InternalServerException;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-import org.codehaus.jettison.json.JSONArray;
+import java.util.List;
+import java.util.stream.Collectors;
+
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.client.application.GlobalMenu;
 import org.openbravo.client.application.MenuManager;
 import org.openbravo.client.application.MenuManager.MenuOption;
+import org.openbravo.client.application.Process;
+import org.openbravo.dal.core.OBContext;
+import org.openbravo.model.ad.system.Language;
+import org.openbravo.model.ad.ui.Form;
 import org.openbravo.model.ad.ui.Menu;
 import org.openbravo.model.ad.ui.Window;
-import org.openbravo.service.json.DataResolvingMode;
-import org.openbravo.service.json.DataToJsonConverter;
 
-import java.util.List;
-import java.util.stream.Collectors;
-
-public class MenuBuilder {
-    private final static String[] MENU_PROPERTIES = new String[]{Menu.PROPERTY_ID, Menu.PROPERTY_NAME, Menu.PROPERTY_ACTION};
-    private final static String[] WINDOW_PROPERTIES = new String[]{Window.PROPERTY_ID, Window.PROPERTY_NAME, Window.PROPERTY_WINDOWTYPE};
-    private static final DataToJsonConverter menuConverter = new DataToJsonConverter();
-    private static final DataToJsonConverter windowConverter = new DataToJsonConverter();
-    private static final Logger logger = LogManager.getLogger();
-    private final MenuOption menu;
+/**
+ * @author luuchorocha
+ */
+public class MenuBuilder extends Builder {
+    private static final ThreadLocal<MenuManager> manager = ThreadLocal.withInitial(MenuManager::new);
 
     public MenuBuilder() {
-        MenuManager manager = new MenuManager();
-        manager.setGlobalMenuOptions(new GlobalMenu());
-        menu = manager.getMenu();
-        menuConverter.setSelectedProperties(String.join(",", MENU_PROPERTIES));
-        windowConverter.setSelectedProperties(String.join(",", WINDOW_PROPERTIES));
-    }
-
-    private static JSONObject toJSON(MenuOption entry) {
         try {
-            Menu menu = entry.getMenu();
-            JSONObject menuItem = menuConverter.toJsonObject(menu, DataResolvingMode.FULL_TRANSLATABLE);
-            Window window = menu.getWindow();
-            List<MenuOption> items = entry.getChildren();
-
-            menuItem.put("icon", menu.getETMETAIcon());
-
-            if (null != window) {
-                menuItem.put("window", windowConverter.toJsonObject(window, DataResolvingMode.FULL_TRANSLATABLE));
-            }
-
-            if (!items.isEmpty()) {
-                menuItem.put("children", items.stream().map(MenuBuilder::toJSON).collect(Collectors.toList()));
-            }
-
-            return menuItem;
-        } catch (JSONException e) {
-            logger.warn(e.getMessage());
-
-            throw new InternalServerException();
+            manager.get().getMenu();
+        } catch (NullPointerException e) {
+            manager.get().setGlobalMenuOptions(new GlobalMenu());
         }
     }
 
-    public JSONArray toJSON() {
-        return new JSONArray(this.menu.getChildren().stream().map(MenuBuilder::toJSON).collect(Collectors.toList()));
+    private JSONObject toJSON(MenuOption entry) {
+        JSONObject json = new JSONObject();
+
+        try {
+            Language language = OBContext.getOBContext().getLanguage();
+            Menu menu = entry.getMenu();
+            String id = menu.getId();
+            Window window = menu.getWindow();
+            List<MenuOption> children = entry.getChildren();
+            Form form = menu.getSpecialForm();
+            Process processDefinition = menu.getOBUIAPPProcessDefinition();
+            org.openbravo.model.ad.ui.Process process = menu.getProcess();
+
+            json.put("id", id);
+            json.put("type", entry.getType());
+            json.put("icon", menu.get(Menu.PROPERTY_ETMETAICON, language, id));
+            json.put("name", menu.get(Menu.PROPERTY_NAME, language, id));
+            json.put("description", menu.get(Menu.PROPERTY_DESCRIPTION, language, id));
+            json.put("url", menu.getURL());
+            json.put("action", menu.getAction());
+
+            if (null != window) json.put("windowId", window.getId());
+            if (null != process) json.put("processId", process.getId());
+            if (null != processDefinition) json.put("processDefinitionId", processDefinition.getId());
+            if (null != form) json.put("formId", form.getId());
+
+            if (!children.isEmpty()) {
+                json.put("children", children.stream().map(this::toJSON).collect(Collectors.toList()));
+            }
+
+        } catch (JSONException e) {
+            logger.error(e.getMessage(), e);
+        }
+
+        return json;
+    }
+
+    @Override
+    public JSONObject toJSON() throws JSONException {
+        JSONObject result = new JSONObject();
+        MenuOption menu = manager.get().getMenu();
+        result.put("menu", menu.getChildren().stream().map(this::toJSON).collect(Collectors.toList()));
+
+        return result;
     }
 }
