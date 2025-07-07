@@ -40,7 +40,7 @@ public class LocationService {
         try {
             String locationId = SequenceIdData.getUUID();
 
-            Location location = createLocationEntity(locationId, locationData);
+            Location location = createLocationEntity(locationId);
             setLocationReferences(location, locationData);
             setLocationFields(location, locationData);
 
@@ -57,7 +57,7 @@ public class LocationService {
     /**
      * Create and initialize Location entity
      */
-    private Location createLocationEntity(String locationId, LocationData locationData) {
+    private Location createLocationEntity(String locationId) {
         Location location = OBProvider.getInstance().get(Location.class);
         location.setId(locationId);
         location.setNewOBObject(true);
