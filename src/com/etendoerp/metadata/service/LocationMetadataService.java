@@ -42,7 +42,7 @@ public class LocationMetadataService extends MetadataService {
         try {
             String pathInfo = getRequest().getPathInfo();
 
-            if (pathInfo.startsWith(LOCATION_PATH + "create")) {
+            if (pathInfo != null && pathInfo.startsWith(LOCATION_PATH + "create")) {
                 handleCreateLocation();
             } else {
                 throw new com.etendoerp.metadata.exceptions.NotFoundException("Location endpoint not found");
