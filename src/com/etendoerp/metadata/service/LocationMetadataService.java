@@ -20,12 +20,18 @@ import com.etendoerp.metadata.exceptions.UnprocessableContentException;
 /**
  * Service to handle location operations
  *
- * @author Santiago Alaniz
+ * @author [tu_nombre]
  */
 public class LocationMetadataService extends MetadataService {
 
-    private final LocationService locationService;
+    private LocationService locationService;
 
+    /**
+     * Constructor to initialize the LocationMetadataService with HTTP request and response objects.
+     *
+     * @param req the HTTP servlet request
+     * @param res the HTTP servlet response
+     */
     public LocationMetadataService(HttpServletRequest req, HttpServletResponse res) {
         super(req, res);
         this.locationService = new LocationService();
