@@ -5,12 +5,14 @@ import java.util.Map;
 
 import javax.enterprise.context.ApplicationScoped;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.openbravo.base.exception.OBException;
 import org.openbravo.base.provider.OBProvider;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
+import org.openbravo.erpCommon.utility.OBMessageUtils;
 import org.openbravo.erpCommon.utility.SequenceIdData;
 import org.openbravo.model.common.geography.Country;
 import org.openbravo.model.common.geography.Location;
@@ -38,7 +40,7 @@ public class LocationService {
         try {
             String locationId = SequenceIdData.getUUID();
 
-            Location location = createLocationEntity(locationId);
+            Location location = createLocationEntity(locationId, locationData);
             setLocationReferences(location, locationData);
             setLocationFields(location, locationData);
 
@@ -55,14 +57,12 @@ public class LocationService {
     /**
      * Create and initialize Location entity
      */
-    private Location createLocationEntity(String locationId) {
+    private Location createLocationEntity(String locationId, LocationData locationData) {
         Location location = OBProvider.getInstance().get(Location.class);
         location.setId(locationId);
         location.setNewOBObject(true);
 
         OBContext context = OBContext.getOBContext();
-        location.setClient(context.getCurrentClient());
-        location.setOrganization(context.getCurrentOrganization());
         location.setActive(true);
         location.setCreatedBy(context.getUser());
         location.setUpdatedBy(context.getUser());
@@ -71,28 +71,37 @@ public class LocationService {
     }
 
     /**
-     * Set foreign key references for Country and Region
+     * Set foreign key references for Country and Region.
+     *
+     * @param location the location entity to set references on
+     * @param locationData the data containing country and region IDs
+     * @throws OBException if referenced entities are not found
      */
     private void setLocationReferences(Location location, LocationData locationData) {
-        if (locationData.getCountryId() != null) {
+        if (StringUtils.isNotBlank(locationData.getCountryId())) {
             Country country = OBDal.getInstance().get(Country.class, locationData.getCountryId());
             if (country == null) {
-                throw new OBException("Country not found with ID: " + locationData.getCountryId());
+                String errorMsg = OBMessageUtils.messageBD("ETMETA_CountryNotFound");
+                throw new OBException(errorMsg + ": " + locationData.getCountryId());
             }
             location.setCountry(country);
         }
 
-        if (locationData.getRegionId() != null) {
+        if (StringUtils.isNotBlank(locationData.getRegionId())) {
             Region region = OBDal.getInstance().get(Region.class, locationData.getRegionId());
             if (region == null) {
-                throw new OBException("Region not found with ID: " + locationData.getRegionId());
+                String errorMsg = OBMessageUtils.messageBD("ETMETA_RegionNotFound");
+                throw new OBException(errorMsg + ": " + locationData.getRegionId());
             }
             location.setRegion(region);
         }
     }
 
     /**
-     * Set location address fields
+     * Set location address fields from the provided data.
+     *
+     * @param location the location entity to set fields on
+     * @param locationData the data containing address information
      */
     private void setLocationFields(Location location, LocationData locationData) {
         location.setAddressLine1(locationData.getAddress1());
@@ -102,7 +111,10 @@ public class LocationService {
     }
 
     /**
-     * Save location to database
+     * Save location to database.
+     *
+     * @param location the location entity to save
+     * @throws OBException if there's an error persisting the location
      */
     private void saveLocation(Location location) {
         try {
@@ -111,12 +123,18 @@ public class LocationService {
             dal.flush();
         } catch (Exception e) {
             logger.error("Error saving location to database", e);
-            throw new OBException("Error persisting location: " + e.getMessage(), e);
+            String errorMsg = OBMessageUtils.messageBD("ETMETA_LocationSaveError");
+            throw new OBException(errorMsg + ": " + e.getMessage(), e);
         }
     }
 
     /**
-     * Build response result map
+     * Build response result map with location data.
+     *
+     * @param locationId the generated location ID
+     * @param location the saved location entity
+     * @param locationData the original input data
+     * @return a map containing the location response data
      */
     private Map<String, Object> buildResult(String locationId, Location location, LocationData locationData) {
         String identifier = buildLocationIdentifier(location);
@@ -136,7 +154,7 @@ public class LocationService {
 
     /**
      * Build an identifier for the address with expected format
-     * Replicates the logic from LocationSearchData.locationAddress
+     * Creates a user-friendly display string for the location selector
      */
     private String buildLocationIdentifier(Location location) {
         StringBuilder identifier = new StringBuilder();
@@ -158,10 +176,13 @@ public class LocationService {
     }
 
     /**
-     * Append value to identifier if not null or empty
+     * Append value to identifier if not null or empty.
+     *
+     * @param identifier the StringBuilder to append to
+     * @param value the value to append if not blank
      */
     private void appendIfNotEmpty(StringBuilder identifier, String value) {
-        if (value != null && !value.trim().isEmpty()) {
+        if (StringUtils.isNotBlank(value)) {
             if (identifier.length() > 0) {
                 identifier.append(" - ");
             }
@@ -181,6 +202,16 @@ public class LocationService {
         private String regionId;
 
         public LocationData() {}
+
+        public LocationData(String address1, String address2, String postal, String city,
+                            String countryId, String regionId) {
+            this.address1 = address1;
+            this.address2 = address2;
+            this.postal = postal;
+            this.city = city;
+            this.countryId = countryId;
+            this.regionId = regionId;
+        }
 
         public String getAddress1() { return address1; }
         public void setAddress1(String address1) { this.address1 = address1; }

@@ -7,6 +7,7 @@ import static org.apache.http.HttpStatus.SC_UNPROCESSABLE_ENTITY;
 import static org.openbravo.client.application.DynamicExpressionParser.replaceSystemPreferencesInDisplayLogic;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -301,7 +302,7 @@ public class Utils {
             throws IOException {
         response.setStatus(statusCode);
         response.setContentType("application/json");
-        response.setCharacterEncoding("UTF-8");
+        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         response.getWriter().write(jsonContent);
         response.getWriter().flush();
     }

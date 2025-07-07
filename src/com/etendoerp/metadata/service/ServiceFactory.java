@@ -5,7 +5,14 @@ import javax.servlet.http.HttpServletResponse;
 
 import com.etendoerp.metadata.exceptions.NotFoundException;
 
-import static com.etendoerp.metadata.utils.Constants.*;
+import static com.etendoerp.metadata.utils.Constants.LABELS_PATH;
+import static com.etendoerp.metadata.utils.Constants.LANGUAGE_PATH;
+import static com.etendoerp.metadata.utils.Constants.MENU_PATH;
+import static com.etendoerp.metadata.utils.Constants.MESSAGE_PATH;
+import static com.etendoerp.metadata.utils.Constants.SESSION_PATH;
+import static com.etendoerp.metadata.utils.Constants.TAB_PATH;
+import static com.etendoerp.metadata.utils.Constants.WINDOW_PATH;
+import static com.etendoerp.metadata.utils.Constants.LOCATION_PATH;
 
 /**
  * @author luuchorocha

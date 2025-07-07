@@ -9,18 +9,20 @@ import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.apache.commons.lang3.StringUtils;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.base.exception.OBException;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.service.json.JsonUtils;
 
+import com.etendoerp.metadata.exceptions.NotFoundException;
 import com.etendoerp.metadata.exceptions.UnprocessableContentException;
 
 /**
  * Service to handle location operations
  *
- * @author [tu_nombre]
+ * @author Santiago Alaniz
  */
 public class LocationMetadataService extends MetadataService {
 
@@ -42,10 +44,10 @@ public class LocationMetadataService extends MetadataService {
         try {
             String pathInfo = getRequest().getPathInfo();
 
-            if (pathInfo != null && pathInfo.startsWith(LOCATION_PATH + "create")) {
+            if (pathInfo.startsWith(LOCATION_PATH + "create")) {
                 handleCreateLocation();
             } else {
-                throw new com.etendoerp.metadata.exceptions.NotFoundException("Location endpoint not found");
+                throw new NotFoundException("Location endpoint not found");
             }
 
         } catch (Exception e) {
@@ -104,19 +106,29 @@ public class LocationMetadataService extends MetadataService {
     }
 
     /**
-     * Validate location data according to business rules
+     * Validate location data according to business rules.
+     * Aggregates all validation errors and returns them together for better user experience.
+     *
+     * @param locationData the location data to validate
+     * @throws UnprocessableContentException if validation fails with all error messages
      */
     private void validateLocationData(LocationService.LocationData locationData) {
-        if (isNullOrEmpty(locationData.getAddress1())) {
-            throw new UnprocessableContentException("Address line 1 is required");
+        StringBuilder errors = new StringBuilder();
+
+        if (StringUtils.isBlank(locationData.getAddress1())) {
+            errors.append("Address line 1 is required. ");
         }
 
-        if (isNullOrEmpty(locationData.getCity())) {
-            throw new UnprocessableContentException("City is required");
+        if (StringUtils.isBlank(locationData.getCity())) {
+            errors.append("City is required. ");
         }
 
-        if (isNullOrEmpty(locationData.getCountryId())) {
-            throw new UnprocessableContentException("Country is required");
+        if (StringUtils.isBlank(locationData.getCountryId())) {
+            errors.append("Country is required. ");
+        }
+
+        if (errors.length() > 0) {
+            throw new UnprocessableContentException(errors.toString().trim());
         }
     }
 
@@ -135,14 +147,11 @@ public class LocationMetadataService extends MetadataService {
     }
 
     /**
-     * Utility method to check if string is null or empty
-     */
-    private boolean isNullOrEmpty(String value) {
-        return value == null || value.trim().isEmpty();
-    }
-
-    /**
-     * Read HTTP request body
+     * Read HTTP request body and return it as a string.
+     *
+     * @param request the HTTP servlet request
+     * @return the request body as a string
+     * @throws IOException if there's an error reading the request body
      */
     private String readRequestBody(HttpServletRequest request) throws IOException {
         StringBuilder buffer = new StringBuilder();
