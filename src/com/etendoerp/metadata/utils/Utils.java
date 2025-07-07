@@ -6,6 +6,7 @@ import static org.apache.http.HttpStatus.SC_UNAUTHORIZED;
 import static org.apache.http.HttpStatus.SC_UNPROCESSABLE_ENTITY;
 import static org.openbravo.client.application.DynamicExpressionParser.replaceSystemPreferencesInDisplayLogic;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -13,6 +14,7 @@ import java.util.Objects;
 
 import javax.script.ScriptException;
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
 import org.apache.http.HttpStatus;
 import org.apache.logging.log4j.LogManager;
@@ -38,6 +40,7 @@ import org.openbravo.model.ad.ui.Field;
 import org.openbravo.model.ad.ui.Tab;
 import org.openbravo.service.json.DataResolvingMode;
 import org.openbravo.service.json.DataToJsonConverter;
+import java.io.BufferedReader;
 
 import com.etendoerp.metadata.builders.ProcessDefinitionBuilder;
 import com.etendoerp.metadata.exceptions.MethodNotAllowedException;
@@ -199,5 +202,49 @@ public class Utils {
         } else {
             return null;
         }
+    }
+
+    /**
+     * Read http body
+     */
+    public static String readRequestBody(HttpServletRequest request) throws IOException {
+        StringBuilder buffer = new StringBuilder();
+        String line;
+        try (BufferedReader reader = request.getReader()) {
+            while ((line = reader.readLine()) != null) {
+                buffer.append(line);
+            }
+        }
+        return buffer.toString();
+    }
+
+    /**
+     * Success Response
+     */
+    public static void writeJsonResponse(HttpServletResponse response, int statusCode, String jsonContent)
+            throws IOException {
+        response.setStatus(statusCode);
+        response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
+        response.getWriter().write(jsonContent);
+        response.getWriter().flush();
+    }
+
+    /**
+     * Error Response
+     */
+    public static void writeJsonErrorResponse(HttpServletResponse response, int statusCode, String errorMessage)
+            throws IOException {
+        JSONObject errorJson = new JSONObject();
+        try {
+            errorJson.put("success", false);
+            errorJson.put("error", errorMessage);
+            errorJson.put("status", statusCode);
+        } catch (JSONException e) {
+            errorMessage = "{\"success\":false,\"error\":\"" + errorMessage.replace("\"", "\\\"") + "\"}";
+            writeJsonResponse(response, statusCode, errorMessage);
+            return;
+        }
+        writeJsonResponse(response, statusCode, errorJson.toString());
     }
 }

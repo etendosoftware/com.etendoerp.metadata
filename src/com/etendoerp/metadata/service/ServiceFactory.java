@@ -17,6 +17,8 @@ import com.etendoerp.metadata.exceptions.NotFoundException;
  * @author luuchorocha
  */
 public class ServiceFactory {
+    private static final String LOCATION_PATH = "/location";
+
     public static MetadataService getService(final HttpServletRequest req, final HttpServletResponse res) {
         final String path = req.getPathInfo();
 
@@ -34,6 +36,8 @@ public class ServiceFactory {
             return new MessageService(req, res);
         } else if (path.equals(LABELS_PATH)) {
             return new LabelsService(req, res);
+        } else if (path.startsWith(LOCATION_PATH)) {
+            return new LocationMetadataService(req, res);
         } else {
             throw new NotFoundException();
         }
