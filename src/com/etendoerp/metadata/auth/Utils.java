@@ -25,14 +25,35 @@ import com.etendoerp.metadata.data.AuthData;
 import com.smf.securewebservices.SWSConfig;
 import com.smf.securewebservices.utils.SecureWebServicesUtils;
 
+/**
+ * Utility class for handling authentication-related operations such as token generation,
+ * decoding, and retrieving user-related entities.
+ *
+ * This class provides methods to interact with JWT tokens, retrieve roles, organizations,
+ * and warehouses, and manage private keys for secure web services.
+ */
 public class Utils {
   private static final long ONE_MINUTE_IN_MILLIS = 60000;
   private static final String HS256_ALGORITHM = "HS256";
 
+  /**
+   * Private constructor to prevent instantiation of the utility class.
+   *
+   * @throws InstantiationException Always thrown to prevent instantiation.
+   */
   private Utils() throws InstantiationException {
     throw new InstantiationException();
   }
 
+  /**
+   * Retrieves the appropriate role for the user based on the provided parameters.
+   *
+   * @param role           The role to evaluate.
+   * @param userRoleList   The list of user roles.
+   * @param defaultWsRole  The default web service role.
+   * @param defaultRole    The default role.
+   * @return The selected role.
+   */
   private static Role getRole(Role role, List<UserRoles> userRoleList, Role defaultWsRole, Role defaultRole) {
     try {
       Method method = SecureWebServicesUtils.class.getDeclaredMethod("getRole", Role.class, List.class, Role.class,
@@ -45,6 +66,15 @@ public class Utils {
     }
   }
 
+  /**
+   * Retrieves the appropriate organization for the user based on the provided parameters.
+   *
+   * @param org           The organization to evaluate.
+   * @param selectedRole  The selected role.
+   * @param defaultRole   The default role.
+   * @param defaultOrg    The default organization.
+   * @return The selected organization.
+   */
   private static Organization getOrganization(Organization org, Role selectedRole, Role defaultRole,
       Organization defaultOrg) {
     try {
@@ -58,6 +88,14 @@ public class Utils {
     }
   }
 
+  /**
+   * Retrieves the appropriate warehouse for the user based on the provided parameters.
+   *
+   * @param warehouse         The warehouse to evaluate.
+   * @param selectedOrg       The selected organization.
+   * @param defaultWarehouse  The default warehouse.
+   * @return The selected warehouse.
+   */
   private static Warehouse getWarehouse(Warehouse warehouse, Organization selectedOrg, Warehouse defaultWarehouse) {
     try {
       Method method = SecureWebServicesUtils.class.getDeclaredMethod("getWarehouse", Warehouse.class,
@@ -70,6 +108,12 @@ public class Utils {
     }
   }
 
+  /**
+   * Cleans the private key from the provided configuration.
+   *
+   * @param config The secure web services configuration.
+   * @return The cleaned private key.
+   */
   private static String cleanPrivateKey(SWSConfig config) {
     try {
       Method method = SecureWebServicesUtils.class.getDeclaredMethod("cleanPrivateKey", SWSConfig.class);
@@ -81,6 +125,13 @@ public class Utils {
     }
   }
 
+  /**
+   * Retrieves the encoder algorithm based on the private key content and algorithm used.
+   *
+   * @param privateKeyContent The private key content.
+   * @param algorithmUsed     The algorithm to use.
+   * @return The encoder algorithm.
+   */
   private static Algorithm getEncoderAlgorithm(String privateKeyContent, String algorithmUsed) {
     try {
       Method method = SecureWebServicesUtils.class.getDeclaredMethod("getEncoderAlgorithm", String.class, String.class);
@@ -111,6 +162,14 @@ public class Utils {
     }
   }
 
+  /**
+   * Generates a JWT token for the authenticated user.
+   *
+   * @param authData  The authentication data of the user.
+   * @param sessionId The session ID.
+   * @return The generated JWT token.
+   * @throws Exception If an error occurs during token generation.
+   */
   public static String generateToken(AuthData authData, String sessionId) throws Exception {
     try {
       OBContext.setAdminMode(true);
@@ -119,10 +178,10 @@ public class Utils {
       SWSConfig config = SWSConfig.getInstance();
       String privateKey = config.getPrivateKey();
 
-      User user = authData.user;
-      Role role = authData.role;
-      Organization org = authData.org;
-      Warehouse warehouse = authData.warehouse;
+      User user = authData.getUser();
+      Role role = authData.getRole();
+      Organization org = authData.getOrg();
+      Warehouse warehouse = authData.getWarehouse();
 
       List<UserRoles> userRoleList = user.getADUserRolesList();
       Role defaultWsRole = user.getSmfswsDefaultWsRole();
@@ -157,12 +216,24 @@ public class Utils {
     }
   }
 
+  /**
+   * Retrieves the algorithm used for encryption from preferences.
+   *
+   * @return The encryption algorithm.
+   * @throws PropertyException If an error occurs while retrieving the preference.
+   */
   private static String getAlgorithmUsed() throws PropertyException {
     return Preferences.getPreferenceValue("SMFSWS_EncryptionAlgorithm", true,
         OBContext.getOBContext().getCurrentClient(), OBContext.getOBContext().getCurrentOrganization(),
         OBContext.getOBContext().getUser(), OBContext.getOBContext().getRole(), null);
   }
 
+  /**
+   * Calculates the expiration date for the JWT token based on the configuration.
+   *
+   * @param config The secure web services configuration.
+   * @return The expiration date.
+   */
   private static Date getExpirationDate(SWSConfig config) {
     Calendar date = Calendar.getInstance();
     long t = date.getTimeInMillis();
@@ -170,6 +241,16 @@ public class Utils {
     return new Date(t + (config.getExpirationTime() * ONE_MINUTE_IN_MILLIS));
   }
 
+  /**
+   * Builds a JWT token with the provided user, role, organization, warehouse, and session ID.
+   *
+   * @param user             The authenticated user.
+   * @param selectedRole     The selected role.
+   * @param selectedOrg      The selected organization.
+   * @param selectedWarehouse The selected warehouse.
+   * @param sessionId        The session ID.
+   * @return The JWT builder.
+   */
   private static JWTCreator.Builder getJwtBuilder(User user, Role selectedRole, Organization selectedOrg,
       Warehouse selectedWarehouse, String sessionId) {
     return JWT.create().withIssuer("sws").withAudience("sws").withClaim("user", user.getId()).withClaim("client",
