@@ -43,6 +43,7 @@ import com.etendoerp.etendorx.utils.DataSourceUtils;
 import com.etendoerp.metadata.data.ReferenceSelectors;
 import com.etendoerp.metadata.utils.Constants;
 import com.etendoerp.metadata.utils.Utils;
+import com.etendoerp.metadata.utils.LegacyUtils;
 
 /**
  * @author luuchorocha
@@ -483,8 +484,16 @@ public class FieldBuilder extends Builder {
     }
 
     private void addProcessInfo(Field field) throws JSONException {
-        if (isProcessField(field)) {
-            Process processAction = field.getColumn().getProcess();
+        String processId = field.getId();
+        Boolean isLegacyProcess = LegacyUtils.isLegacyProcess(processId);
+        if (isProcessField(field) || isLegacyProcess) {
+            Process processAction = null;
+            if (isLegacyProcess) {
+                // Create a new Process instance to simulate a real process
+                processAction = new Process();
+            } else {
+                processAction = field.getColumn().getProcess();
+            }
             org.openbravo.client.application.Process processDefinition = field.getColumn().getOBUIAPPProcess();
 
             if (processDefinition != null) {
@@ -492,7 +501,7 @@ public class FieldBuilder extends Builder {
             }
 
             if (processAction != null) {
-                json.put("processAction", ProcessActionBuilder.getFieldProcess(field));
+                json.put("processAction", ProcessActionBuilder.getFieldProcess(field, processAction));
             }
         }
     }
