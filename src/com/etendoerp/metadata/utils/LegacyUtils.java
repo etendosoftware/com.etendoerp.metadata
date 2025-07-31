@@ -13,7 +13,8 @@ public class LegacyUtils {
      * and therefore must be treated in a special way by the system.
      */
     private static final Set<String> LEGACY_PROCESS_IDS = Set.of(
-            "3663"
+            "3663",
+            "4242"
     );
 
     /**
