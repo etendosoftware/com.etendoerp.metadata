@@ -485,12 +485,12 @@ public class FieldBuilder extends Builder {
 
     private void addProcessInfo(Field field) throws JSONException {
         String processId = field.getId();
-        Boolean isLegacyProcess = LegacyUtils.isLegacyProcess(processId);
+        boolean isLegacyProcess = LegacyUtils.isLegacyProcess(processId);
         if (isProcessField(field) || isLegacyProcess) {
             Process processAction = null;
             if (isLegacyProcess) {
                 // Create a new Process instance to simulate a real process
-                processAction = new Process();
+                processAction = LegacyUtils.getLegacyProcess(processId);
             } else {
                 processAction = field.getColumn().getProcess();
             }
