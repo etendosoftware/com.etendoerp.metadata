@@ -10,7 +10,11 @@
 <!--51E67C9184F6439595409B46040FC572-->  <DESCRIPTION><![CDATA[A module that provides API endpoints for loading windows metadata and other information]]></DESCRIPTION>
 <!--51E67C9184F6439595409B46040FC572-->  <HELP><![CDATA[A module that provides API endpoints for loading windows metadata and other information]]></HELP>
 <!--51E67C9184F6439595409B46040FC572-->  <TYPE><![CDATA[M]]></TYPE>
+<!--51E67C9184F6439595409B46040FC572-->  <LICENSE><![CDATA[This module is licensed under the Etendo License Version 1.0.
+You can find a copy of the license at: https://github.com/etendosoftware/etendo_core/blob/main/legal/Etendo_license.txt or in the LICENSE file located in the root directory of this module’s source code.]]></LICENSE>
 <!--51E67C9184F6439595409B46040FC572-->  <JAVAPACKAGE><![CDATA[com.etendoerp.metadata]]></JAVAPACKAGE>
+<!--51E67C9184F6439595409B46040FC572-->  <LICENSETYPE><![CDATA[ETCL]]></LICENSETYPE>
+<!--51E67C9184F6439595409B46040FC572-->  <AUTHOR><![CDATA[Futit Services S.L.]]></AUTHOR>
 <!--51E67C9184F6439595409B46040FC572-->  <ISTRANSLATIONREQUIRED><![CDATA[N]]></ISTRANSLATIONREQUIRED>
 <!--51E67C9184F6439595409B46040FC572-->  <AD_LANGUAGE><![CDATA[en_US]]></AD_LANGUAGE>
 <!--51E67C9184F6439595409B46040FC572-->  <HASCHARTOFACCOUNTS><![CDATA[N]]></HASCHARTOFACCOUNTS>
