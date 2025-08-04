@@ -43,5 +43,5 @@ repositories {
 dependencies {
     implementation('com.etendoerp.platform:etendo-core:[25.1.0,25.3.0)')
     implementation('com.etendoerp:metadata.template:0.2.0')
-    implementation('com.etendoerp:etendorx:3.0.0')
+    implementation('com.etendoerp:etendorx:3.3.1')
 }
