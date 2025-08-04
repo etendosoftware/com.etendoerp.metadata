@@ -2,10 +2,18 @@ group = "com.etendoerp"
 version = "0.2.0"
 description = "A module that provides APIs for the new Etendo UI"
 ext.artifact = "metadata"
-ext.repository = "https://maven.pkg.github.com/etendosoftware/com.etendoerp.metadata"
+ext.repository = "https://maven.pkg.github.com/etendosoftware/com.etendoerp.platform.extensions"
 
 configurations {
     moduleDependencyContainer
+}
+
+sourceSets {
+    main {
+        resources {
+            srcDirs("etendo-resources")
+        }
+    }
 }
 
 publishing {
@@ -19,7 +27,7 @@ publishing {
     }
     repositories {
         maven {
-            url "https://maven.pkg.github.com/etendosoftware/com.etendoerp.metadata"
+            url "https://maven.pkg.github.com/etendosoftware/com.etendoerp.platform.extensions"
         }
     }
 }
@@ -27,7 +35,7 @@ publishing {
 repositories {
     mavenCentral()
     maven {
-        url "https://maven.pkg.github.com/etendosoftware/com.etendoerp.metadata"
+        url "https://maven.pkg.github.com/etendosoftware/com.etendoerp.platform.extensions"
     }
     maven {
         url "https://repo.futit.cloud/repository/maven-releases"
