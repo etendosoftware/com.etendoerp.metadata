@@ -1,3 +1,20 @@
+/*
+ *************************************************************************
+ * The contents of this file are subject to the Etendo License
+ * (the "License"), you may not use this file except in compliance with
+ * the License.
+ * You may obtain a copy of the License at
+ * https://github.com/etendosoftware/etendo_core/blob/main/legal/Etendo_license.txt
+ * Software distributed under the License is distributed on an
+ * "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
+ * implied. See the License for the specific language governing rights
+ * and limitations under the License.
+ * All portions are Copyright © 2021–2025 FUTIT SERVICES, S.L
+ * All Rights Reserved.
+ * Contributor(s): Futit Services S.L.
+ *************************************************************************
+ */
+
 package com.etendoerp.metadata.builders;
 
 import static com.etendoerp.metadata.builders.FieldBuilder.getListInfo;
@@ -23,18 +40,14 @@ public class ProcessActionBuilder extends Builder {
     }
 
     private static boolean isSelectorParameter(ProcessParameter parameter) {
-        return parameter != null && parameter.getReference() != null &&
-            SELECTOR_REFERENCES.contains(parameter.getReference().getId());
+        return parameter != null && parameter.getReference() != null && SELECTOR_REFERENCES.contains(parameter.getReference().getId());
     }
 
     private static boolean isListParameter(ProcessParameter parameter) {
-        return parameter != null && parameter.getReference() != null &&
-            LIST_REFERENCE_ID.contains(parameter.getReference().getId());
+        return parameter != null && parameter.getReference() != null && LIST_REFERENCE_ID.contains(parameter.getReference().getId());
     }
 
-    public static JSONObject getFieldProcess(Field field) throws JSONException {
-        Process process = field.getColumn().getProcess();
-
+    public static JSONObject getFieldProcess(Field field, Process process) throws JSONException {
         if (process == null) {
             return new JSONObject();
         }
