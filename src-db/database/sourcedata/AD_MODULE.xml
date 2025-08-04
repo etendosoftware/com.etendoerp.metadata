@@ -6,9 +6,26 @@
 <!--51E67C9184F6439595409B46040FC572-->  <AD_ORG_ID><![CDATA[0]]></AD_ORG_ID>
 <!--51E67C9184F6439595409B46040FC572-->  <ISACTIVE><![CDATA[Y]]></ISACTIVE>
 <!--51E67C9184F6439595409B46040FC572-->  <NAME><![CDATA[Main UI API]]></NAME>
-<!--51E67C9184F6439595409B46040FC572-->  <VERSION><![CDATA[1.0.1]]></VERSION>
-<!--51E67C9184F6439595409B46040FC572-->  <DESCRIPTION><![CDATA[A module that provides API endpoints for loading windows metadata and other information]]></DESCRIPTION>
-<!--51E67C9184F6439595409B46040FC572-->  <HELP><![CDATA[A module that provides API endpoints for loading windows metadata and other information]]></HELP>
+<!--51E67C9184F6439595409B46040FC572-->  <VERSION><![CDATA[0.2.0]]></VERSION>
+<!--51E67C9184F6439595409B46040FC572-->  <DESCRIPTION><![CDATA[Core metadata provider module for the new Etendo UI ecosystem. Delivers essential backend APIs that enable dynamic rendering of windows, tabs, fields, and components in the modern React-based interface. Handles entity definitions, field properties, layout]]></DESCRIPTION>
+<!--51E67C9184F6439595409B46040FC572-->  <HELP><![CDATA[This module serves as the foundational metadata backbone for Etendo's next-generation user interface architecture. It provides comprehensive REST APIs that expose window metadata, tab structures, field definitions, business process configurations, and authentication services required by the new React-based frontend.
+
+KEY FEATURES:
+- Dynamic Window Metadata: Delivers complete window definitions including tabs, fields, references, and layout information
+- Authentication Management: Implements token-based authentication system for secure API access
+- Real-time Data Synchronization: Ensures frontend components stay synchronized with backend metadata changes  
+- Field Configuration APIs: Exposes field properties, validation rules, display logic, and user interface rendering hints
+- Business Process Integration: Provides metadata for processes, parameters, and workflow definitions
+- Multi-language Support: Handles internationalization metadata for labels, help text, and field descriptions
+- Security Integration: Manages role-based access control and field-level security configurations
+
+DEPENDENCIES:
+Requires Etendo Core [25.1.0,25.3.0], metadata.template 0.2.0, etendorx 3.3.0, OpenAPI Implementation 1.1.0, and Secure Web Services 1.3.4.
+
+CONFIGURATION:
+Set authentication.class=com.etendoerp.metadata.auth.AuthenticationManager in Openbravo.properties for proper token authentication with the new UI frontend.
+
+This module is essential for the modern Etendo UI experience and should not be disabled if using the new React-based interface components.]]></HELP>
 <!--51E67C9184F6439595409B46040FC572-->  <TYPE><![CDATA[M]]></TYPE>
 <!--51E67C9184F6439595409B46040FC572-->  <LICENSE><![CDATA[This module is licensed under the Etendo License Version 1.0.
 You can find a copy of the license at: https://github.com/etendosoftware/etendo_core/blob/main/legal/Etendo_license.txt or in the LICENSE file located in the root directory of this module’s source code.]]></LICENSE>
