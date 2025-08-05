@@ -50,3 +50,7 @@ Thumbs.db
 
 /build/
 etendo.artifact.properties
+
+build/
+!build/classes/
+etendo.artifact.properties
