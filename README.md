@@ -41,3 +41,11 @@ authentication.class=com.etendoerp.metadata.auth.AuthenticationManager
 ```
 
 This is required for token-based authentication to work properly with the new frontend.
+
+---
+
+### 📜 Legacy Forwarding + JWT Session
+
+If you need to open legacy Openbravo HTML forms through `/meta/forward/...` while authenticating via JWT, see:
+
+- `docs/LegacyForwarding-JWT-Session.md`
