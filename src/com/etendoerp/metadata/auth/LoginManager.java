@@ -149,9 +149,13 @@ public class LoginManager {
     User user = authenticateUser(data);
     Role role = getEntity(data, ROLE, Role.class);
     if (role == null) {
-      List<UserRoles> userRoleList = user.getADUserRolesList();
-      if (userRoleList.size() > 0) {
-        role = userRoleList.get(0).getRole();
+      role = user.getDefaultRole();
+
+      if (role == null) {
+        List<UserRoles> userRoleList = user.getADUserRolesList();
+        if (userRoleList.size() > 0) {
+          role = userRoleList.get(0).getRole();
+        }
       }
     }
     Organization org = getEntity(data, ORGANIZATION, Organization.class);
