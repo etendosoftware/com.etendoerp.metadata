@@ -153,7 +153,7 @@ public class LoginManager {
 
       if (role == null) {
         List<UserRoles> userRoleList = user.getADUserRolesList();
-        if (userRoleList.size() > 0) {
+        if (!userRoleList.isEmpty())  {
           role = userRoleList.get(0).getRole();
         }
       }
