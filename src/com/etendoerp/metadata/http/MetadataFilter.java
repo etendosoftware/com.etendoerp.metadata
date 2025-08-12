@@ -44,6 +44,7 @@ import com.etendoerp.metadata.utils.Utils;
 @WebFilter(urlPatterns = { "/meta", "/meta/*" })
 public class MetadataFilter implements Filter {
     private static final Logger log4j = LogManager.getLogger(MetadataFilter.class);
+    public static final String HTML = ".html";
 
     @Override
     public void init(FilterConfig fConfig) {
@@ -66,44 +67,59 @@ public class MetadataFilter implements Filter {
                 effectiveRes = captureWrapper;
             }
             chain.doFilter(request, effectiveRes);
-            // Fallback diagnostic for empty successful HTML responses
             if (capture && captureWrapper != null) {
-                byte[] body = captureWrapper.getCapturedOutput();
-                int status = captureWrapper.getStatus();
-                String contentType = captureWrapper.getContentType();
-                if (body.length == 0 && (status == 0 || status == HttpServletResponse.SC_OK)) {
-                    String uri = httpReq != null ? httpReq.getRequestURI() : "";
-                    String html = buildHtmlError(UUID.randomUUID().toString(),
-                        HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
-                        httpReq != null ? httpReq.getMethod() : "",
-                        uri,
-                        "Empty response returned by downstream component");
-                    HttpServletResponse orig = httpRes;
-                    orig.reset();
-                    orig.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-                    orig.setCharacterEncoding(StandardCharsets.UTF_8.name());
-                    orig.setContentType("text/html; charset=UTF-8");
-                    orig.getWriter().write(html);
-                    orig.getWriter().flush();
-                } else {
-                    // Relay captured output as-is
-                    HttpServletResponse orig = httpRes;
-                    if (contentType != null) {
-                        orig.setContentType(contentType);
-                    }
-                    if (status != 0) {
-                        orig.setStatus(status);
-                    }
-                    if (body.length > 0) {
-                        orig.getOutputStream().write(body);
-                        orig.getOutputStream().flush();
-                    }
-                }
+                handleCapturedResponse(httpReq, httpRes, captureWrapper);
             }
         } catch (Throwable t) {
             handleException(request, response, t);
         } finally {
             MetadataService.clear();
+        }
+    }
+
+    /**
+     * Extracts the logic for handling the captured response to reduce the cognitive complexity of doFilter.
+     */
+    private void handleCapturedResponse(HttpServletRequest httpReq, HttpServletResponse httpRes, HttpServletResponseLegacyWrapper captureWrapper) throws IOException {
+        byte[] body = captureWrapper.getCapturedOutput();
+        int status = captureWrapper.getStatus();
+        String contentType = captureWrapper.getContentType();
+        if (isEmptySuccessfulHtml(body, status)) {
+            handleEmptyHtmlResponse(httpReq, httpRes);
+        } else {
+            relayCapturedOutput(httpRes, body, status, contentType);
+        }
+    }
+
+    private boolean isEmptySuccessfulHtml(byte[] body, int status) {
+        return body.length == 0 && (status == 0 || status == HttpServletResponse.SC_OK);
+    }
+
+    private void handleEmptyHtmlResponse(HttpServletRequest httpReq, HttpServletResponse httpRes) throws IOException {
+        String uri = httpReq != null ? httpReq.getRequestURI() : "";
+        String html = buildHtmlError(UUID.randomUUID().toString(),
+            HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+            httpReq != null ? httpReq.getMethod() : "",
+            uri,
+            "Empty response returned by downstream component");
+        httpRes.reset();
+        httpRes.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+        httpRes.setCharacterEncoding(StandardCharsets.UTF_8.name());
+        httpRes.setContentType("text/html; charset=UTF-8");
+        httpRes.getWriter().write(html);
+        httpRes.getWriter().flush();
+    }
+
+    private void relayCapturedOutput(HttpServletResponse httpRes, byte[] body, int status, String contentType) throws IOException {
+        if (contentType != null) {
+            httpRes.setContentType(contentType);
+        }
+        if (status != 0) {
+            httpRes.setStatus(status);
+        }
+        if (body.length > 0) {
+            httpRes.getOutputStream().write(body);
+            httpRes.getOutputStream().flush();
         }
     }
 
@@ -142,7 +158,7 @@ public class MetadataFilter implements Filter {
 
         // Decide response type: HTML for legacy pages (.html in URI or Accept contains text/html), JSON otherwise
         String isc = request != null ? request.getParameter("isc_dataFormat") : null;
-        boolean wantsHtml = (uri != null && uri.toLowerCase().endsWith(".html"))
+        boolean wantsHtml = (uri != null && uri.toLowerCase().endsWith(HTML))
             || (accept != null && accept.toLowerCase().contains("text/html"));
         if (isc != null && isc.equalsIgnoreCase("json")) {
             wantsHtml = false;
@@ -168,7 +184,7 @@ public class MetadataFilter implements Filter {
         if (req == null || res == null) return false;
         String uri = req.getRequestURI();
         String accept = req.getHeader("Accept");
-        return (uri != null && uri.toLowerCase().endsWith(".html"))
+        return (uri != null && uri.toLowerCase().endsWith(HTML))
             || (accept != null && accept.toLowerCase().contains("text/html"));
     }
 
@@ -194,7 +210,7 @@ public class MetadataFilter implements Filter {
 
     private String buildHtmlErrorDetailed(String cid, int status, String method, String uri, String exClass, String message, HttpServletRequest req) {
         String base = buildHtmlError(cid, status, method, uri, message + (exClass != null ? " (" + exClass + ")" : ""));
-        boolean isLegacyHtml = uri != null && uri.toLowerCase().endsWith(".html");
+        boolean isLegacyHtml = uri != null && uri.toLowerCase().endsWith(HTML);
         boolean isCNF = exClass != null && (exClass.endsWith("ClassNotFoundException") || (message != null && message.contains("org.openbravo.erpWindows")));
         if (isLegacyHtml && isCNF) {
             String hint = buildLegacyHint(uri);
@@ -227,7 +243,7 @@ public class MetadataFilter implements Filter {
             if (parts.length < 2) return null;
             String window = parts[0];
             String page = parts[1];
-            if (page.endsWith(".html")) page = page.substring(0, page.length() - 5);
+            if (page.endsWith(HTML)) page = page.substring(0, page.length() - 5);
             String base = page.contains("_") ? page.substring(0, page.indexOf('_')) : page;
             return "org.openbravo.erpWindows." + window + "." + base;
         } catch (Exception ignore) {
