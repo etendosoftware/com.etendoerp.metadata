@@ -20,6 +20,7 @@ package com.etendoerp.metadata.auth;
 import static com.etendoerp.metadata.auth.Utils.decodeToken;
 import static com.etendoerp.metadata.auth.Utils.generateToken;
 
+import java.util.List;
 import java.util.Optional;
 
 import javax.servlet.ServletException;
@@ -37,6 +38,7 @@ import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.access.Role;
 import org.openbravo.model.ad.access.User;
+import org.openbravo.model.ad.access.UserRoles;
 import org.openbravo.model.ad.system.Client;
 import org.openbravo.model.common.enterprise.Organization;
 import org.openbravo.model.common.enterprise.Warehouse;
@@ -146,6 +148,16 @@ public class LoginManager {
   private AuthData getAuthData(JSONObject data) {
     User user = authenticateUser(data);
     Role role = getEntity(data, ROLE, Role.class);
+    if (role == null) {
+      role = user.getDefaultRole();
+
+      if (role == null) {
+        List<UserRoles> userRoleList = user.getADUserRolesList();
+        if (!userRoleList.isEmpty())  {
+          role = userRoleList.get(0).getRole();
+        }
+      }
+    }
     Organization org = getEntity(data, ORGANIZATION, Organization.class);
     Warehouse warehouse = getEntity(data, WAREHOUSE, Warehouse.class);
     Client client = getEntity(data, CLIENT, Client.class);

@@ -108,6 +108,9 @@ public class ForwarderServlet extends BaseServlet {
 
       handleRequestContext(res, request);
 
+      // Preflight: for legacy HTML, check that the expected WAD servlet class exists
+      maybeValidateLegacyClass(request.getPathInfo());
+
       request.getRequestDispatcher(request.getPathInfo()).include(request, responseWrapper);
 
       String output = responseWrapper.getCapturedOutputAsString();
@@ -118,6 +121,43 @@ public class ForwarderServlet extends BaseServlet {
       response.setStatus(responseWrapper.getStatus());
       response.getWriter().write(output);
       response.getWriter().flush();
+  }
+
+    /**
+     * For legacy HTML pages, validate that the expected WAD servlet class exists; if not, throw a descriptive error.
+     */
+    private void maybeValidateLegacyClass(String pathInfo) {
+      if (pathInfo == null || !isLegacyRequest(pathInfo)) {
+        return;
+      }
+      try {
+        String expected = deriveLegacyClass(pathInfo);
+        if (expected != null) {
+          try {
+            Class.forName(expected);
+          } catch (ClassNotFoundException e) {
+            throw new OBException("Legacy WAD servlet not found: " + expected
+                + ". Please run './gradlew wad compile.complete' and redeploy.");
+          }
+        }
+      } catch (Exception ignore) {
+        // Do not block request if we cannot derive class name
+      }
+    }
+
+    private String deriveLegacyClass(String pathInfo) {
+      String tail = pathInfo;
+      if (tail.startsWith("/")) {
+        tail = tail.substring(1);
+      }
+      // Expect pattern: SalesInvoice/Header_Edition.html
+      String[] parts = tail.split("/");
+      if (parts.length < 2) return null;
+      String window = parts[0];
+      String page = parts[1];
+      if (page.endsWith(".html")) page = page.substring(0, page.length() - 5);
+      String base = page.contains("_") ? page.substring(0, page.indexOf('_')) : page;
+      return "org.openbravo.erpWindows." + window + "." + base;
     }
 
     /**
