@@ -65,11 +65,11 @@ import com.etendoerp.metadata.utils.LegacyUtils;
 /**
  * @author luuchorocha
  */
-public class FieldBuilder extends Builder {
-    private final Field field;
-    private final FieldAccess fieldAccess;
-    private final JSONObject json;
-    private final Language language;
+public abstract class FieldBuilder extends Builder {
+    protected final Field field;
+    protected final FieldAccess fieldAccess;
+    protected final JSONObject json;
+    protected final Language language;
 
     public FieldBuilder(Field field, FieldAccess fieldAccess) {
         this.field = field;
@@ -369,11 +369,11 @@ public class FieldBuilder extends Builder {
         return result.replace(DalUtil.DOT, DalUtil.FIELDSEPARATOR);
     }
 
-    private static String getInputName(Column column) {
+    protected static String getInputName(Column column) {
         return DataSourceUtils.getInpName(column);
     }
 
-    private static String getHqlName(Field field) {
+    protected static String getHqlName(Field field) {
         try {
             Column fieldColumn = field.getColumn();
             String dbTableName = fieldColumn.getTable().getDBTableName();
@@ -405,11 +405,11 @@ public class FieldBuilder extends Builder {
         return json;
     }
 
-    private void addAccessProperties(FieldAccess access) throws JSONException {
+    protected void addAccessProperties(FieldAccess access) throws JSONException {
         boolean checkOnSave = access != null ? access.isCheckonsave() : Constants.DEFAULT_CHECKON_SAVE;
         boolean editableField = access != null ? access.isEditableField() : Constants.DEFAULT_EDITABLE_FIELD;
         boolean fieldIsReadOnly = field.isReadOnly();
-        boolean isColUpdatable = field.getColumn() != null ? field.getColumn().isUpdatable() : true;
+        boolean isColUpdatable = true; // Default to true, as we don't have a column to check against
         boolean readOnly = fieldIsReadOnly || (access != null && !access.isEditableField());
 
         json.put("checkOnSave", checkOnSave);
@@ -418,109 +418,36 @@ public class FieldBuilder extends Builder {
         json.put("isUpdatable", isColUpdatable);
     }
 
-    private void addBasicProperties(Field field) throws JSONException {
-        Column column = field.getColumn();
-        boolean mandatory = column.isMandatory();
+    protected void addBasicProperties(Field field) throws JSONException {
         boolean isParentRecordProperty = isParentRecordProperty(field, field.getTab());
-        JSONObject columnJson = converter.toJsonObject(field.getColumn(), DataResolvingMode.FULL_TRANSLATABLE);
-        String inputName = getInputName(column);
         String hqlName = getHqlName(field);
-        String columnName = column.getDBColumnName();
 
         json.put("hqlName", hqlName);
-        json.put("columnName", columnName);
-        json.put("column", columnJson);
-        json.put("isMandatory", mandatory);
-        json.put("inputName", inputName);
         json.put("isParentRecordProperty", isParentRecordProperty);
     }
 
-    private void addReferencedProperty(Field field) throws JSONException {
-        Property referenced = KernelUtils.getProperty(field).getReferencedProperty();
-
-        if (referenced != null) {
-            String tableId = referenced.getEntity().getTableId();
-            Table table = OBDal.getInstance().get(Table.class, tableId);
-            Tab referencedTab = (Tab) OBDal.getInstance().createCriteria(Tab.class).add(
-                Restrictions.eq(Tab.PROPERTY_TABLE, table)).setMaxResults(1).uniqueResult();
-            Window referencedWindow = referencedTab != null ? referencedTab.getWindow() : null;
-            String tabId = referencedTab != null ? referencedTab.getId() : null;
-            String windowId = referencedWindow != null ? referencedWindow.getId() : null;
-
-            json.put("referencedEntity", referenced.getEntity().getName());
-            json.put("referencedWindowId", windowId);
-            json.put("referencedTabId", tabId);
-        }
+    protected void addReferencedProperty(Field field) throws JSONException {
+        return;
     }
 
-    private boolean isParentRecordProperty(Field field, Tab tab) {
-        Entity parentEntity = null;
-
-        if (field.getColumn().isLinkToParentColumn()) {
-            Tab parentTab = KernelUtils.getInstance().getParentTab(tab);
-            // If the parent table is not based in a db table, don't try to retrieve the record
-            // Because tables not based on db tables do not have BaseOBObjects
-            // See issue https://issues.openbravo.com/view.php?id=29667
-            if (parentTab != null && ApplicationConstants.TABLEBASEDTABLE.equals(
-                parentTab.getTable().getDataOriginType())) {
-                parentEntity = ModelProvider.getInstance().getEntityByTableName(parentTab.getTable().getDBTableName());
-            }
-
-            Property property = KernelUtils.getProperty(field);
-            Entity referencedEntity = property.getReferencedProperty().getEntity();
-            return referencedEntity.equals(parentEntity);
-        } else {
-            return false;
-        }
+    protected boolean isParentRecordProperty(Field field, Tab tab) {
+        return false; // Default to false, as we don't have a column to check against
     }
 
-    private void addReferencedTableInfo(Field field) throws JSONException {
-        Property referenced = KernelUtils.getProperty(field).getReferencedProperty();
-
-        if (referenced != null) {
-            Tab referencedTab = getReferencedTab(referenced);
-
-            if (referencedTab != null) {
-                json.put("referencedEntity", referenced.getEntity().getName());
-                json.put("referencedWindowId", referencedTab.getWindow().getId());
-                json.put("referencedTabId", referencedTab.getId());
-            }
-        }
+    protected void addReferencedTableInfo(Field field) throws JSONException {
+        return;
     }
 
-    private void addComboSelectInfo(Field field) throws JSONException {
-        if (isSelectorField(field)) {
-            json.put("selector", getSelectorInfo(field.getId(), field.getColumn().getReferenceSearchKey()));
-        }
+    protected void addComboSelectInfo(Field field) throws JSONException {
+        return;
     }
 
-    private void addSelectorReferenceList(Field field) throws JSONException {
-        if (isRefListField(field)) {
-            json.put("refList", getListInfo(field.getColumn().getReferenceSearchKey(), language));
-        }
+    protected void addSelectorReferenceList(Field field) throws JSONException {
+        return;
     }
 
-    private void addProcessInfo(Field field) throws JSONException {
-        String processId = field.getId();
-        boolean isLegacyProcess = LegacyUtils.isLegacyProcess(processId);
-        if (isProcessField(field) || isLegacyProcess) {
-            Process processAction = null;
-            if (isLegacyProcess) {
-                // Create a new Process instance to simulate a real process
-                processAction = LegacyUtils.getLegacyProcess(processId);
-            } else {
-                processAction = field.getColumn().getProcess();
-            }
-            org.openbravo.client.application.Process processDefinition = field.getColumn().getOBUIAPPProcess();
-
-            if (processDefinition != null) {
-                json.put("processDefinition", Utils.getFieldProcess(field));
-            }
-
-            if (processAction != null) {
-                json.put("processAction", ProcessActionBuilder.getFieldProcess(field, processAction));
-            }
-        }
+    protected void addProcessInfo(Field field) throws JSONException {
+        return;
     }
 
     private void addDisplayLogic(Field field) throws JSONException {
@@ -532,24 +459,15 @@ public class FieldBuilder extends Builder {
         }
     }
 
-    private void addReadOnlyLogic(Field field) throws JSONException {
-        String readOnlyLogic = field.getColumn().getReadOnlyLogic();
-
-        if (readOnlyLogic != null && !readOnlyLogic.isBlank()) {
-            DynamicExpressionParser parser = new DynamicExpressionParser(readOnlyLogic, field.getTab(), field);
-            json.put("readOnlyLogicExpression", parser.getJSExpression());
-        }
+    protected void addReadOnlyLogic(Field field) throws JSONException {
+        return;
     }
 
-    private boolean isRefListField(Field field) {
-        Column column = field.getColumn();
-
-        return column != null && Constants.LIST_REFERENCE_ID.equals(column.getReference().getId());
+    protected boolean isRefListField(Field field) {
+        return false; // Default to false, as we don't have a column to check against
     }
 
-    private boolean isSelectorField(Field field) {
-        Column column = field.getColumn();
-
-        return column != null && Constants.SELECTOR_REFERENCES.contains(column.getReference().getId());
+    protected boolean isSelectorField(Field field) {
+        return false; // Default to false, as we don't have a column to check against
     }
 }
