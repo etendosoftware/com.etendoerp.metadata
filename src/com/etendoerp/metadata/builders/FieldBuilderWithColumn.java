@@ -43,7 +43,7 @@ import static com.etendoerp.metadata.utils.Utils.getReferencedTab;
 
 /**
  * Concrete implementation of FieldBuilder for fields with columns
- * @author luuchorocha
+ * @author Futit Services S.L.
  */
 public class FieldBuilderWithColumn extends FieldBuilder {
 

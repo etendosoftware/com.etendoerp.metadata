@@ -63,7 +63,7 @@ import com.etendoerp.metadata.utils.Utils;
 import com.etendoerp.metadata.utils.LegacyUtils;
 
 /**
- * @author luuchorocha
+ * @author Futit Services S.L.
  */
 public abstract class FieldBuilder extends Builder {
     protected final Field field;

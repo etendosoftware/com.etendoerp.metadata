@@ -24,7 +24,7 @@ import org.openbravo.model.ad.ui.Tab;
 
 /**
  * Concrete implementation of FieldBuilder for fields without columns
- * @author luuchorocha
+ * @author Futit Services S.L.
  */
 public class FieldBuilderWithoutColumn extends FieldBuilder {
 
