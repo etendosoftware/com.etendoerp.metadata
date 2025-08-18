@@ -45,6 +45,7 @@ import org.openbravo.model.ad.ui.Tab;
 import com.etendoerp.metadata.builders.FieldBuilderWithColumn;
 import com.etendoerp.redis.interfaces.CachedConcurrentMap;
 import java.util.function.BiFunction;
+import java.util.function.BiConsumer;
 
 public class TabProcessor {
   private static final Logger logger = LogManager.getLogger(TabProcessor.class);
@@ -65,6 +66,9 @@ public class TabProcessor {
 
   public static <T> JSONObject getFields(String id, String updated, List<T> data, Predicate<T> accessPredicate,
                                          Function<T, Column> columnExtractor, Function<T,String> customJsExtractor,
+                                          Function<T, String> clientClassExtractor,
+                                         Function<T, String> nameExtractor,
+                                         BiConsumer<T, String> nameSetter,
                                          BiFunction<T, Boolean, JSONObject> fieldMapper,
                                          ConcurrentMap<String, JSONObject> cache) {
     String cacheKey = getCacheKey(id, updated);
@@ -87,10 +91,16 @@ public class TabProcessor {
             }
           } else {
             String customJs = customJsExtractor.apply(fieldLike);
-            if (customJs != null) {
-              result.put("test", fieldMapper.apply(fieldLike, false));
+            String clientClass = clientClassExtractor.apply(fieldLike);
+            String fieldName = nameExtractor.apply(fieldLike);
+            if (customJs != null && clientClass != null && fieldName != null && nameSetter != null) {
+              String fieldKey = fieldName + "_" + clientClass;
+              String newFieldName = fieldName + " " + "Canva";
+              nameSetter.accept(fieldLike, newFieldName);
+              result.put(fieldKey, fieldMapper.apply(fieldLike, false));
+            } else {
+              logger.warn("Field has null column and null custom javascript - skipping field: {}", fieldLike);
             }
-            logger.warn("Field has null column - skipping field: {}", fieldLike);
           }
         }
       } catch (JSONException e) {
@@ -104,13 +114,17 @@ public class TabProcessor {
 
   public static JSONObject getTabFields(Tab tab) {
     return getFields(tab.getId(), tab.getUpdated().toString(), tab.getADFieldList(), TabProcessor::isFieldAccessible,
-        Field::getColumn, Field::getEtmetaCustomjs ,TabProcessor::getJSONField, fieldCache);
+        Field::getColumn, Field::getEtmetaCustomjs, Field::getClientclass, Field::getName,
+            Field::setName, TabProcessor::getJSONField, fieldCache);
   }
 
   public static JSONObject getTabFields(TabAccess tabAccess) {
     return getFields(tabAccess.getId(), tabAccess.getUpdated().toString(), tabAccess.getADFieldAccessList(),
         TabProcessor::isFieldAccessAccessible, fieldAccess -> fieldAccess.getField().getColumn(),
         fieldAccess -> fieldAccess.getField().getEtmetaCustomjs(),
+        fieldAccess -> fieldAccess.getField().getClientclass(),
+        fieldAccess -> fieldAccess.getField().getName(),
+        (fieldAccess, name) -> fieldAccess.getField().setName(name),
         TabProcessor::getJSONField, fieldAccessCache);
   }
 
