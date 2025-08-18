@@ -95,6 +95,8 @@ public class TabProcessor {
             String fieldName = nameExtractor.apply(fieldLike);
             if (customJs != null && clientClass != null && fieldName != null && nameSetter != null) {
               String fieldKey = fieldName + "_" + clientClass;
+              // Set a new name for the field, appending "Canva" to it
+              // In the future, Canva may become another word if we need it to.
               String newFieldName = fieldName + " " + "Canva";
               nameSetter.accept(fieldLike, newFieldName);
               result.put(fieldKey, fieldMapper.apply(fieldLike, false));
