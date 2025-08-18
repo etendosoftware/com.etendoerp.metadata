@@ -35,6 +35,7 @@ import org.openbravo.service.json.JsonUtils;
 import com.etendoerp.metadata.auth.LoginManager;
 import com.etendoerp.metadata.exceptions.InternalServerException;
 import com.etendoerp.metadata.utils.Constants;
+import com.etendoerp.metadata.utils.Utils;
 import com.smf.securewebservices.SWSConfig;
 
 /**
@@ -51,6 +52,24 @@ public class LoginServlet extends HttpBaseServlet {
   @Override
   public final void doOptions(HttpServletRequest req, HttpServletResponse res) {
     AllowedCrossDomainsHandler.getInstance().setCORSHeaders(req, res);
+  }
+
+  @Override
+  public void doGet(HttpServletRequest req, HttpServletResponse res) throws IOException {
+    AllowedCrossDomainsHandler.getInstance().setCORSHeaders(req, res);
+    String iscFormat = req.getParameter("isc_dataFormat");
+    boolean wantsJson = "json".equalsIgnoreCase(iscFormat);
+
+    if (wantsJson) {
+      Utils.writeJsonErrorResponse(res, HttpServletResponse.SC_METHOD_NOT_ALLOWED,
+          "Use POST with JSON body to login at /meta/login");
+    } else {
+      res.setStatus(HttpServletResponse.SC_METHOD_NOT_ALLOWED);
+      res.setContentType("text/plain");
+      res.setCharacterEncoding(StandardCharsets.UTF_8.name());
+      res.getWriter().write("Method GET not allowed on /meta/login. Use POST.");
+      res.getWriter().flush();
+    }
   }
 
   @Override
