@@ -42,15 +42,32 @@ import org.openbravo.service.json.DataResolvingMode;
 import static com.etendoerp.metadata.utils.Utils.getReferencedTab;
 
 /**
- * Concrete implementation of FieldBuilder for fields with columns
+ * Concrete implementation of FieldBuilder for fields with database columns.
+ * Extends the base functionality to handle column-specific properties such as
+ * column metadata, referenced entities, process definitions, selectors, and read-only logic.
+ *
  * @author Futit Services S.L.
  */
 public class FieldBuilderWithColumn extends FieldBuilder {
 
+    /**
+     * Constructs a FieldBuilderWithColumn for fields that have associated database columns.
+     *
+     * @param field The UI field entity with an associated database column
+     * @param fieldAccess The field access permissions (can be null for default permissions)
+     */
     public FieldBuilderWithColumn(Field field, FieldAccess fieldAccess) {
         super(field, fieldAccess);
     }
 
+    /**
+     * Builds the complete JSON representation of a field with column-specific properties.
+     * Calls the parent method to add basic properties, then adds column-specific metadata
+     * including column information, referenced entities, processes, selectors, and logic expressions.
+     *
+     * @return JSONObject containing complete field metadata with column-specific properties
+     * @throws JSONException if there's an error building the JSON structure
+     */
     @Override
     public JSONObject toJSON() throws JSONException {
         // Call parent method to add basic properties
@@ -68,11 +85,25 @@ public class FieldBuilderWithColumn extends FieldBuilder {
         return json;
     }
 
+    /**
+     * Determines if the database column associated with this field is updatable.
+     * Overrides the base implementation to check the actual column's updatable property.
+     *
+     * @return true if the column exists and is updatable, true as fallback if column is null
+     */
     @Override
     protected boolean getColumnUpdatable() {
         return field.getColumn() != null ? field.getColumn().isUpdatable() : true;
     }
 
+    /**
+     * Adds column-specific properties to the field JSON.
+     * Includes column metadata, mandatory status, input name, column name,
+     * and parent record relationship information.
+     *
+     * @param field The field with associated column to extract properties from
+     * @throws JSONException if there's an error updating the JSON structure
+     */
     private void addColumnSpecificProperties(Field field) throws JSONException {
         Column column = field.getColumn();
         boolean mandatory = column.isMandatory();
@@ -88,6 +119,14 @@ public class FieldBuilderWithColumn extends FieldBuilder {
         json.put("isParentRecordProperty", isParentRecordProperty);
     }
 
+    /**
+     * Adds referenced entity information to the field JSON for foreign key fields.
+     * Determines the referenced entity, window, and tab for navigation purposes.
+     * Only processes fields that have a referenced property (foreign key relationship).
+     *
+     * @param field The field that may reference another entity
+     * @throws JSONException if there's an error updating the JSON structure
+     */
     private void addReferencedProperty(Field field) throws JSONException {
         Property referenced = KernelUtils.getProperty(field).getReferencedProperty();
 
@@ -106,6 +145,15 @@ public class FieldBuilderWithColumn extends FieldBuilder {
         }
     }
 
+    /**
+     * Determines if a field represents a parent record property.
+     * Checks if the field's column is a link to parent column and if the referenced
+     * entity matches the parent tab's entity.
+     *
+     * @param field The field to check for parent record relationship
+     * @param tab The current tab context
+     * @return true if the field represents a parent record property, false otherwise
+     */
     private boolean isParentRecordProperty(Field field, Tab tab) {
         Entity parentEntity = null;
 
@@ -127,6 +175,14 @@ public class FieldBuilderWithColumn extends FieldBuilder {
         }
     }
 
+    /**
+     * Adds referenced table information using utility methods.
+     * Alternative approach to addReferencedProperty that uses Utils.getReferencedTab.
+     * Provides referenced entity, window, and tab information for foreign key fields.
+     *
+     * @param field The field that may reference another table
+     * @throws JSONException if there's an error updating the JSON structure
+     */
     private void addReferencedTableInfo(Field field) throws JSONException {
         Property referenced = KernelUtils.getProperty(field).getReferencedProperty();
 
@@ -141,18 +197,41 @@ public class FieldBuilderWithColumn extends FieldBuilder {
         }
     }
 
+    /**
+     * Adds selector information for fields that use selector-based references.
+     * Configures custom selectors, tree selectors, or combo table selectors
+     * based on the field's reference configuration.
+     *
+     * @param field The field that may have selector functionality
+     * @throws JSONException if there's an error updating the JSON structure
+     */
     private void addComboSelectInfo(Field field) throws JSONException {
         if (isSelectorField(field)) {
             json.put("selector", getSelectorInfo(field.getId(), field.getColumn().getReferenceSearchKey()));
         }
     }
 
+    /**
+     * Adds reference list information for fields that use list-based references.
+     * Provides dropdown options for fields with predefined value lists.
+     *
+     * @param field The field that may have reference list functionality
+     * @throws JSONException if there's an error updating the JSON structure
+     */
     private void addSelectorReferenceList(Field field) throws JSONException {
         if (isRefListField(field)) {
             json.put("refList", getListInfo(field.getColumn().getReferenceSearchKey(), language));
         }
     }
 
+    /**
+     * Adds process information for fields that trigger processes or actions.
+     * Handles both legacy processes and new process definitions.
+     * Includes process action buttons and process definition metadata.
+     *
+     * @param field The field that may have associated process functionality
+     * @throws JSONException if there's an error updating the JSON structure
+     */
     private void addProcessInfo(Field field) throws JSONException {
         String processId = field.getId();
         boolean isLegacyProcess = LegacyUtils.isLegacyProcess(processId);
@@ -176,6 +255,14 @@ public class FieldBuilderWithColumn extends FieldBuilder {
         }
     }
 
+    /**
+     * Adds read-only logic expression to the field JSON if configured on the column.
+     * Read-only logic controls field editability based on dynamic conditions.
+     * Converts Etendo read-only logic syntax to JavaScript expressions.
+     *
+     * @param field The field whose column may have read-only logic configured
+     * @throws JSONException if there's an error updating the JSON structure
+     */
     private void addReadOnlyLogic(Field field) throws JSONException {
         String readOnlyLogic = field.getColumn().getReadOnlyLogic();
 
@@ -185,12 +272,26 @@ public class FieldBuilderWithColumn extends FieldBuilder {
         }
     }
 
+    /**
+     * Determines if a field uses reference list functionality.
+     * Checks if the field's column reference is of list type.
+     *
+     * @param field The field to check for reference list functionality
+     * @return true if the field uses a list reference, false otherwise
+     */
     private boolean isRefListField(Field field) {
         Column column = field.getColumn();
 
         return column != null && Constants.LIST_REFERENCE_ID.equals(column.getReference().getId());
     }
 
+    /**
+     * Determines if a field uses selector functionality.
+     * Checks if the field's column reference is one of the supported selector types.
+     *
+     * @param field The field to check for selector functionality
+     * @return true if the field uses a selector reference, false otherwise
+     */
     private boolean isSelectorField(Field field) {
         Column column = field.getColumn();
 

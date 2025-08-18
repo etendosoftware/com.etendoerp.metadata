@@ -21,11 +21,25 @@ import org.openbravo.model.ad.access.FieldAccess;
 import org.openbravo.model.ad.ui.Field;
 
 /**
- * Concrete implementation of FieldBuilder for fields without columns
+ * Concrete implementation of FieldBuilder for fields without associated database columns.
+ * This is a minimal implementation that relies entirely on the base class functionality
+ * for fields that don't have column-specific properties or behaviors.
+ *
+ * Examples of fields without columns include:
+ * - Canva Fields
+ *
  * @author Futit Services S.L.
  */
 public class FieldBuilderWithoutColumn extends FieldBuilder {
 
+    /**
+     * Constructs a FieldBuilderWithoutColumn for fields that don't have associated database columns.
+     * These fields typically serve display, calculation, or UI organization purposes and don't
+     * require column-specific metadata like mandatory status, input names, or database constraints.
+     *
+     * @param field The UI field entity without an associated database column
+     * @param fieldAccess The field access permissions (can be null for default permissions)
+     */
     public FieldBuilderWithoutColumn(Field field, FieldAccess fieldAccess) {
         super(field, fieldAccess);
     }
