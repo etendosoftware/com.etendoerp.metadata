@@ -17,15 +17,12 @@
 
 package com.etendoerp.metadata.builders;
 
-import static com.etendoerp.metadata.utils.Utils.getReferencedTab;
-
 import java.util.List;
 import java.util.stream.Collectors;
 
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
-import org.hibernate.criterion.Restrictions;
 import org.openbravo.base.model.Entity;
 import org.openbravo.base.model.ModelProvider;
 import org.openbravo.base.model.Property;
@@ -33,22 +30,16 @@ import org.openbravo.base.model.domaintype.DomainType;
 import org.openbravo.base.model.domaintype.ForeignKeyDomainType;
 import org.openbravo.base.model.domaintype.PrimitiveDomainType;
 import org.openbravo.base.util.Check;
-import org.openbravo.client.application.ApplicationConstants;
 import org.openbravo.client.application.DynamicExpressionParser;
-import org.openbravo.client.kernel.KernelUtils;
 import org.openbravo.dal.core.DalUtil;
 import org.openbravo.dal.core.OBContext;
-import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.access.FieldAccess;
 import org.openbravo.model.ad.datamodel.Column;
-import org.openbravo.model.ad.datamodel.Table;
 import org.openbravo.model.ad.domain.Reference;
 import org.openbravo.model.ad.domain.ReferencedTree;
 import org.openbravo.model.ad.system.Language;
 import org.openbravo.model.ad.ui.Field;
 import org.openbravo.model.ad.ui.Process;
-import org.openbravo.model.ad.ui.Tab;
-import org.openbravo.model.ad.ui.Window;
 import org.openbravo.service.datasource.DataSource;
 import org.openbravo.service.datasource.DatasourceField;
 import org.openbravo.service.json.DataResolvingMode;
@@ -59,8 +50,6 @@ import org.openbravo.userinterface.selector.SelectorField;
 import com.etendoerp.etendorx.utils.DataSourceUtils;
 import com.etendoerp.metadata.data.ReferenceSelectors;
 import com.etendoerp.metadata.utils.Constants;
-import com.etendoerp.metadata.utils.Utils;
-import com.etendoerp.metadata.utils.LegacyUtils;
 
 /**
  * @author Futit Services S.L.
@@ -390,26 +379,29 @@ public abstract class FieldBuilder extends Builder {
         return field.getName();
     }
 
+    /**
+     * Determines if the column is updatable.
+     * Override in subclasses to provide specific column updatable logic.
+     * @return true if the column is updatable, false otherwise
+     */
+    protected boolean getColumnUpdatable() {
+        return true; // Default implementation for fields without columns
+    }
+
     @Override
     public JSONObject toJSON() throws JSONException {
         addAccessProperties(fieldAccess);
-        addBasicProperties(field);
-        addReferencedProperty(field);
-        addReferencedTableInfo(field);
+        addHqlName(field);
         addDisplayLogic(field);
-        addReadOnlyLogic(field);
-        addProcessInfo(field);
-        addSelectorReferenceList(field);
-        addComboSelectInfo(field);
 
         return json;
     }
 
-    protected void addAccessProperties(FieldAccess access) throws JSONException {
+    private void addAccessProperties(FieldAccess access) throws JSONException {
         boolean checkOnSave = access != null ? access.isCheckonsave() : Constants.DEFAULT_CHECKON_SAVE;
         boolean editableField = access != null ? access.isEditableField() : Constants.DEFAULT_EDITABLE_FIELD;
         boolean fieldIsReadOnly = field.isReadOnly();
-        boolean isColUpdatable = true; // Default to true, as we don't have a column to check against
+        boolean isColUpdatable = getColumnUpdatable();
         boolean readOnly = fieldIsReadOnly || (access != null && !access.isEditableField());
 
         json.put("checkOnSave", checkOnSave);
@@ -418,36 +410,9 @@ public abstract class FieldBuilder extends Builder {
         json.put("isUpdatable", isColUpdatable);
     }
 
-    protected void addBasicProperties(Field field) throws JSONException {
-        boolean isParentRecordProperty = isParentRecordProperty(field, field.getTab());
+    private void addHqlName(Field field) throws JSONException {
         String hqlName = getHqlName(field);
-
         json.put("hqlName", hqlName);
-        json.put("isParentRecordProperty", isParentRecordProperty);
-    }
-
-    protected void addReferencedProperty(Field field) throws JSONException {
-        return;
-    }
-
-    protected boolean isParentRecordProperty(Field field, Tab tab) {
-        return false; // Default to false, as we don't have a column to check against
-    }
-
-    protected void addReferencedTableInfo(Field field) throws JSONException {
-        return;
-    }
-
-    protected void addComboSelectInfo(Field field) throws JSONException {
-        return;
-    }
-
-    protected void addSelectorReferenceList(Field field) throws JSONException {
-        return;
-    }
-
-    protected void addProcessInfo(Field field) throws JSONException {
-        return;
     }
 
     private void addDisplayLogic(Field field) throws JSONException {
@@ -457,17 +422,5 @@ public abstract class FieldBuilder extends Builder {
             DynamicExpressionParser parser = new DynamicExpressionParser(displayLogic, field.getTab(), field);
             json.put("displayLogicExpression", parser.getJSExpression());
         }
-    }
-
-    protected void addReadOnlyLogic(Field field) throws JSONException {
-        return;
-    }
-
-    protected boolean isRefListField(Field field) {
-        return false; // Default to false, as we don't have a column to check against
-    }
-
-    protected boolean isSelectorField(Field field) {
-        return false; // Default to false, as we don't have a column to check against
     }
 }

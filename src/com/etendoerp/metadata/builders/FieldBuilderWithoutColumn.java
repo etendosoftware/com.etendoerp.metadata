@@ -17,10 +17,8 @@
 
 package com.etendoerp.metadata.builders;
 
-import org.codehaus.jettison.json.JSONException;
 import org.openbravo.model.ad.access.FieldAccess;
 import org.openbravo.model.ad.ui.Field;
-import org.openbravo.model.ad.ui.Tab;
 
 /**
  * Concrete implementation of FieldBuilder for fields without columns

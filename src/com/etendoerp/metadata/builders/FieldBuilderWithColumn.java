@@ -52,30 +52,35 @@ public class FieldBuilderWithColumn extends FieldBuilder {
     }
 
     @Override
-    protected void addAccessProperties(FieldAccess access) throws JSONException {
-        boolean checkOnSave = access != null ? access.isCheckonsave() : Constants.DEFAULT_CHECKON_SAVE;
-        boolean editableField = access != null ? access.isEditableField() : Constants.DEFAULT_EDITABLE_FIELD;
-        boolean fieldIsReadOnly = field.isReadOnly();
-        boolean isColUpdatable = field.getColumn() != null ? field.getColumn().isUpdatable() : true;
-        boolean readOnly = fieldIsReadOnly || (access != null && !access.isEditableField());
+    public JSONObject toJSON() throws JSONException {
+        // Call parent method to add basic properties
+        super.toJSON();
 
-        json.put("checkOnSave", checkOnSave);
-        json.put("isEditable", editableField);
-        json.put("isReadOnly", readOnly);
-        json.put("isUpdatable", isColUpdatable);
+        // Add column-specific properties
+        addColumnSpecificProperties(field);
+        addReferencedProperty(field);
+        addReferencedTableInfo(field);
+        addReadOnlyLogic(field);
+        addProcessInfo(field);
+        addSelectorReferenceList(field);
+        addComboSelectInfo(field);
+
+        return json;
     }
 
     @Override
-    protected void addBasicProperties(Field field) throws JSONException {
+    protected boolean getColumnUpdatable() {
+        return field.getColumn() != null ? field.getColumn().isUpdatable() : true;
+    }
+
+    private void addColumnSpecificProperties(Field field) throws JSONException {
         Column column = field.getColumn();
         boolean mandatory = column.isMandatory();
         boolean isParentRecordProperty = isParentRecordProperty(field, field.getTab());
         JSONObject columnJson = converter.toJsonObject(field.getColumn(), DataResolvingMode.FULL_TRANSLATABLE);
         String inputName = getInputName(column);
-        String hqlName = getHqlName(field);
         String columnName = column.getDBColumnName();
 
-        json.put("hqlName", hqlName);
         json.put("columnName", columnName);
         json.put("column", columnJson);
         json.put("isMandatory", mandatory);
@@ -83,8 +88,7 @@ public class FieldBuilderWithColumn extends FieldBuilder {
         json.put("isParentRecordProperty", isParentRecordProperty);
     }
 
-    @Override
-    protected void addReferencedProperty(Field field) throws JSONException {
+    private void addReferencedProperty(Field field) throws JSONException {
         Property referenced = KernelUtils.getProperty(field).getReferencedProperty();
 
         if (referenced != null) {
@@ -102,9 +106,7 @@ public class FieldBuilderWithColumn extends FieldBuilder {
         }
     }
 
-
-    @Override
-    protected boolean isParentRecordProperty(Field field, Tab tab) {
+    private boolean isParentRecordProperty(Field field, Tab tab) {
         Entity parentEntity = null;
 
         if (field.getColumn().isLinkToParentColumn()) {
@@ -125,8 +127,7 @@ public class FieldBuilderWithColumn extends FieldBuilder {
         }
     }
 
-    @Override
-    protected void addReferencedTableInfo(Field field) throws JSONException {
+    private void addReferencedTableInfo(Field field) throws JSONException {
         Property referenced = KernelUtils.getProperty(field).getReferencedProperty();
 
         if (referenced != null) {
@@ -140,22 +141,19 @@ public class FieldBuilderWithColumn extends FieldBuilder {
         }
     }
 
-    @Override
-    protected void addComboSelectInfo(Field field) throws JSONException {
+    private void addComboSelectInfo(Field field) throws JSONException {
         if (isSelectorField(field)) {
             json.put("selector", getSelectorInfo(field.getId(), field.getColumn().getReferenceSearchKey()));
         }
     }
 
-    @Override
-    protected void addSelectorReferenceList(Field field) throws JSONException {
+    private void addSelectorReferenceList(Field field) throws JSONException {
         if (isRefListField(field)) {
             json.put("refList", getListInfo(field.getColumn().getReferenceSearchKey(), language));
         }
     }
 
-    @Override
-    protected void addProcessInfo(Field field) throws JSONException {
+    private void addProcessInfo(Field field) throws JSONException {
         String processId = field.getId();
         boolean isLegacyProcess = LegacyUtils.isLegacyProcess(processId);
         if (isProcessField(field) || isLegacyProcess) {
@@ -178,8 +176,7 @@ public class FieldBuilderWithColumn extends FieldBuilder {
         }
     }
 
-    @Override
-    protected void addReadOnlyLogic(Field field) throws JSONException {
+    private void addReadOnlyLogic(Field field) throws JSONException {
         String readOnlyLogic = field.getColumn().getReadOnlyLogic();
 
         if (readOnlyLogic != null && !readOnlyLogic.isBlank()) {
@@ -188,15 +185,13 @@ public class FieldBuilderWithColumn extends FieldBuilder {
         }
     }
 
-    @Override
-    protected boolean isRefListField(Field field) {
+    private boolean isRefListField(Field field) {
         Column column = field.getColumn();
 
         return column != null && Constants.LIST_REFERENCE_ID.equals(column.getReference().getId());
     }
 
-    @Override
-    protected boolean isSelectorField(Field field) {
+    private boolean isSelectorField(Field field) {
         Column column = field.getColumn();
 
         return column != null && Constants.SELECTOR_REFERENCES.contains(column.getReference().getId());
