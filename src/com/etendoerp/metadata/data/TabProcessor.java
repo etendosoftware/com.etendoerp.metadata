@@ -26,6 +26,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
+import com.etendoerp.metadata.builders.FieldBuilderWithoutColumn;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.codehaus.jettison.json.JSONException;
@@ -41,8 +42,10 @@ import org.openbravo.model.ad.datamodel.Column;
 import org.openbravo.model.ad.ui.Field;
 import org.openbravo.model.ad.ui.Tab;
 
-import com.etendoerp.metadata.builders.FieldBuilder;
+import com.etendoerp.metadata.builders.FieldBuilderWithColumn;
 import com.etendoerp.redis.interfaces.CachedConcurrentMap;
+import java.util.function.BiFunction;
+import java.util.function.BiConsumer;
 
 public class TabProcessor {
   private static final Logger logger = LogManager.getLogger(TabProcessor.class);
@@ -62,7 +65,11 @@ public class TabProcessor {
   }
 
   public static <T> JSONObject getFields(String id, String updated, List<T> data, Predicate<T> accessPredicate,
-                                         Function<T, Column> columnExtractor, Function<T, JSONObject> jsonMapper,
+                                         Function<T, Column> columnExtractor, Function<T,String> customJsExtractor,
+                                          Function<T, String> clientClassExtractor,
+                                         Function<T, String> nameExtractor,
+                                         BiConsumer<T, String> nameSetter,
+                                         BiFunction<T, Boolean, JSONObject> fieldMapper,
                                          ConcurrentMap<String, JSONObject> cache) {
     String cacheKey = getCacheKey(id, updated);
     JSONObject list = cache.get(cacheKey);
@@ -77,13 +84,25 @@ public class TabProcessor {
           if (column != null) {
             String entityColumnName = getEntityColumnName(column);
             if (entityColumnName != null) {
-              result.put(entityColumnName, jsonMapper.apply(fieldLike));
+              result.put(entityColumnName, fieldMapper.apply(fieldLike, true));
             } else {
               logger.warn("Could not determine entity column name for column: {} - skipping field",
                       column.getDBColumnName());
             }
           } else {
-            logger.warn("Field has null column - skipping field: {}", fieldLike);
+            String customJs = customJsExtractor.apply(fieldLike);
+            String clientClass = clientClassExtractor.apply(fieldLike);
+            String fieldName = nameExtractor.apply(fieldLike);
+            if (customJs != null && clientClass != null && fieldName != null && nameSetter != null) {
+              String fieldKey = fieldName + "_" + clientClass;
+              // Set a new name for the field, appending "Canva" to it
+              // In the future, Canva may become another word if we need it to.
+              String newFieldName = fieldName + " " + "Canva";
+              nameSetter.accept(fieldLike, newFieldName);
+              result.put(fieldKey, fieldMapper.apply(fieldLike, false));
+            } else {
+              logger.warn("Field has null column and null custom javascript - skipping field: {}", fieldLike);
+            }
           }
         }
       } catch (JSONException e) {
@@ -97,12 +116,17 @@ public class TabProcessor {
 
   public static JSONObject getTabFields(Tab tab) {
     return getFields(tab.getId(), tab.getUpdated().toString(), tab.getADFieldList(), TabProcessor::isFieldAccessible,
-        Field::getColumn, TabProcessor::getJSONField, fieldCache);
+        Field::getColumn, Field::getEtmetaCustomjs, Field::getClientclass, Field::getName,
+            Field::setName, TabProcessor::getJSONField, fieldCache);
   }
 
   public static JSONObject getTabFields(TabAccess tabAccess) {
     return getFields(tabAccess.getId(), tabAccess.getUpdated().toString(), tabAccess.getADFieldAccessList(),
         TabProcessor::isFieldAccessAccessible, fieldAccess -> fieldAccess.getField().getColumn(),
+        fieldAccess -> fieldAccess.getField().getEtmetaCustomjs(),
+        fieldAccess -> fieldAccess.getField().getClientclass(),
+        fieldAccess -> fieldAccess.getField().getName(),
+        (fieldAccess, name) -> fieldAccess.getField().setName(name),
         TabProcessor::getJSONField, fieldAccessCache);
   }
 
@@ -135,9 +159,13 @@ public class TabProcessor {
 
     return property.getName();
   }
-  public static JSONObject getJSONField(Field field) {
+
+  public static JSONObject getJSONField(Field field, boolean withColumn) {
     try {
-      return new FieldBuilder(field, null).toJSON();
+      if (withColumn) {
+        return new FieldBuilderWithColumn(field, null).toJSON();
+      }
+      return new FieldBuilderWithoutColumn(field, null).toJSON();
     } catch (JSONException e) {
       logger.warn(e.getMessage(), e);
 
@@ -145,9 +173,13 @@ public class TabProcessor {
     }
   }
 
-  public static JSONObject getJSONField(FieldAccess access) {
+  public static JSONObject getJSONField(FieldAccess access, boolean withColumn) {
+
     try {
-      return new FieldBuilder(access.getField(), access).toJSON();
+      if (withColumn) {
+        return new FieldBuilderWithColumn(access.getField(), access).toJSON();
+      }
+      return new FieldBuilderWithoutColumn(access.getField(), access).toJSON();
     } catch (JSONException e) {
       logger.warn(e.getMessage(), e);
 
@@ -177,4 +209,3 @@ public class TabProcessor {
     return String.join("#", id, updated, getContext());
   }
 }
-
