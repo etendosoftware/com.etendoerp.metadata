@@ -1,5 +1,13 @@
 package com.etendoerp.metadata.service;
 
+import static com.etendoerp.metadata.MetadataTestConstants.ADDRESS1;
+import static com.etendoerp.metadata.MetadataTestConstants.ADDRESS_123_MAIN_ST;
+import static com.etendoerp.metadata.MetadataTestConstants.ADDRESS_123_MAIN_STREET;
+import static com.etendoerp.metadata.MetadataTestConstants.APT_1;
+import static com.etendoerp.metadata.MetadataTestConstants.CREATE;
+import static com.etendoerp.metadata.MetadataTestConstants.JSON_ADDRESS_SAMPLE;
+import static com.etendoerp.metadata.MetadataTestConstants.SPRINGFIELD;
+import static com.etendoerp.metadata.MetadataTestConstants.ZIP_CODE_12345;
 import static com.etendoerp.metadata.utils.Constants.LOCATION_PATH;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -120,10 +128,10 @@ public class LocationMetadataServiceTest extends OBBaseTest {
    */
   @Test
   public void processShouldHandleCreateLocationSuccessfully() throws IOException {
-    String requestBody = "{\"address1\":\"123 Main St\",\"city\":\"Springfield\",\"countryId\":\"US\"}";
+    String requestBody = JSON_ADDRESS_SAMPLE;
     Map<String, Object> locationResult = createLocationResult();
 
-    when(request.getPathInfo()).thenReturn(LOCATION_PATH + "create");
+    when(request.getPathInfo()).thenReturn(LOCATION_PATH + CREATE);
     when(request.getReader()).thenReturn(new BufferedReader(new StringReader(requestBody)));
     when(locationService.createLocation(any(LocationData.class))).thenReturn(locationResult);
 
@@ -182,7 +190,7 @@ public class LocationMetadataServiceTest extends OBBaseTest {
   public void handleCreateLocationShouldValidateRequiredFields() throws IOException {
     String requestBodyMissingFields = "{\"address2\":\"Apt 1\"}";
 
-    when(request.getPathInfo()).thenReturn(LOCATION_PATH + "create");
+    when(request.getPathInfo()).thenReturn(LOCATION_PATH + CREATE);
     when(request.getReader()).thenReturn(new BufferedReader(new StringReader(requestBodyMissingFields)));
 
     try (MockedStatic<OBContext> contextMock = mockStatic(OBContext.class);
@@ -218,7 +226,7 @@ public class LocationMetadataServiceTest extends OBBaseTest {
   public void handleCreateLocationShouldHandleJSONException() throws IOException {
     String invalidJson = "{invalid json}";
 
-    when(request.getPathInfo()).thenReturn(LOCATION_PATH + "create");
+    when(request.getPathInfo()).thenReturn(LOCATION_PATH + CREATE);
     when(request.getReader()).thenReturn(new BufferedReader(new StringReader(invalidJson)));
 
     try (MockedStatic<OBContext> contextMock = mockStatic(OBContext.class);
@@ -253,9 +261,9 @@ public class LocationMetadataServiceTest extends OBBaseTest {
    */
   @Test
   public void handleCreateLocationShouldHandleOBException() throws IOException {
-    String requestBody = "{\"address1\":\"123 Main St\",\"city\":\"Springfield\",\"countryId\":\"US\"}";
+    String requestBody = JSON_ADDRESS_SAMPLE;
 
-    when(request.getPathInfo()).thenReturn(LOCATION_PATH + "create");
+    when(request.getPathInfo()).thenReturn(LOCATION_PATH + CREATE);
     when(request.getReader()).thenReturn(new BufferedReader(new StringReader(requestBody)));
     when(locationService.createLocation(any(LocationData.class)))
         .thenThrow(new OBException("Database error"));
@@ -292,9 +300,9 @@ public class LocationMetadataServiceTest extends OBBaseTest {
    */
   @Test
   public void handleCreateLocationShouldHandleUnexpectedException() throws IOException {
-    String requestBody = "{\"address1\":\"123 Main St\",\"city\":\"Springfield\",\"countryId\":\"US\"}";
+    String requestBody = JSON_ADDRESS_SAMPLE;
 
-    when(request.getPathInfo()).thenReturn(LOCATION_PATH + "create");
+    when(request.getPathInfo()).thenReturn(LOCATION_PATH + CREATE);
     when(request.getReader()).thenReturn(new BufferedReader(new StringReader(requestBody)));
     when(locationService.createLocation(any(LocationData.class)))
         .thenThrow(new RuntimeException("Unexpected error"));
@@ -331,19 +339,19 @@ public class LocationMetadataServiceTest extends OBBaseTest {
   @Test
   public void buildLocationDataShouldMapJsonFieldsCorrectly() throws JSONException {
     JSONObject jsonRequest = new JSONObject();
-    jsonRequest.put("address1", "123 Main Street");
+    jsonRequest.put(ADDRESS1, ADDRESS_123_MAIN_STREET);
     jsonRequest.put("address2", "Suite 100");
-    jsonRequest.put("postal", "12345");
-    jsonRequest.put("city", "Springfield");
+    jsonRequest.put("postal", ZIP_CODE_12345);
+    jsonRequest.put("city", SPRINGFIELD);
     jsonRequest.put("countryId", "US");
     jsonRequest.put("regionId", "CA");
 
     LocationData result = invokePrivateBuildLocationData(jsonRequest);
 
-    assertEquals("123 Main Street", result.getAddress1());
+    assertEquals(ADDRESS_123_MAIN_STREET, result.getAddress1());
     assertEquals("Suite 100", result.getAddress2());
-    assertEquals("12345", result.getPostal());
-    assertEquals("Springfield", result.getCity());
+    assertEquals(ZIP_CODE_12345, result.getPostal());
+    assertEquals(SPRINGFIELD, result.getCity());
     assertEquals("US", result.getCountryId());
     assertEquals("CA", result.getRegionId());
   }
@@ -361,15 +369,15 @@ public class LocationMetadataServiceTest extends OBBaseTest {
   @Test
   public void buildLocationDataShouldHandleMissingFields() throws JSONException {
     JSONObject jsonRequest = new JSONObject();
-    jsonRequest.put("address1", "123 Main Street");
-    jsonRequest.put("city", "Springfield");
+    jsonRequest.put(ADDRESS1, ADDRESS_123_MAIN_STREET);
+    jsonRequest.put("city", SPRINGFIELD);
 
     LocationData result = invokePrivateBuildLocationData(jsonRequest);
 
-    assertEquals("123 Main Street", result.getAddress1());
+    assertEquals(ADDRESS_123_MAIN_STREET, result.getAddress1());
     assertEquals("", result.getAddress2());
     assertEquals("", result.getPostal());
-    assertEquals("Springfield", result.getCity());
+    assertEquals(SPRINGFIELD, result.getCity());
     assertNull(result.getCountryId());
     assertNull(result.getRegionId());
   }
@@ -405,7 +413,7 @@ public class LocationMetadataServiceTest extends OBBaseTest {
   @Test
   public void validateLocationDataShouldPassForValidData() {
     LocationData validData = new LocationData(
-        "123 Main St", "Apt 1", "12345", "Springfield", "US", "CA"
+        ADDRESS_123_MAIN_ST, APT_1, ZIP_CODE_12345, SPRINGFIELD, "US", "CA"
     );
 
     // Should not throw exception
@@ -425,7 +433,7 @@ public class LocationMetadataServiceTest extends OBBaseTest {
   @Test(expected = UnprocessableContentException.class)
   public void validateLocationDataShouldFailForMissingAddress1() {
     LocationData invalidData = new LocationData(
-        "", "Apt 1", "12345", "Springfield", "US", "CA"
+        "", APT_1, ZIP_CODE_12345, SPRINGFIELD, "US", "CA"
     );
 
     invokePrivateValidateLocationData(invalidData);
@@ -444,7 +452,7 @@ public class LocationMetadataServiceTest extends OBBaseTest {
   @Test(expected = UnprocessableContentException.class)
   public void validateLocationDataShouldFailForMissingCity() {
     LocationData invalidData = new LocationData(
-        "123 Main St", "Apt 1", "12345", "", "US", "CA"
+        ADDRESS_123_MAIN_ST, APT_1, ZIP_CODE_12345, "", "US", "CA"
     );
 
     invokePrivateValidateLocationData(invalidData);
@@ -463,7 +471,7 @@ public class LocationMetadataServiceTest extends OBBaseTest {
   @Test(expected = UnprocessableContentException.class)
   public void validateLocationDataShouldFailForMissingCountry() {
     LocationData invalidData = new LocationData(
-        "123 Main St", "Apt 1", "12345", "Springfield", "", "CA"
+        ADDRESS_123_MAIN_ST, APT_1, ZIP_CODE_12345, SPRINGFIELD, "", "CA"
     );
 
     invokePrivateValidateLocationData(invalidData);
@@ -479,7 +487,7 @@ public class LocationMetadataServiceTest extends OBBaseTest {
   @Test
   public void validateLocationDataShouldAggregateMultipleErrors() {
     LocationData invalidData = new LocationData(
-        "", "Apt 1", "12345", "", "", "CA"
+        "", APT_1, ZIP_CODE_12345, "", "", "CA"
     );
 
     try {
@@ -503,7 +511,7 @@ public class LocationMetadataServiceTest extends OBBaseTest {
   @Test
   public void validateLocationDataShouldAllowOptionalFields() {
     LocationData validData = new LocationData(
-        "123 Main St", null, null, "Springfield", "US", null
+        ADDRESS_123_MAIN_ST, null, null, SPRINGFIELD, "US", null
     );
 
     // Should not throw exception
@@ -707,10 +715,10 @@ public class LocationMetadataServiceTest extends OBBaseTest {
     Map<String, Object> result = new HashMap<>();
     result.put("id", "test-location-id");
     result.put("_identifier", "123 Main St - Springfield - US");
-    result.put("address1", "123 Main St");
+    result.put(ADDRESS1, ADDRESS_123_MAIN_ST);
     result.put("address2", "");
     result.put("postal", "");
-    result.put("city", "Springfield");
+    result.put("city", SPRINGFIELD);
     result.put("countryId", "US");
     result.put("regionId", null);
     return result;

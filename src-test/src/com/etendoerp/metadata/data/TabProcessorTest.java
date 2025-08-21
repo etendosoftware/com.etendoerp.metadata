@@ -1,5 +1,13 @@
 package com.etendoerp.metadata.data;
 
+import static com.etendoerp.metadata.MetadataTestConstants.TEST_COLUMN_NAME;
+import static com.etendoerp.metadata.MetadataTestConstants.TEST_CONTEXT;
+import static com.etendoerp.metadata.MetadataTestConstants.TEST_DATE;
+import static com.etendoerp.metadata.MetadataTestConstants.TEST_EXCEPTION;
+import static com.etendoerp.metadata.MetadataTestConstants.TEST_PROPERTY_NAME;
+import static com.etendoerp.metadata.MetadataTestConstants.TEST_TABLE_NAME;
+import static com.etendoerp.metadata.MetadataTestConstants.TEST_TAB_ID;
+import static com.etendoerp.metadata.MetadataTestConstants.TEST_WINDOW_ID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -15,7 +23,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.quality.Strictness.LENIENT;
 
-import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentMap;
@@ -83,13 +90,6 @@ class TabProcessorTest {
   private MockedStatic<OBContext> staticOBContext;
   private MockedStatic<Utils> staticUtils;
   private MockedStatic<org.openbravo.client.application.process.BaseProcessActionHandler> staticBaseProcessActionHandler;
-
-  private static final String TEST_TAB_ID = "testTabId";
-  private static final String TEST_COLUMN_NAME = "testColumn";
-  private static final String TEST_TABLE_NAME = "testTable";
-  private static final String TEST_PROPERTY_NAME = "testProperty";
-  private static final String TEST_WINDOW_ID = "testWindowId";
-  private static final Date TEST_DATE = new Date();
 
   /**
    * Sets up the test environment before each test case.
@@ -161,7 +161,7 @@ class TabProcessorTest {
    * Expects the method to return null.
    */
   @Test
-  void testGetEntityColumnNameWithNullColumn_ReturnsNull() {
+  void testGetEntityColumnNameWithNullColumnReturnsNull() {
     String result = TabProcessor.getEntityColumnName(null);
 
     assertNull(result);
@@ -311,7 +311,7 @@ class TabProcessorTest {
   @Test
   void testGetJSONFieldWithJSONExceptionReturnsEmptyJSON() {
     try (MockedConstruction<FieldBuilderWithColumn> mockedConstruction = mockConstruction(FieldBuilderWithColumn.class,
-        (mock, context) -> when(mock.toJSON()).thenThrow(new JSONException("Test exception")))) {
+        (mock, context) -> when(mock.toJSON()).thenThrow(new JSONException(TEST_EXCEPTION)))) {
 
       JSONObject result = TabProcessor.getJSONField(mockField, true);
 
@@ -374,7 +374,7 @@ class TabProcessorTest {
    */
   @Test
   void testGetFieldsWithCachedValueReturnsCachedResult() throws JSONException {
-    String cacheKey = TEST_TAB_ID + "#" + TEST_DATE + "#testContext";
+    String cacheKey = TEST_TAB_ID + "#" + TEST_DATE + TEST_CONTEXT;
     JSONObject cachedResult = new JSONObject();
     cachedResult.put("cached", true);
     ConcurrentMap<String, JSONObject> cache = mock(ConcurrentMap.class);
@@ -401,7 +401,7 @@ class TabProcessorTest {
    */
   @Test
   void testGetFieldsWithoutCacheProcessesAndCaches() throws JSONException {
-    String cacheKey = TEST_TAB_ID + "#" + TEST_DATE + "#testContext";
+    String cacheKey = TEST_TAB_ID + "#" + TEST_DATE + TEST_CONTEXT;
     ConcurrentMap<String, JSONObject> cache = mock(ConcurrentMap.class);
     when(cache.get(cacheKey)).thenReturn(null);
 
@@ -428,7 +428,7 @@ class TabProcessorTest {
    */
   @Test
   void testGetFieldsWithInvalidAccessSkipsField() {
-    String cacheKey = TEST_TAB_ID + "#" + TEST_DATE + "#testContext";
+    String cacheKey = TEST_TAB_ID + "#" + TEST_DATE + TEST_CONTEXT;
     ConcurrentMap<String, JSONObject> cache = mock(ConcurrentMap.class);
     when(cache.get(cacheKey)).thenReturn(null);
 
@@ -452,7 +452,7 @@ class TabProcessorTest {
    */
   @Test
   void testGetFieldsWithNullColumnSkipsField() {
-    String cacheKey = TEST_TAB_ID + "#" + TEST_DATE + "#testContext";
+    String cacheKey = TEST_TAB_ID + "#" + TEST_DATE + TEST_CONTEXT;
     ConcurrentMap<String, JSONObject> cache = mock(ConcurrentMap.class);
     when(cache.get(cacheKey)).thenReturn(null);
 
@@ -475,7 +475,7 @@ class TabProcessorTest {
    */
   @Test
   void testGetFieldsWithNullEntityColumnNameSkipsField() {
-    String cacheKey = TEST_TAB_ID + "#" + TEST_DATE + "#testContext";
+    String cacheKey = TEST_TAB_ID + "#" + TEST_DATE + TEST_CONTEXT;
     ConcurrentMap<String, JSONObject> cache = mock(ConcurrentMap.class);
     when(cache.get(cacheKey)).thenReturn(null);
 
@@ -502,7 +502,7 @@ class TabProcessorTest {
    */
   @Test
   void testGetFieldsWithCustomJSField() throws JSONException {
-    String cacheKey = TEST_TAB_ID + "#" + TEST_DATE + "#testContext";
+    String cacheKey = TEST_TAB_ID + "#" + TEST_DATE + TEST_CONTEXT;
     ConcurrentMap<String, JSONObject> cache = mock(ConcurrentMap.class);
     when(cache.get(cacheKey)).thenReturn(null);
 

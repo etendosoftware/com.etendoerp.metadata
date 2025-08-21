@@ -21,6 +21,14 @@ import org.openbravo.service.json.DataToJsonConverter;
 import java.util.ArrayList;
 import java.util.List;
 
+import static com.etendoerp.metadata.MetadataTestConstants.CONVERTER;
+import static com.etendoerp.metadata.MetadataTestConstants.COULD_NOT_SET_CONVERTER_FIELD;
+import static com.etendoerp.metadata.MetadataTestConstants.ON_LOAD;
+import static com.etendoerp.metadata.MetadataTestConstants.ON_PROCESS;
+import static com.etendoerp.metadata.MetadataTestConstants.PARAM1_COLUMN;
+import static com.etendoerp.metadata.MetadataTestConstants.PARAM2_COLUMN;
+import static com.etendoerp.metadata.MetadataTestConstants.PARAMETERS;
+import static com.etendoerp.metadata.MetadataTestConstants.TEST_PROCESS_ID;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -52,7 +60,6 @@ public class ProcessDefinitionBuilderTest {
   private Language mockLanguage;
 
   private MockedStatic<OBContext> mockedOBContextStatic;
-  private List<Parameter> parameterList;
 
   /**
    * Sets up the test environment before each test case.
@@ -67,13 +74,13 @@ public class ProcessDefinitionBuilderTest {
 
     mockedOBContextStatic.when(OBContext::getOBContext).thenReturn(mockOBContext);
 
-    parameterList = new ArrayList<>();
+    List<Parameter> parameterList = new ArrayList<>();
     parameterList.add(mockParameter1);
     parameterList.add(mockParameter2);
 
     when(mockProcess.getOBUIAPPParameterList()).thenReturn(parameterList);
-    when(mockParameter1.getDBColumnName()).thenReturn("param1Column");
-    when(mockParameter2.getDBColumnName()).thenReturn("param2Column");
+    when(mockParameter1.getDBColumnName()).thenReturn(PARAM1_COLUMN);
+    when(mockParameter2.getDBColumnName()).thenReturn(PARAM2_COLUMN);
     when(mockProcess.getEtmetaOnload()).thenReturn("onLoadScript");
     when(mockProcess.getEtmetaOnprocess()).thenReturn("onProcessScript");
   }
@@ -107,7 +114,7 @@ public class ProcessDefinitionBuilderTest {
   @Test
   void testToJSONWithParametersAndScripts() throws JSONException {
     JSONObject mockProcessJSON = new JSONObject();
-    mockProcessJSON.put("id", "testProcessId");
+    mockProcessJSON.put("id", TEST_PROCESS_ID);
     mockProcessJSON.put("name", "Test Process");
 
     JSONObject mockParamJSON1 = new JSONObject();
@@ -117,20 +124,18 @@ public class ProcessDefinitionBuilderTest {
     mockParamJSON2.put("id", "param2Id");
 
     try (MockedConstruction<ParameterBuilder> ignored = mockConstruction(ParameterBuilder.class,
-        (mock, context) -> {
-          when(mock.toJSON()).thenReturn(
-              context.arguments().get(0) == mockParameter1 ? mockParamJSON1 : mockParamJSON2
-          );
-        })) {
+        (mock, context) -> when(mock.toJSON()).thenReturn(
+            context.arguments().get(0) == mockParameter1 ? mockParamJSON1 : mockParamJSON2
+        ))) {
 
       ProcessDefinitionBuilder builder = new ProcessDefinitionBuilder(mockProcess);
 
       try {
-        java.lang.reflect.Field converterField = Builder.class.getDeclaredField("converter");
+        java.lang.reflect.Field converterField = Builder.class.getDeclaredField(CONVERTER);
         converterField.setAccessible(true);
         converterField.set(builder, mockConverter);
       } catch (Exception e) {
-        fail("Could not set converter field: " + e.getMessage());
+        fail(COULD_NOT_SET_CONVERTER_FIELD + e.getMessage());
       }
 
       when(mockConverter.toJsonObject(eq(mockProcess), eq(DataResolvingMode.FULL_TRANSLATABLE)))
@@ -139,18 +144,18 @@ public class ProcessDefinitionBuilderTest {
       JSONObject result = builder.toJSON();
 
       assertNotNull(result);
-      assertEquals("testProcessId", result.getString("id"));
+      assertEquals(TEST_PROCESS_ID, result.getString("id"));
       assertEquals("Test Process", result.getString("name"));
-      assertEquals("onLoadScript", result.getString("onLoad"));
-      assertEquals("onProcessScript", result.getString("onProcess"));
+      assertEquals("onLoadScript", result.getString(ON_LOAD));
+      assertEquals("onProcessScript", result.getString(ON_PROCESS));
 
-      assertTrue(result.has("parameters"));
-      JSONObject parameters = result.getJSONObject("parameters");
-      assertTrue(parameters.has("param1Column"));
-      assertTrue(parameters.has("param2Column"));
+      assertTrue(result.has(PARAMETERS));
+      JSONObject parameters = result.getJSONObject(PARAMETERS);
+      assertTrue(parameters.has(PARAM1_COLUMN));
+      assertTrue(parameters.has(PARAM2_COLUMN));
 
-      assertEquals("param1Id", parameters.getJSONObject("param1Column").getString("id"));
-      assertEquals("param2Id", parameters.getJSONObject("param2Column").getString("id"));
+      assertEquals("param1Id", parameters.getJSONObject(PARAM1_COLUMN).getString("id"));
+      assertEquals("param2Id", parameters.getJSONObject(PARAM2_COLUMN).getString("id"));
     }
   }
 
@@ -167,16 +172,16 @@ public class ProcessDefinitionBuilderTest {
     when(mockProcess.getEtmetaOnprocess()).thenReturn(null);
 
     JSONObject mockProcessJSON = new JSONObject();
-    mockProcessJSON.put("id", "testProcessId");
+    mockProcessJSON.put("id", TEST_PROCESS_ID);
 
     ProcessDefinitionBuilder builder = new ProcessDefinitionBuilder(mockProcess);
 
     try {
-      java.lang.reflect.Field converterField = Builder.class.getDeclaredField("converter");
+      java.lang.reflect.Field converterField = Builder.class.getDeclaredField(CONVERTER);
       converterField.setAccessible(true);
       converterField.set(builder, mockConverter);
     } catch (Exception e) {
-      fail("Could not set converter field: " + e.getMessage());
+      fail(COULD_NOT_SET_CONVERTER_FIELD + e.getMessage());
     }
 
     when(mockConverter.toJsonObject(eq(mockProcess), eq(DataResolvingMode.FULL_TRANSLATABLE)))
@@ -185,14 +190,14 @@ public class ProcessDefinitionBuilderTest {
     JSONObject result = builder.toJSON();
 
     assertNotNull(result);
-    assertEquals("testProcessId", result.getString("id"));
+    assertEquals(TEST_PROCESS_ID, result.getString("id"));
 
-    assertTrue(result.has("parameters"));
-    JSONObject parameters = result.getJSONObject("parameters");
+    assertTrue(result.has(PARAMETERS));
+    JSONObject parameters = result.getJSONObject(PARAMETERS);
     assertEquals(0, parameters.length());
 
-    assertNull(result.opt("onLoad"));
-    assertNull(result.opt("onProcess"));
+    assertNull(result.opt(ON_LOAD));
+    assertNull(result.opt(ON_PROCESS));
   }
 
   /**
@@ -207,7 +212,7 @@ public class ProcessDefinitionBuilderTest {
     when(mockProcess.getEtmetaOnprocess()).thenReturn(null);
 
     JSONObject mockProcessJSON = new JSONObject();
-    mockProcessJSON.put("id", "testProcessId");
+    mockProcessJSON.put("id", TEST_PROCESS_ID);
 
     JSONObject mockParamJSON = new JSONObject();
     mockParamJSON.put("id", "paramId");
@@ -218,11 +223,11 @@ public class ProcessDefinitionBuilderTest {
       ProcessDefinitionBuilder builder = new ProcessDefinitionBuilder(mockProcess);
 
       try {
-        java.lang.reflect.Field converterField = Builder.class.getDeclaredField("converter");
+        java.lang.reflect.Field converterField = Builder.class.getDeclaredField(CONVERTER);
         converterField.setAccessible(true);
         converterField.set(builder, mockConverter);
       } catch (Exception e) {
-        fail("Could not set converter field: " + e.getMessage());
+        fail(COULD_NOT_SET_CONVERTER_FIELD + e.getMessage());
       }
 
       when(mockConverter.toJsonObject(eq(mockProcess), eq(DataResolvingMode.FULL_TRANSLATABLE)))
@@ -231,8 +236,8 @@ public class ProcessDefinitionBuilderTest {
       JSONObject result = builder.toJSON();
 
       assertNotNull(result);
-      assertNull(result.opt("onLoad"));
-      assertNull(result.opt("onProcess"));
+      assertNull(result.opt(ON_LOAD));
+      assertNull(result.opt(ON_PROCESS));
     }
   }
 
@@ -244,11 +249,11 @@ public class ProcessDefinitionBuilderTest {
     ProcessDefinitionBuilder builder = new ProcessDefinitionBuilder(mockProcess);
 
     try {
-      java.lang.reflect.Field converterField = Builder.class.getDeclaredField("converter");
+      java.lang.reflect.Field converterField = Builder.class.getDeclaredField(CONVERTER);
       converterField.setAccessible(true);
       converterField.set(builder, mockConverter);
     } catch (Exception e) {
-      fail("Could not set converter field: " + e.getMessage());
+      fail(COULD_NOT_SET_CONVERTER_FIELD + e.getMessage());
     }
 
     when(mockConverter.toJsonObject(eq(mockProcess), eq(DataResolvingMode.FULL_TRANSLATABLE)))
@@ -274,11 +279,11 @@ public class ProcessDefinitionBuilderTest {
     ProcessDefinitionBuilder builder = new ProcessDefinitionBuilder(mockProcess);
 
     try {
-      java.lang.reflect.Field converterField = Builder.class.getDeclaredField("converter");
+      java.lang.reflect.Field converterField = Builder.class.getDeclaredField(CONVERTER);
       converterField.setAccessible(true);
       converterField.set(builder, null);
     } catch (Exception e) {
-      fail("Could not set converter field: " + e.getMessage());
+      fail(COULD_NOT_SET_CONVERTER_FIELD + e.getMessage());
     }
 
     assertThrows(NullPointerException.class, builder::toJSON);

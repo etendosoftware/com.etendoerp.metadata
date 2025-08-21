@@ -1,5 +1,8 @@
 package com.etendoerp.metadata.builders;
 
+import static com.etendoerp.metadata.MetadataTestConstants.DISPLAY_PROPERTY;
+import static com.etendoerp.metadata.MetadataTestConstants.FIELD_ID;
+import static com.etendoerp.metadata.MetadataTestConstants.TEST_FIELD;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -96,7 +99,7 @@ class FieldBuilderTest {
   void setUp() {
     when(field.getColumn()).thenReturn(column);
     when(field.getTab()).thenReturn(tab);
-    when(field.getId()).thenReturn("field-id");
+    when(field.getId()).thenReturn(FIELD_ID);
     when(column.getReference()).thenReturn(reference);
     when(reference.getId()).thenReturn("reference-id");
   }
@@ -195,7 +198,7 @@ class FieldBuilderTest {
       mockedStatic.when(() -> FieldBuilder.getReferenceSelectors(reference))
           .thenReturn(mockSelectors);
 
-      JSONObject result = FieldBuilder.getSelectorInfo("field-id", reference);
+      JSONObject result = FieldBuilder.getSelectorInfo(FIELD_ID, reference);
 
       assertNotNull(result);
       assertTrue(result.has(Constants.DATASOURCE_PROPERTY));
@@ -214,14 +217,14 @@ class FieldBuilderTest {
     ReferenceSelectors mockSelectors = new ReferenceSelectors(null, referencedTree);
     when(referencedTree.getId()).thenReturn("tree-id");
     when(referencedTree.getDisplayfield()).thenReturn(referencedTreeField);
-    when(referencedTreeField.getProperty()).thenReturn("displayProperty");
+    when(referencedTreeField.getProperty()).thenReturn(DISPLAY_PROPERTY);
     when(referencedTree.getValuefield()).thenReturn(referencedTreeField);
 
     try (MockedStatic<FieldBuilder> mockedStatic = mockStatic(FieldBuilder.class, CALLS_REAL_METHODS)) {
       mockedStatic.when(() -> FieldBuilder.getReferenceSelectors(reference))
           .thenReturn(mockSelectors);
 
-      JSONObject result = FieldBuilder.getSelectorInfo("field-id", reference);
+      JSONObject result = FieldBuilder.getSelectorInfo(FIELD_ID, reference);
 
       assertNotNull(result);
       assertTrue(result.has(Constants.DATASOURCE_PROPERTY));
@@ -265,11 +268,11 @@ class FieldBuilderTest {
 
     try (MockedStatic<FieldBuilder> mockedStatic = mockStatic(FieldBuilder.class, CALLS_REAL_METHODS)) {
       mockedStatic.when(() -> FieldBuilder.getPropertyOrDataSourceField(selectorField))
-          .thenReturn("displayProperty");
+          .thenReturn(DISPLAY_PROPERTY);
 
       String result = FieldBuilder.getDisplayField(selector);
 
-      assertEquals("displayProperty", result);
+      assertEquals(DISPLAY_PROPERTY, result);
     }
   }
 
@@ -453,7 +456,7 @@ class FieldBuilderTest {
       mockedStatic.when(() -> FieldBuilder.getValueField(selector)).thenReturn(JsonConstants.ID);
       mockedStatic.when(() -> FieldBuilder.getExtraSearchFields(selector)).thenReturn("");
 
-      JSONObject result = FieldBuilder.addSelectorInfo("field-id", selector);
+      JSONObject result = FieldBuilder.addSelectorInfo(FIELD_ID, selector);
 
       assertEquals(Constants.CUSTOM_QUERY_DS, result.getString(Constants.DATASOURCE_PROPERTY));
       assertEquals("exact", result.getString(JsonConstants.TEXTMATCH_PARAMETER));
@@ -471,7 +474,7 @@ class FieldBuilderTest {
     when(column.getTable()).thenReturn(table);
     when(table.getDBTableName()).thenReturn("test_table");
     when(column.getDBColumnName()).thenReturn("test_column");
-    when(field.getName()).thenReturn("testField");
+    when(field.getName()).thenReturn(TEST_FIELD);
 
     try (MockedStatic<DataSourceUtils> mockedDataSourceUtils = mockStatic(DataSourceUtils.class)) {
       mockedDataSourceUtils.when(() -> DataSourceUtils.getHQLColumnName(true, "test_table", "test_column"))
@@ -493,14 +496,14 @@ class FieldBuilderTest {
    */
   @Test
   void testGetHqlNameException() throws Exception {
-    when(field.getName()).thenReturn("testField");
+    when(field.getName()).thenReturn(TEST_FIELD);
     when(field.getColumn()).thenThrow(new RuntimeException("Test exception"));
 
     Method method = FieldBuilder.class.getDeclaredMethod("getHqlName", Field.class);
     method.setAccessible(true);
     String result = (String) method.invoke(null, field);
 
-    assertEquals("testField", result);
+    assertEquals(TEST_FIELD, result);
   }
 
 }

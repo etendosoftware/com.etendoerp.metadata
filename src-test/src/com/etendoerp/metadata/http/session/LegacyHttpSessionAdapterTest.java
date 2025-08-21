@@ -1,5 +1,13 @@
 package com.etendoerp.metadata.http.session;
 
+import static com.etendoerp.metadata.MetadataTestConstants.ATTR1;
+import static com.etendoerp.metadata.MetadataTestConstants.ATTR2;
+import static com.etendoerp.metadata.MetadataTestConstants.ATTR3;
+import static com.etendoerp.metadata.MetadataTestConstants.OBJECT;
+import static com.etendoerp.metadata.MetadataTestConstants.TEST_ATTRIBUTE;
+import static com.etendoerp.metadata.MetadataTestConstants.TEST_VALUE;
+import static com.etendoerp.metadata.MetadataTestConstants.VALUE;
+import static com.etendoerp.metadata.MetadataTestConstants.VALUE1_LOWER;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -208,8 +216,8 @@ public class LegacyHttpSessionAdapterTest extends OBBaseTest {
    */
   @Test
   public void setAttributeShouldStoreValue() {
-    String attributeName = "testAttribute";
-    String attributeValue = "testValue";
+    String attributeName = TEST_ATTRIBUTE;
+    String attributeValue = TEST_VALUE;
 
     session.setAttribute(attributeName, attributeValue);
 
@@ -226,7 +234,7 @@ public class LegacyHttpSessionAdapterTest extends OBBaseTest {
    */
   @Test
   public void setAttributeWithNullValueShouldRemoveAttribute() {
-    String attributeName = "testAttribute";
+    String attributeName = TEST_ATTRIBUTE;
 
     session.setAttribute(attributeName, "someValue");
     assertNotNull(session.getAttribute(attributeName));
@@ -243,8 +251,8 @@ public class LegacyHttpSessionAdapterTest extends OBBaseTest {
    */
   @Test
   public void getAttributeShouldReturnStoredValue() {
-    String attributeName = "testAttribute";
-    String attributeValue = "testValue";
+    String attributeName = TEST_ATTRIBUTE;
+    String attributeValue = TEST_VALUE;
 
     session.setAttribute(attributeName, attributeValue);
 
@@ -273,8 +281,8 @@ public class LegacyHttpSessionAdapterTest extends OBBaseTest {
    */
   @Test
   public void putValueShouldBehaveLikeSetAttribute() {
-    String attributeName = "testAttribute";
-    String attributeValue = "testValue";
+    String attributeName = TEST_ATTRIBUTE;
+    String attributeValue = TEST_VALUE;
 
     session.putValue(attributeName, attributeValue);
 
@@ -290,8 +298,8 @@ public class LegacyHttpSessionAdapterTest extends OBBaseTest {
    */
   @Test
   public void getValueShouldBehaveLikeGetAttribute() {
-    String attributeName = "testAttribute";
-    String attributeValue = "testValue";
+    String attributeName = TEST_ATTRIBUTE;
+    String attributeValue = TEST_VALUE;
 
     session.setAttribute(attributeName, attributeValue);
 
@@ -307,8 +315,8 @@ public class LegacyHttpSessionAdapterTest extends OBBaseTest {
    */
   @Test
   public void removeAttributeShouldRemoveStoredValue() {
-    String attributeName = "testAttribute";
-    String attributeValue = "testValue";
+    String attributeName = TEST_ATTRIBUTE;
+    String attributeValue = TEST_VALUE;
 
     session.setAttribute(attributeName, attributeValue);
     assertNotNull(session.getAttribute(attributeName));
@@ -325,8 +333,8 @@ public class LegacyHttpSessionAdapterTest extends OBBaseTest {
    */
   @Test
   public void removeValueShouldBehaveLikeRemoveAttribute() {
-    String attributeName = "testAttribute";
-    String attributeValue = "testValue";
+    String attributeName = TEST_ATTRIBUTE;
+    String attributeValue = TEST_VALUE;
 
     session.setAttribute(attributeName, attributeValue);
     assertNotNull(session.getAttribute(attributeName));
@@ -344,9 +352,9 @@ public class LegacyHttpSessionAdapterTest extends OBBaseTest {
    */
   @Test
   public void getAttributeNamesShouldReturnAllAttributeNames() {
-    session.setAttribute("attr1", "value1");
-    session.setAttribute("attr2", "value2");
-    session.setAttribute("attr3", "value3");
+    session.setAttribute(ATTR1,VALUE1_LOWER);
+    session.setAttribute(ATTR2, "value2");
+    session.setAttribute(ATTR3, "value3");
 
     Enumeration<String> attributeNames = session.getAttributeNames();
 
@@ -356,9 +364,9 @@ public class LegacyHttpSessionAdapterTest extends OBBaseTest {
     }
 
     assertEquals(3, nameSet.size());
-    assertTrue(nameSet.contains("attr1"));
-    assertTrue(nameSet.contains("attr2"));
-    assertTrue(nameSet.contains("attr3"));
+    assertTrue(nameSet.contains(ATTR1));
+    assertTrue(nameSet.contains(ATTR2));
+    assertTrue(nameSet.contains(ATTR3));
   }
 
   /**
@@ -370,15 +378,15 @@ public class LegacyHttpSessionAdapterTest extends OBBaseTest {
    */
   @Test
   public void getValueNamesShouldReturnAllAttributeNamesAsArray() {
-    session.setAttribute("attr1", "value1");
-    session.setAttribute("attr2", "value2");
+    session.setAttribute(ATTR1,VALUE1_LOWER);
+    session.setAttribute(ATTR2, "value2");
 
     String[] valueNames = session.getValueNames();
 
     assertEquals(2, valueNames.length);
     java.util.Set<String> nameSet = java.util.Set.of(valueNames);
-    assertTrue(nameSet.contains("attr1"));
-    assertTrue(nameSet.contains("attr2"));
+    assertTrue(nameSet.contains(ATTR1));
+    assertTrue(nameSet.contains(ATTR2));
   }
 
   /**
@@ -503,7 +511,7 @@ public class LegacyHttpSessionAdapterTest extends OBBaseTest {
   @Test(expected = IllegalStateException.class)
   public void setAttributeAfterInvalidateShouldThrowException() {
     session.invalidate();
-    session.setAttribute("test", "value");
+    session.setAttribute("test", VALUE);
   }
 
   /**
@@ -595,19 +603,19 @@ public class LegacyHttpSessionAdapterTest extends OBBaseTest {
    */
   @Test
   public void multipleAttributeOperationsShouldWorkCorrectly() {
-    session.setAttribute("attr1", "value1");
-    session.setAttribute("attr2", 123);
-    session.setAttribute("attr3", new Object());
+    session.setAttribute(ATTR1,VALUE1_LOWER);
+    session.setAttribute(ATTR2, 123);
+    session.setAttribute(ATTR3, new Object());
 
-    assertEquals("value1", session.getAttribute("attr1"));
-    assertEquals(123, session.getAttribute("attr2"));
-    assertNotNull(session.getAttribute("attr3"));
+    assertEquals("value1", session.getAttribute(ATTR1));
+    assertEquals(123, session.getAttribute(ATTR2));
+    assertNotNull(session.getAttribute(ATTR3));
 
-    session.setAttribute("attr1", "newValue1");
-    assertEquals("newValue1", session.getAttribute("attr1"));
+    session.setAttribute(ATTR1, "newValue1");
+    assertEquals("newValue1", session.getAttribute(ATTR1));
 
-    session.removeAttribute("attr2");
-    assertNull(session.getAttribute("attr2"));
+    session.removeAttribute(ATTR2);
+    assertNull(session.getAttribute(ATTR2));
 
     Enumeration<String> names = session.getAttributeNames();
     java.util.Set<String> nameSet = new java.util.HashSet<>();
@@ -616,9 +624,9 @@ public class LegacyHttpSessionAdapterTest extends OBBaseTest {
     }
 
     assertEquals(2, nameSet.size());
-    assertTrue(nameSet.contains("attr1"));
-    assertTrue(nameSet.contains("attr3"));
-    assertFalse(nameSet.contains("attr2"));
+    assertTrue(nameSet.contains(ATTR1));
+    assertTrue(nameSet.contains(ATTR3));
+    assertFalse(nameSet.contains(ATTR2));
   }
 
   /**
@@ -643,7 +651,7 @@ public class LegacyHttpSessionAdapterTest extends OBBaseTest {
 
     Thread.sleep(10);
 
-    session.setAttribute("test", "value");
+    session.setAttribute("test", VALUE);
     long time2 = session.getLastAccessedTime();
     assertTrue(time2 > time1);
 
@@ -672,13 +680,13 @@ public class LegacyHttpSessionAdapterTest extends OBBaseTest {
     session.setAttribute("string", "stringValue");
     session.setAttribute("integer", 42);
     session.setAttribute("boolean", true);
-    session.setAttribute("object", new java.util.Date());
+    session.setAttribute(OBJECT, new java.util.Date());
 
     assertEquals("stringValue", session.getAttribute("string"));
     assertEquals(42, session.getAttribute("integer"));
     assertEquals(true, session.getAttribute("boolean"));
-    assertNotNull(session.getAttribute("object"));
-    assertTrue(session.getAttribute("object") instanceof java.util.Date);
+    assertNotNull(session.getAttribute(OBJECT));
+    assertTrue(session.getAttribute(OBJECT) instanceof java.util.Date);
   }
 
   /**
@@ -691,7 +699,7 @@ public class LegacyHttpSessionAdapterTest extends OBBaseTest {
   @Test
   public void attributeOperationsWithNullNamesShouldHandleGracefully() {
     try {
-      session.setAttribute(null, "value");
+      session.setAttribute(null, VALUE);
       session.getAttribute(null);
       session.removeAttribute(null);
     } catch (Exception e) {

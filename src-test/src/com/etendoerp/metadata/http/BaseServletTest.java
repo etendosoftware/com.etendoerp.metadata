@@ -1,5 +1,6 @@
 package com.etendoerp.metadata.http;
 
+import static com.etendoerp.metadata.MetadataTestConstants.TEST_EXCEPTION;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -204,13 +205,13 @@ class BaseServletTest {
          MockedStatic<AllowedCrossDomainsHandler> corsMock = mockStatic(AllowedCrossDomainsHandler.class);
          MockedStatic<Utils> utilsMock = mockStatic(Utils.class)) {
 
-      RuntimeException testException = new RuntimeException("Test exception");
+      RuntimeException testException = new RuntimeException(TEST_EXCEPTION);
       wrapperMock.when(() -> HttpServletRequestWrapper.wrap(request)).thenThrow(testException);
       corsMock.when(AllowedCrossDomainsHandler::getInstance).thenReturn(corsHandler);
       utilsMock.when(() -> Utils.getHttpStatusFor(testException)).thenReturn(500);
 
       JSONObject jsonError = new JSONObject();
-      jsonError.put("error", "Test exception");
+      jsonError.put("error", TEST_EXCEPTION);
       utilsMock.when(() -> Utils.convertToJson(testException)).thenReturn(jsonError);
 
       servlet.service(request, response, false, false);
@@ -236,7 +237,7 @@ class BaseServletTest {
     when(response.isCommitted()).thenReturn(true);
 
     try (MockedStatic<HttpServletRequestWrapper> wrapperMock = mockStatic(HttpServletRequestWrapper.class)) {
-      RuntimeException testException = new RuntimeException("Test exception");
+      RuntimeException testException = new RuntimeException(TEST_EXCEPTION);
       wrapperMock.when(() -> HttpServletRequestWrapper.wrap(request)).thenThrow(testException);
 
       servlet.service(request, response, false, false);

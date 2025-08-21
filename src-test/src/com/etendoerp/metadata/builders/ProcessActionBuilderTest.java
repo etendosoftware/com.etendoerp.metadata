@@ -1,5 +1,13 @@
 package com.etendoerp.metadata.builders;
 
+import static com.etendoerp.metadata.MetadataTestConstants.PARAMETERS;
+import static com.etendoerp.metadata.MetadataTestConstants.REF_LIST;
+import static com.etendoerp.metadata.MetadataTestConstants.SELECTOR;
+import static com.etendoerp.metadata.MetadataTestConstants.SELECTOR_123;
+import static com.etendoerp.metadata.MetadataTestConstants.SELECTOR_ID;
+import static com.etendoerp.metadata.MetadataTestConstants.SELECTOR_PARAM_ID;
+import static com.etendoerp.metadata.MetadataTestConstants.TEST_PROCESS;
+import static com.etendoerp.metadata.MetadataTestConstants.TEST_PROCESS_ID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -72,8 +80,8 @@ class ProcessActionBuilderTest {
         }
         
         mockProcessJson = new JSONObject();
-        mockProcessJson.put("id", "testProcessId");
-        mockProcessJson.put("name", "Test Process");
+        mockProcessJson.put("id", TEST_PROCESS_ID);
+        mockProcessJson.put("name", TEST_PROCESS);
         
         mockParameterJson = new JSONObject();
         mockParameterJson.put("id", "testParamId");
@@ -255,8 +263,8 @@ class ProcessActionBuilderTest {
         assertNotNull(result);
         assertEquals("testParamId", result.getString("id"));
         assertEquals("Test Parameter", result.getString("name"));
-        assertFalse(result.has("selector"));
-        assertFalse(result.has("refList"));
+        assertFalse(result.has(SELECTOR));
+        assertFalse(result.has(REF_LIST));
     }
 
     /**
@@ -275,7 +283,7 @@ class ProcessActionBuilderTest {
         when(mockParameter.getId()).thenReturn("paramId123");
 
         JSONObject mockSelectorInfo = new JSONObject();
-        mockSelectorInfo.put("selectorId", "selector123");
+        mockSelectorInfo.put(SELECTOR_ID, SELECTOR_123);
 
         try (MockedStatic<FieldBuilder> fieldBuilderMock = mockStatic(FieldBuilder.class)) {
             fieldBuilderMock.when(() -> FieldBuilder.getSelectorInfo("paramId123", mockReference))
@@ -284,8 +292,8 @@ class ProcessActionBuilderTest {
             JSONObject result = processActionBuilder.buildParameterJSON(mockParameter);
 
             assertNotNull(result);
-            assertTrue(result.has("selector"));
-            assertEquals("selector123", result.getJSONObject("selector").getString("selectorId"));
+            assertTrue(result.has(SELECTOR));
+            assertEquals(SELECTOR_123, result.getJSONObject(SELECTOR).getString(SELECTOR_ID));
         }
     }
 
@@ -318,8 +326,8 @@ class ProcessActionBuilderTest {
             JSONObject result = processActionBuilder.buildParameterJSON(mockParameter);
 
             assertNotNull(result);
-            assertTrue(result.has("refList"));
-            assertEquals(1, result.getJSONArray("refList").length());
+            assertTrue(result.has(REF_LIST));
+            assertEquals(1, result.getJSONArray(REF_LIST).length());
         }
     }
 
@@ -338,10 +346,10 @@ class ProcessActionBuilderTest {
         JSONObject result = processActionBuilder.toJSON();
 
         assertNotNull(result);
-        assertEquals("testProcessId", result.getString("id"));
-        assertEquals("Test Process", result.getString("name"));
-        assertTrue(result.has("parameters"));
-        assertEquals(0, result.getJSONArray("parameters").length());
+        assertEquals(TEST_PROCESS_ID, result.getString("id"));
+        assertEquals(TEST_PROCESS, result.getString("name"));
+        assertTrue(result.has(PARAMETERS));
+        assertEquals(0, result.getJSONArray(PARAMETERS).length());
     }
 
     /**
@@ -363,10 +371,10 @@ class ProcessActionBuilderTest {
         JSONObject result = processActionBuilder.toJSON();
 
         assertNotNull(result);
-        assertEquals("testProcessId", result.getString("id"));
-        assertEquals("Test Process", result.getString("name"));
-        assertTrue(result.has("parameters"));
-        assertEquals(1, result.getJSONArray("parameters").length());
+        assertEquals(TEST_PROCESS_ID, result.getString("id"));
+        assertEquals(TEST_PROCESS, result.getString("name"));
+        assertTrue(result.has(PARAMETERS));
+        assertEquals(1, result.getJSONArray(PARAMETERS).length());
     }
 
     /**
@@ -388,8 +396,8 @@ class ProcessActionBuilderTest {
         JSONObject result = processActionBuilder.toJSON();
 
         assertNotNull(result);
-        assertTrue(result.has("parameters"));
-        assertEquals(1, result.getJSONArray("parameters").length());
+        assertTrue(result.has(PARAMETERS));
+        assertEquals(1, result.getJSONArray(PARAMETERS).length());
     }
 
     /**
@@ -411,12 +419,12 @@ class ProcessActionBuilderTest {
             .thenReturn(Arrays.asList(selectorParam, listParam));
 
         JSONObject selectorParamJson = new JSONObject();
-        selectorParamJson.put("id", "selectorParamId");
+        selectorParamJson.put("id", SELECTOR_PARAM_ID);
         when(mockConverter.toJsonObject(selectorParam, DataResolvingMode.FULL_TRANSLATABLE))
             .thenReturn(selectorParamJson);
         when(selectorParam.getReference()).thenReturn(selectorRef);
         when(selectorParam.getReferenceSearchKey()).thenReturn(selectorRef);
-        when(selectorParam.getId()).thenReturn("selectorParamId");
+        when(selectorParam.getId()).thenReturn(SELECTOR_PARAM_ID);
         when(selectorRef.getId()).thenReturn("18");
 
         JSONObject listParamJson = new JSONObject();
@@ -428,7 +436,7 @@ class ProcessActionBuilderTest {
         when(listRef.getId()).thenReturn("17");
 
         JSONObject mockSelectorInfo = new JSONObject();
-        mockSelectorInfo.put("selectorId", "selector123");
+        mockSelectorInfo.put(SELECTOR_ID, SELECTOR_123);
         JSONArray mockRefList = new JSONArray();
         mockRefList.put(new JSONObject().put("value", "option1"));
 
@@ -438,7 +446,7 @@ class ProcessActionBuilderTest {
             contextMock.when(OBContext::getOBContext).thenReturn(mockOBContext);
             when(mockOBContext.getLanguage()).thenReturn(mockLanguage);
             
-            fieldBuilderMock.when(() -> FieldBuilder.getSelectorInfo("selectorParamId", selectorRef))
+            fieldBuilderMock.when(() -> FieldBuilder.getSelectorInfo(SELECTOR_PARAM_ID, selectorRef))
                            .thenReturn(mockSelectorInfo);
             fieldBuilderMock.when(() -> FieldBuilder.getListInfo(listRef, mockLanguage))
                            .thenReturn(mockRefList);
@@ -446,19 +454,19 @@ class ProcessActionBuilderTest {
             JSONObject result = processActionBuilder.toJSON();
 
             assertNotNull(result);
-            assertTrue(result.has("parameters"));
-            assertEquals(2, result.getJSONArray("parameters").length());
+            assertTrue(result.has(PARAMETERS));
+            assertEquals(2, result.getJSONArray(PARAMETERS).length());
 
-            JSONArray parameters = result.getJSONArray("parameters");
+            JSONArray parameters = result.getJSONArray(PARAMETERS);
             boolean foundSelector = false;
             boolean foundList = false;
             
             for (int i = 0; i < parameters.length(); i++) {
                 JSONObject param = parameters.getJSONObject(i);
-                if (param.has("selector")) {
+                if (param.has(SELECTOR)) {
                     foundSelector = true;
                 }
-                if (param.has("refList")) {
+                if (param.has(REF_LIST)) {
                     foundList = true;
                 }
             }

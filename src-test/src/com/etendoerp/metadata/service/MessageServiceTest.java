@@ -1,5 +1,10 @@
 package com.etendoerp.metadata.service;
 
+import static com.etendoerp.metadata.MetadataTestConstants.ACCESS_CONTROL_ALLOW_ORIGIN;
+import static com.etendoerp.metadata.MetadataTestConstants.HTTP_LOCALHOST_8080;
+import static com.etendoerp.metadata.MetadataTestConstants.MESSAGE;
+import static com.etendoerp.metadata.MetadataTestConstants.ORIGIN;
+import static com.etendoerp.metadata.MetadataTestConstants.TEST_TAB_ID;
 import static com.etendoerp.metadata.utils.Constants.TAB_ID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -79,18 +84,16 @@ public class MessageServiceTest extends OBBaseTest {
      */
     @Test
     public void processShouldSetCORSHeadersWhenOriginPresent() throws IOException {
-        String origin = "http://localhost:8080";
-        when(request.getHeader("Origin")).thenReturn(origin);
-        when(request.getParameter(TAB_ID)).thenReturn("testTabId");
+        String origin = HTTP_LOCALHOST_8080;
+        when(request.getHeader(ORIGIN)).thenReturn(origin);
+        when(request.getParameter(TAB_ID)).thenReturn(TEST_TAB_ID);
         
         try (MockedConstruction<RequestVariables> ignored = mockConstruction(RequestVariables.class,
-                (mock, context) -> {
-                    when(mock.getMessage("testTabId")).thenReturn(null);
-                })) {
+                (mock, context) -> when(mock.getMessage(TEST_TAB_ID)).thenReturn(null))) {
             
             messageService.process();
             
-            verify(response).setHeader("Access-Control-Allow-Origin", origin);
+            verify(response).setHeader(ACCESS_CONTROL_ALLOW_ORIGIN, origin);
             verify(response).setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
             verify(response).setHeader("Access-Control-Allow-Credentials", "true");
             verify(response).setHeader("Access-Control-Allow-Headers", "Content-Type, origin, accept, X-Requested-With");
@@ -107,17 +110,15 @@ public class MessageServiceTest extends OBBaseTest {
      */
     @Test
     public void processShouldNotSetCORSHeadersWhenOriginNull() throws IOException {
-        when(request.getHeader("Origin")).thenReturn(null);
-        when(request.getParameter(TAB_ID)).thenReturn("testTabId");
+        when(request.getHeader(ORIGIN)).thenReturn(null);
+        when(request.getParameter(TAB_ID)).thenReturn(TEST_TAB_ID);
         
         try (MockedConstruction<RequestVariables> ignored = mockConstruction(RequestVariables.class,
-                (mock, context) -> {
-                    when(mock.getMessage("testTabId")).thenReturn(null);
-                })) {
+                (mock, context) -> when(mock.getMessage(TEST_TAB_ID)).thenReturn(null))) {
             
             messageService.process();
             
-            verify(response, never()).setHeader(eq("Access-Control-Allow-Origin"), any());
+            verify(response, never()).setHeader(eq(ACCESS_CONTROL_ALLOW_ORIGIN), any());
         }
     }
 
@@ -130,17 +131,15 @@ public class MessageServiceTest extends OBBaseTest {
      */
     @Test
     public void processShouldNotSetCORSHeadersWhenOriginEmpty() throws IOException {
-        when(request.getHeader("Origin")).thenReturn("");
-        when(request.getParameter(TAB_ID)).thenReturn("testTabId");
+        when(request.getHeader(ORIGIN)).thenReturn("");
+        when(request.getParameter(TAB_ID)).thenReturn(TEST_TAB_ID);
         
         try (MockedConstruction<RequestVariables> ignored = mockConstruction(RequestVariables.class,
-                (mock, context) -> {
-                    when(mock.getMessage("testTabId")).thenReturn(null);
-                })) {
+                (mock, context) -> when(mock.getMessage(TEST_TAB_ID)).thenReturn(null))) {
             
             messageService.process();
             
-            verify(response, never()).setHeader(eq("Access-Control-Allow-Origin"), any());
+            verify(response, never()).setHeader(eq(ACCESS_CONTROL_ALLOW_ORIGIN), any());
         }
     }
 
@@ -155,14 +154,12 @@ public class MessageServiceTest extends OBBaseTest {
      */
     @Test
     public void processShouldReturnEmptyMessageWhenNoErrorFound() throws IOException, JSONException {
-        String tabId = "testTabId";
+        String tabId = TEST_TAB_ID;
         when(request.getParameter(TAB_ID)).thenReturn(tabId);
-        when(request.getHeader("Origin")).thenReturn("http://localhost:8080");
+        when(request.getHeader(ORIGIN)).thenReturn(HTTP_LOCALHOST_8080);
         
         try (MockedConstruction<RequestVariables> mockedConstruction = mockConstruction(RequestVariables.class, 
-                (mock, context) -> {
-                    when(mock.getMessage(tabId)).thenReturn(null);
-                })) {
+                (mock, context) -> when(mock.getMessage(tabId)).thenReturn(null))) {
             
             messageService.process();
             
@@ -170,7 +167,7 @@ public class MessageServiceTest extends OBBaseTest {
             String jsonResponse = stringWriter.toString();
             JSONObject responseJson = new JSONObject(jsonResponse);
             
-            assertEquals("", responseJson.getString("message"));
+            assertEquals("", responseJson.getString(MESSAGE));
             
             RequestVariables varsInstance = mockedConstruction.constructed().get(0);
             verify(varsInstance).removeMessage(tabId);
@@ -188,21 +185,19 @@ public class MessageServiceTest extends OBBaseTest {
      */
     @Test
     public void processShouldReturnErrorDetailsWhenErrorExists() throws IOException, JSONException {
-        String tabId = "testTabId";
+        String tabId = TEST_TAB_ID;
         String errorMessage = "Test error message";
         String errorType = "Error";
         String errorTitle = "Error Title";
         
         when(request.getParameter(TAB_ID)).thenReturn(tabId);
-        when(request.getHeader("Origin")).thenReturn("http://localhost:8080");
+        when(request.getHeader(ORIGIN)).thenReturn(HTTP_LOCALHOST_8080);
         when(error.getMessage()).thenReturn(errorMessage);
         when(error.getType()).thenReturn(errorType);
         when(error.getTitle()).thenReturn(errorTitle);
         
         try (MockedConstruction<RequestVariables> mockedConstruction = mockConstruction(RequestVariables.class, 
-                (mock, context) -> {
-                    when(mock.getMessage(tabId)).thenReturn(error);
-                })) {
+                (mock, context) -> when(mock.getMessage(tabId)).thenReturn(error))) {
             
             messageService.process();
             
@@ -210,7 +205,7 @@ public class MessageServiceTest extends OBBaseTest {
             String jsonResponse = stringWriter.toString();
             JSONObject responseJson = new JSONObject(jsonResponse);
             
-            assertEquals(errorMessage, responseJson.getString("message"));
+            assertEquals(errorMessage, responseJson.getString(MESSAGE));
             assertEquals(errorType, responseJson.getString("type"));
             assertEquals(errorTitle, responseJson.getString("title"));
             
@@ -229,13 +224,11 @@ public class MessageServiceTest extends OBBaseTest {
      */
     @Test
     public void processShouldSetCorrectContentType() throws IOException {
-        when(request.getParameter(TAB_ID)).thenReturn("testTabId");
-        when(request.getHeader("Origin")).thenReturn("http://localhost:8080");
+        when(request.getParameter(TAB_ID)).thenReturn(TEST_TAB_ID);
+        when(request.getHeader(ORIGIN)).thenReturn(HTTP_LOCALHOST_8080);
         
         try (MockedConstruction<RequestVariables> ignored = mockConstruction(RequestVariables.class,
-                (mock, context) -> {
-                    when(mock.getMessage("testTabId")).thenReturn(null);
-                })) {
+                (mock, context) -> when(mock.getMessage(TEST_TAB_ID)).thenReturn(null))) {
             
             messageService.process();
             
@@ -257,12 +250,10 @@ public class MessageServiceTest extends OBBaseTest {
     public void processShouldHandleNullTabId() throws IOException, JSONException {
         // Given
         when(request.getParameter(TAB_ID)).thenReturn(null);
-        when(request.getHeader("Origin")).thenReturn("http://localhost:8080");
+        when(request.getHeader(ORIGIN)).thenReturn(HTTP_LOCALHOST_8080);
         
         try (MockedConstruction<RequestVariables> mockedConstruction = mockConstruction(RequestVariables.class, 
-                (mock, context) -> {
-                    when(mock.getMessage(null)).thenReturn(null);
-                })) {
+                (mock, context) -> when(mock.getMessage(null)).thenReturn(null))) {
 
             messageService.process();
             
@@ -270,7 +261,7 @@ public class MessageServiceTest extends OBBaseTest {
             String jsonResponse = stringWriter.toString();
             JSONObject responseJson = new JSONObject(jsonResponse);
             
-            assertEquals("", responseJson.getString("message"));
+            assertEquals("", responseJson.getString(MESSAGE));
             
             RequestVariables varsInstance = mockedConstruction.constructed().get(0);
             verify(varsInstance).removeMessage(null);

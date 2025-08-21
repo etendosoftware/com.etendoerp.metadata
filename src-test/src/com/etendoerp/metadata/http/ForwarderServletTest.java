@@ -1,5 +1,9 @@
 package com.etendoerp.metadata.http;
 
+import static com.etendoerp.metadata.MetadataTestConstants.API_DATA_PATH;
+import static com.etendoerp.metadata.MetadataTestConstants.JWT_TOKEN_HASH;
+import static com.etendoerp.metadata.MetadataTestConstants.SALES_INVOICE_HEADER_EDITION_HTML;
+import static com.etendoerp.metadata.MetadataTestConstants.TOKEN;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -108,11 +112,11 @@ public class ForwarderServletTest extends OBBaseTest {
    */
   @Test
   public void serviceShouldHandleLegacyHtmlRequest() throws Exception {
-    String path = "/SalesInvoice/Header_Edition.html";
+    String path = SALES_INVOICE_HEADER_EDITION_HTML;
     when(request.getPathInfo()).thenReturn(path);
 
-    when(request.getParameter("token")).thenReturn(null);
-    when(session.getAttribute("#JWT_TOKEN")).thenReturn(null);
+    when(request.getParameter(TOKEN)).thenReturn(null);
+    when(session.getAttribute(JWT_TOKEN_HASH)).thenReturn(null);
 
     try (MockedStatic<RequestContext> contextMock = mockStatic(RequestContext.class);
          MockedStatic<OBContext> obContextMock = mockStatic(OBContext.class)) {
@@ -139,9 +143,9 @@ public class ForwarderServletTest extends OBBaseTest {
   public void isLegacyRequestShouldReturnTrueForHtmlFiles() throws Exception {
     assertTrue(invokeIsLegacyRequest("/test/page.html"));
     assertTrue(invokeIsLegacyRequest("/test/page.HTML"));
-    assertTrue(invokeIsLegacyRequest("/SalesInvoice/Header_Edition.html"));
+    assertTrue(invokeIsLegacyRequest(SALES_INVOICE_HEADER_EDITION_HTML));
 
-    assertFalse(invokeIsLegacyRequest("/api/data"));
+    assertFalse(invokeIsLegacyRequest(API_DATA_PATH));
     assertFalse(invokeIsLegacyRequest("/test/page.jsp"));
     assertFalse(invokeIsLegacyRequest("/test/page"));
   }
@@ -159,13 +163,13 @@ public class ForwarderServletTest extends OBBaseTest {
   @Test
   public void handleTokenConsistencyShouldStoreTokenWhenProvided() throws Exception {
     String token = "test-jwt-token";
-    when(request.getParameter("token")).thenReturn(token);
+    when(request.getParameter(TOKEN)).thenReturn(token);
 
     HttpServletRequestWrapper wrapper = mock(HttpServletRequestWrapper.class);
 
     invokeHandleTokenConsistency(request, wrapper);
 
-    verify(session).setAttribute("#JWT_TOKEN", token);
+    verify(session).setAttribute(JWT_TOKEN_HASH, token);
   }
 
   /**
@@ -183,8 +187,8 @@ public class ForwarderServletTest extends OBBaseTest {
     String sessionToken = "session-jwt-token";
     String sessionId = "test-session-id";
 
-    when(request.getParameter("token")).thenReturn(null);
-    when(session.getAttribute("#JWT_TOKEN")).thenReturn(sessionToken);
+    when(request.getParameter(TOKEN)).thenReturn(null);
+    when(session.getAttribute(JWT_TOKEN_HASH)).thenReturn(sessionToken);
 
     try (MockedStatic<SecureWebServicesUtils> swsUtilsMock = mockStatic(SecureWebServicesUtils.class)) {
       swsUtilsMock.when(() -> SecureWebServicesUtils.decodeToken(sessionToken))
@@ -210,8 +214,8 @@ public class ForwarderServletTest extends OBBaseTest {
   public void handleTokenConsistencyShouldThrowExceptionOnDecodeError() {
     String sessionToken = "invalid-jwt-token";
 
-    when(request.getParameter("token")).thenReturn(null);
-    when(session.getAttribute("#JWT_TOKEN")).thenReturn(sessionToken);
+    when(request.getParameter(TOKEN)).thenReturn(null);
+    when(session.getAttribute(JWT_TOKEN_HASH)).thenReturn(sessionToken);
 
     try (MockedStatic<SecureWebServicesUtils> swsUtilsMock = mockStatic(SecureWebServicesUtils.class)) {
       swsUtilsMock.when(() -> SecureWebServicesUtils.decodeToken(sessionToken))
@@ -319,7 +323,7 @@ public class ForwarderServletTest extends OBBaseTest {
    */
   @Test
   public void maybeValidateLegacyClassShouldValidateExistingClass() throws Exception {
-    String pathInfo = "/SalesInvoice/Header_Edition.html";
+    String pathInfo = SALES_INVOICE_HEADER_EDITION_HTML;
 
     // This should not throw exception for existing classes
     try {
@@ -343,7 +347,7 @@ public class ForwarderServletTest extends OBBaseTest {
    */
   @Test
   public void maybeValidateLegacyClassShouldIgnoreNonLegacyPaths() throws Exception {
-    String pathInfo = "/api/data";
+    String pathInfo = API_DATA_PATH;
 
     // Should not throw exception for non-legacy paths
     invokeMaybeValidateLegacyClass(pathInfo);
@@ -361,7 +365,7 @@ public class ForwarderServletTest extends OBBaseTest {
    */
   @Test
   public void deriveLegacyClassShouldCreateCorrectClassName() throws Exception {
-    String result1 = invokeDerivateLegacyClass("/SalesInvoice/Header_Edition.html");
+    String result1 = invokeDerivateLegacyClass(SALES_INVOICE_HEADER_EDITION_HTML);
     assertEquals("org.openbravo.erpWindows.SalesInvoice.Header", result1);
 
     String result2 = invokeDerivateLegacyClass("/ProductMgmt/Product.html");

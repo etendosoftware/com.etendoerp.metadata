@@ -81,15 +81,14 @@ public class UtilsTest extends OBBaseTest {
     private OBContext obContext;
     
     private String sessionId;
-    private List<UserRoles> userRolesList;
 
-    @Override
+  @Override
     @Before
     public void setUp() throws Exception {
         super.setUp();
         
         sessionId = "test-session-id";
-        userRolesList = new ArrayList<>();
+        List<UserRoles> userRolesList = new ArrayList<>();
         userRolesList.add(userRoles);
         
         // Setup basic mocks

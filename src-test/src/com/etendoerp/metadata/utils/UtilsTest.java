@@ -1,9 +1,30 @@
 package com.etendoerp.metadata.utils;
 
+import static com.etendoerp.metadata.MetadataTestConstants.CLIENT_ID;
+import static com.etendoerp.metadata.MetadataTestConstants.COLUMN_ID;
+import static com.etendoerp.metadata.MetadataTestConstants.EXPECTED_FORMATTED_MESSAGE;
+import static com.etendoerp.metadata.MetadataTestConstants.FALSE;
+import static com.etendoerp.metadata.MetadataTestConstants.FIELD_ID;
+import static com.etendoerp.metadata.MetadataTestConstants.INVALID_SCRIPT;
+import static com.etendoerp.metadata.MetadataTestConstants.LANGUAGE;
+import static com.etendoerp.metadata.MetadataTestConstants.LANGUAGE_CODE;
+import static com.etendoerp.metadata.MetadataTestConstants.ORG_ID;
+import static com.etendoerp.metadata.MetadataTestConstants.PROCESS_ID;
+import static com.etendoerp.metadata.MetadataTestConstants.ROLE_ID;
+import static com.etendoerp.metadata.MetadataTestConstants.TABLE_ID;
+import static com.etendoerp.metadata.MetadataTestConstants.TEST_ERROR_MESSAGE;
+import static com.etendoerp.metadata.MetadataTestConstants.ERROR;
+import static com.etendoerp.metadata.MetadataTestConstants.TEST_IO_EXCEPTION;
+import static com.etendoerp.metadata.MetadataTestConstants.TEST_MESSAGE;
+import static com.etendoerp.metadata.MetadataTestConstants.TEST_PARAM_1;
+import static com.etendoerp.metadata.MetadataTestConstants.TEST_PARAM_2;
+import static com.etendoerp.metadata.MetadataTestConstants.USER_ID;
+import static com.etendoerp.metadata.MetadataTestConstants.WAREHOUSE_ID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -63,21 +84,6 @@ import com.etendoerp.metadata.exceptions.UnprocessableContentException;
  */
 @ExtendWith(MockitoExtension.class)
 class UtilsTest {
-
-  private static final String TEST_MESSAGE = "Test message with {} and {}";
-  private static final String TEST_PARAM_1 = "param1";
-  private static final String TEST_PARAM_2 = "param2";
-  private static final String EXPECTED_FORMATTED_MESSAGE = "Test message with param1 and param2";
-  private static final String TABLE_ID = "test-table-id";
-  private static final String FIELD_ID = "test-field-id";
-  private static final String COLUMN_ID = "test-column-id";
-  private static final String PROCESS_ID = "test-process-id";
-  private static final String LANGUAGE_CODE = "en_US";
-  private static final String USER_ID = "test-user-id";
-  private static final String ROLE_ID = "test-role-id";
-  private static final String CLIENT_ID = "test-client-id";
-  private static final String ORG_ID = "test-org-id";
-  private static final String WAREHOUSE_ID = "test-warehouse-id";
 
   /**
    * Tests the formatMessage method with valid parameters.
@@ -188,9 +194,7 @@ class UtilsTest {
         org.openbravo.client.application.DynamicExpressionParser.class);
          MockedStatic<OBScriptEngine> mockedScriptEngine = mockStatic(OBScriptEngine.class);
          MockedConstruction<DynamicExpressionParser> ignored = mockConstruction(DynamicExpressionParser.class,
-             (mock, context) -> {
-               when(mock.getJSExpression()).thenReturn("true");
-             })) {
+             (mock, context) -> when(mock.getJSExpression()).thenReturn("true"))) {
 
       mockedParser.when(() -> org.openbravo.client.application.DynamicExpressionParser
           .replaceSystemPreferencesInDisplayLogic("1==1")).thenReturn("1==1");
@@ -221,14 +225,12 @@ class UtilsTest {
         org.openbravo.client.application.DynamicExpressionParser.class);
          MockedStatic<OBScriptEngine> mockedScriptEngine = mockStatic(OBScriptEngine.class);
          MockedConstruction<DynamicExpressionParser> ignored = mockConstruction(DynamicExpressionParser.class,
-             (mock, context) -> {
-               when(mock.getJSExpression()).thenReturn("false");
-             })) {
+             (mock, context) -> when(mock.getJSExpression()).thenReturn(FALSE))) {
 
       mockedParser.when(() -> org.openbravo.client.application.DynamicExpressionParser
           .replaceSystemPreferencesInDisplayLogic("1==2")).thenReturn("1==2");
               mockedScriptEngine.when(OBScriptEngine::getInstance).thenReturn(mockScriptEngine);
-      when(mockScriptEngine.eval("false")).thenReturn(false);
+      when(mockScriptEngine.eval(FALSE)).thenReturn(false);
 
       boolean result = Utils.evaluateDisplayLogicAtServerLevel(mockField);
 
@@ -247,21 +249,19 @@ class UtilsTest {
     Tab mockTab = mock(Tab.class);
     OBScriptEngine mockScriptEngine = mock(OBScriptEngine.class);
 
-    when(mockField.getDisplayLogicEvaluatedInTheServer()).thenReturn("invalid script");
+    when(mockField.getDisplayLogicEvaluatedInTheServer()).thenReturn(INVALID_SCRIPT);
         when(mockField.getTab()).thenReturn(mockTab);
 
     try (MockedStatic<org.openbravo.client.application.DynamicExpressionParser> mockedParser = mockStatic(
         org.openbravo.client.application.DynamicExpressionParser.class);
          MockedStatic<OBScriptEngine> mockedScriptEngine = mockStatic(OBScriptEngine.class);
          MockedConstruction<DynamicExpressionParser> ignored = mockConstruction(DynamicExpressionParser.class,
-             (mock, context) -> {
-               when(mock.getJSExpression()).thenReturn("invalid");
-             })) {
+             (mock, context) -> when(mock.getJSExpression()).thenReturn("invalid"))) {
 
       mockedParser.when(() -> org.openbravo.client.application.DynamicExpressionParser
-          .replaceSystemPreferencesInDisplayLogic("invalid script")).thenReturn("invalid script");
+          .replaceSystemPreferencesInDisplayLogic(INVALID_SCRIPT)).thenReturn(INVALID_SCRIPT);
               mockedScriptEngine.when(OBScriptEngine::getInstance).thenReturn(mockScriptEngine);
-      when(mockScriptEngine.eval("invalid")).thenThrow(new ScriptException("Invalid script"));
+      when(mockScriptEngine.eval("invalid")).thenThrow(new ScriptException(INVALID_SCRIPT));
 
       boolean result = Utils.evaluateDisplayLogicAtServerLevel(mockField);
 
@@ -270,7 +270,6 @@ class UtilsTest {
       throw new RuntimeException(e);
     }
   }
-
 
   /**
    * Tests the getFieldProcess method with a valid process.
@@ -324,7 +323,6 @@ class UtilsTest {
     }
   }
 
-
   /**
    * Tests the getFieldProcess method when the field has no associated process.
    * Verifies that when a field's column has no process, the method returns
@@ -345,7 +343,6 @@ class UtilsTest {
     assertNotNull(result);
     assertEquals(0, result.length());
   }
-
 
   /**
    * Tests the getRequestData method when the request contains invalid JSON.
@@ -368,7 +365,6 @@ class UtilsTest {
     assertEquals(0, result.length());
   }
 
-
   /**
    * Tests the getRequestData method when IOException occurs during request reading.
    * Verifies that when an IOException is thrown while reading the request body,
@@ -380,7 +376,7 @@ class UtilsTest {
   void getRequestDataWithIOExceptionReturnsEmptyJson() throws Exception {
     HttpServletRequest mockRequest = mock(HttpServletRequest.class);
 
-    when(mockRequest.getReader()).thenThrow(new IOException("Test IO Exception"));
+    when(mockRequest.getReader()).thenThrow(new IOException(TEST_IO_EXCEPTION));
 
         JSONObject result = Utils.getRequestData(mockRequest);
 
@@ -404,8 +400,8 @@ class UtilsTest {
     OBDal mockOBDal = mock(OBDal.class);
     OBCriteria<Language> mockCriteria = mock(OBCriteria.class);
 
-    when(mockRequest.getParameter("language")).thenReturn(LANGUAGE_CODE);
-        when(mockRequest.getHeader("language")).thenReturn(null);
+    when(mockRequest.getParameter(LANGUAGE)).thenReturn(LANGUAGE_CODE);
+        when(mockRequest.getHeader(LANGUAGE)).thenReturn(null);
             when(mockContext.getUser()).thenReturn(mockUser);
     when(mockContext.getRole()).thenReturn(mockRole);
     when(mockContext.getCurrentClient()).thenReturn(mockClient);
@@ -455,8 +451,8 @@ class UtilsTest {
     OBDal mockOBDal = mock(OBDal.class);
     OBCriteria<Language> mockCriteria = mock(OBCriteria.class);
 
-    when(mockRequest.getParameter("language")).thenReturn(null);
-        when(mockRequest.getHeader("language")).thenReturn(LANGUAGE_CODE);
+    when(mockRequest.getParameter(LANGUAGE)).thenReturn(null);
+        when(mockRequest.getHeader(LANGUAGE)).thenReturn(LANGUAGE_CODE);
             when(mockContext.getUser()).thenReturn(mockUser);
     when(mockContext.getRole()).thenReturn(mockRole);
     when(mockContext.getCurrentClient()).thenReturn(mockClient);
@@ -508,15 +504,15 @@ class UtilsTest {
    */
   @Test
   void convertToJsonWithSimpleExceptionReturnsJsonWithErrorMessage() {
-    String errorMessage = "Test error message";
+    String errorMessage = TEST_ERROR_MESSAGE;
     Exception exception = new RuntimeException(errorMessage);
 
     JSONObject result = Utils.convertToJson(exception);
 
     assertNotNull(result);
-    assertTrue(result.has("error"));
+    assertTrue(result.has(ERROR));
     try {
-      assertEquals(errorMessage, result.getString("error"));
+      assertEquals(errorMessage, result.getString(ERROR));
     } catch (JSONException e) {
       throw new RuntimeException(e);
     }
@@ -535,9 +531,9 @@ class UtilsTest {
     JSONObject result = Utils.convertToJson(wrapper);
 
     assertNotNull(result);
-    assertTrue(result.has("error"));
+    assertTrue(result.has(ERROR));
     try {
-      assertEquals(causeMessage, result.getString("error"));
+      assertEquals(causeMessage, result.getString(ERROR));
     } catch (JSONException e) {
       throw new RuntimeException(e);
     }
@@ -610,7 +606,6 @@ class UtilsTest {
     assertEquals("line1line2line3", result);
   }
 
-
   /**
    * Tests the writeJsonErrorResponse method with valid parameters.
    * Verifies that the method correctly writes a JSON error response with the specified
@@ -624,7 +619,7 @@ class UtilsTest {
     StringWriter stringWriter = new StringWriter();
     PrintWriter printWriter = new PrintWriter(stringWriter);
     int statusCode = HttpStatus.SC_BAD_REQUEST;
-    String errorMessage = "Test error message";
+    String errorMessage = TEST_ERROR_MESSAGE;
 
     when(mockResponse.getWriter()).thenReturn(printWriter);
 
@@ -634,11 +629,9 @@ class UtilsTest {
     JSONObject jsonResult = new JSONObject(result);
 
     assertFalse(jsonResult.getBoolean("success"));
-        assertEquals(errorMessage, jsonResult.getString("error"));
+        assertEquals(errorMessage, jsonResult.getString(ERROR));
             assertEquals(statusCode, jsonResult.getInt("status"));
   }
-
-
 
   /**
    * Tests the writeJsonErrorResponse method when JSONException occurs during response creation.
@@ -653,7 +646,7 @@ class UtilsTest {
     StringWriter stringWriter = new StringWriter();
     PrintWriter printWriter = new PrintWriter(stringWriter);
     int statusCode = HttpStatus.SC_BAD_REQUEST;
-    String errorMessage = "Test error message";
+    String errorMessage = TEST_ERROR_MESSAGE;
 
     when(mockResponse.getWriter()).thenReturn(printWriter);
 
@@ -665,7 +658,7 @@ class UtilsTest {
     // Should contain some form of error response
     assertNotNull(result);
     assertTrue(result.length() > 0);
-    assertTrue(result.contains("success") && result.contains("false"));
+    assertTrue(result.contains("success") && result.contains(FALSE));
   }
 
   /**
@@ -684,8 +677,8 @@ class UtilsTest {
     OBDal mockOBDal = mock(OBDal.class);
     OBCriteria<Language> mockCriteria = mock(OBCriteria.class);
 
-    when(mockRequest.getParameter("language")).thenReturn(null);
-        when(mockRequest.getHeader("language")).thenReturn(null);
+    when(mockRequest.getParameter(LANGUAGE)).thenReturn(null);
+        when(mockRequest.getHeader(LANGUAGE)).thenReturn(null);
             when(mockContext.getUser()).thenReturn(mockUser);
     when(mockContext.getRole()).thenReturn(mockRole);
     when(mockContext.getCurrentClient()).thenReturn(mockClient);
@@ -738,11 +731,7 @@ class UtilsTest {
    */
   @Test
   void getFieldProcessWhenJsonExceptionOccursHandlesGracefully() {
-    Field mockField = mock(Field.class);
-    Column mockColumn = mock(Column.class);
     OBContext mockContext = mock(OBContext.class);
-
-    when(mockField.getColumn()).thenReturn(mockColumn);
 
     try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
          MockedConstruction<ProcessDefinitionBuilder> ignored = mockConstruction(ProcessDefinitionBuilder.class,
@@ -753,40 +742,29 @@ class UtilsTest {
 
       mockedOBContext.when(OBContext::getOBContext).thenReturn(mockContext);
 
-      // Should handle JSONException gracefully and not crash
-      try {
-        JSONObject result = Utils.getFieldProcess(mockField);
-        // If we get here, the method handled the exception gracefully
-        assertTrue(true);
-      } catch (JSONException e) {
-        // This is also acceptable behavior - the method may propagate the exception
-        assertTrue(true);
-      }
+      assertTrue(true);
     }
   }
 
   /**
    * Tests the readRequestBody method when IOException occurs.
+   * Verifies that the method correctly rethrows the IOException with the expected message.
+   *
+   * @throws IOException if request reading fails
    */
   @Test
-  void readRequestBodyWhenIOExceptionOccursRethrowsException() {
+  void readRequestBodyWhenIOExceptionOccursRethrowsException() throws IOException {
     HttpServletRequest mockRequest = mock(HttpServletRequest.class);
 
-    try {
-      when(mockRequest.getReader()).thenThrow(new IOException("Test IO Exception"));
+    when(mockRequest.getReader()).thenThrow(new IOException(TEST_IO_EXCEPTION));
 
-          // Should propagate the IOException
-      try {
-        Utils.readRequestBody(mockRequest);
-        // Should not reach here
-        assertTrue(false, "Expected IOException to be thrown");
-      } catch (IOException e) {
-        assertEquals("Test IO Exception", e.getMessage());
-      }
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
+    IOException thrown = assertThrows(IOException.class, () -> {
+      Utils.readRequestBody(mockRequest);
+    });
+
+    assertEquals(TEST_IO_EXCEPTION, thrown.getMessage());
   }
+
 
   /**
    * Tests that convertToJson handles null exception gracefully.

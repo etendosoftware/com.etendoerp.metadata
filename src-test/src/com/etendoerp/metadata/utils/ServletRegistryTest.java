@@ -15,6 +15,8 @@ import javax.servlet.ServletConfig;
 import javax.servlet.ServletContext;
 import javax.servlet.ServletRegistration;
 
+import static com.etendoerp.metadata.MetadataTestConstants.TEST_PATH;
+import static com.etendoerp.metadata.MetadataTestConstants.TEST_PATH_WILDCARD;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -100,10 +102,10 @@ class ServletRegistryTest {
          MockedStatic<WeldUtils> weldUtilsMock = mockStatic(WeldUtils.class)) {
 
       Map<String, ServletRegistration> registrations = new HashMap<>();
-      registrations.put("/test", servletRegistration);
+      registrations.put(TEST_PATH, servletRegistration);
 
       when(servletRegistration.getClassName()).thenReturn(invalidClassName);
-      when(servletRegistration.getMappings()).thenReturn(Arrays.asList("/test/*"));
+      when(servletRegistration.getMappings()).thenReturn(Arrays.asList(TEST_PATH_WILDCARD));
 
       requestContextMock.when(RequestContext::getServletContext).thenReturn(servletContext);
       doReturn(registrations).when(servletContext).getServletRegistrations();
@@ -148,7 +150,7 @@ class ServletRegistryTest {
       Map<String, ServletRegistration> registrations = new HashMap<>();
       registrations.put("test", servletRegistration);
 
-      when(servletRegistration.getMappings()).thenReturn(Arrays.asList("/test/*"));
+      when(servletRegistration.getMappings()).thenReturn(Arrays.asList(TEST_PATH_WILDCARD));
 
       requestContextMock.when(RequestContext::getServletContext).thenReturn(servletContext);
       doReturn(registrations).when(servletContext).getServletRegistrations();
@@ -163,17 +165,17 @@ class ServletRegistryTest {
    */
   @Test
   void getDelegatedServletWithValidServletMockingShouldCreateServlet() {
-    String uri = "/test";
+    String uri = TEST_PATH;
     String className = "org.openbravo.erpCommon.security.Menu";
 
     try (MockedStatic<RequestContext> requestContextMock = mockStatic(RequestContext.class);
          MockedStatic<WeldUtils> weldUtilsMock = mockStatic(WeldUtils.class)) {
 
       Map<String, ServletRegistration> registrations = new HashMap<>();
-      registrations.put("/test", servletRegistration);
+      registrations.put(TEST_PATH, servletRegistration);
 
       when(servletRegistration.getClassName()).thenReturn(className);
-      when(servletRegistration.getMappings()).thenReturn(Arrays.asList("/test/*"));
+      when(servletRegistration.getMappings()).thenReturn(Arrays.asList(TEST_PATH_WILDCARD));
 
       requestContextMock.when(RequestContext::getServletContext).thenReturn(servletContext);
       doReturn(registrations).when(servletContext).getServletRegistrations();
@@ -203,10 +205,10 @@ class ServletRegistryTest {
          MockedStatic<WeldUtils> weldUtilsMock = mockStatic(WeldUtils.class)) {
 
       Map<String, ServletRegistration> registrations = new HashMap<>();
-      registrations.put("/test", servletRegistration);
+      registrations.put(TEST_PATH, servletRegistration);
 
       when(servletRegistration.getClassName()).thenReturn(className);
-      when(servletRegistration.getMappings()).thenReturn(Arrays.asList("/test/*"));
+      when(servletRegistration.getMappings()).thenReturn(Arrays.asList(TEST_PATH_WILDCARD));
 
       requestContextMock.when(RequestContext::getServletContext).thenReturn(servletContext);
       doReturn(registrations).when(servletContext).getServletRegistrations();

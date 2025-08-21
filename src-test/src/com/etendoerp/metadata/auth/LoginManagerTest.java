@@ -1,5 +1,20 @@
 package com.etendoerp.metadata.auth;
 
+import static com.etendoerp.metadata.MetadataTestConstants.AUTHORIZATION;
+import static com.etendoerp.metadata.MetadataTestConstants.CLIENT_ID;
+import static com.etendoerp.metadata.MetadataTestConstants.DEFAULT_ROLE_ID;
+import static com.etendoerp.metadata.MetadataTestConstants.ENTITY_PROVIDER;
+import static com.etendoerp.metadata.MetadataTestConstants.ORG_ID;
+import static com.etendoerp.metadata.MetadataTestConstants.PASSWORD;
+import static com.etendoerp.metadata.MetadataTestConstants.ROLE_ID;
+import static com.etendoerp.metadata.MetadataTestConstants.SESSION_ID;
+import static com.etendoerp.metadata.MetadataTestConstants.TEST_JWT_TOKEN;
+import static com.etendoerp.metadata.MetadataTestConstants.TEST_PASSWORD;
+import static com.etendoerp.metadata.MetadataTestConstants.TEST_USER;
+import static com.etendoerp.metadata.MetadataTestConstants.TOKEN;
+import static com.etendoerp.metadata.MetadataTestConstants.USERNAME;
+import static com.etendoerp.metadata.MetadataTestConstants.USER_ID;
+import static com.etendoerp.metadata.MetadataTestConstants.WAREHOUSE_ID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -57,47 +72,20 @@ import com.smf.securewebservices.utils.SecureWebServicesUtils;
 @RunWith(MockitoJUnitRunner.class)
 public class LoginManagerTest extends OBBaseTest {
 
-    @Mock
-    private HttpServletRequest request;
-
-    @Mock
-    private HttpSession session;
-
-    @Mock
-    private User user;
-
-    @Mock
-    private Role role;
-
-    @Mock
-    private Role defaultRole;
-
-    @Mock
-    private Organization organization;
-
-    @Mock
-    private Warehouse warehouse;
-
-    @Mock
-    private Client client;
-
-    @Mock
-    private UserRoles userRoles;
-
-    @Mock
-    private OBDal obDal;
-
-    @Mock
-    private DalConnectionProvider connectionProvider;
-
-    @Mock
-    private DecodedJWT decodedJWT;
-
-    @Mock
-    private Claim claim;
-
-    @Mock
-    private LoginUtils.RoleDefaults roleDefaults;
+    @Mock private HttpServletRequest request;
+    @Mock private HttpSession session;
+    @Mock private User user;
+    @Mock private Role role;
+    @Mock private Role defaultRole;
+    @Mock private Organization organization;
+    @Mock private Warehouse warehouse;
+    @Mock private Client client;
+    @Mock private UserRoles userRoles;
+    @Mock private OBDal obDal;
+    @Mock private DalConnectionProvider connectionProvider;
+    @Mock private DecodedJWT decodedJWT;
+    @Mock private Claim claim;
+    @Mock private LoginUtils.RoleDefaults roleDefaults;
 
     private LoginManager loginManager;
     private JSONObject requestData;
@@ -113,22 +101,24 @@ public class LoginManagerTest extends OBBaseTest {
     public void setUp() throws Exception {
         super.setUp();
         loginManager = new LoginManager();
+        setupBasicMocks();
+        setupRequestData();
+        setupRoleDefaults();
+    }
 
-        requestData = new JSONObject();
-        requestData.put("username", "testuser");
-        requestData.put("password", "testpass");
-        requestData.put("role", "role-id");
-        requestData.put("organization", "org-id");
-        requestData.put("warehouse", "warehouse-id");
-        requestData.put("client", "client-id");
-
+    /**
+     * Sets up the basic mocks required for the tests.
+     * This includes mocking the session, user, role, organization, warehouse, and client objects,
+     * as well as setting up their IDs and default values.
+     */
+    private void setupBasicMocks() {
         when(request.getSession(true)).thenReturn(session);
-        when(user.getId()).thenReturn("user-id");
-        when(role.getId()).thenReturn("role-id");
-        when(organization.getId()).thenReturn("org-id");
-        when(warehouse.getId()).thenReturn("warehouse-id");
-        when(client.getId()).thenReturn("client-id");
-        when(session.getId()).thenReturn("session-id");
+        when(user.getId()).thenReturn(USER_ID);
+        when(role.getId()).thenReturn(ROLE_ID);
+        when(organization.getId()).thenReturn(ORG_ID);
+        when(warehouse.getId()).thenReturn(WAREHOUSE_ID);
+        when(client.getId()).thenReturn(CLIENT_ID);
+        when(session.getId()).thenReturn(SESSION_ID);
 
         when(user.getDefaultRole()).thenReturn(defaultRole);
         List<UserRoles> userRolesList = new ArrayList<>();
@@ -138,14 +128,198 @@ public class LoginManagerTest extends OBBaseTest {
     }
 
     /**
+     * Sets up the request data for login, including username, password, role, organization,
+     * warehouse, and client information.
+     *
+     * @throws JSONException if there is an error creating the JSON object
+     */
+    private void setupRequestData() throws JSONException {
+        requestData = new JSONObject();
+        requestData.put(USERNAME, TEST_USER);
+        requestData.put(PASSWORD, TEST_PASSWORD);
+        requestData.put("role", ROLE_ID);
+        requestData.put("organization", ORG_ID);
+        requestData.put("warehouse", WAREHOUSE_ID);
+        requestData.put("client", CLIENT_ID);
+    }
+
+    /**
+     * Sets up the default values for the role used in the login process.
+     * This includes setting the organization, warehouse, and client IDs for the role defaults.
+     */
+    private void setupRoleDefaults() {
+        roleDefaults.org = ORG_ID;
+        roleDefaults.warehouse = WAREHOUSE_ID;
+        roleDefaults.client = CLIENT_ID;
+    }
+
+    /**
+     * Sets up the LoginManager fields using reflection to inject the necessary dependencies.
+     * This includes setting the entity provider and connection provider for the login manager.
+     */
+    private void setupLoginManagerFields() {
+        setFieldWithReflection(ENTITY_PROVIDER, loginManager, obDal);
+        setFieldWithReflection("conn", loginManager, connectionProvider);
+    }
+
+    /**
+     * Mocks the necessary entity retrievals from the OBDal data access layer.
+     * This method sets up the expected behavior for retrieving Role, Organization, Warehouse,
+     * Client, and User entities based on their IDs.
+     */
+    private void setupEntityMocks() {
+        when(obDal.get(Role.class, ROLE_ID)).thenReturn(role);
+        when(obDal.get(Organization.class, ORG_ID)).thenReturn(organization);
+        when(obDal.get(Warehouse.class, WAREHOUSE_ID)).thenReturn(warehouse);
+        when(obDal.get(Client.class, CLIENT_ID)).thenReturn(client);
+        when(obDal.get(User.class, USER_ID)).thenReturn(user);
+    }
+
+    /**
+     * Creates a mocked static Utils instance to return the request data.
+     *
+     * @param data the JSON object containing request data
+     * @return a mocked static Utils instance
+     */
+    private MockedStatic<Utils> createUtilsMock(JSONObject data) {
+        MockedStatic<Utils> utilsMock = mockStatic(Utils.class);
+        utilsMock.when(() -> Utils.getRequestData(request)).thenReturn(data);
+        return utilsMock;
+    }
+
+    /**
+     * Creates a mocked static PasswordHash instance to simulate user credential validation.
+     *
+     * @param validCredentials whether the credentials are valid
+     * @return a mocked static PasswordHash instance
+     */
+    private MockedStatic<PasswordHash> createPasswordHashMock(boolean validCredentials) {
+        MockedStatic<PasswordHash> passwordHashMock = mockStatic(PasswordHash.class);
+        Optional<User> userResult = validCredentials ? Optional.of(user) : Optional.empty();
+        passwordHashMock.when(() -> PasswordHash.getUserWithPassword(TEST_USER, TEST_PASSWORD))
+            .thenReturn(userResult);
+        return passwordHashMock;
+    }
+
+    /**
+     * Creates a mocked static Utils instance to generate a JWT token.
+     *
+     * @return a mocked static Utils instance
+     */
+    private MockedStatic<com.etendoerp.metadata.auth.Utils> createAuthUtilsMock() {
+        MockedStatic<com.etendoerp.metadata.auth.Utils> authUtilsMock =
+            mockStatic(com.etendoerp.metadata.auth.Utils.class);
+        authUtilsMock.when(() -> com.etendoerp.metadata.auth.Utils.generateToken(any(AuthData.class), eq(SESSION_ID)))
+            .thenReturn(TEST_JWT_TOKEN);
+        return authUtilsMock;
+    }
+
+    /**
+     * Creates a mocked static Utils instance to decode a JWT token.
+     *
+     * @param token the JWT token to decode
+     * @return a mocked static Utils instance
+     */
+    private MockedStatic<com.etendoerp.metadata.auth.Utils> createAuthUtilsMockWithTokenDecoding(String token) {
+        MockedStatic<com.etendoerp.metadata.auth.Utils> authUtilsMock = createAuthUtilsMock();
+        authUtilsMock.when(() -> com.etendoerp.metadata.auth.Utils.decodeToken(token))
+            .thenReturn(decodedJWT);
+        return authUtilsMock;
+    }
+
+    /**
+     * Creates a mocked static LoginUtils instance to return role defaults.
+     *
+     * @param roleId the ID of the role for which to get defaults
+     * @return a mocked static LoginUtils instance
+     */
+    private MockedStatic<LoginUtils> createLoginUtilsMock(String roleId) {
+        MockedStatic<LoginUtils> loginUtilsMock = mockStatic(LoginUtils.class);
+        loginUtilsMock.when(() -> LoginUtils.getLoginDefaults(USER_ID, roleId, connectionProvider))
+            .thenReturn(roleDefaults);
+        return loginUtilsMock;
+    }
+
+    /**
+     * Creates a mocked static OBContext instance to set the context for the login process.
+     *
+     * @return a mocked static OBContext instance
+     */
+    private MockedStatic<OBContext> createOBContextMock() {
+        MockedStatic<OBContext> contextMock = mockStatic(OBContext.class);
+        contextMock.when(() -> OBContext.setOBContext((HttpServletRequest) any())).thenAnswer(invocation -> null);
+        contextMock.when(() -> OBContext.setOBContextInSession(any(), any())).thenAnswer(invocation -> null);
+        return contextMock;
+    }
+
+    /**
+     * Sets up the claims for the decoded JWT token.
+     * This method mocks the behavior of the decoded JWT to return specific claims for user, role,
+     * organization, and warehouse when requested.
+     */
+    private void setupTokenClaims() {
+        when(decodedJWT.getClaim("user")).thenReturn(claim);
+        when(decodedJWT.getClaim("role")).thenReturn(claim);
+        when(decodedJWT.getClaim("organization")).thenReturn(claim);
+        when(decodedJWT.getClaim("warehouse")).thenReturn(claim);
+        when(claim.asString()).thenReturn(USER_ID, ROLE_ID, ORG_ID, WAREHOUSE_ID);
+    }
+
+    /**
+     * Executes a successful login process with the provided data and role ID.
+     *
+     * @param data the JSON object containing login data
+     * @param roleId the ID of the role to use for login
+     * @return a JSON object containing the login result
+     * @throws Exception if any error occurs during the login process
+     */
+    private JSONObject executeSuccessfulLogin(JSONObject data, String roleId) throws Exception {
+        try (MockedStatic<Utils> ignored2 = createUtilsMock(data);
+             MockedStatic<PasswordHash> ignored3 = createPasswordHashMock(true);
+             MockedStatic<com.etendoerp.metadata.auth.Utils> ignored6 = createAuthUtilsMock();
+             MockedStatic<LoginUtils> ignored5 = createLoginUtilsMock(roleId);
+             MockedStatic<OBContext> ignored4 = createOBContextMock();
+             MockedStatic<SecureWebServicesUtils> ignored = mockStatic(SecureWebServicesUtils.class);
+             MockedStatic<BaseServlet> ignored1 = mockStatic(BaseServlet.class)) {
+
+            setupLoginManagerFields();
+            setupEntityMocks();
+            return loginManager.processLogin(request);
+        }
+    }
+
+    /**
+     * Executes the login process using a JWT token.
+     *
+     * @param token the JWT token to use for login
+     * @return a JSON object containing the login result
+     * @throws Exception if any error occurs during the login process
+     */
+    private JSONObject executeTokenLogin(String token) throws Exception {
+        JSONObject emptyData = new JSONObject();
+
+        try (MockedStatic<Utils> ignored2 = createUtilsMock(emptyData);
+             MockedStatic<com.etendoerp.metadata.auth.Utils> ignored3 = createAuthUtilsMockWithTokenDecoding(token);
+             MockedStatic<LoginUtils> ignored4 = createLoginUtilsMock(ROLE_ID);
+             MockedStatic<OBContext> ignored5 = createOBContextMock();
+             MockedStatic<SecureWebServicesUtils> ignored = mockStatic(SecureWebServicesUtils.class);
+             MockedStatic<BaseServlet> ignored1 = mockStatic(BaseServlet.class)) {
+
+            when(request.getHeader(AUTHORIZATION)).thenReturn("Bearer " + token);
+            setupTokenClaims();
+            setupLoginManagerFields();
+            setupEntityMocks();
+            return loginManager.processLogin(request);
+        }
+    }
+
+    /**
      * Test for the extractToken method to ensure it correctly extracts the token from the Authorization header.
      */
     @Test
     public void extractTokenShouldReturnTokenWithoutBearerPrefix() {
         String authorization = "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9";
-
         String result = LoginManager.extractToken(authorization);
-
         assertEquals("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9", result);
     }
 
@@ -155,7 +329,6 @@ public class LoginManagerTest extends OBBaseTest {
     @Test
     public void extractTokenShouldReturnNullWhenAuthorizationIsNull() {
         String result = LoginManager.extractToken(null);
-
         assertNull(result);
     }
 
@@ -168,48 +341,12 @@ public class LoginManagerTest extends OBBaseTest {
      */
     @Test
     public void processLoginShouldReturnJSONWithTokenForValidCredentials() throws Exception {
-        try (MockedStatic<Utils> utilsMock = mockStatic(Utils.class);
-             MockedStatic<PasswordHash> passwordHashMock = mockStatic(PasswordHash.class);
-             MockedStatic<com.etendoerp.metadata.auth.Utils> authUtilsMock = mockStatic(com.etendoerp.metadata.auth.Utils.class);
-             MockedStatic<LoginUtils> loginUtilsMock = mockStatic(LoginUtils.class);
-             MockedStatic<OBContext> contextMock = mockStatic(OBContext.class);
-             MockedStatic<SecureWebServicesUtils> ignored = mockStatic(SecureWebServicesUtils.class);
-             MockedStatic<BaseServlet> ignored1 = mockStatic(BaseServlet.class)) {
+        JSONObject result = executeSuccessfulLogin(requestData, ROLE_ID);
 
-            // Setup mocks
-            utilsMock.when(() -> Utils.getRequestData(request)).thenReturn(requestData);
-            passwordHashMock.when(() -> PasswordHash.getUserWithPassword("testuser", "testpass"))
-                .thenReturn(Optional.of(user));
-
-            setFieldWithReflection("entityProvider", loginManager, obDal);
-            setFieldWithReflection("conn", loginManager, connectionProvider);
-
-            when(obDal.get(Role.class, "role-id")).thenReturn(role);
-            when(obDal.get(Organization.class, "org-id")).thenReturn(organization);
-            when(obDal.get(Warehouse.class, "warehouse-id")).thenReturn(warehouse);
-            when(obDal.get(Client.class, "client-id")).thenReturn(client);
-
-            roleDefaults.org = "org-id";
-            roleDefaults.warehouse = "warehouse-id";
-            roleDefaults.client = "client-id";
-
-            loginUtilsMock.when(() -> LoginUtils.getLoginDefaults("user-id", "role-id", connectionProvider))
-                .thenReturn(roleDefaults);
-
-            contextMock.when(() -> OBContext.setOBContext((HttpServletRequest) any())).thenAnswer(invocation -> null);
-            contextMock.when(() -> OBContext.setOBContextInSession(any(), any())).thenAnswer(invocation -> null);
-
-            authUtilsMock.when(() -> com.etendoerp.metadata.auth.Utils.generateToken(any(AuthData.class), eq("session-id")))
-                .thenReturn("test-jwt-token");
-
-            JSONObject result = loginManager.processLogin(request);
-
-            assertNotNull(result);
-            assertTrue(result.has("token"));
-            assertEquals("test-jwt-token", result.getString("token"));
-
-            verify(session).setMaxInactiveInterval(3600);
-        }
+        assertNotNull(result);
+        assertTrue(result.has(TOKEN));
+        assertEquals(TEST_JWT_TOKEN, result.getString(TOKEN));
+        verify(session).setMaxInactiveInterval(3600);
     }
 
     /**
@@ -221,56 +358,12 @@ public class LoginManagerTest extends OBBaseTest {
      */
     @Test
     public void processLoginShouldReturnJSONWithTokenForValidToken() throws Exception {
-        JSONObject emptyData = new JSONObject();
         String token = "valid-jwt-token";
+        JSONObject result = executeTokenLogin(token);
 
-        try (MockedStatic<Utils> utilsMock = mockStatic(Utils.class);
-             MockedStatic<com.etendoerp.metadata.auth.Utils> authUtilsMock = mockStatic(com.etendoerp.metadata.auth.Utils.class);
-             MockedStatic<LoginUtils> loginUtilsMock = mockStatic(LoginUtils.class);
-             MockedStatic<OBContext> contextMock = mockStatic(OBContext.class);
-             MockedStatic<SecureWebServicesUtils> ignored = mockStatic(SecureWebServicesUtils.class);
-             MockedStatic<BaseServlet> ignored1 = mockStatic(BaseServlet.class)) {
-
-            utilsMock.when(() -> Utils.getRequestData(request)).thenReturn(emptyData);
-            when(request.getHeader("Authorization")).thenReturn("Bearer " + token);
-
-            authUtilsMock.when(() -> com.etendoerp.metadata.auth.Utils.decodeToken(token))
-                .thenReturn(decodedJWT);
-
-            when(decodedJWT.getClaim("user")).thenReturn(claim);
-            when(decodedJWT.getClaim("role")).thenReturn(claim);
-            when(decodedJWT.getClaim("organization")).thenReturn(claim);
-            when(decodedJWT.getClaim("warehouse")).thenReturn(claim);
-            when(claim.asString()).thenReturn("user-id", "role-id", "org-id", "warehouse-id");
-
-            setFieldWithReflection("entityProvider", loginManager, obDal);
-            setFieldWithReflection("conn", loginManager, connectionProvider);
-
-            when(obDal.get(User.class, "user-id")).thenReturn(user);
-            when(obDal.get(Role.class, "role-id")).thenReturn(role);
-            when(obDal.get(Organization.class, "org-id")).thenReturn(organization);
-            when(obDal.get(Warehouse.class, "warehouse-id")).thenReturn(warehouse);
-            when(obDal.get(Client.class, "client-id")).thenReturn(client);
-
-            roleDefaults.org = "org-id";
-            roleDefaults.warehouse = "warehouse-id";
-            roleDefaults.client = "client-id";
-
-            loginUtilsMock.when(() -> LoginUtils.getLoginDefaults("user-id", "role-id", connectionProvider))
-                .thenReturn(roleDefaults);
-
-            contextMock.when(() -> OBContext.setOBContext((HttpServletRequest) any())).thenAnswer(invocation -> null);
-            contextMock.when(() -> OBContext.setOBContextInSession(any(), any())).thenAnswer(invocation -> null);
-
-            authUtilsMock.when(() -> com.etendoerp.metadata.auth.Utils.generateToken(any(AuthData.class), eq("session-id")))
-                .thenReturn("test-jwt-token");
-
-            JSONObject result = loginManager.processLogin(request);
-
-            assertNotNull(result);
-            assertTrue(result.has("token"));
-            assertEquals("test-jwt-token", result.getString("token"));
-        }
+        assertNotNull(result);
+        assertTrue(result.has(TOKEN));
+        assertEquals(TEST_JWT_TOKEN, result.getString(TOKEN));
     }
 
     /**
@@ -284,10 +377,8 @@ public class LoginManagerTest extends OBBaseTest {
     public void processLoginShouldThrowExceptionWhenNoCredentialsOrToken() throws Exception {
         JSONObject emptyData = new JSONObject();
 
-        try (MockedStatic<Utils> utilsMock = mockStatic(Utils.class)) {
-            utilsMock.when(() -> Utils.getRequestData(request)).thenReturn(emptyData);
-            when(request.getHeader("Authorization")).thenReturn(null);
-
+        try (MockedStatic<Utils> utilsMock = createUtilsMock(emptyData)) {
+            when(request.getHeader(AUTHORIZATION)).thenReturn(null);
             loginManager.processLogin(request);
         }
     }
@@ -301,13 +392,8 @@ public class LoginManagerTest extends OBBaseTest {
      */
     @Test(expected = UnauthorizedException.class)
     public void processLoginShouldThrowExceptionWhenInvalidCredentials() throws Exception {
-        try (MockedStatic<Utils> utilsMock = mockStatic(Utils.class);
-             MockedStatic<PasswordHash> passwordHashMock = mockStatic(PasswordHash.class)) {
-
-            utilsMock.when(() -> Utils.getRequestData(request)).thenReturn(requestData);
-            passwordHashMock.when(() -> PasswordHash.getUserWithPassword("testuser", "testpass"))
-                .thenReturn(Optional.empty());
-
+        try (MockedStatic<Utils> ignored = createUtilsMock(requestData);
+             MockedStatic<PasswordHash> ignored1 = createPasswordHashMock(false)) {
             loginManager.processLogin(request);
         }
     }
@@ -324,12 +410,11 @@ public class LoginManagerTest extends OBBaseTest {
         JSONObject emptyData = new JSONObject();
         String token = "invalid-jwt-token";
 
-        try (MockedStatic<Utils> utilsMock = mockStatic(Utils.class);
-             MockedStatic<com.etendoerp.metadata.auth.Utils> authUtilsMock = mockStatic(com.etendoerp.metadata.auth.Utils.class)) {
+        try (MockedStatic<Utils> utilsMock = createUtilsMock(emptyData);
+             MockedStatic<com.etendoerp.metadata.auth.Utils> authUtilsMock =
+                 mockStatic(com.etendoerp.metadata.auth.Utils.class)) {
 
-            utilsMock.when(() -> Utils.getRequestData(request)).thenReturn(emptyData);
-            when(request.getHeader("Authorization")).thenReturn("Bearer " + token);
-
+            when(request.getHeader(AUTHORIZATION)).thenReturn("Bearer " + token);
             authUtilsMock.when(() -> com.etendoerp.metadata.auth.Utils.decodeToken(token))
                 .thenThrow(new RuntimeException("Token decoding failed"));
 
@@ -347,49 +432,14 @@ public class LoginManagerTest extends OBBaseTest {
     @Test
     public void processLoginShouldUseDefaultRoleWhenRoleNotProvided() throws Exception {
         JSONObject dataWithoutRole = new JSONObject();
-        dataWithoutRole.put("username", "testuser");
-        dataWithoutRole.put("password", "testpass");
+        dataWithoutRole.put(USERNAME, TEST_USER);
+        dataWithoutRole.put(PASSWORD, TEST_PASSWORD);
 
-        try (MockedStatic<Utils> utilsMock = mockStatic(Utils.class);
-             MockedStatic<PasswordHash> passwordHashMock = mockStatic(PasswordHash.class);
-             MockedStatic<com.etendoerp.metadata.auth.Utils> authUtilsMock = mockStatic(com.etendoerp.metadata.auth.Utils.class);
-             MockedStatic<LoginUtils> loginUtilsMock = mockStatic(LoginUtils.class);
-             MockedStatic<OBContext> contextMock = mockStatic(OBContext.class);
-             MockedStatic<SecureWebServicesUtils> ignored1 = mockStatic(SecureWebServicesUtils.class);
-             MockedStatic<BaseServlet> ignored = mockStatic(BaseServlet.class)) {
+        when(defaultRole.getId()).thenReturn(DEFAULT_ROLE_ID);
+        JSONObject result = executeSuccessfulLogin(dataWithoutRole, DEFAULT_ROLE_ID);
 
-            utilsMock.when(() -> Utils.getRequestData(request)).thenReturn(dataWithoutRole);
-            passwordHashMock.when(() -> PasswordHash.getUserWithPassword("testuser", "testpass"))
-                .thenReturn(Optional.of(user));
-
-            setFieldWithReflection("entityProvider", loginManager, obDal);
-            setFieldWithReflection("conn", loginManager, connectionProvider);
-
-            when(user.getDefaultRole()).thenReturn(defaultRole);
-            when(defaultRole.getId()).thenReturn("default-role-id");
-
-            roleDefaults.org = "org-id";
-            roleDefaults.warehouse = "warehouse-id";
-            roleDefaults.client = "client-id";
-
-            loginUtilsMock.when(() -> LoginUtils.getLoginDefaults("user-id", "default-role-id", connectionProvider))
-                .thenReturn(roleDefaults);
-
-            when(obDal.get(Organization.class, "org-id")).thenReturn(organization);
-            when(obDal.get(Warehouse.class, "warehouse-id")).thenReturn(warehouse);
-            when(obDal.get(Client.class, "client-id")).thenReturn(client);
-
-            contextMock.when(() -> OBContext.setOBContext((HttpServletRequest) any())).thenAnswer(invocation -> null);
-            contextMock.when(() -> OBContext.setOBContextInSession(any(), any())).thenAnswer(invocation -> null);
-
-            authUtilsMock.when(() -> com.etendoerp.metadata.auth.Utils.generateToken(any(AuthData.class), eq("session-id")))
-                .thenReturn("test-jwt-token");
-
-            JSONObject result = loginManager.processLogin(request);
-
-            assertNotNull(result);
-            assertTrue(result.has("token"));
-        }
+        assertNotNull(result);
+        assertTrue(result.has(TOKEN));
     }
 
     /**
@@ -402,48 +452,14 @@ public class LoginManagerTest extends OBBaseTest {
     @Test
     public void processLoginShouldUseFirstUserRoleWhenNoDefaultRole() throws Exception {
         JSONObject dataWithoutRole = new JSONObject();
-        dataWithoutRole.put("username", "testuser");
-        dataWithoutRole.put("password", "testpass");
+        dataWithoutRole.put(USERNAME, TEST_USER);
+        dataWithoutRole.put(PASSWORD, TEST_PASSWORD);
 
-        try (MockedStatic<Utils> utilsMock = mockStatic(Utils.class);
-             MockedStatic<PasswordHash> passwordHashMock = mockStatic(PasswordHash.class);
-             MockedStatic<com.etendoerp.metadata.auth.Utils> authUtilsMock = mockStatic(com.etendoerp.metadata.auth.Utils.class);
-             MockedStatic<LoginUtils> loginUtilsMock = mockStatic(LoginUtils.class);
-             MockedStatic<OBContext> contextMock = mockStatic(OBContext.class);
-             MockedStatic<SecureWebServicesUtils> ignored = mockStatic(SecureWebServicesUtils.class);
-             MockedStatic<BaseServlet> ignored1 = mockStatic(BaseServlet.class)) {
+        when(user.getDefaultRole()).thenReturn(null);
+        JSONObject result = executeSuccessfulLogin(dataWithoutRole, ROLE_ID);
 
-            utilsMock.when(() -> Utils.getRequestData(request)).thenReturn(dataWithoutRole);
-            passwordHashMock.when(() -> PasswordHash.getUserWithPassword("testuser", "testpass"))
-                .thenReturn(Optional.of(user));
-
-            setFieldWithReflection("entityProvider", loginManager, obDal);
-            setFieldWithReflection("conn", loginManager, connectionProvider);
-
-            when(user.getDefaultRole()).thenReturn(null);
-
-            roleDefaults.org = "org-id";
-            roleDefaults.warehouse = "warehouse-id";
-            roleDefaults.client = "client-id";
-
-            loginUtilsMock.when(() -> LoginUtils.getLoginDefaults("user-id", "role-id", connectionProvider))
-                .thenReturn(roleDefaults);
-
-            when(obDal.get(Organization.class, "org-id")).thenReturn(organization);
-            when(obDal.get(Warehouse.class, "warehouse-id")).thenReturn(warehouse);
-            when(obDal.get(Client.class, "client-id")).thenReturn(client);
-
-            contextMock.when(() -> OBContext.setOBContext((HttpServletRequest) any())).thenAnswer(invocation -> null);
-            contextMock.when(() -> OBContext.setOBContextInSession(any(), any())).thenAnswer(invocation -> null);
-
-            authUtilsMock.when(() -> com.etendoerp.metadata.auth.Utils.generateToken(any(AuthData.class), eq("session-id")))
-                .thenReturn("test-jwt-token");
-
-            JSONObject result = loginManager.processLogin(request);
-
-            assertNotNull(result);
-            assertTrue(result.has("token"));
-        }
+        assertNotNull(result);
+        assertTrue(result.has(TOKEN));
     }
 
     /**
@@ -455,101 +471,48 @@ public class LoginManagerTest extends OBBaseTest {
      */
     @Test(expected = InternalServerException.class)
     public void processLoginShouldThrowInternalServerExceptionWhenJWTCreationFails() throws Exception {
-        try (MockedStatic<Utils> utilsMock = mockStatic(Utils.class);
-             MockedStatic<PasswordHash> passwordHashMock = mockStatic(PasswordHash.class);
-             MockedStatic<com.etendoerp.metadata.auth.Utils> authUtilsMock = mockStatic(com.etendoerp.metadata.auth.Utils.class);
-             MockedStatic<LoginUtils> loginUtilsMock = mockStatic(LoginUtils.class);
-             MockedStatic<OBContext> contextMock = mockStatic(OBContext.class);
+        try (MockedStatic<Utils> ignored2 = createUtilsMock(requestData);
+             MockedStatic<PasswordHash> ignored3 = createPasswordHashMock(true);
+             MockedStatic<com.etendoerp.metadata.auth.Utils> authUtilsMock =
+                 mockStatic(com.etendoerp.metadata.auth.Utils.class);
+             MockedStatic<LoginUtils> ignored4 = createLoginUtilsMock(ROLE_ID);
+             MockedStatic<OBContext> ignored5 = createOBContextMock();
              MockedStatic<SecureWebServicesUtils> ignored = mockStatic(SecureWebServicesUtils.class);
              MockedStatic<BaseServlet> ignored1 = mockStatic(BaseServlet.class)) {
 
-            utilsMock.when(() -> Utils.getRequestData(request)).thenReturn(requestData);
-            passwordHashMock.when(() -> PasswordHash.getUserWithPassword("testuser", "testpass"))
-                .thenReturn(Optional.of(user));
+            setupLoginManagerFields();
+            setupEntityMocks();
 
-            setFieldWithReflection("entityProvider", loginManager, obDal);
-            setFieldWithReflection("conn", loginManager, connectionProvider);
-
-            when(obDal.get(Role.class, "role-id")).thenReturn(role);
-            when(obDal.get(Organization.class, "org-id")).thenReturn(organization);
-            when(obDal.get(Warehouse.class, "warehouse-id")).thenReturn(warehouse);
-            when(obDal.get(Client.class, "client-id")).thenReturn(client);
-
-            roleDefaults.org = "org-id";
-            roleDefaults.warehouse = "warehouse-id";
-            roleDefaults.client = "client-id";
-
-            loginUtilsMock.when(() -> LoginUtils.getLoginDefaults("user-id", "role-id", connectionProvider))
-                .thenReturn(roleDefaults);
-
-            contextMock.when(() -> OBContext.setOBContext((HttpServletRequest) any())).thenAnswer(invocation -> null);
-            contextMock.when(() -> OBContext.setOBContextInSession(any(), any())).thenAnswer(invocation -> null);
-
-            authUtilsMock.when(() -> com.etendoerp.metadata.auth.Utils.generateToken(any(AuthData.class), eq("session-id")))
+            authUtilsMock.when(() -> com.etendoerp.metadata.auth.Utils.generateToken(any(AuthData.class), eq(SESSION_ID)))
                 .thenThrow(new JWTCreationException("JWT creation failed", new RuntimeException()));
 
             loginManager.processLogin(request);
         }
     }
 
-  /**
-   * Tests that the processLogin method handles a JSONException gracefully.
-   * This test simulates a scenario where the input JSONObject throws a JSONException
-   * when attempting to retrieve the "role" property. It verifies that the processLogin
-   * method does not crash and still returns a valid JSON object with a token.
-   *
-   * @throws Exception if any unexpected error occurs during the test execution
-   */
+    /**
+     * Tests that the processLogin method handles a JSONException gracefully.
+     * This test simulates a scenario where the input JSONObject throws a JSONException
+     * when attempting to retrieve the "role" property. It verifies that the processLogin
+     * method does not crash and still returns a valid JSON object with a token.
+     *
+     * @throws Exception if any unexpected error occurs during the test execution
+     */
     @Test
     public void processLoginShouldHandleJSONExceptionGracefully() throws Exception {
         JSONObject invalidData = mock(JSONObject.class);
-        when(invalidData.has("username")).thenReturn(true);
-        when(invalidData.has("password")).thenReturn(true);
-        when(invalidData.optString("username", null)).thenReturn("testuser");
-        when(invalidData.optString("password", null)).thenReturn("testpass");
+        when(invalidData.has(USERNAME)).thenReturn(true);
+        when(invalidData.has(PASSWORD)).thenReturn(true);
+        when(invalidData.optString(USERNAME, null)).thenReturn(TEST_USER);
+        when(invalidData.optString(PASSWORD, null)).thenReturn(TEST_PASSWORD);
         when(invalidData.has("role")).thenReturn(true);
         when(invalidData.getString("role")).thenThrow(new JSONException("JSON error"));
 
-        try (MockedStatic<Utils> utilsMock = mockStatic(Utils.class);
-             MockedStatic<PasswordHash> passwordHashMock = mockStatic(PasswordHash.class);
-             MockedStatic<com.etendoerp.metadata.auth.Utils> authUtilsMock = mockStatic(com.etendoerp.metadata.auth.Utils.class);
-             MockedStatic<LoginUtils> loginUtilsMock = mockStatic(LoginUtils.class);
-             MockedStatic<OBContext> contextMock = mockStatic(OBContext.class);
-             MockedStatic<SecureWebServicesUtils> ignored = mockStatic(SecureWebServicesUtils.class);
-             MockedStatic<BaseServlet> ignored1 = mockStatic(BaseServlet.class)) {
+        when(defaultRole.getId()).thenReturn(DEFAULT_ROLE_ID);
+        JSONObject result = executeSuccessfulLogin(invalidData, DEFAULT_ROLE_ID);
 
-            utilsMock.when(() -> Utils.getRequestData(request)).thenReturn(invalidData);
-            passwordHashMock.when(() -> PasswordHash.getUserWithPassword("testuser", "testpass"))
-                .thenReturn(Optional.of(user));
-
-            setFieldWithReflection("entityProvider", loginManager, obDal);
-            setFieldWithReflection("conn", loginManager, connectionProvider);
-
-            when(user.getDefaultRole()).thenReturn(defaultRole);
-            when(defaultRole.getId()).thenReturn("default-role-id");
-
-            roleDefaults.org = "org-id";
-            roleDefaults.warehouse = "warehouse-id";
-            roleDefaults.client = "client-id";
-
-            loginUtilsMock.when(() -> LoginUtils.getLoginDefaults("user-id", "default-role-id", connectionProvider))
-                .thenReturn(roleDefaults);
-
-            when(obDal.get(Organization.class, "org-id")).thenReturn(organization);
-            when(obDal.get(Warehouse.class, "warehouse-id")).thenReturn(warehouse);
-            when(obDal.get(Client.class, "client-id")).thenReturn(client);
-
-            contextMock.when(() -> OBContext.setOBContext((HttpServletRequest) any())).thenAnswer(invocation -> null);
-            contextMock.when(() -> OBContext.setOBContextInSession(any(), any())).thenAnswer(invocation -> null);
-
-            authUtilsMock.when(() -> com.etendoerp.metadata.auth.Utils.generateToken(any(AuthData.class), eq("session-id")))
-                .thenReturn("test-jwt-token");
-
-            JSONObject result = loginManager.processLogin(request);
-
-            assertNotNull(result);
-            assertTrue(result.has("token"));
-        }
+        assertNotNull(result);
+        assertTrue(result.has(TOKEN));
     }
 
     /**

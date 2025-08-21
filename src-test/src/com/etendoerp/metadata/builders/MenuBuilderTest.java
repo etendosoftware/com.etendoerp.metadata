@@ -1,5 +1,8 @@
 package com.etendoerp.metadata.builders;
 
+import static com.etendoerp.metadata.MetadataTestConstants.CHILDREN;
+import static com.etendoerp.metadata.MetadataTestConstants.GRANDCHILD_ID;
+import static com.etendoerp.metadata.MetadataTestConstants.PARENT_ID;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -117,10 +120,10 @@ class MenuBuilderTest {
 
     when(freshChildOption.getMenu()).thenReturn(freshParentMenu);
     when(freshChildOption.getType()).thenReturn(MenuManager.MenuEntryType.Summary);
-    when(freshParentMenu.getId()).thenReturn("parent-id");
-    when(freshParentMenu.get(Menu.PROPERTY_ETMETAICON, language, "parent-id")).thenReturn("folder-icon");
-    when(freshParentMenu.get(Menu.PROPERTY_NAME, language, "parent-id")).thenReturn("Parent Menu");
-    when(freshParentMenu.get(Menu.PROPERTY_DESCRIPTION, language, "parent-id")).thenReturn("Parent Description");
+    when(freshParentMenu.getId()).thenReturn(PARENT_ID);
+    when(freshParentMenu.get(Menu.PROPERTY_ETMETAICON, language, PARENT_ID)).thenReturn("folder-icon");
+    when(freshParentMenu.get(Menu.PROPERTY_NAME, language, PARENT_ID)).thenReturn("Parent Menu");
+    when(freshParentMenu.get(Menu.PROPERTY_DESCRIPTION, language, PARENT_ID)).thenReturn("Parent Description");
     when(freshParentMenu.getURL()).thenReturn(null);
     when(freshParentMenu.getAction()).thenReturn(null);
     when(freshParentMenu.getWindow()).thenReturn(null);
@@ -130,10 +133,10 @@ class MenuBuilderTest {
 
     when(grandChild.getMenu()).thenReturn(grandChildMenu);
     when(grandChild.getType()).thenReturn(MenuManager.MenuEntryType.Window);
-    when(grandChildMenu.getId()).thenReturn("grandchild-id");
-    when(grandChildMenu.get(Menu.PROPERTY_ETMETAICON, language, "grandchild-id")).thenReturn("child-icon");
-    when(grandChildMenu.get(Menu.PROPERTY_NAME, language, "grandchild-id")).thenReturn("Grand Child");
-    when(grandChildMenu.get(Menu.PROPERTY_DESCRIPTION, language, "grandchild-id")).thenReturn(
+    when(grandChildMenu.getId()).thenReturn(GRANDCHILD_ID);
+    when(grandChildMenu.get(Menu.PROPERTY_ETMETAICON, language, GRANDCHILD_ID)).thenReturn("child-icon");
+    when(grandChildMenu.get(Menu.PROPERTY_NAME, language, GRANDCHILD_ID)).thenReturn("Grand Child");
+    when(grandChildMenu.get(Menu.PROPERTY_DESCRIPTION, language, GRANDCHILD_ID)).thenReturn(
         "Grand Child Description");
     when(grandChildMenu.getURL()).thenReturn("http://example.com/grandchild");
     when(grandChildMenu.getAction()).thenReturn("grandchild-action");
@@ -144,9 +147,7 @@ class MenuBuilderTest {
 
     try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
          MockedConstruction<MenuManager> ignored = mockConstruction(MenuManager.class,
-             (mock, context) -> {
-               when(mock.getMenu()).thenReturn(rootMenuOption);
-             })) {
+             (mock, context) -> when(mock.getMenu()).thenReturn(rootMenuOption))) {
 
       obContextStatic.when(OBContext::getOBContext).thenReturn(obContext);
       when(obContext.getLanguage()).thenReturn(language);
@@ -159,16 +160,16 @@ class MenuBuilderTest {
       assertEquals(1, menuArray.length());
 
       JSONObject parentMenu = menuArray.getJSONObject(0);
-      assertEquals("parent-id", parentMenu.getString("id"));
-      assertTrue(parentMenu.has("children"));
+      assertEquals(PARENT_ID, parentMenu.getString("id"));
+      assertTrue(parentMenu.has(CHILDREN));
 
-      JSONArray children = parentMenu.getJSONArray("children");
+      JSONArray children = parentMenu.getJSONArray(CHILDREN);
       assertEquals(1, children.length());
 
       JSONObject childMenu = children.getJSONObject(0);
-      assertEquals("grandchild-id", childMenu.getString("id"));
+      assertEquals(GRANDCHILD_ID, childMenu.getString("id"));
       assertEquals("Window", childMenu.getString("type"));
-      assertFalse(childMenu.has("children"));
+      assertFalse(childMenu.has(CHILDREN));
     }
   }
 
@@ -187,9 +188,7 @@ class MenuBuilderTest {
 
     try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
          MockedConstruction<MenuManager> ignored = mockConstruction(MenuManager.class,
-             (mock, context) -> {
-               when(mock.getMenu()).thenReturn(freshRootOption);
-             })) {
+             (mock, context) -> when(mock.getMenu()).thenReturn(freshRootOption))) {
 
       obContextStatic.when(OBContext::getOBContext).thenReturn(obContext);
       when(obContext.getLanguage()).thenReturn(language);

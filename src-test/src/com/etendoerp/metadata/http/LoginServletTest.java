@@ -1,5 +1,9 @@
 package com.etendoerp.metadata.http;
 
+import static com.etendoerp.metadata.MetadataTestConstants.ISC_DATA_FORMAT;
+import static com.etendoerp.metadata.MetadataTestConstants.MANAGER;
+import static com.etendoerp.metadata.MetadataTestConstants.TEST_PRIVATE_KEY;
+import static com.etendoerp.metadata.MetadataTestConstants.TOKEN;
 import static org.junit.Assert.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mockStatic;
@@ -109,7 +113,7 @@ public class LoginServletTest {
    */
   @Test
   public void doGetWithJsonFormatShouldReturnJsonError() throws Exception {
-    when(request.getParameter("isc_dataFormat")).thenReturn("json");
+    when(request.getParameter(ISC_DATA_FORMAT)).thenReturn("json");
 
     try (MockedStatic<AllowedCrossDomainsHandler> corsHandlerMock = mockStatic(AllowedCrossDomainsHandler.class);
          MockedStatic<Utils> utilsMock = mockStatic(Utils.class)) {
@@ -138,7 +142,7 @@ public class LoginServletTest {
    */
   @Test
   public void doGetWithJsonFormatCaseInsensitiveShouldReturnJsonError() throws Exception {
-    when(request.getParameter("isc_dataFormat")).thenReturn("JSON");
+    when(request.getParameter(ISC_DATA_FORMAT)).thenReturn("JSON");
 
     try (MockedStatic<AllowedCrossDomainsHandler> corsHandlerMock = mockStatic(AllowedCrossDomainsHandler.class);
          MockedStatic<Utils> utilsMock = mockStatic(Utils.class)) {
@@ -166,7 +170,7 @@ public class LoginServletTest {
    */
   @Test
   public void doGetWithNonJsonFormatShouldReturnPlainTextError() throws Exception {
-    when(request.getParameter("isc_dataFormat")).thenReturn("xml");
+    when(request.getParameter(ISC_DATA_FORMAT)).thenReturn("xml");
 
     try (MockedStatic<AllowedCrossDomainsHandler> corsHandlerMock = mockStatic(AllowedCrossDomainsHandler.class)) {
       corsHandlerMock.when(AllowedCrossDomainsHandler::getInstance).thenReturn(corsHandler);
@@ -193,7 +197,7 @@ public class LoginServletTest {
    */
   @Test
   public void doGetWithEmptyIscDataFormatShouldReturnPlainText() throws Exception {
-    when(request.getParameter("isc_dataFormat")).thenReturn("");
+    when(request.getParameter(ISC_DATA_FORMAT)).thenReturn("");
 
     try (MockedStatic<AllowedCrossDomainsHandler> corsHandlerMock = mockStatic(AllowedCrossDomainsHandler.class)) {
       corsHandlerMock.when(AllowedCrossDomainsHandler::getInstance).thenReturn(corsHandler);
@@ -222,7 +226,7 @@ public class LoginServletTest {
   @Test
   public void doPostShouldProcessLoginSuccessfully() throws Exception {
     JSONObject loginResult = new JSONObject();
-    loginResult.put("token", "test-jwt-token");
+    loginResult.put(TOKEN, "test-jwt-token");
     loginResult.put("success", true);
 
     try (MockedStatic<AllowedCrossDomainsHandler> corsHandlerMock = mockStatic(AllowedCrossDomainsHandler.class);
@@ -231,9 +235,9 @@ public class LoginServletTest {
 
       corsHandlerMock.when(AllowedCrossDomainsHandler::getInstance).thenReturn(corsHandler);
       configMock.when(SWSConfig::getInstance).thenReturn(swsConfig);
-      when(swsConfig.getPrivateKey()).thenReturn("test-private-key");
+      when(swsConfig.getPrivateKey()).thenReturn(TEST_PRIVATE_KEY);
 
-      setFieldWithReflection("manager", servlet, loginManager);
+      setFieldWithReflection(MANAGER, servlet, loginManager);
       when(loginManager.processLogin(request)).thenReturn(loginResult);
 
       servlet.doPost(request, response);
@@ -269,9 +273,9 @@ public class LoginServletTest {
 
       corsHandlerMock.when(AllowedCrossDomainsHandler::getInstance).thenReturn(corsHandler);
       configMock.when(SWSConfig::getInstance).thenReturn(swsConfig);
-      when(swsConfig.getPrivateKey()).thenReturn("test-private-key");
+      when(swsConfig.getPrivateKey()).thenReturn(TEST_PRIVATE_KEY);
 
-      setFieldWithReflection("manager", servlet, loginManager);
+      setFieldWithReflection(MANAGER, servlet, loginManager);
       UnauthorizedException loginException = new UnauthorizedException("Invalid credentials");
       when(loginManager.processLogin(request)).thenThrow(loginException);
 
@@ -312,9 +316,9 @@ public class LoginServletTest {
 
       corsHandlerMock.when(AllowedCrossDomainsHandler::getInstance).thenReturn(corsHandler);
       configMock.when(SWSConfig::getInstance).thenReturn(swsConfig);
-      when(swsConfig.getPrivateKey()).thenReturn("test-private-key");
+      when(swsConfig.getPrivateKey()).thenReturn(TEST_PRIVATE_KEY);
 
-      setFieldWithReflection("manager", servlet, loginManager);
+      setFieldWithReflection(MANAGER, servlet, loginManager);
       RuntimeException runtimeException = new RuntimeException("Unexpected error");
       when(loginManager.processLogin(request)).thenThrow(runtimeException);
 
@@ -382,7 +386,7 @@ public class LoginServletTest {
   @Test
   public void doPostShouldSetCorrectContentTypeAndEncoding() throws Exception {
     JSONObject loginResult = new JSONObject();
-    loginResult.put("token", "test-jwt-token");
+    loginResult.put(TOKEN, "test-jwt-token");
 
     try (MockedStatic<AllowedCrossDomainsHandler> corsHandlerMock = mockStatic(AllowedCrossDomainsHandler.class);
          MockedStatic<OBContext> ignored = mockStatic(OBContext.class);
@@ -390,9 +394,9 @@ public class LoginServletTest {
 
       corsHandlerMock.when(AllowedCrossDomainsHandler::getInstance).thenReturn(corsHandler);
       configMock.when(SWSConfig::getInstance).thenReturn(swsConfig);
-      when(swsConfig.getPrivateKey()).thenReturn("test-private-key");
+      when(swsConfig.getPrivateKey()).thenReturn(TEST_PRIVATE_KEY);
 
-      setFieldWithReflection("manager", servlet, loginManager);
+      setFieldWithReflection(MANAGER, servlet, loginManager);
       when(loginManager.processLogin(request)).thenReturn(loginResult);
 
       servlet.doPost(request, response);
@@ -417,7 +421,7 @@ public class LoginServletTest {
   @Test
   public void doPostWithComplexLoginResponseShouldSerializeCorrectly() throws Exception {
     JSONObject loginResult = new JSONObject();
-    loginResult.put("token", "complex-jwt-token-with-claims");
+    loginResult.put(TOKEN, "complex-jwt-token-with-claims");
     loginResult.put("user", "testuser");
     loginResult.put("expires", 3600);
     loginResult.put("roles", new String[]{ "admin", "user" });
@@ -428,9 +432,9 @@ public class LoginServletTest {
 
       corsHandlerMock.when(AllowedCrossDomainsHandler::getInstance).thenReturn(corsHandler);
       configMock.when(SWSConfig::getInstance).thenReturn(swsConfig);
-      when(swsConfig.getPrivateKey()).thenReturn("test-private-key");
+      when(swsConfig.getPrivateKey()).thenReturn(TEST_PRIVATE_KEY);
 
-      setFieldWithReflection("manager", servlet, loginManager);
+      setFieldWithReflection(MANAGER, servlet, loginManager);
       when(loginManager.processLogin(request)).thenReturn(loginResult);
 
       servlet.doPost(request, response);
@@ -452,7 +456,7 @@ public class LoginServletTest {
    */
   @Test
   public void loginManagerFieldShouldBeInitialized() throws Exception {
-    LoginManager manager = getFieldWithReflection("manager", servlet, LoginManager.class);
+    LoginManager manager = getFieldWithReflection(MANAGER, servlet, LoginManager.class);
     assertNotNull("LoginManager should be initialized", manager);
   }
 

@@ -1,5 +1,8 @@
 package com.etendoerp.metadata.builders;
 
+import static com.etendoerp.metadata.MetadataTestConstants.ATTRIBUTES;
+import static com.etendoerp.metadata.MetadataTestConstants.ORGANIZATIONS;
+import static com.etendoerp.metadata.MetadataTestConstants.ROLES;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -119,9 +122,7 @@ class SessionBuilderTest {
                when(mock.toJSON()).thenReturn(languagesJson);
              });
          MockedConstruction<DataToJsonConverter> ignored1 = mockConstruction(DataToJsonConverter.class,
-             (mock, context) -> {
-               when(mock.toJsonObject(any(), any())).thenReturn(new JSONObject().put("id", "mock-id"));
-             })) {
+             (mock, context) -> when(mock.toJsonObject(any(), any())).thenReturn(new JSONObject().put("id", "mock-id")))) {
 
       mockedOBContext.when(OBContext::getOBContext).thenReturn(mockContext);
       mockedRequestContext.when(RequestContext::get).thenReturn(mockRequestContext);
@@ -135,20 +136,20 @@ class SessionBuilderTest {
       assertTrue(result.has("currentClient"));
       assertTrue(result.has("currentOrganization"));
       assertTrue(result.has("currentWarehouse"));
-      assertTrue(result.has("roles"));
-      assertTrue(result.has("attributes"));
+      assertTrue(result.has(ROLES));
+      assertTrue(result.has(ATTRIBUTES));
       assertTrue(result.has("languages"));
 
-      JSONArray roles = result.getJSONArray("roles");
+      JSONArray roles = result.getJSONArray(ROLES);
       assertNotNull(roles);
 
       if (roles.length() > 0) {
         JSONObject roleJson = roles.getJSONObject(0);
         assertTrue(roleJson.has("id"));
         assertTrue(roleJson.has("name"));
-        assertTrue(roleJson.has("organizations"));
+        assertTrue(roleJson.has(ORGANIZATIONS));
 
-        JSONArray organizations = roleJson.getJSONArray("organizations");
+        JSONArray organizations = roleJson.getJSONArray(ORGANIZATIONS);
         assertNotNull(organizations);
 
         if (organizations.length() > 0) {
@@ -168,7 +169,7 @@ class SessionBuilderTest {
         }
       }
 
-      JSONObject attributes = result.getJSONObject("attributes");
+      JSONObject attributes = result.getJSONObject(ATTRIBUTES);
       assertEquals("testValue", attributes.getString("testAttr"));
     }
   }
@@ -220,7 +221,7 @@ class SessionBuilderTest {
       JSONObject result = sessionBuilder.toJSON();
 
       assertNotNull(result);
-      JSONArray roles = result.getJSONArray("roles");
+      JSONArray roles = result.getJSONArray(ROLES);
       assertEquals(0, roles.length());
     }
   }
@@ -272,7 +273,7 @@ class SessionBuilderTest {
       JSONObject result = sessionBuilder.toJSON();
 
       assertNotNull(result);
-      JSONArray roles = result.getJSONArray("roles");
+      JSONArray roles = result.getJSONArray(ROLES);
       assertEquals(0, roles.length());
     }
   }
@@ -350,12 +351,12 @@ class SessionBuilderTest {
       JSONObject result = sessionBuilder.toJSON();
 
       assertNotNull(result);
-      JSONArray roles = result.getJSONArray("roles");
+      JSONArray roles = result.getJSONArray(ROLES);
       assertEquals(1, roles.length());
 
       JSONObject roleJson = roles.getJSONObject(0);
       assertEquals("role-id", roleJson.getString("id"));
-      JSONArray organizations = roleJson.getJSONArray("organizations");
+      JSONArray organizations = roleJson.getJSONArray(ORGANIZATIONS);
       assertEquals(0, organizations.length());
     }
   }
@@ -407,8 +408,8 @@ class SessionBuilderTest {
       assertTrue(result.has("currentClient"));
       assertTrue(result.has("currentOrganization"));
       assertTrue(result.has("currentWarehouse"));
-      assertTrue(result.has("roles"));
-      assertTrue(result.has("attributes"));
+      assertTrue(result.has(ROLES));
+      assertTrue(result.has(ATTRIBUTES));
       assertTrue(result.has("languages"));
     }
   }

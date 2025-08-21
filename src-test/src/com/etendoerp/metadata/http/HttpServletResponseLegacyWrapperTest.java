@@ -1,5 +1,10 @@
 package com.etendoerp.metadata.http;
 
+import static com.etendoerp.metadata.MetadataTestConstants.DEFAULT_BUFFER_SIZE;
+import static com.etendoerp.metadata.MetadataTestConstants.ISO_ENCODING;
+import static com.etendoerp.metadata.MetadataTestConstants.TEST_CONTENT;
+import static com.etendoerp.metadata.MetadataTestConstants.UTF8_ENCODING;
+import static com.etendoerp.metadata.MetadataTestConstants.WORLD;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -52,11 +57,6 @@ public class HttpServletResponseLegacyWrapperTest extends OBBaseTest {
   private HttpServletResponse mockResponse;
 
   private HttpServletResponseLegacyWrapper wrapper;
-
-  private static final String TEST_CONTENT = "Test content for response";
-  private static final String UTF8_ENCODING = "UTF-8";
-  private static final String ISO_ENCODING = "ISO-8859-1";
-  private static final int DEFAULT_BUFFER_SIZE = 1024;
 
   /**
    * Sets up the test environment before each test method execution.
@@ -624,7 +624,7 @@ public class HttpServletResponseLegacyWrapperTest extends OBBaseTest {
     outputStream.write(data, 6, 5);
 
     String capturedString = wrapper.getCapturedOutputAsString();
-    assertEquals("Should capture only the specified portion", "World", capturedString);
+    assertEquals("Should capture only the specified portion", WORLD, capturedString);
   }
 
   /**
@@ -641,13 +641,13 @@ public class HttpServletResponseLegacyWrapperTest extends OBBaseTest {
     PrintWriter writer = wrapper.getWriter();
 
     writer.print("Hello ");
-    writer.println("World");
+    writer.println(WORLD);
     writer.printf("Number: %d", 42);
     writer.flush();
 
     String capturedString = wrapper.getCapturedOutputAsString();
     assertTrue("Should capture print output", capturedString.contains("Hello"));
-    assertTrue("Should capture println output", capturedString.contains("World"));
+    assertTrue("Should capture println output", capturedString.contains(WORLD));
     assertTrue("Should capture printf output", capturedString.contains("Number: 42"));
   }
 

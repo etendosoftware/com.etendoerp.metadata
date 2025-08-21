@@ -1,5 +1,16 @@
 package com.etendoerp.metadata.builders;
 
+import static com.etendoerp.metadata.MetadataTestConstants.DISPLAY_LOGIC;
+import static com.etendoerp.metadata.MetadataTestConstants.ENTITY_COLUMN_NAME;
+import static com.etendoerp.metadata.MetadataTestConstants.FIELD1;
+import static com.etendoerp.metadata.MetadataTestConstants.FIELDS;
+import static com.etendoerp.metadata.MetadataTestConstants.FILTER;
+import static com.etendoerp.metadata.MetadataTestConstants.ENTITY_NAME;
+import static com.etendoerp.metadata.MetadataTestConstants.PARENT_COLUMNS;
+import static com.etendoerp.metadata.MetadataTestConstants.PARENT_TAB_ID;
+import static com.etendoerp.metadata.MetadataTestConstants.PARENT_TAB_ID_CAMEL;
+import static com.etendoerp.metadata.MetadataTestConstants.TABLE_NAME;
+import static com.etendoerp.metadata.MetadataTestConstants.TAB_ID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -39,11 +50,6 @@ import com.etendoerp.metadata.data.TabProcessor;
  */
 @ExtendWith(MockitoExtension.class)
 class TabBuilderTest {
-
-    private static final String TAB_ID = "test-tab-id";
-    private static final String PARENT_TAB_ID = "parent-tab-id";
-    private static final String TABLE_NAME = "TestTable";
-    private static final String ENTITY_COLUMN_NAME = "testColumn";
 
     /**
      * Tests the constructor with Tab and TabAccess parameters.
@@ -129,24 +135,24 @@ class TabBuilderTest {
             mockedOBContext.when(OBContext::getOBContext).thenReturn(mockContext);
             mockedKernelUtils.when(KernelUtils::getInstance).thenReturn(mockKernelUtils);
             mockedTabProcessor.when(() -> TabProcessor.getTabFields(mockTab))
-                .thenReturn(new JSONObject().put("field1", new JSONObject()));
+                .thenReturn(new JSONObject().put(FIELD1, new JSONObject()));
 
             TabBuilder tabBuilder = new TabBuilder(mockTab, null);
             JSONObject result = tabBuilder.toJSON();
 
             assertNotNull(result);
-            assertTrue(result.has("filter"));
-            assertTrue(result.has("displayLogic"));
-            assertTrue(result.has("entityName"));
-            assertTrue(result.has("parentColumns"));
-            assertTrue(result.has("fields"));
-            assertFalse(result.has("parentTabId"));
+            assertTrue(result.has(FILTER));
+            assertTrue(result.has(DISPLAY_LOGIC));
+            assertTrue(result.has(ENTITY_NAME));
+            assertTrue(result.has(PARENT_COLUMNS));
+            assertTrue(result.has(FIELDS));
+            assertFalse(result.has(PARENT_TAB_ID_CAMEL));
 
-            assertEquals("1=1", result.getString("filter"));
-            assertEquals("", result.getString("displayLogic"));
-            assertEquals(TABLE_NAME, result.getString("entityName"));
+            assertEquals("1=1", result.getString(FILTER));
+            assertEquals("", result.getString(DISPLAY_LOGIC));
+            assertEquals(TABLE_NAME, result.getString(ENTITY_NAME));
 
-            JSONArray parentColumns = result.getJSONArray("parentColumns");
+            JSONArray parentColumns = result.getJSONArray(PARENT_COLUMNS);
             assertEquals(0, parentColumns.length());
         }
     }
@@ -193,8 +199,8 @@ class TabBuilderTest {
             JSONObject result = tabBuilder.toJSON();
 
             assertNotNull(result);
-            assertTrue(result.has("parentTabId"));
-            assertEquals(PARENT_TAB_ID, result.getString("parentTabId"));
+            assertTrue(result.has(PARENT_TAB_ID_CAMEL));
+            assertEquals(PARENT_TAB_ID, result.getString(PARENT_TAB_ID_CAMEL));
         }
     }
 
@@ -250,8 +256,8 @@ class TabBuilderTest {
             JSONObject result = tabBuilder.toJSON();
 
             assertNotNull(result);
-            assertTrue(result.has("parentColumns"));
-            JSONArray parentColumns = result.getJSONArray("parentColumns");
+            assertTrue(result.has(PARENT_COLUMNS));
+            JSONArray parentColumns = result.getJSONArray(PARENT_COLUMNS);
             assertEquals(1, parentColumns.length());
             assertEquals(ENTITY_COLUMN_NAME, parentColumns.getString(0));
         }
@@ -303,7 +309,7 @@ class TabBuilderTest {
             JSONObject result = tabBuilder.toJSON();
 
             assertNotNull(result);
-            assertTrue(result.has("fields"));
+            assertTrue(result.has(FIELDS));
 
             mockedTabProcessor.verify(() -> TabProcessor.getTabFields(mockTabAccess));
         }
@@ -345,13 +351,13 @@ class TabBuilderTest {
             mockedOBContext.when(OBContext::getOBContext).thenReturn(mockContext);
             mockedKernelUtils.when(KernelUtils::getInstance).thenReturn(mockKernelUtils);
             mockedTabProcessor.when(() -> TabProcessor.getTabFields(mockTab))
-                .thenReturn(new JSONObject().put("field1", new JSONObject()));
+                .thenReturn(new JSONObject().put(FIELD1, new JSONObject()));
 
             TabBuilder tabBuilder = new TabBuilder(mockTab, mockTabAccess);
             JSONObject result = tabBuilder.toJSON();
 
             assertNotNull(result);
-            assertTrue(result.has("fields"));
+            assertTrue(result.has(FIELDS));
             
             mockedTabProcessor.verify(() -> TabProcessor.getTabFields(mockTab));
         }
@@ -391,13 +397,13 @@ class TabBuilderTest {
             mockedOBContext.when(OBContext::getOBContext).thenReturn(mockContext);
             mockedKernelUtils.when(KernelUtils::getInstance).thenReturn(mockKernelUtils);
             mockedTabProcessor.when(() -> TabProcessor.getTabFields(mockTab))
-                .thenReturn(new JSONObject().put("field1", new JSONObject()));
+                .thenReturn(new JSONObject().put(FIELD1, new JSONObject()));
 
             TabBuilder tabBuilder = new TabBuilder(mockTab, null);
             JSONObject result = tabBuilder.toJSON();
 
             assertNotNull(result);
-            assertTrue(result.has("fields"));
+            assertTrue(result.has(FIELDS));
         }
     }
 
@@ -492,23 +498,23 @@ class TabBuilderTest {
 
             assertNotNull(result);
             
-            assertTrue(result.has("filter"));
-            assertTrue(result.has("displayLogic"));
-            assertTrue(result.has("entityName"));
-            assertTrue(result.has("parentColumns"));
-            assertTrue(result.has("fields"));
-            assertTrue(result.has("parentTabId"));
+            assertTrue(result.has(FILTER));
+            assertTrue(result.has(DISPLAY_LOGIC));
+            assertTrue(result.has(ENTITY_NAME));
+            assertTrue(result.has(PARENT_COLUMNS));
+            assertTrue(result.has(FIELDS));
+            assertTrue(result.has(PARENT_TAB_ID_CAMEL));
 
-            assertEquals("active='Y'", result.getString("filter"));
-            assertEquals("@docstatus@='DR'", result.getString("displayLogic"));
-            assertEquals(TABLE_NAME, result.getString("entityName"));
-            assertEquals(PARENT_TAB_ID, result.getString("parentTabId"));
+            assertEquals("active='Y'", result.getString(FILTER));
+            assertEquals("@docstatus@='DR'", result.getString(DISPLAY_LOGIC));
+            assertEquals(TABLE_NAME, result.getString(ENTITY_NAME));
+            assertEquals(PARENT_TAB_ID, result.getString(PARENT_TAB_ID_CAMEL));
 
-            JSONArray parentColumns = result.getJSONArray("parentColumns");
+            JSONArray parentColumns = result.getJSONArray(PARENT_COLUMNS);
             assertEquals(1, parentColumns.length());
             assertEquals(ENTITY_COLUMN_NAME, parentColumns.getString(0));
 
-            JSONObject fields = result.getJSONObject("fields");
+            JSONObject fields = result.getJSONObject(FIELDS);
             assertNotNull(fields);
         }
     }

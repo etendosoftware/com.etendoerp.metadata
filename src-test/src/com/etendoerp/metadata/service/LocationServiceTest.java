@@ -1,5 +1,17 @@
 package com.etendoerp.metadata.service;
 
+import static com.etendoerp.metadata.MetadataTestConstants.ADDRESS_123_MAIN_STREET;
+import static com.etendoerp.metadata.MetadataTestConstants.APT_4B;
+import static com.etendoerp.metadata.MetadataTestConstants.COUNTRY_ID;
+import static com.etendoerp.metadata.MetadataTestConstants.COUNTRY_ID_HYPHEN;
+import static com.etendoerp.metadata.MetadataTestConstants.IDENTIFIER;
+import static com.etendoerp.metadata.MetadataTestConstants.MAIN_ST;
+import static com.etendoerp.metadata.MetadataTestConstants.REGION_ID;
+import static com.etendoerp.metadata.MetadataTestConstants.REGION_ID_HYPHEN;
+import static com.etendoerp.metadata.MetadataTestConstants.SPRINGFIELD;
+import static com.etendoerp.metadata.MetadataTestConstants.TEST_ID;
+import static com.etendoerp.metadata.MetadataTestConstants.ZIP_CODE_12345;
+import static com.etendoerp.metadata.MetadataTestConstants.TEST_LOCATION;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -79,18 +91,18 @@ public class LocationServiceTest extends OBBaseTest {
         locationService = new LocationService();
         
         locationData = new LocationData(
-            "123 Main Street",
-            "Apt 4B", 
-            "12345",
-            "Springfield",
-            "country-id",
-            "region-id"
+            ADDRESS_123_MAIN_STREET,
+            APT_4B,
+            ZIP_CODE_12345,
+            SPRINGFIELD,
+            COUNTRY_ID_HYPHEN,
+            REGION_ID_HYPHEN
         );
         
         when(obProvider.get(Location.class)).thenReturn(location);
         when(obContext.getUser()).thenReturn(user);
-        when(obDal.get(Country.class, "country-id")).thenReturn(country);
-        when(obDal.get(Region.class, "region-id")).thenReturn(region);
+        when(obDal.get(Country.class, COUNTRY_ID_HYPHEN)).thenReturn(country);
+        when(obDal.get(Region.class, REGION_ID_HYPHEN)).thenReturn(region);
         when(country.getName()).thenReturn("United States");
         when(region.getName()).thenReturn("California");
     }
@@ -101,7 +113,7 @@ public class LocationServiceTest extends OBBaseTest {
      */
     @Test
     public void createLocationShouldReturnSuccessfulResult() {
-        String generatedId = "test-location-id";
+        String generatedId =TEST_LOCATION;
         
         try (MockedStatic<SequenceIdData> sequenceIdMock = mockStatic(SequenceIdData.class);
              MockedStatic<OBProvider> providerMock = mockStatic(OBProvider.class);
@@ -117,13 +129,13 @@ public class LocationServiceTest extends OBBaseTest {
             
             assertNotNull(result);
             assertEquals(generatedId, result.get("id"));
-            assertEquals("123 Main Street", result.get("address1"));
-            assertEquals("Apt 4B", result.get("address2"));
-            assertEquals("12345", result.get("postal"));
-            assertEquals("Springfield", result.get("city"));
-            assertEquals("country-id", result.get("countryId"));
-            assertEquals("region-id", result.get("regionId"));
-            assertTrue(result.containsKey("_identifier"));
+            assertEquals(ADDRESS_123_MAIN_STREET, result.get("address1"));
+            assertEquals(APT_4B, result.get("address2"));
+            assertEquals(ZIP_CODE_12345, result.get("postal"));
+            assertEquals(SPRINGFIELD, result.get("city"));
+            assertEquals(COUNTRY_ID_HYPHEN, result.get(COUNTRY_ID));
+            assertEquals(REGION_ID_HYPHEN, result.get(REGION_ID));
+            assertTrue(result.containsKey(IDENTIFIER));
             
             verify(location).setId(generatedId);
             verify(location).setNewOBObject(true);
@@ -132,10 +144,10 @@ public class LocationServiceTest extends OBBaseTest {
             verify(location).setUpdatedBy(user);
             verify(location).setCountry(country);
             verify(location).setRegion(region);
-            verify(location).setAddressLine1("123 Main Street");
-            verify(location).setAddressLine2("Apt 4B");
-            verify(location).setPostalCode("12345");
-            verify(location).setCityName("Springfield");
+            verify(location).setAddressLine1(ADDRESS_123_MAIN_STREET);
+            verify(location).setAddressLine2(APT_4B);
+            verify(location).setPostalCode(ZIP_CODE_12345);
+            verify(location).setCityName(SPRINGFIELD);
             verify(obDal).save(location);
             verify(obDal).flush();
         }
@@ -147,12 +159,12 @@ public class LocationServiceTest extends OBBaseTest {
      */
     @Test
     public void createLocationShouldBuildCorrectIdentifier() {
-        String generatedId = "test-location-id";
+        String generatedId =TEST_LOCATION;
         
-        when(location.getAddressLine1()).thenReturn("123 Main Street");
-        when(location.getAddressLine2()).thenReturn("Apt 4B");
-        when(location.getPostalCode()).thenReturn("12345");
-        when(location.getCityName()).thenReturn("Springfield");
+        when(location.getAddressLine1()).thenReturn(ADDRESS_123_MAIN_STREET);
+        when(location.getAddressLine2()).thenReturn(APT_4B);
+        when(location.getPostalCode()).thenReturn(ZIP_CODE_12345);
+        when(location.getCityName()).thenReturn(SPRINGFIELD);
         when(location.getRegion()).thenReturn(region);
         when(location.getCountry()).thenReturn(country);
         
@@ -168,11 +180,11 @@ public class LocationServiceTest extends OBBaseTest {
             
             Map<String, Object> result = locationService.createLocation(locationData);
             
-            String identifier = (String) result.get("_identifier");
-            assertTrue(identifier.contains("123 Main Street"));
-            assertTrue(identifier.contains("Apt 4B"));
-            assertTrue(identifier.contains("12345"));
-            assertTrue(identifier.contains("Springfield"));
+            String identifier = (String) result.get(IDENTIFIER);
+            assertTrue(identifier.contains(ADDRESS_123_MAIN_STREET));
+            assertTrue(identifier.contains(APT_4B));
+            assertTrue(identifier.contains(ZIP_CODE_12345));
+            assertTrue(identifier.contains(SPRINGFIELD));
             assertTrue(identifier.contains("California"));
             assertTrue(identifier.contains("United States"));
         }
@@ -184,10 +196,10 @@ public class LocationServiceTest extends OBBaseTest {
      */
     @Test
     public void createLocationWithMinimalDataShouldWork() {
-        LocationData minimalData = new LocationData("Main St", null, null, "City", null, null);
-        String generatedId = "test-location-id";
+        LocationData minimalData = new LocationData(MAIN_ST, null, null, "City", null, null);
+        String generatedId =TEST_LOCATION;
         
-        when(location.getAddressLine1()).thenReturn("Main St");
+        when(location.getAddressLine1()).thenReturn(MAIN_ST);
         when(location.getCityName()).thenReturn("City");
         
         try (MockedStatic<SequenceIdData> sequenceIdMock = mockStatic(SequenceIdData.class);
@@ -204,12 +216,12 @@ public class LocationServiceTest extends OBBaseTest {
             
             assertNotNull(result);
             assertEquals(generatedId, result.get("id"));
-            assertEquals("Main St", result.get("address1"));
+            assertEquals(MAIN_ST, result.get("address1"));
             assertNull(result.get("address2"));
             assertNull(result.get("postal"));
             assertEquals("City", result.get("city"));
-            assertNull(result.get("countryId"));
-            assertNull(result.get("regionId"));
+            assertNull(result.get(COUNTRY_ID));
+            assertNull(result.get(REGION_ID));
             
             verify(location, never()).setCountry(any());
             verify(location, never()).setRegion(any());
@@ -228,14 +240,14 @@ public class LocationServiceTest extends OBBaseTest {
              MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
              MockedStatic<OBMessageUtils> messageUtilsMock = mockStatic(OBMessageUtils.class)) {
             
-            sequenceIdMock.when(SequenceIdData::getUUID).thenReturn("test-id");
+            sequenceIdMock.when(SequenceIdData::getUUID).thenReturn(TEST_ID);
             providerMock.when(OBProvider::getInstance).thenReturn(obProvider);
             contextMock.when(OBContext::getOBContext).thenReturn(obContext);
             dalMock.when(OBDal::getInstance).thenReturn(obDal);
             messageUtilsMock.when(() -> OBMessageUtils.messageBD("ETMETA_CountryNotFound"))
                 .thenReturn("Country not found");
             
-            when(obDal.get(Country.class, "country-id")).thenReturn(null);
+            when(obDal.get(Country.class, COUNTRY_ID_HYPHEN)).thenReturn(null);
             
             locationService.createLocation(locationData);
         }
@@ -252,14 +264,14 @@ public class LocationServiceTest extends OBBaseTest {
              MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
              MockedStatic<OBMessageUtils> messageUtilsMock = mockStatic(OBMessageUtils.class)) {
             
-            sequenceIdMock.when(SequenceIdData::getUUID).thenReturn("test-id");
+            sequenceIdMock.when(SequenceIdData::getUUID).thenReturn(TEST_ID);
             providerMock.when(OBProvider::getInstance).thenReturn(obProvider);
             contextMock.when(OBContext::getOBContext).thenReturn(obContext);
             dalMock.when(OBDal::getInstance).thenReturn(obDal);
             messageUtilsMock.when(() -> OBMessageUtils.messageBD("ETMETA_RegionNotFound"))
                 .thenReturn("Region not found");
             
-            when(obDal.get(Region.class, "region-id")).thenReturn(null);
+            when(obDal.get(Region.class, REGION_ID_HYPHEN)).thenReturn(null);
             
             locationService.createLocation(locationData);
         }
@@ -276,7 +288,7 @@ public class LocationServiceTest extends OBBaseTest {
              MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
              MockedStatic<OBMessageUtils> messageUtilsMock = mockStatic(OBMessageUtils.class)) {
             
-            sequenceIdMock.when(SequenceIdData::getUUID).thenReturn("test-id");
+            sequenceIdMock.when(SequenceIdData::getUUID).thenReturn(TEST_ID);
             providerMock.when(OBProvider::getInstance).thenReturn(obProvider);
             contextMock.when(OBContext::getOBContext).thenReturn(obContext);
             dalMock.when(OBDal::getInstance).thenReturn(obDal);
@@ -295,8 +307,8 @@ public class LocationServiceTest extends OBBaseTest {
      */
     @Test
     public void createLocationWithEmptyStringsShouldNotSetReferences() {
-        LocationData dataWithEmptyStrings = new LocationData("Address", "Address2", "12345", "City", "", "");
-        String generatedId = "test-location-id";
+        LocationData dataWithEmptyStrings = new LocationData("Address", "Address2", ZIP_CODE_12345, "City", "", "");
+        String generatedId =TEST_LOCATION;
         
         try (MockedStatic<SequenceIdData> sequenceIdMock = mockStatic(SequenceIdData.class);
              MockedStatic<OBProvider> providerMock = mockStatic(OBProvider.class);
@@ -311,8 +323,8 @@ public class LocationServiceTest extends OBBaseTest {
             Map<String, Object> result = locationService.createLocation(dataWithEmptyStrings);
             
             assertNotNull(result);
-            assertEquals("", result.get("countryId"));
-            assertEquals("", result.get("regionId"));
+            assertEquals("", result.get(COUNTRY_ID));
+            assertEquals("", result.get(REGION_ID));
             
             verify(location, never()).setCountry(any());
             verify(location, never()).setRegion(any());
@@ -327,8 +339,8 @@ public class LocationServiceTest extends OBBaseTest {
      */
     @Test
     public void identifierBuilderShouldHandleNullValues() {
-        LocationData dataWithNulls = new LocationData(null, null, null, "City", "country-id", null);
-        String generatedId = "test-location-id";
+        LocationData dataWithNulls = new LocationData(null, null, null, "City", COUNTRY_ID_HYPHEN, null);
+        String generatedId =TEST_LOCATION;
         
         when(location.getAddressLine1()).thenReturn(null);
         when(location.getAddressLine2()).thenReturn(null);
@@ -349,7 +361,7 @@ public class LocationServiceTest extends OBBaseTest {
             
             Map<String, Object> result = locationService.createLocation(dataWithNulls);
             
-            String identifier = (String) result.get("_identifier");
+            String identifier = (String) result.get(IDENTIFIER);
             assertEquals("City - United States", identifier);
         }
     }
@@ -360,8 +372,8 @@ public class LocationServiceTest extends OBBaseTest {
      */
     @Test
     public void identifierBuilderShouldHandleEmptyStrings() {
-        LocationData dataWithEmptyStrings = new LocationData("", "", "", "City", "country-id", null);
-        String generatedId = "test-location-id";
+        LocationData dataWithEmptyStrings = new LocationData("", "", "", "City", COUNTRY_ID_HYPHEN, null);
+        String generatedId =TEST_LOCATION;
         
         when(location.getAddressLine1()).thenReturn("");
         when(location.getAddressLine2()).thenReturn("");
@@ -382,7 +394,7 @@ public class LocationServiceTest extends OBBaseTest {
             
             Map<String, Object> result = locationService.createLocation(dataWithEmptyStrings);
             
-            String identifier = (String) result.get("_identifier");
+            String identifier = (String) result.get(IDENTIFIER);
             assertEquals("City - United States", identifier);
         }
     }

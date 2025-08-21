@@ -1,5 +1,14 @@
 package com.etendoerp.metadata.builders;
 
+import static com.etendoerp.metadata.MetadataTestConstants.DATASOURCE_NAME;
+import static com.etendoerp.metadata.MetadataTestConstants.JS_EXPRESSION;
+import static com.etendoerp.metadata.MetadataTestConstants.PARAMETER_ID;
+import static com.etendoerp.metadata.MetadataTestConstants.READONLY_LOGIC;
+import static com.etendoerp.metadata.MetadataTestConstants.READ_ONLY_LOGIC_EXPRESSION;
+import static com.etendoerp.metadata.MetadataTestConstants.REF_LIST;
+import static com.etendoerp.metadata.MetadataTestConstants.SELECTOR;
+import static com.etendoerp.metadata.MetadataTestConstants.WINDOW;
+import static com.etendoerp.metadata.MetadataTestConstants.WINDOW_ID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -39,11 +48,6 @@ import com.etendoerp.metadata.utils.Constants;
  */
 @ExtendWith(MockitoExtension.class)
 class ParameterBuilderTest {
-
-  private static final String PARAMETER_ID = "test-parameter-id";
-  private static final String READONLY_LOGIC = "@SQL=SELECT 1 FROM DUAL";
-  private static final String JS_EXPRESSION = "1==1";
-  private static final String WINDOW_ID = "test-window-id";
 
   /**
    * Tests that the ParameterBuilder constructor creates an instance successfully.
@@ -101,10 +105,10 @@ class ParameterBuilderTest {
       assertNotNull(result);
       assertEquals(PARAMETER_ID, result.getString("id"));
       assertEquals("Test Parameter", result.getString("name"));
-      assertFalse(result.has("readOnlyLogicExpression"));
-      assertFalse(result.has("selector"));
-      assertFalse(result.has("refList"));
-      assertFalse(result.has("window"));
+      assertFalse(result.has(READ_ONLY_LOGIC_EXPRESSION));
+      assertFalse(result.has(SELECTOR));
+      assertFalse(result.has(REF_LIST));
+      assertFalse(result.has(WINDOW));
     }
   }
 
@@ -133,9 +137,7 @@ class ParameterBuilderTest {
                when(mock.toJsonObject(any(), eq(DataResolvingMode.FULL_TRANSLATABLE))).thenReturn(parameterJson);
              });
          MockedConstruction<DynamicExpressionParser> ignored2 = mockConstruction(DynamicExpressionParser.class,
-             (mock, context) -> {
-               when(mock.getJSExpression()).thenReturn(JS_EXPRESSION);
-             })) {
+             (mock, context) -> when(mock.getJSExpression()).thenReturn(JS_EXPRESSION))) {
 
       mockedOBContext.when(OBContext::getOBContext).thenReturn(mockContext);
 
@@ -143,8 +145,8 @@ class ParameterBuilderTest {
       JSONObject result = parameterBuilder.toJSON();
 
       assertNotNull(result);
-      assertTrue(result.has("readOnlyLogicExpression"));
-      assertEquals(JS_EXPRESSION, result.getString("readOnlyLogicExpression"));
+      assertTrue(result.has(READ_ONLY_LOGIC_EXPRESSION));
+      assertEquals(JS_EXPRESSION, result.getString(READ_ONLY_LOGIC_EXPRESSION));
     }
   }
 
@@ -179,7 +181,7 @@ class ParameterBuilderTest {
       JSONObject result = parameterBuilder.toJSON();
 
       assertNotNull(result);
-      assertFalse(result.has("readOnlyLogicExpression"));
+      assertFalse(result.has(READ_ONLY_LOGIC_EXPRESSION));
     }
   }
 
@@ -217,7 +219,7 @@ class ParameterBuilderTest {
       mockedOBContext.when(OBContext::getOBContext).thenReturn(mockContext);
 
       JSONObject selectorInfo = new JSONObject();
-      selectorInfo.put("datasourceName", "TestDataSource");
+      selectorInfo.put(DATASOURCE_NAME, "TestDataSource");
       mockedFieldBuilder.when(() -> FieldBuilder.getSelectorInfo(PARAMETER_ID, mockReferenceSearchKey))
           .thenReturn(selectorInfo);
 
@@ -225,9 +227,9 @@ class ParameterBuilderTest {
       JSONObject result = parameterBuilder.toJSON();
 
       assertNotNull(result);
-      assertTrue(result.has("selector"));
-      JSONObject selector = result.getJSONObject("selector");
-      assertEquals("TestDataSource", selector.getString("datasourceName"));
+      assertTrue(result.has(SELECTOR));
+      JSONObject selector = result.getJSONObject(SELECTOR);
+      assertEquals("TestDataSource", selector.getString(DATASOURCE_NAME));
     }
   }
 
@@ -277,8 +279,8 @@ class ParameterBuilderTest {
       JSONObject result = parameterBuilder.toJSON();
 
       assertNotNull(result);
-      assertTrue(result.has("refList"));
-      JSONArray refList = result.getJSONArray("refList");
+      assertTrue(result.has(REF_LIST));
+      JSONArray refList = result.getJSONArray(REF_LIST);
       assertEquals(1, refList.length());
       JSONObject item = refList.getJSONObject(0);
       assertEquals("list-item-1", item.getString("id"));
@@ -337,8 +339,8 @@ class ParameterBuilderTest {
       JSONObject result = parameterBuilder.toJSON();
 
       assertNotNull(result);
-      assertTrue(result.has("window"));
-      JSONObject window = result.getJSONObject("window");
+      assertTrue(result.has(WINDOW));
+      JSONObject window = result.getJSONObject(WINDOW);
       assertEquals(WINDOW_ID, window.getString("id"));
       assertEquals("Test Window", window.getString("name"));
     }
@@ -389,8 +391,8 @@ class ParameterBuilderTest {
         JSONObject result = parameterBuilder.toJSON();
 
         assertNotNull(result);
-        assertTrue(result.has("selector"), "Selector should be present for reference ID: " + referenceId);
-        JSONObject selector = result.getJSONObject("selector");
+        assertTrue(result.has(SELECTOR), "Selector should be present for reference ID: " + referenceId);
+        JSONObject selector = result.getJSONObject(SELECTOR);
         assertEquals(referenceId, selector.getString("referenceType"));
       }
     }
@@ -428,14 +430,12 @@ class ParameterBuilderTest {
                when(mock.toJsonObject(any(), eq(DataResolvingMode.FULL_TRANSLATABLE))).thenReturn(parameterJson);
              });
          MockedConstruction<DynamicExpressionParser> ignored2 = mockConstruction(DynamicExpressionParser.class,
-             (mock, context) -> {
-               when(mock.getJSExpression()).thenReturn(JS_EXPRESSION);
-             })) {
+             (mock, context) -> when(mock.getJSExpression()).thenReturn(JS_EXPRESSION))) {
 
       mockedOBContext.when(OBContext::getOBContext).thenReturn(mockContext);
 
       JSONObject selectorInfo = new JSONObject();
-      selectorInfo.put("datasourceName", "ComplexDataSource");
+      selectorInfo.put(DATASOURCE_NAME, "ComplexDataSource");
       mockedFieldBuilder.when(() -> FieldBuilder.getSelectorInfo(PARAMETER_ID, mockReferenceSearchKey))
           .thenReturn(selectorInfo);
 
@@ -445,11 +445,11 @@ class ParameterBuilderTest {
       assertNotNull(result);
       assertEquals(PARAMETER_ID, result.getString("id"));
       assertEquals("Complex Parameter", result.getString("name"));
-      assertTrue(result.has("readOnlyLogicExpression"));
-      assertEquals(JS_EXPRESSION, result.getString("readOnlyLogicExpression"));
-      assertTrue(result.has("selector"));
-      JSONObject selector = result.getJSONObject("selector");
-      assertEquals("ComplexDataSource", selector.getString("datasourceName"));
+      assertTrue(result.has(READ_ONLY_LOGIC_EXPRESSION));
+      assertEquals(JS_EXPRESSION, result.getString(READ_ONLY_LOGIC_EXPRESSION));
+      assertTrue(result.has(SELECTOR));
+      JSONObject selector = result.getJSONObject(SELECTOR);
+      assertEquals("ComplexDataSource", selector.getString(DATASOURCE_NAME));
     }
   }
 
@@ -484,9 +484,9 @@ class ParameterBuilderTest {
       JSONObject result = parameterBuilder.toJSON();
 
       assertNotNull(result);
-      assertFalse(result.has("selector"));
-      assertFalse(result.has("refList"));
-      assertFalse(result.has("window"));
+      assertFalse(result.has(SELECTOR));
+      assertFalse(result.has(REF_LIST));
+      assertFalse(result.has(WINDOW));
     }
   }
 
@@ -523,9 +523,9 @@ class ParameterBuilderTest {
       JSONObject result = parameterBuilder.toJSON();
 
       assertNotNull(result);
-      assertFalse(result.has("selector"));
-      assertFalse(result.has("refList"));
-      assertFalse(result.has("window"));
+      assertFalse(result.has(SELECTOR));
+      assertFalse(result.has(REF_LIST));
+      assertFalse(result.has(WINDOW));
     }
   }
 }

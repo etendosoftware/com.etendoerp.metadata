@@ -1,5 +1,19 @@
 package com.etendoerp.metadata.http;
 
+import static com.etendoerp.metadata.MetadataTestConstants.APPLICATION_JSON_CONSTANT;
+import static com.etendoerp.metadata.MetadataTestConstants.AUTHORIZATION_HEADER;
+import static com.etendoerp.metadata.MetadataTestConstants.BEARER_PREFIX;
+import static com.etendoerp.metadata.MetadataTestConstants.CONTENT_TYPE_CONSTANT;
+import static com.etendoerp.metadata.MetadataTestConstants.CUSTOM_VALUE;
+import static com.etendoerp.metadata.MetadataTestConstants.LAST_MODIFIED;
+import static com.etendoerp.metadata.MetadataTestConstants.MULTI_HEADER;
+import static com.etendoerp.metadata.MetadataTestConstants.ORIGINAL_HEADER;
+import static com.etendoerp.metadata.MetadataTestConstants.SHOULD_HAVE_NO_MORE_VALUES;
+import static com.etendoerp.metadata.MetadataTestConstants.TEST_SESSION_ID;
+import static com.etendoerp.metadata.MetadataTestConstants.TEST_TOKEN;
+import static com.etendoerp.metadata.MetadataTestConstants.TOKEN;
+import static com.etendoerp.metadata.MetadataTestConstants.VALUE1;
+import static com.etendoerp.metadata.MetadataTestConstants.VALUE2;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -10,9 +24,10 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
-import java.util.Vector;
+import java.util.List;
 
 import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServletRequest;
@@ -24,7 +39,6 @@ import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.MockitoJUnitRunner;
-import org.openbravo.base.exception.OBException;
 import org.openbravo.test.base.OBBaseTest;
 
 import com.auth0.jwt.interfaces.Claim;
@@ -73,12 +87,6 @@ public class HttpServletRequestWrapperTest extends OBBaseTest {
   private Claim mockUserClaim;
 
   private HttpServletRequestWrapper wrapper;
-
-  private static final String TEST_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test.token";
-  private static final String TEST_SESSION_ID = "test-session-id";
-  private static final String TEST_USER_ID = "test-user-id";
-  private static final String AUTHORIZATION_HEADER = "Authorization";
-  private static final String BEARER_PREFIX = "Bearer ";
 
   /**
    * Sets up the test environment before each test method execution.
@@ -149,7 +157,7 @@ public class HttpServletRequestWrapperTest extends OBBaseTest {
   @Test
   public void constructorShouldExtractTokenFromParameter() {
     when(mockRequest.getHeader(AUTHORIZATION_HEADER)).thenReturn(null);
-    when(mockRequest.getParameter("token")).thenReturn(TEST_TOKEN);
+    when(mockRequest.getParameter(TOKEN)).thenReturn(TEST_TOKEN);
 
     try (MockedStatic<SecureWebServicesUtils> mockedUtils = mockStatic(SecureWebServicesUtils.class)) {
       mockedUtils.when(() -> SecureWebServicesUtils.decodeToken(TEST_TOKEN)).thenReturn(mockDecodedJWT);
@@ -172,7 +180,7 @@ public class HttpServletRequestWrapperTest extends OBBaseTest {
   @Test
   public void constructorShouldHandleNoToken() {
     when(mockRequest.getHeader(AUTHORIZATION_HEADER)).thenReturn(null);
-    when(mockRequest.getParameter("token")).thenReturn(null);
+    when(mockRequest.getParameter(TOKEN)).thenReturn(null);
 
     wrapper = new HttpServletRequestWrapper(mockRequest);
 
@@ -189,7 +197,7 @@ public class HttpServletRequestWrapperTest extends OBBaseTest {
   @Test
   public void constructorShouldHandleEmptyAuthorizationHeader() {
     when(mockRequest.getHeader(AUTHORIZATION_HEADER)).thenReturn("");
-    when(mockRequest.getParameter("token")).thenReturn(null);
+    when(mockRequest.getParameter(TOKEN)).thenReturn(null);
 
     wrapper = new HttpServletRequestWrapper(mockRequest);
 
@@ -206,7 +214,7 @@ public class HttpServletRequestWrapperTest extends OBBaseTest {
   @Test
   public void constructorShouldHandleAuthorizationHeaderWithoutBearer() {
     when(mockRequest.getHeader(AUTHORIZATION_HEADER)).thenReturn("Basic " + TEST_TOKEN);
-    when(mockRequest.getParameter("token")).thenReturn(null);
+    when(mockRequest.getParameter(TOKEN)).thenReturn(null);
 
     wrapper = new HttpServletRequestWrapper(mockRequest);
 
@@ -239,7 +247,7 @@ public class HttpServletRequestWrapperTest extends OBBaseTest {
   @Test
   public void wrapShouldReturnSameInstanceForWrapper() {
     when(mockRequest.getHeader(AUTHORIZATION_HEADER)).thenReturn(null);
-    when(mockRequest.getParameter("token")).thenReturn(null);
+    when(mockRequest.getParameter(TOKEN)).thenReturn(null);
 
     HttpServletRequestWrapper originalWrapper = new HttpServletRequestWrapper(mockRequest);
     HttpServletRequestWrapper wrappedRequest = HttpServletRequestWrapper.wrap(originalWrapper);
@@ -282,7 +290,7 @@ public class HttpServletRequestWrapperTest extends OBBaseTest {
   @Test
   public void getSessionWithCreateParameterShouldIgnoreParameter() {
     when(mockRequest.getHeader(AUTHORIZATION_HEADER)).thenReturn(null);
-    when(mockRequest.getParameter("token")).thenReturn(null);
+    when(mockRequest.getParameter(TOKEN)).thenReturn(null);
 
     wrapper = new HttpServletRequestWrapper(mockRequest);
     HttpSession session1 = wrapper.getSession(true);
@@ -304,10 +312,10 @@ public class HttpServletRequestWrapperTest extends OBBaseTest {
   @Test
   public void addHeaderShouldAddCustomHeader() {
     when(mockRequest.getHeader(AUTHORIZATION_HEADER)).thenReturn(null);
-    when(mockRequest.getParameter("token")).thenReturn(null);
+    when(mockRequest.getParameter(TOKEN)).thenReturn(null);
 
     wrapper = new HttpServletRequestWrapper(mockRequest);
-    wrapper.addHeader("Custom-Header", "Custom-Value");
+    wrapper.addHeader("Custom-Header",CUSTOM_VALUE);
 
     // Due to implementation details, we need to use lowercase for retrieval
     assertEquals("Should return custom header value",
@@ -325,20 +333,20 @@ public class HttpServletRequestWrapperTest extends OBBaseTest {
   @Test
   public void addHeaderShouldHandleMultipleValues() {
     when(mockRequest.getHeader(AUTHORIZATION_HEADER)).thenReturn(null);
-    when(mockRequest.getParameter("token")).thenReturn(null);
+    when(mockRequest.getParameter(TOKEN)).thenReturn(null);
 
     wrapper = new HttpServletRequestWrapper(mockRequest);
-    wrapper.addHeader("Multi-Header", "Value1");
-    wrapper.addHeader("Multi-Header", "Value2");
+    wrapper.addHeader(MULTI_HEADER,VALUE1);
+    wrapper.addHeader(MULTI_HEADER, VALUE2);
 
     // Use lowercase key for retrieval due to implementation
     assertEquals("Should return first value for multiple values",
         "Value1", wrapper.getHeader("multi-header"));
 
-    Enumeration<String> values = wrapper.getHeaders("Multi-Header");
-    assertEquals("Should have first value", "Value1", values.nextElement());
-    assertEquals("Should have second value", "Value2", values.nextElement());
-    assertFalse("Should have no more values", values.hasMoreElements());
+    Enumeration<String> values = wrapper.getHeaders(MULTI_HEADER);
+    assertEquals("Should have first value",VALUE1, values.nextElement());
+    assertEquals("Should have second value", VALUE2, values.nextElement());
+    assertFalse(SHOULD_HAVE_NO_MORE_VALUES, values.hasMoreElements());
   }
 
   /**
@@ -351,7 +359,7 @@ public class HttpServletRequestWrapperTest extends OBBaseTest {
   @Test
   public void addHeaderShouldHandleNullParameters() {
     when(mockRequest.getHeader(AUTHORIZATION_HEADER)).thenReturn(null);
-    when(mockRequest.getParameter("token")).thenReturn(null);
+    when(mockRequest.getParameter(TOKEN)).thenReturn(null);
 
     wrapper = new HttpServletRequestWrapper(mockRequest);
     wrapper.addHeader(null, "value");
@@ -373,7 +381,7 @@ public class HttpServletRequestWrapperTest extends OBBaseTest {
   @Test
   public void getHeaderShouldReturnCustomHeader() {
     when(mockRequest.getHeader(AUTHORIZATION_HEADER)).thenReturn(null);
-    when(mockRequest.getParameter("token")).thenReturn(null);
+    when(mockRequest.getParameter(TOKEN)).thenReturn(null);
 
     wrapper = new HttpServletRequestWrapper(mockRequest);
     wrapper.addHeader("Test-Header", "Test-Value");
@@ -393,13 +401,13 @@ public class HttpServletRequestWrapperTest extends OBBaseTest {
   @Test
   public void getHeaderShouldFallbackToOriginalRequest() {
     when(mockRequest.getHeader(AUTHORIZATION_HEADER)).thenReturn(null);
-    when(mockRequest.getParameter("token")).thenReturn(null);
-    when(mockRequest.getHeader("Original-Header")).thenReturn("Original-Value");
+    when(mockRequest.getParameter(TOKEN)).thenReturn(null);
+    when(mockRequest.getHeader(ORIGINAL_HEADER)).thenReturn("Original-Value");
 
     wrapper = new HttpServletRequestWrapper(mockRequest);
 
     assertEquals("Should return original header value",
-        "Original-Value", wrapper.getHeader("Original-Header"));
+        "Original-Value", wrapper.getHeader(ORIGINAL_HEADER));
   }
 
   /**
@@ -412,7 +420,7 @@ public class HttpServletRequestWrapperTest extends OBBaseTest {
   @Test
   public void getHeaderShouldHandleNullName() {
     when(mockRequest.getHeader(AUTHORIZATION_HEADER)).thenReturn(null);
-    when(mockRequest.getParameter("token")).thenReturn(null);
+    when(mockRequest.getParameter(TOKEN)).thenReturn(null);
 
     wrapper = new HttpServletRequestWrapper(mockRequest);
 
@@ -429,16 +437,16 @@ public class HttpServletRequestWrapperTest extends OBBaseTest {
   @Test
   public void getHeadersShouldReturnCustomHeaderValues() {
     when(mockRequest.getHeader(AUTHORIZATION_HEADER)).thenReturn(null);
-    when(mockRequest.getParameter("token")).thenReturn(null);
+    when(mockRequest.getParameter(TOKEN)).thenReturn(null);
 
     wrapper = new HttpServletRequestWrapper(mockRequest);
-    wrapper.addHeader("Multi-Header", "Value1");
-    wrapper.addHeader("Multi-Header", "Value2");
+    wrapper.addHeader(MULTI_HEADER,VALUE1);
+    wrapper.addHeader(MULTI_HEADER, VALUE2);
 
-    Enumeration<String> headers = wrapper.getHeaders("Multi-Header");
-    assertEquals("Should have first value", "Value1", headers.nextElement());
-    assertEquals("Should have second value", "Value2", headers.nextElement());
-    assertFalse("Should have no more values", headers.hasMoreElements());
+    Enumeration<String> headers = wrapper.getHeaders(MULTI_HEADER);
+    assertEquals("Should have first value",VALUE1, headers.nextElement());
+    assertEquals("Should have second value", VALUE2, headers.nextElement());
+    assertFalse(SHOULD_HAVE_NO_MORE_VALUES, headers.hasMoreElements());
   }
 
   /**
@@ -451,19 +459,19 @@ public class HttpServletRequestWrapperTest extends OBBaseTest {
   @Test
   public void getHeadersShouldFallbackToOriginalRequest() {
     when(mockRequest.getHeader(AUTHORIZATION_HEADER)).thenReturn(null);
-    when(mockRequest.getParameter("token")).thenReturn(null);
+    when(mockRequest.getParameter(TOKEN)).thenReturn(null);
 
-    Vector<String> originalValues = new Vector<>();
+    List<String> originalValues = new ArrayList<>();
     originalValues.add("Original-Value1");
     originalValues.add("Original-Value2");
-    when(mockRequest.getHeaders("Original-Header")).thenReturn(originalValues.elements());
+    when(mockRequest.getHeaders(ORIGINAL_HEADER)).thenReturn(Collections.enumeration(originalValues));
 
     wrapper = new HttpServletRequestWrapper(mockRequest);
 
-    Enumeration<String> headers = wrapper.getHeaders("Original-Header");
+    Enumeration<String> headers = wrapper.getHeaders(ORIGINAL_HEADER);
     assertEquals("Should have first original value", "Original-Value1", headers.nextElement());
     assertEquals("Should have second original value", "Original-Value2", headers.nextElement());
-    assertFalse("Should have no more values", headers.hasMoreElements());
+    assertFalse(SHOULD_HAVE_NO_MORE_VALUES, headers.hasMoreElements());
   }
 
   /**
@@ -476,7 +484,7 @@ public class HttpServletRequestWrapperTest extends OBBaseTest {
   @Test
   public void getHeadersShouldHandleNullName() {
     when(mockRequest.getHeader(AUTHORIZATION_HEADER)).thenReturn(null);
-    when(mockRequest.getParameter("token")).thenReturn(null);
+    when(mockRequest.getParameter(TOKEN)).thenReturn(null);
 
     wrapper = new HttpServletRequestWrapper(mockRequest);
 
@@ -494,22 +502,22 @@ public class HttpServletRequestWrapperTest extends OBBaseTest {
   @Test
   public void getHeaderNamesShouldIncludeCustomHeaders() {
     when(mockRequest.getHeader(AUTHORIZATION_HEADER)).thenReturn(null);
-    when(mockRequest.getParameter("token")).thenReturn(null);
+    when(mockRequest.getParameter(TOKEN)).thenReturn(null);
 
-    Vector<String> originalHeaders = new Vector<>();
-    originalHeaders.add("Original-Header");
-    when(mockRequest.getHeaderNames()).thenReturn(originalHeaders.elements());
+    List<String> originalHeaders = new ArrayList<>();
+    originalHeaders.add(ORIGINAL_HEADER);
+    when(mockRequest.getHeaderNames()).thenReturn(Collections.enumeration(originalHeaders));
 
     wrapper = new HttpServletRequestWrapper(mockRequest);
-    wrapper.addHeader("Custom-Header", "Custom-Value");
+    wrapper.addHeader("Custom-Header",CUSTOM_VALUE);
 
     Enumeration<String> headerNames = wrapper.getHeaderNames();
-    Vector<String> allHeaders = new Vector<>();
+    List<String> allHeaders = new ArrayList<>();
     while (headerNames.hasMoreElements()) {
       allHeaders.add(headerNames.nextElement());
     }
 
-    assertTrue("Should include original header", allHeaders.contains("Original-Header"));
+    assertTrue("Should include original header", allHeaders.contains(ORIGINAL_HEADER));
     assertTrue("Should include custom header", allHeaders.contains("custom-header"));
   }
 
@@ -523,7 +531,7 @@ public class HttpServletRequestWrapperTest extends OBBaseTest {
   @Test
   public void getIntHeaderShouldParseIntegerValue() {
     when(mockRequest.getHeader(AUTHORIZATION_HEADER)).thenReturn(null);
-    when(mockRequest.getParameter("token")).thenReturn(null);
+    when(mockRequest.getParameter(TOKEN)).thenReturn(null);
 
     wrapper = new HttpServletRequestWrapper(mockRequest);
     wrapper.addHeader("Content-Length", "1024");
@@ -542,7 +550,7 @@ public class HttpServletRequestWrapperTest extends OBBaseTest {
   @Test
   public void getIntHeaderShouldReturnMinusOneForNonExistentHeader() {
     when(mockRequest.getHeader(AUTHORIZATION_HEADER)).thenReturn(null);
-    when(mockRequest.getParameter("token")).thenReturn(null);
+    when(mockRequest.getParameter(TOKEN)).thenReturn(null);
 
     wrapper = new HttpServletRequestWrapper(mockRequest);
 
@@ -561,15 +569,13 @@ public class HttpServletRequestWrapperTest extends OBBaseTest {
   @Test
   public void getDateHeaderShouldReturnMinusOneForNonExistentHeader() {
     when(mockRequest.getHeader(AUTHORIZATION_HEADER)).thenReturn(null);
-    when(mockRequest.getParameter("token")).thenReturn(null);
+    when(mockRequest.getParameter(TOKEN)).thenReturn(null);
 
     wrapper = new HttpServletRequestWrapper(mockRequest);
 
     assertEquals("Should return -1 for non-existent header", -1L,
         wrapper.getDateHeader("Non-Existent-Header"));
   }
-
-
 
   /**
    * Tests getDateHeader method falls back to original request.
@@ -581,14 +587,14 @@ public class HttpServletRequestWrapperTest extends OBBaseTest {
   @Test
   public void getDateHeaderShouldFallbackToOriginalRequest() {
     when(mockRequest.getHeader(AUTHORIZATION_HEADER)).thenReturn(null);
-    when(mockRequest.getParameter("token")).thenReturn(null);
-    when(mockRequest.getHeader("Last-Modified")).thenReturn("Mon, 01 Jan 2024 00:00:00 GMT");
-    when(mockRequest.getDateHeader("Last-Modified")).thenReturn(1704067200000L);
+    when(mockRequest.getParameter(TOKEN)).thenReturn(null);
+    when(mockRequest.getHeader(LAST_MODIFIED)).thenReturn("Mon, 01 Jan 2024 00:00:00 GMT");
+    when(mockRequest.getDateHeader(LAST_MODIFIED)).thenReturn(1704067200000L);
 
     wrapper = new HttpServletRequestWrapper(mockRequest);
 
     assertEquals("Should delegate to original request for date parsing",
-        1704067200000L, wrapper.getDateHeader("Last-Modified"));
+        1704067200000L, wrapper.getDateHeader(LAST_MODIFIED));
   }
 
   /**
@@ -601,7 +607,7 @@ public class HttpServletRequestWrapperTest extends OBBaseTest {
   @Test
   public void setSessionIdShouldUpdateSessionId() {
     when(mockRequest.getHeader(AUTHORIZATION_HEADER)).thenReturn(null);
-    when(mockRequest.getParameter("token")).thenReturn(null);
+    when(mockRequest.getParameter(TOKEN)).thenReturn(null);
 
     wrapper = new HttpServletRequestWrapper(mockRequest);
     String newSessionId = "new-session-id";
@@ -621,16 +627,16 @@ public class HttpServletRequestWrapperTest extends OBBaseTest {
   @Test
   public void headersShouldBeCaseInsensitive() {
     when(mockRequest.getHeader(AUTHORIZATION_HEADER)).thenReturn(null);
-    when(mockRequest.getParameter("token")).thenReturn(null);
+    when(mockRequest.getParameter(TOKEN)).thenReturn(null);
 
     wrapper = new HttpServletRequestWrapper(mockRequest);
-    wrapper.addHeader("Content-Type", "application/json");
+    wrapper.addHeader(CONTENT_TYPE_CONSTANT,APPLICATION_JSON_CONSTANT);
 
     // Implementation stores with toLowerCase(), so use lowercase for retrieval
     assertEquals("Should retrieve header with lowercase key",
         "application/json", wrapper.getHeader("content-type"));
     assertNull("Should not retrieve with original case due to implementation",
-        wrapper.getHeader("Content-Type"));
+        wrapper.getHeader(CONTENT_TYPE_CONSTANT));
   }
 
   /**
@@ -646,7 +652,7 @@ public class HttpServletRequestWrapperTest extends OBBaseTest {
   @Test
   public void concurrentAccessShouldBeHandledGracefully() throws Exception {
     when(mockRequest.getHeader(AUTHORIZATION_HEADER)).thenReturn(null);
-    when(mockRequest.getParameter("token")).thenReturn(null);
+    when(mockRequest.getParameter(TOKEN)).thenReturn(null);
 
     wrapper = new HttpServletRequestWrapper(mockRequest);
 
@@ -667,7 +673,6 @@ public class HttpServletRequestWrapperTest extends OBBaseTest {
           }
         } catch (Exception e) {
           // Expected due to HashMap concurrency issues - log but continue
-          System.out.println("Expected concurrent modification: " + e.getClass().getSimpleName());
         }
       });
     }
@@ -697,8 +702,8 @@ public class HttpServletRequestWrapperTest extends OBBaseTest {
    */
   @Test
   public void constructorShouldHandleMalformedBearerToken() {
-    when(mockRequest.getHeader(AUTHORIZATION_HEADER)).thenReturn("Bearer ");
-    when(mockRequest.getParameter("token")).thenReturn(null);
+    when(mockRequest.getHeader(AUTHORIZATION_HEADER)).thenReturn(BEARER_PREFIX);
+    when(mockRequest.getParameter(TOKEN)).thenReturn(null);
 
     wrapper = new HttpServletRequestWrapper(mockRequest);
 
@@ -714,7 +719,7 @@ public class HttpServletRequestWrapperTest extends OBBaseTest {
   @Test
   public void addHeaderShouldHandleEmptyValues() {
     when(mockRequest.getHeader(AUTHORIZATION_HEADER)).thenReturn(null);
-    when(mockRequest.getParameter("token")).thenReturn(null);
+    when(mockRequest.getParameter(TOKEN)).thenReturn(null);
 
     wrapper = new HttpServletRequestWrapper(mockRequest);
     wrapper.addHeader("Empty-Header", "");
@@ -733,7 +738,7 @@ public class HttpServletRequestWrapperTest extends OBBaseTest {
   @Test
   public void getHeaderNamesShouldHandleNoHeaders() {
     when(mockRequest.getHeader(AUTHORIZATION_HEADER)).thenReturn(null);
-    when(mockRequest.getParameter("token")).thenReturn(null);
+    when(mockRequest.getParameter(TOKEN)).thenReturn(null);
     when(mockRequest.getHeaderNames()).thenReturn(Collections.enumeration(Collections.emptyList()));
 
     wrapper = new HttpServletRequestWrapper(mockRequest);
@@ -752,7 +757,7 @@ public class HttpServletRequestWrapperTest extends OBBaseTest {
   @Test
   public void getSessionShouldHandleNullSessionId() {
     when(mockRequest.getHeader(AUTHORIZATION_HEADER)).thenReturn(null);
-    when(mockRequest.getParameter("token")).thenReturn(null);
+    when(mockRequest.getParameter(TOKEN)).thenReturn(null);
 
     wrapper = new HttpServletRequestWrapper(mockRequest);
     HttpSession session = wrapper.getSession();
@@ -771,7 +776,7 @@ public class HttpServletRequestWrapperTest extends OBBaseTest {
   @Test
   public void getIntHeaderShouldHandleNullHeader() {
     when(mockRequest.getHeader(AUTHORIZATION_HEADER)).thenReturn(null);
-    when(mockRequest.getParameter("token")).thenReturn(null);
+    when(mockRequest.getParameter(TOKEN)).thenReturn(null);
     when(mockRequest.getHeader("Null-Header")).thenReturn(null);
 
     wrapper = new HttpServletRequestWrapper(mockRequest);
@@ -790,10 +795,10 @@ public class HttpServletRequestWrapperTest extends OBBaseTest {
   @Test
   public void customHeadersShouldOverrideOriginalHeaders() {
     when(mockRequest.getHeader(AUTHORIZATION_HEADER)).thenReturn(null);
-    when(mockRequest.getParameter("token")).thenReturn(null);
+    when(mockRequest.getParameter(TOKEN)).thenReturn(null);
 
     wrapper = new HttpServletRequestWrapper(mockRequest);
-    wrapper.addHeader("Override-Header", "Custom-Value");
+    wrapper.addHeader("Override-Header",CUSTOM_VALUE);
 
     // Custom headers are stored with lowercase keys, so they override
     // when we search with lowercase
@@ -811,7 +816,7 @@ public class HttpServletRequestWrapperTest extends OBBaseTest {
   @Test
   public void headersShouldHandleSpecialCharacters() {
     when(mockRequest.getHeader(AUTHORIZATION_HEADER)).thenReturn(null);
-    when(mockRequest.getParameter("token")).thenReturn(null);
+    when(mockRequest.getParameter(TOKEN)).thenReturn(null);
 
     wrapper = new HttpServletRequestWrapper(mockRequest);
     String specialValue = "Value with spaces, symbols: !@#$%^&*()";
@@ -879,15 +884,15 @@ public class HttpServletRequestWrapperTest extends OBBaseTest {
   @Test
   public void headerCaseHandlingShouldBeConsistent() {
     when(mockRequest.getHeader(AUTHORIZATION_HEADER)).thenReturn(null);
-    when(mockRequest.getParameter("token")).thenReturn(null);
+    when(mockRequest.getParameter(TOKEN)).thenReturn(null);
 
     wrapper = new HttpServletRequestWrapper(mockRequest);
 
-    wrapper.addHeader("Content-Type", "application/json");
+    wrapper.addHeader(CONTENT_TYPE_CONSTANT,APPLICATION_JSON_CONSTANT);
 
-    assertEquals("Should retrieve with lowercase key", "application/json", wrapper.getHeader("content-type"));
+    assertEquals("Should retrieve with lowercase key",APPLICATION_JSON_CONSTANT, wrapper.getHeader("content-type"));
 
-    assertNull("Original case won't work due to toLowerCase storage", wrapper.getHeader("Content-Type"));
+    assertNull("Original case won't work due to toLowerCase storage", wrapper.getHeader(CONTENT_TYPE_CONSTANT));
     assertNull("Upper case won't work due to toLowerCase storage", wrapper.getHeader("CONTENT-TYPE"));
   }
 }
