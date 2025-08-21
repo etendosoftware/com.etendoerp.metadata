@@ -24,12 +24,13 @@ import com.etendoerp.metadata.exceptions.NotFoundException;
 
 import static com.etendoerp.metadata.utils.Constants.LABELS_PATH;
 import static com.etendoerp.metadata.utils.Constants.LANGUAGE_PATH;
+import static com.etendoerp.metadata.utils.Constants.LOCATION_PATH;
 import static com.etendoerp.metadata.utils.Constants.MENU_PATH;
 import static com.etendoerp.metadata.utils.Constants.MESSAGE_PATH;
 import static com.etendoerp.metadata.utils.Constants.SESSION_PATH;
 import static com.etendoerp.metadata.utils.Constants.TAB_PATH;
+import static com.etendoerp.metadata.utils.Constants.TOOLBAR_PATH;
 import static com.etendoerp.metadata.utils.Constants.WINDOW_PATH;
-import static com.etendoerp.metadata.utils.Constants.LOCATION_PATH;
 
 /**
  * @author luuchorocha
@@ -55,6 +56,8 @@ public class ServiceFactory {
             return new LabelsService(req, res);
         } else if (path.startsWith(LOCATION_PATH)) {
             return new LocationMetadataService(req, res);
+        } else if (path.startsWith(TOOLBAR_PATH)) {
+            return new ToolbarService(req, res);
         } else {
             throw new NotFoundException();
         }
