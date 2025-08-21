@@ -39,11 +39,11 @@ public class ProcessActionBuilder extends Builder {
         this.process = process;
     }
 
-    private static boolean isSelectorParameter(ProcessParameter parameter) {
+    protected static boolean isSelectorParameter(ProcessParameter parameter) {
         return parameter != null && parameter.getReference() != null && SELECTOR_REFERENCES.contains(parameter.getReference().getId());
     }
 
-    private static boolean isListParameter(ProcessParameter parameter) {
+    protected static boolean isListParameter(ProcessParameter parameter) {
         return parameter != null && parameter.getReference() != null && LIST_REFERENCE_ID.contains(parameter.getReference().getId());
     }
 
@@ -65,7 +65,7 @@ public class ProcessActionBuilder extends Builder {
         return processJson;
     }
 
-    private JSONObject buildParameterJSON(ProcessParameter param) throws JSONException {
+    protected JSONObject buildParameterJSON(ProcessParameter param) throws JSONException {
         JSONObject paramJSON = converter.toJsonObject(param, DataResolvingMode.FULL_TRANSLATABLE);
 
         if (isSelectorParameter(param)) {

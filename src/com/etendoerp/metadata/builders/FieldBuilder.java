@@ -202,7 +202,7 @@ public abstract class FieldBuilder extends Builder {
      * @return JSONObject with complete custom selector configuration
      * @throws JSONException if there's an error creating the JSON structure
      */
-    private static JSONObject addSelectorInfo(String fieldId, Selector selector) throws JSONException {
+    protected static JSONObject addSelectorInfo(String fieldId, Selector selector) throws JSONException {
         String dataSourceId;
         JSONObject selectorInfo = new JSONObject();
 
