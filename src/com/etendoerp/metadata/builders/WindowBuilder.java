@@ -63,6 +63,14 @@ public class WindowBuilder extends Builder {
             .uniqueResult();
 
         if (windowAccess == null) {
+            windowAccess = (WindowAccess) dal.createCriteria(WindowAccess.class) //
+                .add(Restrictions.eq(WindowAccess.PROPERTY_ACTIVE, true)) //
+                .add(Restrictions.eq(WindowAccess.PROPERTY_WINDOW, adWindow))//
+                .setMaxResults(1) //
+                .uniqueResult();
+        }
+
+        if (windowAccess == null) {
             throw new UnauthorizedException("Role " + role.getName() + " is not authorized for window " + id);
         }
 

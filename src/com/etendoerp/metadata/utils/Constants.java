@@ -68,4 +68,5 @@ public class Constants {
     public static final String PATCH = "PATCH";
     public static final String DELETE = "DELETE";
     public static final String LOCATION_PATH = "/location/";
+    public static final String TOOLBAR_PATH = "/toolbar";
 }
