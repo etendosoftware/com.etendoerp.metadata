@@ -25,6 +25,7 @@ import java.util.List;
 
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONObject;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.MockedConstruction;
@@ -49,17 +50,29 @@ import com.etendoerp.metadata.utils.Constants;
 @ExtendWith(MockitoExtension.class)
 class ParameterBuilderTest {
 
+  private Parameter mockParameter;
+  private OBContext mockContext;
+  private Language mockLanguage;
+
+
+  /**
+   * Sets up mock objects before each test execution.
+   * Initializes mockParameter, mockContext, and mockLanguage with basic configuration.
+   */
+  @BeforeEach
+  void setUp() {
+    mockParameter = mock(Parameter.class);
+    mockContext = mock(OBContext.class);
+    mockLanguage = mock(Language.class);
+
+    when(mockContext.getLanguage()).thenReturn(mockLanguage);
+  }
+
   /**
    * Tests that the ParameterBuilder constructor creates an instance successfully.
    */
   @Test
   void constructorCreatesInstanceSuccessfully() {
-    Parameter mockParameter = mock(Parameter.class);
-    OBContext mockContext = mock(OBContext.class);
-    Language mockLanguage = mock(Language.class);
-
-    when(mockContext.getLanguage()).thenReturn(mockLanguage);
-
     try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
          MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class)) {
 
@@ -80,11 +93,6 @@ class ParameterBuilderTest {
    */
   @Test
   void toJSONReturnsBasicParameterJSON() throws Exception {
-    Parameter mockParameter = mock(Parameter.class);
-    OBContext mockContext = mock(OBContext.class);
-    Language mockLanguage = mock(Language.class);
-
-    when(mockContext.getLanguage()).thenReturn(mockLanguage);
     when(mockParameter.getReadOnlyLogic()).thenReturn(null);
     when(mockParameter.getReference()).thenReturn(null);
 
@@ -121,11 +129,6 @@ class ParameterBuilderTest {
    */
   @Test
   void toJSONWithReadOnlyLogicIncludesExpression() throws Exception {
-    Parameter mockParameter = mock(Parameter.class);
-    OBContext mockContext = mock(OBContext.class);
-    Language mockLanguage = mock(Language.class);
-
-    when(mockContext.getLanguage()).thenReturn(mockLanguage);
     when(mockParameter.getReadOnlyLogic()).thenReturn(READONLY_LOGIC);
     when(mockParameter.getReference()).thenReturn(null);
 
@@ -159,11 +162,6 @@ class ParameterBuilderTest {
    */
   @Test
   void toJSONWithBlankReadOnlyLogicDoesNotIncludeExpression() throws Exception {
-    Parameter mockParameter = mock(Parameter.class);
-    OBContext mockContext = mock(OBContext.class);
-    Language mockLanguage = mock(Language.class);
-
-    when(mockContext.getLanguage()).thenReturn(mockLanguage);
     when(mockParameter.getReadOnlyLogic()).thenReturn("   ");
     when(mockParameter.getReference()).thenReturn(null);
 
@@ -194,18 +192,14 @@ class ParameterBuilderTest {
    */
   @Test
   void toJSONWithSelectorReferenceIncludesSelectorInfo() throws Exception {
-    Parameter mockParameter = mock(Parameter.class);
     Reference mockReference = mock(Reference.class);
     Reference mockReferenceSearchKey = mock(Reference.class);
-    OBContext mockContext = mock(OBContext.class);
-    Language mockLanguage = mock(Language.class);
 
-    when(mockContext.getLanguage()).thenReturn(mockLanguage);
     when(mockParameter.getReadOnlyLogic()).thenReturn(null);
     when(mockParameter.getReference()).thenReturn(mockReference);
     when(mockParameter.getReferenceSearchKey()).thenReturn(mockReferenceSearchKey);
     when(mockParameter.getId()).thenReturn(PARAMETER_ID);
-    when(mockReference.getId()).thenReturn("18"); // TABLE_REFERENCE_ID
+    when(mockReference.getId()).thenReturn("18");
 
     try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
          MockedStatic<FieldBuilder> mockedFieldBuilder = mockStatic(FieldBuilder.class);
@@ -242,13 +236,9 @@ class ParameterBuilderTest {
    */
   @Test
   void toJSONWithListReferenceIncludesRefListInfo() throws Exception {
-    Parameter mockParameter = mock(Parameter.class);
     Reference mockReference = mock(Reference.class);
     Reference mockReferenceSearchKey = mock(Reference.class);
-    OBContext mockContext = mock(OBContext.class);
-    Language mockLanguage = mock(Language.class);
 
-    when(mockContext.getLanguage()).thenReturn(mockLanguage);
     when(mockParameter.getReadOnlyLogic()).thenReturn(null);
     when(mockParameter.getReference()).thenReturn(mockReference);
     when(mockParameter.getReferenceSearchKey()).thenReturn(mockReferenceSearchKey);
@@ -298,15 +288,11 @@ class ParameterBuilderTest {
    */
   @Test
   void toJSONWithWindowReferenceIncludesWindowInfo() throws Exception {
-    Parameter mockParameter = mock(Parameter.class);
     Reference mockReference = mock(Reference.class);
     Reference mockReferenceSearchKey = mock(Reference.class);
     RefWindow mockRefWindow = mock(RefWindow.class);
     Window mockWindow = mock(Window.class);
-    OBContext mockContext = mock(OBContext.class);
-    Language mockLanguage = mock(Language.class);
 
-    when(mockContext.getLanguage()).thenReturn(mockLanguage);
     when(mockParameter.getReadOnlyLogic()).thenReturn(null);
     when(mockParameter.getReference()).thenReturn(mockReference);
     when(mockParameter.getReferenceSearchKey()).thenReturn(mockReferenceSearchKey);
@@ -358,13 +344,9 @@ class ParameterBuilderTest {
     String[] selectorReferenceIds = { "18", "19", "30", "95E2A8B50A254B2AAE6774B8C2F28120", "8C57A4A2E05F4261A1FADF47C30398AD" };
 
     for (String referenceId : selectorReferenceIds) {
-      Parameter mockParameter = mock(Parameter.class);
       Reference mockReference = mock(Reference.class);
       Reference mockReferenceSearchKey = mock(Reference.class);
-      OBContext mockContext = mock(OBContext.class);
-      Language mockLanguage = mock(Language.class);
 
-      when(mockContext.getLanguage()).thenReturn(mockLanguage);
       when(mockParameter.getReadOnlyLogic()).thenReturn(null);
       when(mockParameter.getReference()).thenReturn(mockReference);
       when(mockParameter.getReferenceSearchKey()).thenReturn(mockReferenceSearchKey);
@@ -407,13 +389,9 @@ class ParameterBuilderTest {
    */
   @Test
   void toJSONWithComplexParameterIncludesAllFeatures() throws Exception {
-    Parameter mockParameter = mock(Parameter.class);
     Reference mockReference = mock(Reference.class);
     Reference mockReferenceSearchKey = mock(Reference.class);
-    OBContext mockContext = mock(OBContext.class);
-    Language mockLanguage = mock(Language.class);
 
-    when(mockContext.getLanguage()).thenReturn(mockLanguage);
     when(mockParameter.getReadOnlyLogic()).thenReturn(READONLY_LOGIC);
     when(mockParameter.getReference()).thenReturn(mockReference);
     when(mockParameter.getReferenceSearchKey()).thenReturn(mockReferenceSearchKey);
@@ -462,11 +440,6 @@ class ParameterBuilderTest {
    */
   @Test
   void toJSONWithNullReferenceDoesNotIncludeReferenceInfo() throws Exception {
-    Parameter mockParameter = mock(Parameter.class);
-    OBContext mockContext = mock(OBContext.class);
-    Language mockLanguage = mock(Language.class);
-
-    when(mockContext.getLanguage()).thenReturn(mockLanguage);
     when(mockParameter.getReadOnlyLogic()).thenReturn(null);
     when(mockParameter.getReference()).thenReturn(null);
 
@@ -499,12 +472,8 @@ class ParameterBuilderTest {
    */
   @Test
   void toJSONWithUnknownReferenceTypeDoesNotIncludeReferenceInfo() throws Exception {
-    Parameter mockParameter = mock(Parameter.class);
     Reference mockReference = mock(Reference.class);
-    OBContext mockContext = mock(OBContext.class);
-    Language mockLanguage = mock(Language.class);
 
-    when(mockContext.getLanguage()).thenReturn(mockLanguage);
     when(mockParameter.getReadOnlyLogic()).thenReturn(null);
     when(mockParameter.getReference()).thenReturn(mockReference);
     when(mockReference.getId()).thenReturn("UNKNOWN_REFERENCE_ID");
