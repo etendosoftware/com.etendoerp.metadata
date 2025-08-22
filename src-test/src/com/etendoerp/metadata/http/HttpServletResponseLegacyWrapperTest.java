@@ -555,7 +555,6 @@ public class HttpServletResponseLegacyWrapperTest extends OBBaseTest {
           }
         } catch (Exception e) {
           // Log but don't fail immediately to allow other threads to complete
-          e.printStackTrace();
         }
       });
     }

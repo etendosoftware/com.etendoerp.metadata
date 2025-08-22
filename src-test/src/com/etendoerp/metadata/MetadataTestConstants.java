@@ -49,9 +49,6 @@ public final class MetadataTestConstants {
   public static final String COULD_NOT_SET_CONVERTER_FIELD = "Could not set converter field: ";
   public static final String ON_LOAD = "onLoad";
   public static final String ON_PROCESS = "onProcess";
-  public static final String ROLES = "roles";
-  public static final String ATTRIBUTES = "attributes";
-  public static final String ORGANIZATIONS = "organizations";
   public static final String FIELD1 = "field1";
   public static final String FILTER = "filter";
   public static final String DISPLAY_LOGIC = "displayLogic";
@@ -156,6 +153,14 @@ public final class MetadataTestConstants {
   public static final String PROCESS_ID = "test-process-id";
   public static final String LANGUAGE_CODE = "en_US";
 
+  public static final String LIST_ID = "list-id";
+  public static final String ENGLISH_USA = "English (USA)";
+  public static final String LANGUAGE1_ID = "language1-id";
+  public static final String ES_ES = "es_ES";
+  public static final String LANGUAGE2_ID = "language2-id";
+  public static final String SPANISH_SPAIN = "Spanish (Spain)";
+  public static final String LANGUAGE_CONST = "language";
+  public static final String SINGLE_LANGUAGE_ID = "single-language-id";
 
   /**
    * Private constructor to prevent instantiation of this utility class.

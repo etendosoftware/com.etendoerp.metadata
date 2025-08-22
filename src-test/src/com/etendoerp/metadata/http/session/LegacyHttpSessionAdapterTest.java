@@ -744,7 +744,6 @@ public class LegacyHttpSessionAdapterTest extends OBBaseTest {
           }
         } catch (Exception e) {
           // Log error but don't fail test immediately
-          e.printStackTrace();
         }
       });
     }

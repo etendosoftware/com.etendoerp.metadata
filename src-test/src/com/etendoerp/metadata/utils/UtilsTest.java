@@ -758,9 +758,7 @@ class UtilsTest {
 
     when(mockRequest.getReader()).thenThrow(new IOException(TEST_IO_EXCEPTION));
 
-    IOException thrown = assertThrows(IOException.class, () -> {
-      Utils.readRequestBody(mockRequest);
-    });
+    IOException thrown = assertThrows(IOException.class, () -> Utils.readRequestBody(mockRequest));
 
     assertEquals(TEST_IO_EXCEPTION, thrown.getMessage());
   }
