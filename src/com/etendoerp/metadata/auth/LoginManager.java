@@ -307,10 +307,13 @@ public class LoginManager {
               authData.getWarehouse() != null ? authData.getWarehouse().getId() : null, authData.getClient().getId()));
       OBContext.setOBContextInSession(request, OBContext.getOBContext());
       OBDal.getInstance().flush();
-      LoginUtils.fillSessionArguments(new DalConnectionProvider(false), vars,
-          authData.getUser().getId(), "en_US", "N",
-          authData.getRole().getId(), authData.getClient().getId(), authData.getOrg().getId(),
-          authData.getWarehouse() != null ? authData.getWarehouse().getId() : null);
+      if (OBContext.getOBContext() != null && OBContext.getOBContext().getLanguage() != null) {
+        LoginUtils.fillSessionArguments(new DalConnectionProvider(false), vars,
+            authData.getUser().getId(), OBContext.getOBContext().getLanguage().getLanguage(),
+            OBContext.getOBContext().isRTL() ? "Y" : "N", authData.getRole().getId(),
+            authData.getClient().getId(), authData.getOrg().getId(),
+            authData.getWarehouse() != null ? authData.getWarehouse().getId() : null);
+      }
       BaseServlet.initializeSession();
       result.put(TOKEN, generateToken(authData, session.getId()));
       return result;
