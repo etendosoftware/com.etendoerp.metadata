@@ -34,6 +34,7 @@ import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.authentication.hashing.PasswordHash;
 import org.openbravo.base.secureApp.DefaultValidationException;
 import org.openbravo.base.secureApp.LoginUtils;
+import org.openbravo.base.secureApp.VariablesSecureApp;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.access.Role;
@@ -300,10 +301,19 @@ public class LoginManager {
       JSONObject result = new JSONObject();
       HttpSession session = request.getSession(true);
       session.setMaxInactiveInterval(3600);
+      final VariablesSecureApp vars = new VariablesSecureApp(request);
       OBContext.setOBContext(
           SecureWebServicesUtils.createContext(authData.getUser().getId(), authData.getRole().getId(), authData.getOrg().getId(),
               authData.getWarehouse() != null ? authData.getWarehouse().getId() : null, authData.getClient().getId()));
       OBContext.setOBContextInSession(request, OBContext.getOBContext());
+      OBDal.getInstance().flush();
+      if (OBContext.getOBContext() != null && OBContext.getOBContext().getLanguage() != null) {
+        LoginUtils.fillSessionArguments(new DalConnectionProvider(false), vars,
+            authData.getUser().getId(), OBContext.getOBContext().getLanguage().getLanguage(),
+            OBContext.getOBContext().isRTL() ? "Y" : "N", authData.getRole().getId(),
+            authData.getClient().getId(), authData.getOrg().getId(),
+            authData.getWarehouse() != null ? authData.getWarehouse().getId() : null);
+      }
       BaseServlet.initializeSession();
       result.put(TOKEN, generateToken(authData, session.getId()));
       return result;
