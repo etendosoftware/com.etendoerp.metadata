@@ -21,6 +21,7 @@ import static com.etendoerp.metadata.auth.Utils.decodeToken;
 import static com.etendoerp.metadata.auth.Utils.generateToken;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 
 import javax.servlet.ServletException;
@@ -308,11 +309,27 @@ public class LoginManager {
 
       OBContext context = OBContext.getOBContext();
       if (context != null && context.getLanguage() != null) {
-        vars.setSessionValue("AD_Language", context.getLanguage().getLanguage());
+        String languageCode = context.getLanguage().getLanguage();
+        vars.setSessionValue("AD_Language", languageCode);
         vars.setSessionValue("IsRTL", context.isRTL() ? "Y" : "N");
+
+        Locale contextLocale = Locale.forLanguageTag(context.getLanguage().getLanguage());
+        if (contextLocale != null) {
+          Locale.setDefault(contextLocale);
+          vars.setSessionValue("Locale", contextLocale.toString());
+          logger.debug("Locale set from context: {}", contextLocale.toString());
+        } else {
+          Locale.setDefault(Locale.US);
+          vars.setSessionValue("Locale", "en_US");
+          logger.warn("Context language has null locale, using en_US");
+        }
+      } else {
+        vars.setSessionValue("AD_Language", "en_US");
+        vars.setSessionValue("IsRTL", "N");
+        vars.setSessionValue("Locale", "en_US");
+        Locale.setDefault(Locale.US);
       }
 
-      logger.debug("Session variables synchronized successfully");
 
     } catch (Exception e) {
       logger.error("Error synchronizing session variables: " + e.getMessage(), e);
@@ -336,11 +353,6 @@ public class LoginManager {
       JSONObject result = new JSONObject();
       HttpSession session = request.getSession(true);
       session.setMaxInactiveInterval(3600);
-      final VariablesSecureApp vars = new VariablesSecureApp(request);
-      RequestContext requestContext = RequestContext.get();
-      if (requestContext != null) {
-        requestContext.setVariableSecureApp(vars);
-      }
       OBContext.setOBContext(
               SecureWebServicesUtils.createContext(
                       authData.getUser().getId(),
@@ -350,8 +362,13 @@ public class LoginManager {
                       authData.getClient().getId()
               )
       );
-      OBContext.setOBContextInSession(request, OBContext.getOBContext());
       OBDal.getInstance().flush();
+      OBContext.setOBContextInSession(request, OBContext.getOBContext());
+      final VariablesSecureApp vars = new VariablesSecureApp(request);
+      RequestContext requestContext = RequestContext.get();
+      if (requestContext != null) {
+        requestContext.setVariableSecureApp(vars);
+      }
       if (OBContext.getOBContext() != null && OBContext.getOBContext().getLanguage() != null) {
         LoginUtils.fillSessionArguments(new DalConnectionProvider(false), vars,
                 authData.getUser().getId(),
@@ -362,16 +379,19 @@ public class LoginManager {
                 authData.getOrg().getId(),
                 authData.getWarehouse() != null ? authData.getWarehouse().getId() : null);
       }
+
       syncSessionVariables(vars, authData);
       BaseServlet.initializeSession();
       result.put(TOKEN, generateToken(authData, session.getId()));
+
       return result;
     } catch (JWTCreationException e) {
       logger.warn("SWS - Error creating token", e);
       throw new InternalServerException(e.getMessage());
+    } catch (Exception e) {
+      throw new InternalServerException("Login process failed: " + e.getMessage());
     }
   }
-
   /**
    * Adds default values to the provided authentication data if they are not already set.
    *
