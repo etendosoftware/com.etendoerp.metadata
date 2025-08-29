@@ -35,6 +35,7 @@ import org.openbravo.authentication.hashing.PasswordHash;
 import org.openbravo.base.secureApp.DefaultValidationException;
 import org.openbravo.base.secureApp.LoginUtils;
 import org.openbravo.base.secureApp.VariablesSecureApp;
+import org.openbravo.client.kernel.RequestContext;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.access.Role;
@@ -44,6 +45,7 @@ import org.openbravo.model.ad.system.Client;
 import org.openbravo.model.common.enterprise.Organization;
 import org.openbravo.model.common.enterprise.Warehouse;
 import org.openbravo.service.db.DalConnectionProvider;
+import org.openbravo.dal.core.OBContext;
 
 import com.auth0.jwt.exceptions.JWTCreationException;
 import com.auth0.jwt.interfaces.DecodedJWT;
@@ -284,6 +286,39 @@ public class LoginManager {
     }
   }
 
+  private void syncSessionVariables(VariablesSecureApp vars, AuthData authData) {
+    try {
+      vars.setSessionValue("AD_User_ID", authData.getUser().getId());
+      vars.setSessionValue("AD_Role_ID", authData.getRole().getId());
+      vars.setSessionValue("AD_Client_ID", authData.getClient().getId());
+      vars.setSessionValue("AD_Org_ID", authData.getOrg().getId());
+
+      if (authData.getWarehouse() != null) {
+        vars.setSessionValue("M_Warehouse_ID", authData.getWarehouse().getId());
+      }
+
+      vars.setSessionValue("AD_User_Name", authData.getUser().getName());
+      vars.setSessionValue("AD_Role_Name", authData.getRole().getName());
+      vars.setSessionValue("AD_Client_Name", authData.getClient().getName());
+      vars.setSessionValue("AD_Org_Name", authData.getOrg().getName());
+
+      if (authData.getWarehouse() != null) {
+        vars.setSessionValue("M_Warehouse_Name", authData.getWarehouse().getName());
+      }
+
+      OBContext context = OBContext.getOBContext();
+      if (context != null && context.getLanguage() != null) {
+        vars.setSessionValue("AD_Language", context.getLanguage().getLanguage());
+        vars.setSessionValue("IsRTL", context.isRTL() ? "Y" : "N");
+      }
+
+      logger.debug("Session variables synchronized successfully");
+
+    } catch (Exception e) {
+      logger.error("Error synchronizing session variables: " + e.getMessage(), e);
+    }
+  }
+
   /**
    * Generates a login result in the form of a JSON object.
    *
@@ -302,18 +337,32 @@ public class LoginManager {
       HttpSession session = request.getSession(true);
       session.setMaxInactiveInterval(3600);
       final VariablesSecureApp vars = new VariablesSecureApp(request);
+      RequestContext requestContext = RequestContext.get();
+      if (requestContext != null) {
+        requestContext.setVariableSecureApp(vars);
+      }
       OBContext.setOBContext(
-          SecureWebServicesUtils.createContext(authData.getUser().getId(), authData.getRole().getId(), authData.getOrg().getId(),
-              authData.getWarehouse() != null ? authData.getWarehouse().getId() : null, authData.getClient().getId()));
+              SecureWebServicesUtils.createContext(
+                      authData.getUser().getId(),
+                      authData.getRole().getId(),
+                      authData.getOrg().getId(),
+                      authData.getWarehouse() != null ? authData.getWarehouse().getId() : null,
+                      authData.getClient().getId()
+              )
+      );
       OBContext.setOBContextInSession(request, OBContext.getOBContext());
       OBDal.getInstance().flush();
       if (OBContext.getOBContext() != null && OBContext.getOBContext().getLanguage() != null) {
         LoginUtils.fillSessionArguments(new DalConnectionProvider(false), vars,
-            authData.getUser().getId(), OBContext.getOBContext().getLanguage().getLanguage(),
-            OBContext.getOBContext().isRTL() ? "Y" : "N", authData.getRole().getId(),
-            authData.getClient().getId(), authData.getOrg().getId(),
-            authData.getWarehouse() != null ? authData.getWarehouse().getId() : null);
+                authData.getUser().getId(),
+                OBContext.getOBContext().getLanguage().getLanguage(),
+                OBContext.getOBContext().isRTL() ? "Y" : "N",
+                authData.getRole().getId(),
+                authData.getClient().getId(),
+                authData.getOrg().getId(),
+                authData.getWarehouse() != null ? authData.getWarehouse().getId() : null);
       }
+      syncSessionVariables(vars, authData);
       BaseServlet.initializeSession();
       result.put(TOKEN, generateToken(authData, session.getId()));
       return result;
