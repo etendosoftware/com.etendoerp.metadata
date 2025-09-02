@@ -46,7 +46,8 @@ import org.openbravo.model.ad.system.Client;
 import org.openbravo.model.common.enterprise.Organization;
 import org.openbravo.model.common.enterprise.Warehouse;
 import org.openbravo.service.db.DalConnectionProvider;
-import org.openbravo.dal.core.OBContext;
+import static com.etendoerp.metadata.utils.Constants.DEFAULT_LOCALE;
+import static com.etendoerp.metadata.utils.Constants.LOCALE_KEY;
 
 import com.auth0.jwt.exceptions.JWTCreationException;
 import com.auth0.jwt.interfaces.DecodedJWT;
@@ -316,20 +317,19 @@ public class LoginManager {
         Locale contextLocale = Locale.forLanguageTag(context.getLanguage().getLanguage());
         if (contextLocale != null) {
           Locale.setDefault(contextLocale);
-          vars.setSessionValue("Locale", contextLocale.toString());
+          vars.setSessionValue(LOCALE_KEY, contextLocale.toString());
           logger.debug("Locale set from context: {}", contextLocale.toString());
         } else {
           Locale.setDefault(Locale.US);
-          vars.setSessionValue("Locale", "en_US");
+          vars.setSessionValue(LOCALE_KEY, DEFAULT_LOCALE);
           logger.warn("Context language has null locale, using en_US");
         }
       } else {
-        vars.setSessionValue("AD_Language", "en_US");
+        vars.setSessionValue("AD_Language", DEFAULT_LOCALE);
         vars.setSessionValue("IsRTL", "N");
-        vars.setSessionValue("Locale", "en_US");
+        vars.setSessionValue(LOCALE_KEY, DEFAULT_LOCALE);
         Locale.setDefault(Locale.US);
       }
-
 
     } catch (Exception e) {
       logger.error("Error synchronizing session variables: " + e.getMessage(), e);
