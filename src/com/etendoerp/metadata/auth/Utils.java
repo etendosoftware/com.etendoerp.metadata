@@ -205,9 +205,12 @@ public class Utils {
       Role defaultRole = user.getDefaultRole();
       Organization defaultOrg = user.getDefaultOrganization();
       Warehouse defaultWarehouse = user.getDefaultWarehouse();
+      // If there is no default warehouse, use the provided warehouse
+      Warehouse warehouseFallback = defaultWarehouse != null ? defaultWarehouse : warehouse;
+
       Role selectedRole = getRole(role, userRoleList, defaultWsRole, defaultRole);
       Organization selectedOrg = getOrganization(org, selectedRole, defaultRole, defaultOrg);
-      Warehouse selectedWarehouse = getWarehouse(warehouse, selectedOrg, defaultWarehouse);
+      Warehouse selectedWarehouse = getWarehouse(warehouse, selectedOrg, warehouseFallback);
 
       if (SecureWebServicesUtils.isNewVersionPrivKey(privateKey)) {
         String algorithmUsed = getAlgorithmUsed();
