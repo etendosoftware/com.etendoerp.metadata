@@ -69,4 +69,6 @@ public class Constants {
     public static final String DELETE = "DELETE";
     public static final String LOCATION_PATH = "/location/";
     public static final String TOOLBAR_PATH = "/toolbar";
+    public static final String LOCALE_KEY = "Locale";
+    public static final String DEFAULT_LOCALE = "en_US";
 }

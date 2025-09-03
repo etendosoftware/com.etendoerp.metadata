@@ -19,8 +19,10 @@ package com.etendoerp.metadata.http;
 
 import static com.etendoerp.metadata.utils.Utils.setContext;
 import static org.openbravo.base.secureApp.LoginUtils.fillSessionArguments;
+import static org.openbravo.base.secureApp.LoginUtils.log4j;
 
 import java.io.IOException;
+import java.util.Locale;
 
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
@@ -132,6 +134,8 @@ public class BaseServlet extends HttpSecureAppServlet {
             String userId = authenticationManager.authenticate(req, res);
             setContext(req);
 
+            setupLocaleFromContext();
+
             if (initializeSession) {
                 initializeSession();
                 readNumberFormat(vars, KernelServlet.getGlobalParameters().getFormatPath());
@@ -156,4 +160,28 @@ public class BaseServlet extends HttpSecureAppServlet {
     public final void doOptions(HttpServletRequest req, HttpServletResponse res) {
         AllowedCrossDomainsHandler.getInstance().setCORSHeaders(req, res);
     }
+
+    private void setupLocaleFromContext() {
+        try {
+            OBContext context = OBContext.getOBContext();
+
+            if (context != null && context.getLanguage() != null) {
+                Locale contextLocale = Locale.forLanguageTag(context.getLanguage().getLanguage());
+                if (contextLocale != null) {
+                    Locale.setDefault(contextLocale);
+                } else {
+                    Locale.setDefault(Locale.US);
+                }
+            } else {
+                Locale.setDefault(Locale.US);
+            }
+
+        } catch (Exception e) {
+            Locale.setDefault(Locale.US);
+        }
+    }
+
 }
+
+
+
