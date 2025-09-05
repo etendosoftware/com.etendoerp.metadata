@@ -19,7 +19,6 @@ package com.etendoerp.metadata.http;
 
 import static com.etendoerp.metadata.utils.Utils.setContext;
 import static org.openbravo.base.secureApp.LoginUtils.fillSessionArguments;
-import static org.openbravo.base.secureApp.LoginUtils.log4j;
 
 import java.io.IOException;
 import java.util.Locale;
@@ -131,10 +130,20 @@ public class BaseServlet extends HttpSecureAppServlet {
             requestContext.setVariableSecureApp(vars);
             requestContext.setResponse(res);
 
-            String userId = authenticationManager.authenticate(req, res);
+            String userId = (String) req.getSession(false).getAttribute("#AD_USER_ID");
+            if (userId == null) {
+                userId = authenticationManager.authenticate(req, res);
+            }
+            OBContext.setOBContext(userId);
+
             setContext(req);
 
             setupLocaleFromContext();
+
+
+            if (req.getSession(false) != null && req.getSession(false).getAttribute("#AD_USER_ID") != null) {
+                initializeSession = false;
+            }
 
             if (initializeSession) {
                 initializeSession();
