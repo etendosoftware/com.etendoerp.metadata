@@ -130,9 +130,9 @@ public class BaseServlet extends HttpSecureAppServlet {
             requestContext.setRequest(req);
             requestContext.setVariableSecureApp(vars);
             requestContext.setResponse(res);
+            setContext(req);
 
             String userId = authenticationManager.authenticate(req, res);
-            setContext(req);
 
             setupLocaleFromContext();
 

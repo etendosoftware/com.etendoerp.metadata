@@ -216,9 +216,19 @@ public class Utils {
             /* Recreating the OBContext, because OBContext.setLanguage
              * does not update langID, only languageCode
              */
-            OBContext.setOBContext(context.getUser().getId(), context.getRole().getId(),
-                    context.getCurrentClient().getId(), context.getCurrentOrganization().getId(),
-                    context.getLanguage().getLanguage(), context.getWarehouse().getId());
+            String warehouseId = null;
+            if (context.getWarehouse() != null) {
+                warehouseId = context.getWarehouse().getId();
+            }
+
+            OBContext.setOBContext(
+                    context.getUser().getId(),
+                    context.getRole().getId(),
+                    context.getCurrentClient().getId(),
+                    context.getCurrentOrganization().getId(),
+                    context.getLanguage().getLanguage(),
+                    warehouseId
+            );
 
             OBContext.setOBContextInSession(request, OBContext.getOBContext());
         } finally {
