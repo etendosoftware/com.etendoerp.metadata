@@ -157,9 +157,18 @@ public class LoginManager {
       role = user.getDefaultRole();
 
       if (role == null) {
-        List<UserRoles> userRoleList = user.getADUserRolesList();
-        if (!userRoleList.isEmpty())  {
-          role = userRoleList.get(0).getRole();
+        try {
+          LoginUtils.RoleDefaults defaults = LoginUtils.getLoginDefaults(user.getId(), "", conn);
+          role = OBDal.getInstance().get(Role.class, defaults.role);
+        } catch (ServletException | DefaultValidationException e) {
+          // Ignore exceptions and proceed to next step
+        }
+
+        if (role == null) {
+          List<UserRoles> userRoleList = user.getADUserRolesList();
+          if (!userRoleList.isEmpty()) {
+            role = userRoleList.get(0).getRole();
+          }
         }
       }
     }
@@ -422,4 +431,3 @@ public class LoginManager {
     return authData;
   }
 }
-
