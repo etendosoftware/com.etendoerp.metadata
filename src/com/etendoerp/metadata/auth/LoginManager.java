@@ -46,11 +46,13 @@ import org.openbravo.model.ad.access.RoleOrganization;
 import org.openbravo.model.ad.access.User;
 import org.openbravo.model.ad.access.UserRoles;
 import org.openbravo.model.ad.system.Client;
+import org.openbravo.model.common.enterprise.OrgWarehouse;
 import org.openbravo.model.common.enterprise.Organization;
 import org.openbravo.model.common.enterprise.Warehouse;
 import org.openbravo.service.db.DalConnectionProvider;
 import static com.etendoerp.metadata.utils.Constants.DEFAULT_LOCALE;
 import static com.etendoerp.metadata.utils.Constants.LOCALE_KEY;
+import static org.openbravo.base.secureApp.LoginUtils.clearSessionMaintainingEssentials;
 
 import com.auth0.jwt.exceptions.JWTCreationException;
 import com.auth0.jwt.interfaces.DecodedJWT;
@@ -143,6 +145,13 @@ public class LoginManager {
     return result;
   }
 
+  private String getValidClientForRole(Role role) {
+    if (role == null) {
+      return null;
+    }
+    return role.getClient().getId();
+  }
+
   /**
    * Retrieves authentication data using the provided JSON data.
    *
@@ -156,25 +165,8 @@ public class LoginManager {
   private AuthData getAuthData(JSONObject data) {
     User user = authenticateUser(data);
     Role role = getEntity(data, ROLE, Role.class);
-    if (role == null) {
-      role = user.getDefaultRole();
+    getValidClientForRole(role);
 
-      if (role == null) {
-        try {
-          LoginUtils.RoleDefaults defaults = LoginUtils.getLoginDefaults(user.getId(), "", conn);
-          role = OBDal.getInstance().get(Role.class, defaults.role);
-        } catch (ServletException | DefaultValidationException e) {
-          // Ignore exceptions and proceed to next step
-        }
-
-        if (role == null) {
-          List<UserRoles> userRoleList = user.getADUserRolesList();
-          if (!userRoleList.isEmpty()) {
-            role = userRoleList.get(0).getRole();
-          }
-        }
-      }
-    }
     Organization org = getEntity(data, ORGANIZATION, Organization.class);
     Warehouse warehouse = getEntity(data, WAREHOUSE, Warehouse.class);
     Client client = getEntity(data, CLIENT, Client.class);
@@ -193,7 +185,6 @@ public class LoginManager {
    * @return       An AuthData object containing the user, role, organization, warehouse, and client details.
    */
   private AuthData getAuthData(JSONObject data, String token) {
-    // Ensure we have a context for database operations
     boolean contextCreated = false;
     if (OBContext.getOBContext() == null) {
       OBContext.setAdminMode(true);
@@ -206,7 +197,13 @@ public class LoginManager {
       Role role = getClaimedEntity(data, decoded, ROLE, Role.class);
       Organization org = getClaimedEntity(data, decoded, ORGANIZATION, Organization.class);
       Warehouse warehouse = getClaimedEntity(data, decoded, WAREHOUSE, Warehouse.class);
-      Client client = getEntity(data, CLIENT, Client.class);
+      Client client = null;
+      if (role != null) {
+        client = role.getClient();
+      } else if (data.has(CLIENT)) {
+        client = getEntity(data, CLIENT, Client.class);
+      }
+
       return new AuthData(user, role, org, warehouse, client);
     } finally {
       if (contextCreated) {
@@ -378,31 +375,30 @@ public class LoginManager {
       JSONObject result = new JSONObject();
       HttpSession session = request.getSession(true);
       session.setMaxInactiveInterval(3600);
-      if (authData.getUser() == null || authData.getRole() == null ||
-              authData.getOrg() == null || authData.getClient() == null) {
+
+      if (authData.getUser() == null || authData.getRole() == null || authData.getClient() == null) {
         throw new IllegalArgumentException("Missing required authentication data");
       }
+
       final VariablesSecureApp vars = new VariablesSecureApp(request);
       String currentRoleId = vars.getSessionValue("#AD_Role_ID");
       boolean isRoleChange = currentRoleId != null && !currentRoleId.equals(authData.getRole().getId());
-
       if (isRoleChange) {
+        clearSessionMaintainingEssentials(vars, request);
         authData.setOrg(null);
         authData.setWarehouse(null);
       }
       if (authData.getOrg() == null) {
-        LoginUtils.RoleDefaults defaults = LoginUtils.getLoginDefaults(authData.getUser().getId(), authData.getRole().getId(), new DalConnectionProvider(false));
-        if (defaults.org != null) {
-          authData.setOrg(OBDal.getInstance().get(Organization.class, defaults.org));
-        } else {
-          List<RoleOrganization> roleOrgs = authData.getRole().getADRoleOrganizationList().stream()
-                  .filter(RoleOrganization::isActive)
-                  .collect(Collectors.toList());
-          if (!roleOrgs.isEmpty()) {
-            authData.setOrg(roleOrgs.get(0).getOrganization());
-          }
-        }
+        authData.setOrg(resolveOrganizationForRole(authData.getRole(), authData.getUser().getId()));
       }
+      if (authData.getWarehouse() == null) {
+        authData.setWarehouse(resolveWarehouseForRoleAndOrg(authData.getRole(), authData.getOrg()));
+      }
+
+      if (authData.getOrg() == null) {
+        throw new UnauthorizedException("No valid organization found for role: " + authData.getRole().getName());
+      }
+
       OBContext.setOBContext(
               SecureWebServicesUtils.createContext(
                       authData.getUser().getId(),
@@ -412,18 +408,23 @@ public class LoginManager {
                       authData.getClient().getId()
               )
       );
+
       OBDal.getInstance().flush();
       OBContext.setOBContextInSession(request, OBContext.getOBContext());
+
       RequestContext requestContext = RequestContext.get();
       if (requestContext != null) {
         requestContext.setVariableSecureApp(vars);
       }
+
       String languageCode = DEFAULT_LOCALE;
       String isRTL = "N";
       if (OBContext.getOBContext() != null && OBContext.getOBContext().getLanguage() != null) {
         languageCode = OBContext.getOBContext().getLanguage().getLanguage();
         isRTL = OBContext.getOBContext().isRTL() ? "Y" : "N";
       }
+
+      // SOLO UNA llamada a fillSessionArguments con datos ya validados
       boolean success = LoginUtils.fillSessionArguments(
               new DalConnectionProvider(false),
               vars,
@@ -440,6 +441,7 @@ public class LoginManager {
         logger.error("Invalid combination of role/org/client/warehouse for user {}", authData.getUser().getId());
         throw new UnauthorizedException("Invalid role configuration");
       }
+
       syncSessionVariables(vars, authData);
       BaseServlet.initializeSession();
       result.put(TOKEN, generateToken(authData, session.getId()));
@@ -477,19 +479,67 @@ public class LoginManager {
     if (authData.getRole() == null) {
       authData.setRole(authData.getUser().getDefaultRole());
     }
-    String roleId = authData.getRole() != null ? authData.getRole().getId() : "";
-    LoginUtils.RoleDefaults defaults = LoginUtils.getLoginDefaults(authData.getUser().getId(), roleId, conn);
-    if (defaults.org != null) {
-      authData.setOrg(entityProvider.get(Organization.class, defaults.org));
-    } else {
-      logger.info("No organization by default");
+
+    if (authData.getClient() == null && authData.getRole() != null) {
+      authData.setClient(authData.getRole().getClient());
     }
-    if (authData.getWarehouse() == null && defaults.warehouse != null) {
-      authData.setWarehouse(entityProvider.get(Warehouse.class, defaults.warehouse));
-    }
-    if (authData.getClient() == null && defaults.client != null) {
-      authData.setClient(entityProvider.get(Client.class, defaults.client));
-    }
+
     return authData;
   }
+
+  private Organization getValidOrganizationForRole(Role role) {
+    try {
+      List<RoleOrganization> roleOrgs = role.getADRoleOrganizationList().stream()
+              .filter(RoleOrganization::isActive)
+              .toList();
+
+      if (!roleOrgs.isEmpty()) {
+        for (RoleOrganization roleOrg : roleOrgs) {
+          Organization org = roleOrg.getOrganization();
+          if (!"0".equals(org.getId())) {
+            logger.debug("Found valid organization: {} for role: {}", org.getId(), role.getId());
+            return org;
+          }
+        }
+
+        // Si solo tiene acceso a System Organization, usar la primera disponible
+        Organization firstOrg = roleOrgs.get(0).getOrganization();
+        logger.warn("Role {} only has access to system organization: {}", role.getId(), firstOrg.getId());
+        return firstOrg;
+      }
+
+      logger.error("No organizations found for role: {}", role.getId());
+    } catch (Exception e) {
+      logger.error("Error getting valid organization for role {}: {}", role.getId(), e.getMessage(), e);
+    }
+
+    return null;
+  }
+
+  private Organization resolveOrganizationForRole(Role role, String userId) {
+    return getValidOrganizationForRole(role);
+  }
+
+  private Warehouse resolveWarehouseForRoleAndOrg(Role role, Organization org) {
+    if (org == null) {
+      return null;
+    }
+
+    try {
+      List<Warehouse> availableWarehouses = org.getOrganizationWarehouseList().stream()
+              .filter(OrgWarehouse::isActive)
+              .map(OrgWarehouse::getWarehouse)
+              .filter(Warehouse::isActive)
+              .toList();
+
+      if (!availableWarehouses.isEmpty()) {
+        return availableWarehouses.get(0);
+      }
+    } catch (Exception e) {
+      logger.warn("Error getting warehouses for org {}: {}", org.getId(), e.getMessage());
+    }
+
+    return null;
+  }
+
 }
