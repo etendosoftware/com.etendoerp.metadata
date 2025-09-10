@@ -113,6 +113,17 @@ public class ForwarderServlet extends BaseServlet {
 
       request.getRequestDispatcher(request.getPathInfo()).include(request, responseWrapper);
 
+      if (responseWrapper.isRedirected()) {
+        String redirectLocation = responseWrapper.getRedirectLocation();
+        String htmlRedirect = getHtmlRedirect(redirectLocation);
+
+        response.setContentType(responseWrapper.getContentType());
+        response.setStatus(responseWrapper.getStatus());
+        response.getWriter().write(htmlRedirect);
+        response.getWriter().flush();
+        return;
+      }
+
       String output = responseWrapper.getCapturedOutputAsString();
 
       output = getInjectedContent(path, output);
@@ -123,7 +134,7 @@ public class ForwarderServlet extends BaseServlet {
       response.getWriter().flush();
   }
 
-    /**
+  /**
      * For legacy HTML pages, validate that the expected WAD servlet class exists; if not, throw a descriptive error.
      */
     private void maybeValidateLegacyClass(String pathInfo) {
@@ -214,7 +225,35 @@ public class ForwarderServlet extends BaseServlet {
       }
     }
 
-    /**
+  /**
+   * Generates an HTML redirect page that automatically redirects the browser to a modified URL.
+   * The method inserts the "/meta/forward" path into the redirect location and creates
+   * a simple HTML page with a meta refresh tag.
+   *
+   * @param redirectLocation the original redirect URL to be modified
+   * @return an HTML string containing the redirect page with meta refresh
+   */
+  private static String getHtmlRedirect(String redirectLocation) {
+    String basePath = "/etendo";
+    String insertPath = "/meta/forward";
+
+    String forwardedUrl = redirectLocation.replace(basePath, basePath + insertPath);
+    return String.format(
+            """
+                    <!DOCTYPE html>
+                    <html>
+                        <head>
+                            <meta charset='UTF-8'/>\
+                    <meta http-equiv="refresh" content="0; url='%s'"/>\
+                    
+                        </head>
+                    </html>""",
+            forwardedUrl
+    );
+  }
+
+
+  /**
      * Injects custom scripts and modifies resource paths in the HTML response as needed.
      * Adds scripts for message passing and button handling depending on the HTML structure.
      *
