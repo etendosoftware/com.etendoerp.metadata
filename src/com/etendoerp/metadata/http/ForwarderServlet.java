@@ -56,6 +56,8 @@ import org.openbravo.dal.core.OBContext;
 public class ForwarderServlet extends BaseServlet {
     /** Session attribute key for JWT token */
     private static final String JWT_TOKEN = "#JWT_TOKEN";
+    private static final String BASE_PATH = "/etendo";
+    private static final String FORWARD_PATH = "/meta/forward";
 
     /**
      * Main entry point for HTTP requests. Determines if the request is legacy or not,
@@ -234,18 +236,14 @@ public class ForwarderServlet extends BaseServlet {
    * @return an HTML string containing the redirect page with meta refresh
    */
   private static String getHtmlRedirect(String redirectLocation) {
-    String basePath = "/etendo";
-    String insertPath = "/meta/forward";
-
-    String forwardedUrl = redirectLocation.replace(basePath, basePath + insertPath);
+    String forwardedUrl = redirectLocation.replace(BASE_PATH, BASE_PATH + FORWARD_PATH);
     return String.format(
             """
                     <!DOCTYPE html>
                     <html>
                         <head>
-                            <meta charset='UTF-8'/>\
-                    <meta http-equiv="refresh" content="0; url='%s'"/>\
-                    
+                            <meta charset='UTF-8'/>
+                            <meta http-equiv="refresh" content="0; url='%s'"/>
                         </head>
                     </html>""",
             forwardedUrl
@@ -263,7 +261,7 @@ public class ForwarderServlet extends BaseServlet {
      */
     private String getInjectedContent(String path, String responseString) {
         responseString = responseString
-          .replace("/meta/forward", "/meta/forward" + path)
+          .replace(FORWARD_PATH, FORWARD_PATH + path)
           .replace("src=\"../web/", "src=\"../../../web/")
           .replace("href=\"../web/", "href=\"../../../web/");
 
