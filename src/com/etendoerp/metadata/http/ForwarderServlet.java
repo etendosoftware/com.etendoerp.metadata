@@ -54,7 +54,7 @@ import org.openbravo.service.web.WebService;
  * </p>
  *
  */
-public class ForwarderServlet extends BaseServlet implements WebService {
+public class ForwarderServlet implements WebService {
     private static final Logger log4j = LogManager.getLogger(ForwarderServlet.class);
     /** Session attribute key for JWT token */
     private static final String JWT_TOKEN = "#JWT_TOKEN";
