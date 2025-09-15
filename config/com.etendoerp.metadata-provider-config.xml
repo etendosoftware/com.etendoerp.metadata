@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<provider>
+    <bean>
+        <name>meta</name>
+        <class>com.etendoerp.metadata.http.MetadataServlet</class>
+        <singleton>true</singleton>
+    </bean>
+    <bean>
+        <name>forward</name>
+        <class>com.etendoerp.metadata.http.ForwarderServlet</class>
+        <singleton>true</singleton>
+    </bean>
+</provider>

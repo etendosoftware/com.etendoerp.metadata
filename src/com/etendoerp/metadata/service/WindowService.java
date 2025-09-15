@@ -36,7 +36,9 @@ public class WindowService extends MetadataService {
 
     @Override
     public void process() throws IOException {
-        String id = getRequest().getPathInfo().substring(8);
+        String path = getRequest().getPathInfo();
+        // The expected path is /com.etendoerp.metadata.meta/window/{id}
+        String id = path.replace("/com.etendoerp.metadata.meta/window/", "").replace("/", "");
 
         try {
             OBContext.setAdminMode(true);

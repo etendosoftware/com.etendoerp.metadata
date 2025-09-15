@@ -20,7 +20,6 @@ package com.etendoerp.metadata.http;
 import static com.etendoerp.metadata.utils.Constants.FORM_CLOSE_TAG;
 import static com.etendoerp.metadata.utils.Constants.FRAMESET_CLOSE_TAG;
 import static com.etendoerp.metadata.utils.Constants.HEAD_CLOSE_TAG;
-import static com.etendoerp.metadata.utils.ServletRegistry.getDelegatedServlet;
 
 import java.io.IOException;
 import java.util.regex.Matcher;
@@ -29,17 +28,19 @@ import java.util.regex.Pattern;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSession;
 
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.etendoerp.metadata.data.RequestVariables;
 import com.smf.securewebservices.utils.SecureWebServicesUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.openbravo.base.exception.OBException;
-import org.openbravo.base.secureApp.HttpSecureAppServlet;
+import org.openbravo.base.weld.WeldUtils;
 import org.openbravo.client.kernel.RequestContext;
 
 import org.openbravo.dal.core.OBContext;
+import org.openbravo.service.web.WebService;
 
 /**
  * Servlet that forwards incoming requests to specific delegated servlets based on the path.
@@ -53,7 +54,8 @@ import org.openbravo.dal.core.OBContext;
  * </p>
  *
  */
-public class ForwarderServlet extends BaseServlet {
+public class ForwarderServlet extends BaseServlet implements WebService {
+    private static final Logger log4j = LogManager.getLogger(ForwarderServlet.class);
     /** Session attribute key for JWT token */
     private static final String JWT_TOKEN = "#JWT_TOKEN";
 
@@ -66,16 +68,12 @@ public class ForwarderServlet extends BaseServlet {
      * @throws IOException if an input or output error occurs
      * @throws ServletException if a servlet error occurs
      */
-    @Override
-    public void service(HttpServletRequest req, HttpServletResponse res) throws IOException, ServletException {
+    public void process(HttpServletRequest req, HttpServletResponse res) throws IOException, ServletException {
         try {
-            //HttpServletRequest request = RequestContext.get().getRequest();
-            //HttpServletResponse response = RequestContext.get().getResponse();
             String path = req.getPathInfo();
             if (isLegacyRequest(path)) {
               handleLegacyRequest(req, res, path, res);
             } else {
-                //super.service(req, res, false, true);
                 processForwardRequest(path, req, res);
             }
         } catch (IOException | ServletException e) {
@@ -308,17 +306,7 @@ public class ForwarderServlet extends BaseServlet {
      */
     private void processForwardRequest(String path, HttpServletRequest request,
         HttpServletResponse response) throws IOException, ServletException {
-        // Delegate the request to the target servlet
-        HttpSecureAppServlet servlet = getDelegatedServlet(this, path);
-        HttpSession session = request.getSession(false);
-        if (session != null) {
-          Object userId = request.getSession().getAttribute("#Authenticated_user");
-          if (userId != null) {
-            session.setAttribute("#CSRF_TOKEN", userId.toString());
-            session.setAttribute("#Csrf_Token", userId.toString());
-          }
-        }
-        servlet.service(request, response);
+      WeldUtils.getInstanceFromStaticBeanManager(org.openbravo.service.datasource.DataSourceServlet.class).doGet(request, response);
     }
 
     /**
@@ -333,4 +321,27 @@ public class ForwarderServlet extends BaseServlet {
         return path.endsWith(".html");
     }
 
+  @Override
+  public void doGet(String path, HttpServletRequest request, HttpServletResponse response)
+      throws Exception {
+    process(request, response);
+  }
+
+  @Override
+  public void doPost(String path, HttpServletRequest request, HttpServletResponse response)
+      throws Exception {
+    process(request, response);
+  }
+
+  @Override
+  public void doDelete(String path, HttpServletRequest request, HttpServletResponse response)
+      throws Exception {
+    process(request, response);
+  }
+
+  @Override
+  public void doPut(String path, HttpServletRequest request, HttpServletResponse response)
+      throws Exception {
+    process(request, response);
+  }
 }

@@ -28,11 +28,12 @@ import com.etendoerp.metadata.service.ServiceFactory;
 import com.etendoerp.metadata.utils.Utils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.openbravo.service.web.WebService;
 
 /**
  * @author luuchorocha
  */
-public class MetadataServlet extends BaseServlet {
+public class MetadataServlet implements WebService {
     private static final Logger log4j = LogManager.getLogger(MetadataServlet.class);
 
     private void process(HttpServletRequest req, HttpServletResponse res) throws IOException {
@@ -117,22 +118,26 @@ public class MetadataServlet extends BaseServlet {
     }
 
     @Override
-    public final void doGet(HttpServletRequest req, HttpServletResponse res) throws IOException {
-        process(req, res);
+    public void doGet(String path, HttpServletRequest request, HttpServletResponse response)
+        throws Exception {
+        process(request, response);
     }
 
     @Override
-    public final void doPost(HttpServletRequest req, HttpServletResponse res) throws IOException {
-        process(req, res);
+    public void doPost(String path, HttpServletRequest request, HttpServletResponse response)
+        throws Exception {
+        process(request, response);
     }
 
     @Override
-    public final void doPut(HttpServletRequest req, HttpServletResponse res) throws IOException {
-        process(req, res);
+    public void doDelete(String path, HttpServletRequest request, HttpServletResponse response)
+        throws Exception {
+        process(request, response);
     }
 
     @Override
-    public final void doDelete(HttpServletRequest req, HttpServletResponse res) throws IOException {
-        process(req, res);
+    public void doPut(String path, HttpServletRequest request, HttpServletResponse response)
+        throws Exception {
+        process(request, response);
     }
 }
