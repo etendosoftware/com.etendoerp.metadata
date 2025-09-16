@@ -1,5 +1,5 @@
 group = "com.etendoerp"
-version = "0.7.0"
+version = "0.7.1"
 description = "A module that provides APIs for the new Etendo UI"
 ext.artifact = "metadata"
 ext.repository = "https://maven.pkg.github.com/etendosoftware/com.etendoerp.platform.extensions"
@@ -51,5 +51,5 @@ repositories {
 dependencies {
     implementation('com.etendoerp.platform:etendo-core:[25.1.0,25.3.0)')
     implementation('com.etendoerp:metadata.template:0.3.0')
-    implementation('com.etendoerp:etendorx:3.8.0')
+    implementation('com.etendoerp:etendorx:3.8.1')
 }
