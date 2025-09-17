@@ -54,7 +54,8 @@ public class ForwarderServlet implements WebService {
     public void process(HttpServletRequest req, HttpServletResponse res) throws IOException, ServletException {
         try {
             // All requests are forwarded to DataSourceServlet for modern API processing
-            processForwardRequest(req, res);
+            String path = req.getPathInfo();
+            processForwardRequest(path, req, res);
         } catch (IOException | ServletException e) {
             log4j.error("Error processing forward request: " + e.getMessage(), e);
             throw e;
@@ -65,15 +66,15 @@ public class ForwarderServlet implements WebService {
      * Delegates all requests to DataSourceServlet for processing.
      * This method handles modern API endpoints that require SWS authentication.
      *
+     * @param path     the request path
      * @param request  the HttpServletRequest
      * @param response the HttpServletResponse
-     * @throws IOException if an input or output error occurs
+     * @throws IOException      if an input or output error occurs
      * @throws ServletException if a servlet error occurs
      */
-    private void processForwardRequest(HttpServletRequest request, HttpServletResponse response)
+    private void processForwardRequest(String path, HttpServletRequest request, HttpServletResponse response)
             throws IOException, ServletException {
-        WeldUtils.getInstanceFromStaticBeanManager(org.openbravo.service.datasource.DataSourceServlet.class)
-                .doGet(request, response);
+        WeldUtils.getInstanceFromStaticBeanManager(org.openbravo.service.datasource.DataSourceServlet.class).doGet(request, response);
     }
 
     @Override

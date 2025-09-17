@@ -22,6 +22,7 @@ import java.io.IOException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.openbravo.base.exception.OBException;
 import org.openbravo.dal.core.OBContext;
 
 import com.etendoerp.metadata.builders.WindowBuilder;
@@ -37,14 +38,45 @@ public class WindowService extends MetadataService {
     @Override
     public void process() throws IOException {
         String path = getRequest().getPathInfo();
-        // The expected path is /com.etendoerp.metadata.meta/window/{id}
-        String id = path.replace("/com.etendoerp.metadata.meta/window/", "").replace("/", "");
+        String windowId = extractWindowId(path);
+
+        if (windowId == null || windowId.isEmpty()) {
+            throw new OBException("Invalid window id in URL: " + path);
+        }
 
         try {
             OBContext.setAdminMode(true);
-            write(new WindowBuilder(id).toJSON());
+            write(new WindowBuilder(windowId).toJSON());
         } finally {
             OBContext.restorePreviousMode();
         }
+    }
+
+    /**
+     * Extract the id of the window from path
+     * Handle paths like: /com.etendoerp.metadata.meta/window/115
+     */
+    private String extractWindowId(String pathInfo) {
+        if (pathInfo == null) {
+            return null;
+        }
+
+        int windowIndex = pathInfo.indexOf("/window/");
+        if (windowIndex == -1) {
+            return null;
+        }
+
+        String windowIdPart = pathInfo.substring(windowIndex + 8); // +8 para saltar "/window/"
+
+        int queryIndex = windowIdPart.indexOf('?');
+        if (queryIndex != -1) {
+            windowIdPart = windowIdPart.substring(0, queryIndex);
+        }
+
+        if (windowIdPart.endsWith("/")) {
+            windowIdPart = windowIdPart.substring(0, windowIdPart.length() - 1);
+        }
+
+        return windowIdPart;
     }
 }

@@ -53,8 +53,9 @@ public class MetadataFilter implements Filter {
 
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
-        HttpServletRequest httpReq = (HttpServletRequest) request;
-        HttpServletResponse httpRes = (HttpServletResponse) response;
+        if (!(request instanceof HttpServletRequest httpReq) || !(response instanceof HttpServletResponse httpRes)) {
+            throw new ServletException("This filter only supports HTTP requests");
+        }
 
         String pathInfo = httpReq.getPathInfo();
 

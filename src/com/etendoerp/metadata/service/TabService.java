@@ -1,20 +1,3 @@
-/*
- *************************************************************************
- * The contents of this file are subject to the Etendo License
- * (the "License"), you may not use this file except in compliance with
- * the License.
- * You may obtain a copy of the License at
- * https://github.com/etendosoftware/etendo_core/blob/main/legal/Etendo_license.txt
- * Software distributed under the License is distributed on an
- * "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
- * implied. See the License for the specific language governing rights
- * and limitations under the License.
- * All portions are Copyright © 2021–2025 FUTIT SERVICES, S.L
- * All Rights Reserved.
- * Contributor(s): Futit Services S.L.
- *************************************************************************
- */
-
 package com.etendoerp.metadata.service;
 
 import java.io.IOException;
@@ -27,6 +10,7 @@ import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.ui.Tab;
 
 import com.etendoerp.metadata.builders.TabBuilder;
+import com.etendoerp.metadata.exceptions.NotFoundException;
 
 /**
  * @author luuchorocha
@@ -40,11 +24,50 @@ public class TabService extends MetadataService {
     public void process() throws IOException {
         try {
             OBContext.setAdminMode(true);
-            String tabId = getRequest().getPathInfo().substring(5);
+            String pathInfo = getRequest().getPathInfo();
+            String tabId = extractTabId(pathInfo);
+
+            if (tabId == null || tabId.isEmpty()) {
+                throw new NotFoundException("Invalid tab path: " + pathInfo);
+            }
+
             Tab tab = OBDal.getInstance().get(Tab.class, tabId);
+
+            if (tab == null) {
+                throw new NotFoundException("Tab not found: " + tabId);
+            }
+
             write(new TabBuilder(tab, null).toJSON());
         } finally {
             OBContext.restorePreviousMode();
         }
+    }
+
+    /**
+     * Extract the ID of the tab path from request
+     * Handles paths like: /etendo/sws/com.etendoerp.metadata.meta/tab/3ACD18ADFBA8406086852B071250C481
+     * Or just: /tab/3ACD18ADFBA8406086852B071250C481
+     */
+    private String extractTabId(String pathInfo) {
+        if (pathInfo == null) {
+            return null;
+        }
+        int tabIndex = pathInfo.indexOf("/tab/");
+        if (tabIndex == -1) {
+            return null;
+        }
+
+        String tabIdPart = pathInfo.substring(tabIndex + 5);
+
+        int queryIndex = tabIdPart.indexOf('?');
+        if (queryIndex != -1) {
+            tabIdPart = tabIdPart.substring(0, queryIndex);
+        }
+
+        if (tabIdPart.endsWith("/")) {
+            tabIdPart = tabIdPart.substring(0, tabIdPart.length() - 1);
+        }
+
+        return tabIdPart;
     }
 }
