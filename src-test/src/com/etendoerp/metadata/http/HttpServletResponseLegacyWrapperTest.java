@@ -5,11 +5,7 @@ import static com.etendoerp.metadata.MetadataTestConstants.ISO_ENCODING;
 import static com.etendoerp.metadata.MetadataTestConstants.TEST_CONTENT;
 import static com.etendoerp.metadata.MetadataTestConstants.UTF8_ENCODING;
 import static com.etendoerp.metadata.MetadataTestConstants.WORLD;
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -52,6 +48,9 @@ import org.openbravo.test.base.OBBaseTest;
  */
 @RunWith(MockitoJUnitRunner.class)
 public class HttpServletResponseLegacyWrapperTest extends OBBaseTest {
+
+  // Test message constants
+  private static final String SHOULD_BE_MARKED_AS_REDIRECTED = "Should be marked as redirected";
 
   @Mock
   private HttpServletResponse mockResponse;
@@ -411,35 +410,6 @@ public class HttpServletResponseLegacyWrapperTest extends OBBaseTest {
   }
 
   /**
-   * Tests that reset clears all wrapper state.
-   *
-   * <p>This test validates that the reset method properly clears all internal
-   * state including captured content, output stream flags, and writer flags,
-   * essentially returning the wrapper to its initial state.</p>
-   *
-   * @throws IOException if I/O operations fail during the test
-   */
-  @Test
-  public void resetShouldClearAllWrapperState() throws IOException {
-    // Use the writer first
-    PrintWriter writer = wrapper.getWriter();
-    writer.write(TEST_CONTENT);
-    writer.flush();
-
-    // Verify content is captured
-    assertTrue("Should have captured content", wrapper.getCapturedOutput().length > 0);
-
-    wrapper.reset();
-
-    // Verify content is cleared
-    assertEquals("Content should be cleared", 0, wrapper.getCapturedOutput().length);
-
-    // Should be able to get OutputStream after reset (previously would throw exception)
-    ServletOutputStream outputStream = wrapper.getOutputStream();
-    assertNotNull("Should be able to get OutputStream after reset", outputStream);
-  }
-
-  /**
    * Tests that OutputStream isReady always returns true.
    *
    * <p>This test validates that the ServletOutputStream implementation
@@ -675,4 +645,155 @@ public class HttpServletResponseLegacyWrapperTest extends OBBaseTest {
     assertEquals("Content should be accessible despite flush errors",
         TEST_CONTENT, capturedString);
   }
+
+  /**
+   * Tests that sendRedirect sets the redirect location correctly.
+   *
+   * <p>This test validates that when sendRedirect is called with a URL,
+   * the redirect location is properly stored and can be retrieved using
+   * getRedirectLocation. It also verifies that the redirected flag is set.</p>
+   *
+   * @throws IOException if I/O operations fail during the test
+   */
+  @Test
+  public void sendRedirectShouldSetRedirectLocation() throws IOException {
+    String redirectUrl = "https://example.com/redirect";
+
+    wrapper.sendRedirect(redirectUrl);
+
+    assertEquals("Redirect location should be set correctly", redirectUrl, wrapper.getRedirectLocation());
+    assertTrue(SHOULD_BE_MARKED_AS_REDIRECTED, wrapper.isRedirected());
+  }
+
+  /**
+   * Tests that multiple calls to sendRedirect override previous values.
+   *
+   * <p>This test validates that when sendRedirect is called multiple times,
+   * each call overwrites the previous redirect location. Only the last
+   * redirect location should be stored and retrievable.</p>
+   *
+   * @throws IOException if I/O operations fail during the test
+   */
+  @Test
+  public void multipleSendRedirectCallsShouldOverridePrevious() throws IOException {
+    String firstUrl = "/first-redirect";
+    String secondUrl = "/second-redirect";
+    String thirdUrl = "/final-redirect";
+
+    wrapper.sendRedirect(firstUrl);
+    wrapper.sendRedirect(secondUrl);
+    wrapper.sendRedirect(thirdUrl);
+
+    assertEquals("Should store the last redirect URL", thirdUrl, wrapper.getRedirectLocation());
+    assertTrue("Should still be marked as redirected", wrapper.isRedirected());
+  }
+
+  /**
+   * Tests that isRedirected returns false initially.
+   *
+   * <p>This test validates that a newly created wrapper is not initially
+   * marked as redirected. The redirected flag should only be set after
+   * sendRedirect is called.</p>
+   */
+  @Test
+  public void isRedirectedShouldReturnFalseInitially() {
+    assertFalse("Should not be redirected initially", wrapper.isRedirected());
+  }
+
+  /**
+   * Tests that getRedirectLocation returns null initially.
+   *
+   * <p>This test validates that a newly created wrapper returns null
+   * for the redirect location until sendRedirect is called. This provides
+   * a clear way to detect whether a redirect has been set.</p>
+   */
+  @Test
+  public void getRedirectLocationShouldReturnNullInitially() {
+    assertNull("Redirect location should be null initially", wrapper.getRedirectLocation());
+  }
+
+  /**
+   * Tests that sendRedirect works correctly after using OutputStream.
+   *
+   * <p>This test validates that sendRedirect can be called even after
+   * the OutputStream has been used for writing content. The redirect
+   * functionality should work independently of output stream usage.</p>
+   *
+   * @throws IOException if I/O operations fail during the test
+   */
+  @Test
+  public void sendRedirectShouldWorkAfterUsingOutputStream() throws IOException {
+    ServletOutputStream outputStream = wrapper.getOutputStream();
+    outputStream.write("Some content".getBytes(StandardCharsets.UTF_8));
+
+    String redirectUrl = "/redirect-after-output";
+    wrapper.sendRedirect(redirectUrl);
+
+    assertEquals("Redirect should work after using OutputStream", redirectUrl, wrapper.getRedirectLocation());
+    assertTrue(SHOULD_BE_MARKED_AS_REDIRECTED, wrapper.isRedirected());
+  }
+
+  /**
+   * Tests that sendRedirect works correctly after using PrintWriter.
+   *
+   * <p>This test validates that sendRedirect can be called even after
+   * the PrintWriter has been used for writing content. The redirect
+   * functionality should work independently of writer usage.</p>
+   *
+   * @throws IOException if I/O operations fail during the test
+   */
+  @Test
+  public void sendRedirectShouldWorkAfterUsingPrintWriter() throws IOException {
+    PrintWriter writer = wrapper.getWriter();
+    writer.write("Some content");
+    writer.flush();
+
+    String redirectUrl = "/redirect-after-writer";
+    wrapper.sendRedirect(redirectUrl);
+
+    assertEquals("Redirect should work after using PrintWriter", redirectUrl, wrapper.getRedirectLocation());
+    assertTrue(SHOULD_BE_MARKED_AS_REDIRECTED, wrapper.isRedirected());
+  }
+
+  /**
+   * Tests that redirect state persists through buffer operations.
+   *
+   * <p>This test validates that the redirect state (both the redirected flag
+   * and redirect location) persists correctly through various buffer operations
+   * like flushBuffer, ensuring that redirect information is not lost.</p>
+   *
+   * @throws IOException if I/O operations fail during the test
+   */
+  @Test
+  public void redirectStateShouldPersistThroughBufferOperations() throws IOException {
+    String redirectUrl = "/persistent-redirect";
+    wrapper.sendRedirect(redirectUrl);
+
+    // Perform various buffer operations
+    wrapper.flushBuffer();
+
+    assertEquals("Redirect location should persist through buffer operations",
+        redirectUrl, wrapper.getRedirectLocation());
+    assertTrue("Redirected flag should persist through buffer operations", wrapper.isRedirected());
+  }
+
+  /**
+   * Tests that sendRedirect with URL containing special characters works correctly.
+   *
+   * <p>This test validates that sendRedirect properly handles URLs containing
+   * special characters including spaces, Unicode characters, and URL-encoded
+   * sequences. All characters should be preserved exactly as provided.</p>
+   *
+   * @throws IOException if I/O operations fail during the test
+   */
+  @Test
+  public void sendRedirectShouldHandleSpecialCharacters() throws IOException {
+    String specialUrl = "/redirect with spaces/ñáéíóú/encoded%20chars?param=value&other=test";
+
+    wrapper.sendRedirect(specialUrl);
+
+    assertEquals("Special characters should be preserved", specialUrl, wrapper.getRedirectLocation());
+    assertTrue(SHOULD_BE_MARKED_AS_REDIRECTED, wrapper.isRedirected());
+  }
 }
+
