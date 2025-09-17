@@ -19,6 +19,7 @@ import static org.mockito.Mockito.when;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.lang.reflect.InvocationTargetException;
 
 import javax.servlet.RequestDispatcher;
 import javax.servlet.http.HttpServletRequest;
@@ -459,6 +460,71 @@ public class ForwarderServletTest extends OBBaseTest {
   }
 
   /**
+   * Tests HTML redirect generation with a basic URL.
+   *
+   * <p>This test validates that the getHtmlRedirect method correctly generates
+   * an HTML page with a meta refresh tag for basic redirect URLs. It verifies
+   * that the BASE_PATH (/etendo) is properly replaced with the forward path.</p>
+   *
+   * @throws Exception
+   *     if HTML redirect generation fails or reflection access encounters issues
+   */
+  @Test
+  public void getHtmlRedirectShouldGenerateBasicRedirect() throws Exception {
+    String redirectLocation = "/etendo/web/login.jsp";
+    String htmlRedirect = invokeGetHtmlRedirect(redirectLocation);
+
+    assertTrue(htmlRedirect.contains("<!DOCTYPE html>"));
+    assertTrue(htmlRedirect.contains("<html>"));
+    assertTrue(htmlRedirect.contains("<head>"));
+    assertTrue(htmlRedirect.contains("charset='UTF-8'"));
+    assertTrue(htmlRedirect.contains("meta http-equiv=\"refresh\""));
+    assertTrue(htmlRedirect.contains("url='/etendo/meta/forward/web/login.jsp'"));
+    assertTrue(htmlRedirect.contains("</head>"));
+    assertTrue(htmlRedirect.contains("</html>"));
+  }
+
+  /**
+   * Tests HTML redirect generation with empty redirect location.
+   *
+   * <p>This test validates that the getHtmlRedirect method handles empty
+   * or null redirect locations gracefully, generating a minimal but valid
+   * HTML redirect structure.</p>
+   *
+   * @throws Exception
+   *     if HTML redirect generation fails or reflection access encounters issues
+   */
+  @Test
+  public void getHtmlRedirectShouldHandleEmptyRedirectLocation() throws Exception {
+    String redirectLocation = "";
+    String htmlRedirect = invokeGetHtmlRedirect(redirectLocation);
+
+    assertTrue(htmlRedirect.contains("<!DOCTYPE html>"));
+    assertTrue(htmlRedirect.contains("url=''"));
+    assertTrue(htmlRedirect.contains("meta http-equiv=\"refresh\" content=\"0;"));
+  }
+
+  /**
+   * Tests HTML redirect generation with URL not containing BASE_PATH.
+   *
+   * <p>This test validates that the getHtmlRedirect method handles URLs
+   * that don't contain the BASE_PATH (/etendo), leaving them unchanged
+   * in the redirect URL. This covers external URLs or different base paths.</p>
+   *
+   * @throws Exception
+   *     if HTML redirect generation fails or reflection access encounters issues
+   */
+  @Test
+  public void getHtmlRedirectShouldHandleUrlWithoutBasePath() throws Exception {
+    String redirectLocation = "/other/path/test.html";
+    String htmlRedirect = invokeGetHtmlRedirect(redirectLocation);
+
+    assertTrue(htmlRedirect.contains("url='/other/path/test.html'"));
+    // Verify that no modification was made since BASE_PATH is not present
+    assertFalse(htmlRedirect.contains("/meta/forward"));
+  }
+
+  /**
    * Helper method to invoke the private isLegacyRequest method via reflection.
    *
    * @param path
@@ -600,5 +666,38 @@ public class ForwarderServletTest extends OBBaseTest {
     java.lang.reflect.Method method = ForwarderServlet.class.getDeclaredMethod("generatePostMessageScript");
     method.setAccessible(true);
     return (String) method.invoke(forwarderServlet);
+  }
+
+  /**
+   * Helper method to invoke the private getHtmlRedirect method via reflection.
+   *
+   * @param redirectLocation
+   *     the redirect URL to be processed
+   * @return the generated HTML redirect page as a string
+   * @throws OBException
+   *     if HTML redirect generation fails or reflection access encounters issues
+   */
+  private String invokeGetHtmlRedirect(String redirectLocation) throws OBException {
+    try {
+      java.lang.reflect.Method method = ForwarderServlet.class.getDeclaredMethod("getHtmlRedirect", String.class);
+      method.setAccessible(true);
+      return (String) method.invoke(forwarderServlet, redirectLocation);
+    } catch (NoSuchMethodException e) {
+      throw new OBException("Failed to find getHtmlRedirect method in ForwarderServlet. " +
+          "Method signature may have changed: " + e.getMessage(), e);
+    } catch (IllegalAccessException e) {
+      throw new OBException("Failed to access getHtmlRedirect method via reflection. " +
+          "Method may have changed visibility: " + e.getMessage(), e);
+    } catch (InvocationTargetException e) {
+      Throwable cause = e.getCause();
+      if (cause instanceof RuntimeException) {
+        throw (RuntimeException) cause;
+      } else if (cause instanceof Error) {
+        throw (Error) cause;
+      } else {
+        throw new OBException("Failed to execute getHtmlRedirect method with location '" +
+            redirectLocation + "': " + cause.getMessage(), cause);
+      }
+    }
   }
 }
