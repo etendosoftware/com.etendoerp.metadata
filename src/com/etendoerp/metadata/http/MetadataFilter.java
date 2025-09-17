@@ -52,24 +52,24 @@ public class MetadataFilter implements Filter {
     }
 
     @Override
-    public void doFilter(ServletRequest request, ServletResponse response,
-        FilterChain chain) throws IOException, ServletException {
-        HttpServletRequest httpReq = request instanceof HttpServletRequest ? (HttpServletRequest) request : null;
-        HttpServletResponse httpRes = response instanceof HttpServletResponse ? (HttpServletResponse) response : null;
-        boolean capture = shouldCaptureHtml(httpReq, httpRes);
+    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
+        HttpServletRequest httpReq = (HttpServletRequest) request;
+        HttpServletResponse httpRes = (HttpServletResponse) response;
 
-        HttpServletResponse effectiveRes = httpRes;
-        HttpServletResponseLegacyWrapper captureWrapper = null;
+        String pathInfo = httpReq.getPathInfo();
 
         try {
-            if (capture && httpRes != null) {
-                captureWrapper = new HttpServletResponseLegacyWrapper(httpRes);
-                effectiveRes = captureWrapper;
+            if (pathInfo != null) {
+                if (pathInfo.toLowerCase().endsWith(HTML)) {
+                    new LegacyProcessServlet().service(httpReq, httpRes);
+                    return;
+                } else if (pathInfo.startsWith("/forward/")) {
+                    new ForwarderServlet().process(httpReq, httpRes);
+                    return;
+                }
             }
-            chain.doFilter(request, effectiveRes);
-            if (capture && captureWrapper != null) {
-                handleCapturedResponse(httpReq, httpRes, captureWrapper);
-            }
+            chain.doFilter(httpReq, httpRes);
+
         } catch (Throwable t) {
             handleException(request, response, t);
         } finally {
