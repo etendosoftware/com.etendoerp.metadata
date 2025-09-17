@@ -238,14 +238,13 @@ public class ForwarderServlet extends BaseServlet {
   private static String getHtmlRedirect(String redirectLocation) {
     String forwardedUrl = redirectLocation.replace(BASE_PATH, BASE_PATH + FORWARD_PATH);
     return String.format(
-            """
-                    <!DOCTYPE html>
-                    <html>
-                        <head>
-                            <meta charset='UTF-8'/>
-                            <meta http-equiv="refresh" content="0; url='%s'"/>
-                        </head>
-                    </html>""",
+            "<!DOCTYPE html>\n" +
+                    "<html>\n" +
+                    "    <head>\n" +
+                    "        <meta charset='UTF-8'/>\n" +
+                    "        <meta http-equiv=\"refresh\" content=\"0; url='%s'\"/>\n" +
+                    "    </head>\n" +
+                    "</html>",
             forwardedUrl
     );
   }
