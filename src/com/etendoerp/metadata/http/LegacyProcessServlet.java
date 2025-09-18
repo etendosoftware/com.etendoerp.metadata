@@ -344,7 +344,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
 
     private String getInjectedContent(String path, String responseString) {
         responseString = responseString
-                .replace("/meta/legacy", META_LEGACY_PATH + path)
+                .replace(META_LEGACY_PATH, META_LEGACY_PATH + path)
                 .replace("src=\"../web/", "src=\"../../../web/")
                 .replace("href=\"../web/", "href=\"../../../web/");
         if (responseString.contains(FRAMESET_CLOSE_TAG)) {

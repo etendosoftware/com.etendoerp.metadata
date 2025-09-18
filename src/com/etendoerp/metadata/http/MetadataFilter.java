@@ -45,6 +45,7 @@ import com.etendoerp.metadata.utils.Utils;
 public class MetadataFilter implements Filter {
     private static final Logger log4j = LogManager.getLogger(MetadataFilter.class);
     public static final String HTML = ".html";
+    private static final String FORWARD_PATH = "/forward/";
 
     @Override
     public void init(FilterConfig fConfig) {
@@ -64,7 +65,7 @@ public class MetadataFilter implements Filter {
                 if (pathInfo.toLowerCase().endsWith(HTML)) {
                     new LegacyProcessServlet().service(httpReq, httpRes);
                     return;
-                } else if (pathInfo.startsWith("/forward/")) {
+                } else if (pathInfo.startsWith(FORWARD_PATH)) {
                     new ForwarderServlet().process(httpReq, httpRes);
                     return;
                 }
@@ -99,10 +100,10 @@ public class MetadataFilter implements Filter {
     private void handleEmptyHtmlResponse(HttpServletRequest httpReq, HttpServletResponse httpRes) throws IOException {
         String uri = httpReq != null ? httpReq.getRequestURI() : "";
         String html = buildHtmlError(UUID.randomUUID().toString(),
-            HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
-            httpReq != null ? httpReq.getMethod() : "",
-            uri,
-            "Empty response returned by downstream component");
+                HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                httpReq != null ? httpReq.getMethod() : "",
+                uri,
+                "Empty response returned by downstream component");
         httpRes.reset();
         httpRes.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
         httpRes.setCharacterEncoding(StandardCharsets.UTF_8.name());
@@ -143,13 +144,13 @@ public class MetadataFilter implements Filter {
         String rootMsg = root.getMessage();
 
         log4j.error("[meta] Unhandled error (cid={}): {} {}{} - {} ({})",
-            correlationId,
-            method,
-            uri,
-            query != null ? ("?" + query) : "",
-            rootMsg,
-            rootClass,
-            t);
+                correlationId,
+                method,
+                uri,
+                query != null ? ("?" + query) : "",
+                rootMsg,
+                rootClass,
+                t);
 
         if (response == null || response.isCommitted()) {
             return; // Nothing safe to do
@@ -160,7 +161,7 @@ public class MetadataFilter implements Filter {
         // Decide response type: HTML for legacy pages (.html in URI or Accept contains text/html), JSON otherwise
         String isc = request != null ? request.getParameter("isc_dataFormat") : null;
         boolean wantsHtml = (uri != null && uri.toLowerCase().endsWith(HTML))
-            || (accept != null && accept.toLowerCase().contains("text/html"));
+                || (accept != null && accept.toLowerCase().contains("text/html"));
         if (isc != null && isc.equalsIgnoreCase("json")) {
             wantsHtml = false;
         }
@@ -186,27 +187,27 @@ public class MetadataFilter implements Filter {
         String uri = req.getRequestURI();
         String accept = req.getHeader("Accept");
         return (uri != null && uri.toLowerCase().endsWith(HTML))
-            || (accept != null && accept.toLowerCase().contains("text/html"));
+                || (accept != null && accept.toLowerCase().contains("text/html"));
     }
 
     private String buildHtmlError(String cid, int status, String method, String uri, String message) {
         String safeMessage = message != null ? message : "Unexpected error";
         return "<!DOCTYPE html><html><head><meta charset=\"utf-8\">"
-            + "<title>Etendo Meta Error</title>"
-            + "<style>body{font-family:system-ui,Segoe UI,Roboto,Arial,Helvetica,sans-serif;margin:2rem;color:#222}" 
-            + "h1{margin:0 0 .5rem 0;font-size:1.4rem}code{background:#f5f5f5;padding:.2rem .4rem;border-radius:4px}" 
-            + ".box{border:1px solid #eee;border-radius:8px;padding:1rem;margin-top:1rem}</style>"
-            + "</head><body>"
-            + "<h1>Request failed in /meta</h1>"
-            + "<div class=\"box\">"
-            + "<div><b>Status:</b> " + status + "</div>"
-            + "<div><b>Method:</b> " + escape(method) + "</div>"
-            + "<div><b>Path:</b> <code>" + escape(uri) + "</code></div>"
-            + "<div><b>Message:</b> " + escape(safeMessage) + "</div>"
-            + "<div><b>Correlation Id:</b> <code>" + cid + "</code></div>"
-            + "</div>"
-            + "<p>Please check server logs with the correlation id above.</p>"
-            + "</body></html>";
+                + "<title>Etendo Meta Error</title>"
+                + "<style>body{font-family:system-ui,Segoe UI,Roboto,Arial,Helvetica,sans-serif;margin:2rem;color:#222}"
+                + "h1{margin:0 0 .5rem 0;font-size:1.4rem}code{background:#f5f5f5;padding:.2rem .4rem;border-radius:4px}"
+                + ".box{border:1px solid #eee;border-radius:8px;padding:1rem;margin-top:1rem}</style>"
+                + "</head><body>"
+                + "<h1>Request failed in /meta</h1>"
+                + "<div class=\"box\">"
+                + "<div><b>Status:</b> " + status + "</div>"
+                + "<div><b>Method:</b> " + escape(method) + "</div>"
+                + "<div><b>Path:</b> <code>" + escape(uri) + "</code></div>"
+                + "<div><b>Message:</b> " + escape(safeMessage) + "</div>"
+                + "<div><b>Correlation Id:</b> <code>" + cid + "</code></div>"
+                + "</div>"
+                + "<p>Please check server logs with the correlation id above.</p>"
+                + "</body></html>";
     }
 
     private String buildHtmlErrorDetailed(String cid, int status, String method, String uri, String exClass, String message, HttpServletRequest req) {
@@ -217,9 +218,9 @@ public class MetadataFilter implements Filter {
             String hint = buildLegacyHint(uri);
             // Insert hint box before closing body
             return base.replace("</body>",
-                "<div class=\"box\" style=\"border-color:#f2c200\"><b>Hint:</b> Legacy WAD servlet not found. "
-                    + hint 
-                    + "</div></body>");
+                    "<div class=\"box\" style=\"border-color:#f2c200\"><b>Hint:</b> Legacy WAD servlet not found. "
+                            + hint
+                            + "</div></body>");
         }
         return base;
     }
@@ -236,10 +237,9 @@ public class MetadataFilter implements Filter {
 
     private String deriveLegacyClass(String uri) {
         try {
-            // /etendo/meta/forward/SalesInvoice/Header_Edition.html => org.openbravo.erpWindows.SalesInvoice.Header
-            int idx = uri.indexOf("/forward/");
+            int idx = uri.indexOf(FORWARD_PATH);
             if (idx == -1) return null;
-            String tail = uri.substring(idx + "/forward/".length());
+            String tail = uri.substring(idx + FORWARD_PATH.length());
             String[] parts = tail.split("/");
             if (parts.length < 2) return null;
             String window = parts[0];

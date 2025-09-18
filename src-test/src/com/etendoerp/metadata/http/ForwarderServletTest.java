@@ -28,6 +28,8 @@ import static org.mockito.Mockito.mockStatic;
 @RunWith(MockitoJUnitRunner.class)
 public class ForwarderServletTest {
 
+  private static final String TEST_PATH = "/some/path";
+
   private ForwarderServlet forwarderServlet;
 
   @Mock
@@ -84,7 +86,7 @@ public class ForwarderServletTest {
   public void doGetShouldCallProcessMethod() throws Exception {
     ForwarderServlet spyServlet = spy(forwarderServlet);
 
-    spyServlet.doGet("/some/path", request, response);
+    spyServlet.doGet(TEST_PATH, request, response);
 
     verify(spyServlet).process(request, response);
   }
@@ -99,7 +101,7 @@ public class ForwarderServletTest {
   public void doPostShouldCallProcessMethod() throws Exception {
     ForwarderServlet spyServlet = spy(forwarderServlet);
 
-    spyServlet.doPost("/some/path", request, response);
+    spyServlet.doPost(TEST_PATH, request, response);
 
     verify(spyServlet).process(request, response);
   }
@@ -114,7 +116,7 @@ public class ForwarderServletTest {
   public void doPutShouldCallProcessMethod() throws Exception {
     ForwarderServlet spyServlet = spy(forwarderServlet);
 
-    spyServlet.doPut("/some/path", request, response);
+    spyServlet.doPut(TEST_PATH, request, response);
 
     verify(spyServlet).process(request, response);
   }
@@ -129,7 +131,7 @@ public class ForwarderServletTest {
   public void doDeleteShouldCallProcessMethod() throws Exception {
     ForwarderServlet spyServlet = spy(forwarderServlet);
 
-    spyServlet.doDelete("/some/path", request, response);
+    spyServlet.doDelete(TEST_PATH, request, response);
 
     verify(spyServlet).process(request, response);
   }
