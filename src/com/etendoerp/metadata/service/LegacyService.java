@@ -35,7 +35,7 @@ public class LegacyService extends MetadataService {
     }
 
     private HttpServletRequestWrapper getHttpServletRequestWrapper(String pathInfo, HttpServletRequest request) {
-        String legacyPath = pathInfo.substring("/legacy".length());
+        String legacyPath = pathInfo != null && pathInfo.startsWith("/legacy") ? pathInfo.substring("/legacy".length()) : null;
 
         return new HttpServletRequestWrapper(request) {
             @Override
