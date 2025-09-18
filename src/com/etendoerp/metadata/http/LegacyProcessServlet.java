@@ -1,15 +1,20 @@
 package com.etendoerp.metadata.http;
 
-import static com.etendoerp.metadata.utils.Constants.HEAD_CLOSE_TAG;
-
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Enumeration;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-
+import javax.servlet.http.HttpSession;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
+import static com.etendoerp.metadata.utils.Constants.*;
+import static com.etendoerp.metadata.utils.Constants.FORM_CLOSE_TAG;
 
 /**
  * Legacy servlet that uses existing HttpServletRequestWrapper infrastructure
@@ -65,12 +70,12 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             }
 
             @Override
-            public javax.servlet.http.HttpSession getSession() {
+            public HttpSession getSession() {
                 return req.getSession(true);
             }
 
             @Override
-            public javax.servlet.http.HttpSession getSession(boolean create) {
+            public HttpSession getSession(boolean create) {
                 return req.getSession(create);
             }
         };
@@ -159,6 +164,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
 
         // Debug: Check if token is present in original request
         String token = req.getParameter("token");
+        String inpKey = req.getParameter("inpKey");
         log4j.debug("Original request has token parameter: {}", token != null ? "yes" : "no");
 
         // Ensure session exists - this is critical for VariablesSecureApp
@@ -202,22 +208,22 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             }
 
             @Override
-            public java.util.Enumeration<String> getHeaders(String name) {
+            public Enumeration<String> getHeaders(String name) {
                 if ("Authorization".equalsIgnoreCase(name) && token != null) {
-                    return java.util.Collections.enumeration(
-                            java.util.Arrays.asList("Bearer " + token)
+                    return Collections.enumeration(
+                            Arrays.asList("Bearer " + token)
                     );
                 }
                 return super.getHeaders(name);
             }
 
             @Override
-            public javax.servlet.http.HttpSession getSession() {
+            public HttpSession getSession() {
                 return req.getSession(true);
             }
 
             @Override
-            public javax.servlet.http.HttpSession getSession(boolean create) {
+            public HttpSession getSession(boolean create) {
                 return req.getSession(create);
             }
         };
@@ -253,24 +259,53 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         return path != null && path.toLowerCase().endsWith(".html");
     }
 
-    private String getInjectedContent(String path, String output) {
-        try {
-            String postMessageScript = "<script>" +
-                    "const sendMessage = (action) => {" +
-                    "  if (window.parent) {" +
-                    "    window.parent.postMessage({" +
-                    "      type: \"fromForm\"," +
-                    "      action: action" +
-                    "    }, \"*\");" +
-                    "  }" +
-                    "};" +
-                    "</script>";
+    /**
+     * Reincorporated private methods from original ForwarderServlet
+     */
 
-            return output.replace(HEAD_CLOSE_TAG, postMessageScript + HEAD_CLOSE_TAG);
+    private String getInjectedContent(String path, String responseString) {
+        responseString = responseString
+                .replace("/meta/legacy", "/meta/legacy" + path)
+                .replace("src=\"../web/", "src=\"../../../web/")
+                .replace("href=\"../web/", "href=\"../../../web/");
 
-        } catch (Exception e) {
-            log4j.warn("Error injecting content: " + e.getMessage());
-            return output;
+        if (responseString.contains(FRAMESET_CLOSE_TAG)) {
+            return responseString.replace(HEAD_CLOSE_TAG, (generateReceiveAndPostMessageScript()).concat(HEAD_CLOSE_TAG));
         }
+        if (responseString.contains(FORM_CLOSE_TAG)) {
+            String resWithNewScript = responseString.replace(FORM_CLOSE_TAG, FORM_CLOSE_TAG.concat(generatePostMessageScript()));
+            resWithNewScript = resWithNewScript.replace("src=\"../web/", "src=\"../../../web/");
+            resWithNewScript = resWithNewScript.replace("href=\"../web/", "href=\"../../../web/");
+            return injectCodeAfterFunctionCall(
+                    injectCodeAfterFunctionCall(resWithNewScript, "submitThisPage\\(([^)]+)\\);", "sendMessage('processOrder');", true),
+                    "closeThisPage();",
+                    "sendMessage('closeModal');",
+                    false
+            );
+        }
+        return responseString;
     }
+
+
+    private String generateReceiveAndPostMessageScript() {
+        return "<script>window.addEventListener(\"message\", (event) => {if (event.data?.type === \"fromForm\" && window.parent) {window.parent.postMessage({ type: \"fromIframe\", action: event.data.action }, \"*\");}});</script>";
+    }
+
+    private String generatePostMessageScript() {
+        return "<script>const sendMessage = (action) => {if (window.parent) {window.parent.postMessage({ type: \"fromForm\", action: action, }, \"*\");}}</script>";
+    }
+
+    private String injectCodeAfterFunctionCall(String originalRes, String originalFunctionCall, String newFunctionCall, Boolean isRegex) {
+        Pattern pattern = isRegex ? Pattern.compile(originalFunctionCall) : Pattern.compile(Pattern.quote(originalFunctionCall));
+        Matcher matcher = pattern.matcher(originalRes);
+        StringBuilder result = new StringBuilder();
+        while (matcher.find()) {
+            String originalSubmitButtonAction = matcher.group(0);
+            String modifiedSubmitButtonAction = originalSubmitButtonAction + newFunctionCall;
+            matcher.appendReplacement(result, Matcher.quoteReplacement(modifiedSubmitButtonAction));
+        }
+        matcher.appendTail(result);
+        return result.toString();
+    }
+
 }
