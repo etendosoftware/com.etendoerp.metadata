@@ -70,6 +70,7 @@ public class ForwarderServletTest {
       weldUtilsMock.when(() -> WeldUtils.getInstanceFromStaticBeanManager(DataSourceServlet.class))
               .thenReturn(dataSourceServlet);
 
+      // Call the protected method directly since we're testing the base functionality
       forwarderServlet.process(request, response);
 
       verify(dataSourceServlet).doGet(request, response);

@@ -26,7 +26,6 @@ import javax.servlet.http.HttpServletResponse;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.openbravo.base.weld.WeldUtils;
-import org.openbravo.service.web.WebService;
 
 /**
  * Servlet that forwards incoming requests to DataSourceServlet for modern API endpoints.
@@ -40,8 +39,9 @@ import org.openbravo.service.web.WebService;
  * </p>
  *
  */
-public class ForwarderServlet implements WebService {
+public class ForwarderServlet extends BaseWebService {
     private static final Logger log4j = LogManager.getLogger(ForwarderServlet.class);
+
     /**
      * Main entry point for HTTP requests. All requests are forwarded to DataSourceServlet
      * as this servlet is exclusively for modern SWS-authenticated API endpoints.
@@ -51,7 +51,8 @@ public class ForwarderServlet implements WebService {
      * @throws IOException if an input or output error occurs
      * @throws ServletException if a servlet error occurs
      */
-    public void process(HttpServletRequest req, HttpServletResponse res) throws IOException, ServletException {
+    @Override
+    protected void process(HttpServletRequest req, HttpServletResponse res) throws IOException, ServletException {
         try {
             // All requests are forwarded to DataSourceServlet for modern API processing
             String path = req.getPathInfo();
@@ -75,29 +76,5 @@ public class ForwarderServlet implements WebService {
     private void processForwardRequest(String path, HttpServletRequest request, HttpServletResponse response)
             throws IOException, ServletException {
         WeldUtils.getInstanceFromStaticBeanManager(org.openbravo.service.datasource.DataSourceServlet.class).doGet(request, response);
-    }
-
-    @Override
-    public void doGet(String path, HttpServletRequest request, HttpServletResponse response)
-            throws Exception {
-        process(request, response);
-    }
-
-    @Override
-    public void doPost(String path, HttpServletRequest request, HttpServletResponse response)
-            throws Exception {
-        process(request, response);
-    }
-
-    @Override
-    public void doDelete(String path, HttpServletRequest request, HttpServletResponse response)
-            throws Exception {
-        process(request, response);
-    }
-
-    @Override
-    public void doPut(String path, HttpServletRequest request, HttpServletResponse response)
-            throws Exception {
-        process(request, response);
     }
 }

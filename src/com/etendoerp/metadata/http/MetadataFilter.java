@@ -39,17 +39,53 @@ import com.etendoerp.metadata.service.MetadataService;
 import com.etendoerp.metadata.utils.Utils;
 
 /**
+ * Servlet filter for handling metadata requests in the Etendo application.
+ * <p>
+ * This filter intercepts requests to "/meta" and "/meta/*" patterns and routes them
+ * to appropriate handlers based on the request path.
+ * </p>
+ * <p>
+ * <strong>Configuration:</strong><br>
+ * The filter supports the following init parameters:
+ * </p>
+ * <ul>
+ * <li><code>forwardPath</code> - The path prefix used to identify requests that should be
+ * forwarded to the ForwarderServlet. Default: "/forward/"</li>
+ * </ul>
+ * <p>
+ * Example configuration in web.xml:
+ * <pre>
+ * &lt;filter&gt;
+ *     &lt;filter-name&gt;MetadataFilter&lt;/filter-name&gt;
+ *     &lt;filter-class&gt;com.etendoerp.metadata.http.MetadataFilter&lt;/filter-class&gt;
+ *     &lt;init-param&gt;
+ *         &lt;param-name&gt;forwardPath&lt;/param-name&gt;
+ *         &lt;param-value&gt;/custom-forward/&lt;/param-value&gt;
+ *     &lt;/init-param&gt;
+ * &lt;/filter&gt;
+ * </pre>
+ *
  * @author luuchorocha
  */
 @WebFilter(urlPatterns = { "/meta", "/meta/*" })
 public class MetadataFilter implements Filter {
     private static final Logger log4j = LogManager.getLogger(MetadataFilter.class);
     public static final String HTML = ".html";
-    private static final String FORWARD_PATH = "/forward/";
+    private static final String DEFAULT_FORWARD_PATH = "/forward/";
+
+    private String forwardPath;
 
     @Override
     public void init(FilterConfig fConfig) {
         RequestContext.setServletContext(fConfig.getServletContext());
+
+        // Read forward path from init parameter, use default if not specified
+        String configuredPath = fConfig.getInitParameter("forwardPath");
+        this.forwardPath = (configuredPath != null && !configuredPath.trim().isEmpty())
+                ? configuredPath
+                : DEFAULT_FORWARD_PATH;
+
+        log4j.info("MetadataFilter initialized with forward path: {}", this.forwardPath);
     }
 
     @Override
@@ -65,7 +101,7 @@ public class MetadataFilter implements Filter {
                 if (pathInfo.toLowerCase().endsWith(HTML)) {
                     new LegacyProcessServlet().service(httpReq, httpRes);
                     return;
-                } else if (pathInfo.startsWith(FORWARD_PATH)) {
+                } else if (pathInfo.startsWith(forwardPath)) {
                     new ForwarderServlet().process(httpReq, httpRes);
                     return;
                 }
@@ -237,9 +273,9 @@ public class MetadataFilter implements Filter {
 
     private String deriveLegacyClass(String uri) {
         try {
-            int idx = uri.indexOf(FORWARD_PATH);
+            int idx = uri.indexOf(forwardPath);
             if (idx == -1) return null;
-            String tail = uri.substring(idx + FORWARD_PATH.length());
+            String tail = uri.substring(idx + forwardPath.length());
             String[] parts = tail.split("/");
             if (parts.length < 2) return null;
             String window = parts[0];

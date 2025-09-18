@@ -28,7 +28,6 @@ import com.etendoerp.metadata.service.ServiceFactory;
 import com.etendoerp.metadata.utils.Utils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.openbravo.service.web.WebService;
 
 /**
  * Servlet entry point for handling all requests under the `/meta/*` namespace.
@@ -44,7 +43,7 @@ import org.openbravo.service.web.WebService;
  * @author
  *   - luuchorocha (initial implementation)
  */
-public class MetadataServlet implements WebService {
+public class MetadataServlet extends BaseWebService {
     private static final Logger log4j = LogManager.getLogger(MetadataServlet.class);
 
     /**
@@ -55,7 +54,8 @@ public class MetadataServlet implements WebService {
      * @param res the HTTP response to write to
      * @throws IOException if writing to the response stream fails
      */
-    private void process(HttpServletRequest req, HttpServletResponse res) throws IOException {
+    @Override
+    protected void process(HttpServletRequest req, HttpServletResponse res) throws IOException {
         try {
             ServiceFactory.getService(req, res).process();
         } catch (Throwable t) {
@@ -166,41 +166,5 @@ public class MetadataServlet implements WebService {
     private String escape(String v) {
         if (v == null) return "";
         return v.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
-    }
-
-    /**
-     * Handles HTTP GET requests by delegating to {@link #process(HttpServletRequest, HttpServletResponse)}.
-     */
-    @Override
-    public void doGet(String path, HttpServletRequest request, HttpServletResponse response)
-            throws Exception {
-        process(request, response);
-    }
-
-    /**
-     * Handles HTTP POST requests by delegating to {@link #process(HttpServletRequest, HttpServletResponse)}.
-     */
-    @Override
-    public void doPost(String path, HttpServletRequest request, HttpServletResponse response)
-            throws Exception {
-        process(request, response);
-    }
-
-    /**
-     * Handles HTTP DELETE requests by delegating to {@link #process(HttpServletRequest, HttpServletResponse)}.
-     */
-    @Override
-    public void doDelete(String path, HttpServletRequest request, HttpServletResponse response)
-            throws Exception {
-        process(request, response);
-    }
-
-    /**
-     * Handles HTTP PUT requests by delegating to {@link #process(HttpServletRequest, HttpServletResponse)}.
-     */
-    @Override
-    public void doPut(String path, HttpServletRequest request, HttpServletResponse response)
-            throws Exception {
-        process(request, response);
     }
 }
