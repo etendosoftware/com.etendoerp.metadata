@@ -8,11 +8,25 @@ import com.etendoerp.metadata.exceptions.InternalServerException;
 import com.etendoerp.metadata.http.LegacyProcessServlet;
 
 /**
- * Service that handles legacy process requests by delegating to LegacyProcessServlet.
- * This service is registered in the MetadataServlet to handle /meta/legacy/* requests
+ * Service that handles legacy process requests by delegating to {@link LegacyProcessServlet}.
+ * <p>
+ * This service is registered in the {@code MetadataServlet} to handle
+ * requests under the {@code /meta/legacy/*} path.
+ * </p>
  */
 public class LegacyService extends MetadataService {
 
+    /**
+     * Creates a new {@link LegacyService} instance for handling legacy process requests.
+     * <p>
+     * The constructor receives the raw {@link HttpServletRequest} and {@link HttpServletResponse}
+     * objects associated with the incoming request and delegates them to the parent
+     * {@link MetadataService} for lifecycle management.
+     * </p>
+     *
+     * @param request  the current HTTP request containing client data and path information
+     * @param response the HTTP response object used to send data back to the client
+     */
     public LegacyService(HttpServletRequest request, HttpServletResponse response) {
         super(request, response);
     }
@@ -35,12 +49,16 @@ public class LegacyService extends MetadataService {
     }
 
     private HttpServletRequestWrapper getHttpServletRequestWrapper(String pathInfo, HttpServletRequest request) {
-        String legacyPath = pathInfo != null && pathInfo.startsWith("/legacy") ? pathInfo.substring("/legacy".length()) : null;
+        String legacyPath = null;
+        if (pathInfo != null && pathInfo.startsWith("/legacy")) {
+            legacyPath = pathInfo.substring("/legacy".length());
+        }
 
+        String finalLegacyPath = legacyPath;
         return new HttpServletRequestWrapper(request) {
             @Override
             public String getPathInfo() {
-                return legacyPath;
+                return finalLegacyPath;
             }
 
             @Override

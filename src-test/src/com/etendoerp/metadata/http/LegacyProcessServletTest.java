@@ -22,32 +22,23 @@ import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Enumeration;
 
 import static com.etendoerp.metadata.MetadataTestConstants.API_DATA_PATH;
 import static com.etendoerp.metadata.MetadataTestConstants.JWT_TOKEN_HASH;
 import static com.etendoerp.metadata.MetadataTestConstants.SALES_INVOICE_HEADER_EDITION_HTML;
 import static com.etendoerp.metadata.MetadataTestConstants.TOKEN;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.mockStatic;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 /**
  * Unit tests for the LegacyProcessServlet class.
- * <p>This class tests the functionality of the LegacyProcessServlet, ensuring that it
+ * <p>
+ * This class tests the functionality of the LegacyProcessServlet, ensuring that it
  * correctly handles legacy HTML requests, manages JWT tokens, and processes
- * request contexts. It uses Mockito for mocking dependencies and JUnit for assertions.</p>
+ * request contexts. It uses Mockito for mocking dependencies and JUnit for assertions.
+ * </p>
  */
 @RunWith(MockitoJUnitRunner.class)
 public class LegacyProcessServletTest extends OBBaseTest {
@@ -71,6 +62,16 @@ public class LegacyProcessServletTest extends OBBaseTest {
 
     private LegacyProcessServlet legacyProcessServlet;
 
+    /**
+     * Sets up the test environment before each test case.
+     * <p>
+     * Initializes the {@link LegacyProcessServlet} instance, mocks the response writer,
+     * and prepares default behavior for mocked {@link HttpServletRequest}, {@link HttpServletResponse},
+     * and {@link HttpSession}.
+     * </p>
+     *
+     * @throws Exception if an error occurs during setup
+     */
     @Override
     @Before
     public void setUp() throws Exception {
@@ -84,7 +85,12 @@ public class LegacyProcessServletTest extends OBBaseTest {
         when(request.getRequestDispatcher(anyString())).thenReturn(requestDispatcher);
     }
 
-
+    /**
+     * Tests that the servlet correctly handles legacy HTML requests by including
+     * the appropriate dispatcher.
+     *
+     * @throws Exception if the service method fails
+     */
     @Test
     public void serviceShouldHandleLegacyHtmlRequest() throws Exception {
         String path = SALES_INVOICE_HEADER_EDITION_HTML;
@@ -100,6 +106,12 @@ public class LegacyProcessServletTest extends OBBaseTest {
         }
     }
 
+    /**
+     * Tests that {@code isLegacyRequest} returns {@code true} for HTML files
+     * (case-insensitive) and {@code false} for non-legacy paths.
+     *
+     * @throws Exception if reflection invocation fails
+     */
     @Test
     public void isLegacyRequestShouldReturnTrueForHtmlFiles() throws Exception {
         assertTrue(invokeIsLegacyRequest("/test/page.html"));
@@ -111,6 +123,12 @@ public class LegacyProcessServletTest extends OBBaseTest {
         assertFalse(invokeIsLegacyRequest("/test/page"));
     }
 
+    /**
+     * Tests that {@code handleTokenConsistency} stores a JWT token in the session
+     * when it is provided in the request parameters.
+     *
+     * @throws Exception if reflection invocation fails
+     */
     @Test
     public void handleTokenConsistencyShouldStoreTokenWhenProvided() throws Exception {
         String token = "test-jwt-token";
@@ -123,6 +141,12 @@ public class LegacyProcessServletTest extends OBBaseTest {
         verify(session).setAttribute(JWT_TOKEN_HASH, token);
     }
 
+    /**
+     * Tests that {@code handleTokenConsistency} decodes and validates a JWT token
+     * from the session when no request token is present.
+     *
+     * @throws Exception if reflection invocation fails
+     */
     @Test
     public void handleTokenConsistencyShouldDecodeTokenFromSession() throws Exception {
         String sessionToken = "session-jwt-token";
@@ -144,6 +168,10 @@ public class LegacyProcessServletTest extends OBBaseTest {
         }
     }
 
+    /**
+     * Tests that {@code handleTokenConsistency} throws an {@link OBException}
+     * when token decoding fails.
+     */
     @Test
     public void handleTokenConsistencyShouldThrowExceptionOnDecodeError() {
         String sessionToken = "invalid-jwt-token";
@@ -166,6 +194,12 @@ public class LegacyProcessServletTest extends OBBaseTest {
         }
     }
 
+    /**
+     * Tests that {@code handleRecordIdentifier} stores the record identifier
+     * in the session when all required parameters are provided.
+     *
+     * @throws Exception if reflection invocation fails
+     */
     @Test
     public void handleRecordIdentifierShouldStoreWhenAllParametersPresent() throws Exception {
         HttpServletRequestWrapper wrapper = mock(HttpServletRequestWrapper.class);
@@ -179,6 +213,12 @@ public class LegacyProcessServletTest extends OBBaseTest {
         verify(session).setAttribute("window-456|COLUMN-789", "key-123");
     }
 
+    /**
+     * Tests that {@code handleRecordIdentifier} does not store anything
+     * when required parameters are missing.
+     *
+     * @throws Exception if reflection invocation fails
+     */
     @Test
     public void handleRecordIdentifierShouldNotStoreWhenParametersMissing() throws Exception {
         HttpServletRequestWrapper wrapper = mock(HttpServletRequestWrapper.class);
@@ -192,6 +232,12 @@ public class LegacyProcessServletTest extends OBBaseTest {
         verify(session, never()).setAttribute(anyString(), anyString());
     }
 
+    /**
+     * Tests that {@code handleRequestContext} correctly sets up the request,
+     * response, SecureApp variables, and OBContext.
+     *
+     * @throws Exception if reflection invocation fails
+     */
     @Test
     public void handleRequestContextShouldSetupContext() throws Exception {
         HttpServletRequestWrapper wrapper = mock(HttpServletRequestWrapper.class);
@@ -207,6 +253,12 @@ public class LegacyProcessServletTest extends OBBaseTest {
         }
     }
 
+    /**
+     * Tests that {@code maybeValidateLegacyClass} throws an exception when
+     * the corresponding legacy WAD servlet class cannot be found.
+     *
+     * @throws Exception if reflection invocation fails
+     */
     @Test
     public void maybeValidateLegacyClassShouldValidateExistingClass() throws Exception {
         String pathInfo = SALES_INVOICE_HEADER_EDITION_HTML;
@@ -218,12 +270,24 @@ public class LegacyProcessServletTest extends OBBaseTest {
         }
     }
 
+    /**
+     * Tests that {@code maybeValidateLegacyClass} ignores non-legacy paths
+     * without throwing exceptions.
+     *
+     * @throws Exception if reflection invocation fails
+     */
     @Test
     public void maybeValidateLegacyClassShouldIgnoreNonLegacyPaths() throws Exception {
         String pathInfo = API_DATA_PATH;
         invokeMaybeValidateLegacyClass(pathInfo);
     }
 
+    /**
+     * Tests that {@code deriveLegacyClass} generates the expected fully-qualified
+     * class name for given legacy paths, and returns {@code null} for invalid paths.
+     *
+     * @throws Exception if reflection invocation fails
+     */
     @Test
     public void deriveLegacyClassShouldCreateCorrectClassName() throws Exception {
         String result1 = invokeDerivateLegacyClass(SALES_INVOICE_HEADER_EDITION_HTML);
@@ -234,6 +298,12 @@ public class LegacyProcessServletTest extends OBBaseTest {
         assertNull(result3);
     }
 
+    /**
+     * Tests that {@code injectCodeAfterFunctionCall} correctly injects
+     * JavaScript code after a given function call when using regex matching.
+     *
+     * @throws Exception if reflection invocation fails
+     */
     @Test
     public void injectCodeAfterFunctionCallShouldInjectWithRegex() throws Exception {
         String original = "submitThisPage(param); doSomething();";
@@ -243,6 +313,12 @@ public class LegacyProcessServletTest extends OBBaseTest {
         assertTrue(result.contains("submitThisPage(param);sendMessage('processOrder');"));
     }
 
+    /**
+     * Tests that {@code injectCodeAfterFunctionCall} correctly injects
+     * JavaScript code after a given function call when using plain string matching.
+     *
+     * @throws Exception if reflection invocation fails
+     */
     @Test
     public void injectCodeAfterFunctionCallShouldInjectWithoutRegex() throws Exception {
         String original = "closeThisPage(); doSomething();";
@@ -252,6 +328,12 @@ public class LegacyProcessServletTest extends OBBaseTest {
         assertTrue(result.contains("closeThisPage();sendMessage('closeModal');"));
     }
 
+    /**
+     * Tests that {@code generateReceiveAndPostMessageScript} produces the expected
+     * JavaScript snippet for listening to and posting messages between frames.
+     *
+     * @throws Exception if reflection invocation fails
+     */
     @Test
     public void generateReceiveAndPostMessageScriptShouldReturnCorrectScript() throws Exception {
         String script = invokeGenerateReceiveAndPostMessageScript();
@@ -262,6 +344,12 @@ public class LegacyProcessServletTest extends OBBaseTest {
         assertTrue(script.contains("window.parent.postMessage"));
     }
 
+    /**
+     * Tests that {@code generatePostMessageScript} produces the expected
+     * JavaScript snippet for sending messages from forms or iframes to the parent window.
+     *
+     * @throws Exception if reflection invocation fails
+     */
     @Test
     public void generatePostMessageScriptShouldReturnCorrectScript() throws Exception {
         String script = invokeGeneratePostMessageScript();
@@ -272,12 +360,26 @@ public class LegacyProcessServletTest extends OBBaseTest {
 
     // --- Helper Methods ---
 
+    /**
+     * Invokes the private {@code isLegacyRequest} method via reflection.
+     *
+     * @param path the request path to check
+     * @return {@code true} if the path is considered legacy, {@code false} otherwise
+     * @throws Exception if reflection invocation fails
+     */
     private boolean invokeIsLegacyRequest(String path) throws Exception {
         java.lang.reflect.Method method = LegacyProcessServlet.class.getDeclaredMethod("isLegacyRequest", String.class);
         method.setAccessible(true);
         return (Boolean) method.invoke(legacyProcessServlet, path);
     }
 
+    /**
+     * Invokes the private {@code handleTokenConsistency} method via reflection.
+     *
+     * @param req     the mocked HTTP request
+     * @param wrapper the request wrapper
+     * @throws Exception if reflection invocation fails
+     */
     private void invokeHandleTokenConsistency(HttpServletRequest req, HttpServletRequestWrapper wrapper) throws Exception {
         java.lang.reflect.Method method = LegacyProcessServlet.class.getDeclaredMethod("handleTokenConsistency",
                 HttpServletRequest.class, HttpServletRequestWrapper.class);
@@ -285,6 +387,12 @@ public class LegacyProcessServletTest extends OBBaseTest {
         method.invoke(legacyProcessServlet, req, wrapper);
     }
 
+    /**
+     * Invokes the private {@code handleRecordIdentifier} method via reflection.
+     *
+     * @param wrapper the request wrapper
+     * @throws Exception if reflection invocation fails
+     */
     private void invokeHandleRecordIdentifier(HttpServletRequestWrapper wrapper) throws Exception {
         java.lang.reflect.Method method = LegacyProcessServlet.class.getDeclaredMethod("handleRecordIdentifier",
                 HttpServletRequestWrapper.class);
@@ -292,6 +400,13 @@ public class LegacyProcessServletTest extends OBBaseTest {
         method.invoke(legacyProcessServlet, wrapper);
     }
 
+    /**
+     * Invokes the private {@code handleRequestContext} method via reflection.
+     *
+     * @param res     the mocked HTTP response
+     * @param wrapper the request wrapper
+     * @throws Exception if reflection invocation fails
+     */
     private void invokeHandleRequestContext(HttpServletResponse res, HttpServletRequestWrapper wrapper) throws Exception {
         java.lang.reflect.Method method = LegacyProcessServlet.class.getDeclaredMethod("handleRequestContext",
                 HttpServletResponse.class, HttpServletRequestWrapper.class);
@@ -299,6 +414,12 @@ public class LegacyProcessServletTest extends OBBaseTest {
         method.invoke(legacyProcessServlet, res, wrapper);
     }
 
+    /**
+     * Invokes the private {@code maybeValidateLegacyClass} method via reflection.
+     *
+     * @param pathInfo the request path to validate
+     * @throws Exception if reflection invocation fails
+     */
     private void invokeMaybeValidateLegacyClass(String pathInfo) throws Exception {
         java.lang.reflect.Method method = LegacyProcessServlet.class.getDeclaredMethod("maybeValidateLegacyClass",
                 String.class);
@@ -306,12 +427,29 @@ public class LegacyProcessServletTest extends OBBaseTest {
         method.invoke(legacyProcessServlet, pathInfo);
     }
 
+    /**
+     * Invokes the private {@code deriveLegacyClass} method via reflection.
+     *
+     * @param pathInfo the request path
+     * @return the derived legacy class name, or {@code null} if invalid
+     * @throws Exception if reflection invocation fails
+     */
     private String invokeDerivateLegacyClass(String pathInfo) throws Exception {
         java.lang.reflect.Method method = LegacyProcessServlet.class.getDeclaredMethod("deriveLegacyClass", String.class);
         method.setAccessible(true);
         return (String) method.invoke(legacyProcessServlet, pathInfo);
     }
 
+    /**
+     * Invokes the private {@code injectCodeAfterFunctionCall} method via reflection.
+     *
+     * @param original     the original JavaScript source
+     * @param functionCall the function call pattern
+     * @param newCall      the code to inject
+     * @param isRegex      whether the function call pattern is a regex
+     * @return the modified JavaScript source with injected code
+     * @throws Exception if reflection invocation fails
+     */
     private String invokeInjectCodeAfterFunctionCall(String original, String functionCall, String newCall,
                                                      Boolean isRegex) throws Exception {
         java.lang.reflect.Method method = LegacyProcessServlet.class.getDeclaredMethod("injectCodeAfterFunctionCall",
@@ -320,12 +458,24 @@ public class LegacyProcessServletTest extends OBBaseTest {
         return (String) method.invoke(legacyProcessServlet, original, functionCall, newCall, isRegex);
     }
 
+    /**
+     * Invokes the private {@code generateReceiveAndPostMessageScript} method via reflection.
+     *
+     * @return the generated JavaScript script
+     * @throws Exception if reflection invocation fails
+     */
     private String invokeGenerateReceiveAndPostMessageScript() throws Exception {
         java.lang.reflect.Method method = LegacyProcessServlet.class.getDeclaredMethod("generateReceiveAndPostMessageScript");
         method.setAccessible(true);
         return (String) method.invoke(legacyProcessServlet);
     }
 
+    /**
+     * Invokes the private {@code generatePostMessageScript} method via reflection.
+     *
+     * @return the generated JavaScript script
+     * @throws Exception if reflection invocation fails
+     */
     private String invokeGeneratePostMessageScript() throws Exception {
         java.lang.reflect.Method method = LegacyProcessServlet.class.getDeclaredMethod("generatePostMessageScript");
         method.setAccessible(true);

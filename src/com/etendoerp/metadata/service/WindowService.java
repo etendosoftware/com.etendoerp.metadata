@@ -17,24 +17,36 @@
 
 package com.etendoerp.metadata.service;
 
-import java.io.IOException;
-
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
+import com.etendoerp.metadata.builders.WindowBuilder;
 import org.openbravo.base.exception.OBException;
 import org.openbravo.dal.core.OBContext;
 
-import com.etendoerp.metadata.builders.WindowBuilder;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
 
 /**
  * @author luuchorocha
+ */
+
+/**
+ * Creates a new {@code WindowService} instance using the given request and response.
  */
 public class WindowService extends MetadataService {
     public WindowService(HttpServletRequest request, HttpServletResponse response) {
         super(request, response);
     }
 
+    /**
+     * Processes the service request for a Window metadata.
+     * <p>
+     * This method extracts the window identifier from the request path, validates it,
+     * and writes the corresponding Window metadata in JSON format to the response.
+     * </p>
+     *
+     * @throws IOException if an error occurs while writing the response
+     * @throws OBException if the window identifier is missing or invalid
+     */
     @Override
     public void process() throws IOException {
         String path = getRequest().getPathInfo();
@@ -52,31 +64,40 @@ public class WindowService extends MetadataService {
         }
     }
 
+
     /**
-     * Extract the id of the window from path
-     * Handle paths like: /com.etendoerp.metadata.meta/window/115
+     * Extracts the window identifier from the given request path.
+     * <p>
+     * The method splits the path into segments and searches for the "window"
+     * segment. The window identifier is expected to be the following segment.
+     * If the identifier contains query parameters, they are removed.
+     * </p>
+     *
+     * <pre>
+     * Example:
+     * Input path: /com.etendoerp.metadata.meta/window/115
+     * Segments: ["", "com.etendoerp.metadata.meta", "window", "115"]
+     * Result: "115"
+     * </pre>
+     *
+     * @param pathInfo the path info from the HTTP request (may be {@code null})
+     * @return the extracted window identifier, or {@code null} if not found
      */
     private String extractWindowId(String pathInfo) {
         if (pathInfo == null) {
             return null;
         }
-
-        int windowIndex = pathInfo.indexOf("/window/");
-        if (windowIndex == -1) {
-            return null;
+        String[] segments = pathInfo.split("/");
+        for (int i = 0; i < segments.length; i++) {
+            if ("window".equals(segments[i]) && i + 1 < segments.length && !segments[i + 1].isEmpty()) {
+                String id = segments[i + 1];
+                int idx = id.indexOf('?');
+                if (idx != -1) {
+                    id = id.substring(0, idx);
+                }
+                return id;
+            }
         }
-
-        String windowIdPart = pathInfo.substring(windowIndex + 8); // +8 para saltar "/window/"
-
-        int queryIndex = windowIdPart.indexOf('?');
-        if (queryIndex != -1) {
-            windowIdPart = windowIdPart.substring(0, queryIndex);
-        }
-
-        if (windowIdPart.endsWith("/")) {
-            windowIdPart = windowIdPart.substring(0, windowIdPart.length() - 1);
-        }
-
-        return windowIdPart;
+        return null;
     }
 }

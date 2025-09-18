@@ -14,18 +14,16 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.mockStatic;
 
 /**
- * Unit tests for the new simplified ForwarderServlet.
+ * Unit tests for the new simplified {@link ForwarderServlet}.
+ * <p>
  * This test class validates that all incoming requests are correctly delegated
- * to the DataSourceServlet, as per the new design.
+ * to the {@link DataSourceServlet}, as per the new design.
+ * </p>
  */
 @RunWith(MockitoJUnitRunner.class)
 public class ForwarderServletTest {
@@ -41,15 +39,28 @@ public class ForwarderServletTest {
   @Mock
   private DataSourceServlet dataSourceServlet;
 
+  /**
+   * Initializes the {@link ForwarderServlet} instance before each test.
+   * <p>
+   * No request writers or sessions are mocked because the new
+   * {@link ForwarderServlet} does not depend on them.
+   * </p>
+   */
   @Before
   public void setUp() {
     forwarderServlet = new ForwarderServlet();
-    // No need to mock response writer or sessions as the new servlet doesn't use them.
   }
 
   /**
-   * Tests that the `process` method correctly delegates the request to the `DataSourceServlet`.
-   * This is the primary and only responsibility of the new ForwarderServlet.
+   * Tests that the {@link ForwarderServlet#process(HttpServletRequest, HttpServletResponse)}
+   * method correctly delegates the request to the {@link DataSourceServlet}.
+   * <p>
+   * The {@link DataSourceServlet#doGet(HttpServletRequest, HttpServletResponse)}
+   * method is expected to be called with the original request and response.
+   * </p>
+   *
+   * @throws ServletException if the delegation fails
+   * @throws IOException      if an I/O error occurs during delegation
    */
   @Test
   public void processShouldDelegateToDataSourceServlet() throws ServletException, IOException {
@@ -59,13 +70,15 @@ public class ForwarderServletTest {
 
       forwarderServlet.process(request, response);
 
-      // Verify that the doGet method of DataSourceServlet was called with the original request and response.
       verify(dataSourceServlet).doGet(request, response);
     }
   }
 
   /**
-   * Tests that `doGet` method correctly calls the `process` method.
+   * Tests that the {@link ForwarderServlet#doGet(String, HttpServletRequest, HttpServletResponse)}
+   * method correctly calls the {@link ForwarderServlet#process(HttpServletRequest, HttpServletResponse)} method.
+   *
+   * @throws Exception if an error occurs during method invocation
    */
   @Test
   public void doGetShouldCallProcessMethod() throws Exception {
@@ -77,7 +90,10 @@ public class ForwarderServletTest {
   }
 
   /**
-   * Tests that `doPost` method correctly calls the `process` method.
+   * Tests that the {@link ForwarderServlet#doPost(String, HttpServletRequest, HttpServletResponse)}
+   * method correctly calls the {@link ForwarderServlet#process(HttpServletRequest, HttpServletResponse)} method.
+   *
+   * @throws Exception if an error occurs during method invocation
    */
   @Test
   public void doPostShouldCallProcessMethod() throws Exception {
@@ -89,7 +105,10 @@ public class ForwarderServletTest {
   }
 
   /**
-   * Tests that `doPut` method correctly calls the `process` method.
+   * Tests that the {@link ForwarderServlet#doPut(String, HttpServletRequest, HttpServletResponse)}
+   * method correctly calls the {@link ForwarderServlet#process(HttpServletRequest, HttpServletResponse)} method.
+   *
+   * @throws Exception if an error occurs during method invocation
    */
   @Test
   public void doPutShouldCallProcessMethod() throws Exception {
@@ -101,7 +120,10 @@ public class ForwarderServletTest {
   }
 
   /**
-   * Tests that `doDelete` method correctly calls the `process` method.
+   * Tests that the {@link ForwarderServlet#doDelete(String, HttpServletRequest, HttpServletResponse)}
+   * method correctly calls the {@link ForwarderServlet#process(HttpServletRequest, HttpServletResponse)} method.
+   *
+   * @throws Exception if an error occurs during method invocation
    */
   @Test
   public void doDeleteShouldCallProcessMethod() throws Exception {

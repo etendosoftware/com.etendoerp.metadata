@@ -35,6 +35,26 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
     private static final Logger log4j = LogManager.getLogger(LegacyProcessServlet.class);
     private static final String JWT_TOKEN = "#JWT_TOKEN";
 
+    // Constants for duplicated literals
+    private static final String HTML_EXTENSION = ".html";
+    private static final String TOKEN_PARAM = "token";
+    private static final String AUTHORIZATION_HEADER = "Authorization";
+    private static final String BEARER_PREFIX = "Bearer ";
+    private static final String META_LEGACY_PATH = "/meta/legacy";
+
+    // JavaScript constants
+    private static final String RECEIVE_AND_POST_MESSAGE_SCRIPT =
+            "<script>window.addEventListener(\"message\", (event) => {" +
+                    "if (event.data?.type === \"fromForm\" && window.parent) {" +
+                    "window.parent.postMessage({ type: \"fromIframe\", action: event.data.action }, \"*\");" +
+                    "}});</script>";
+
+    private static final String POST_MESSAGE_SCRIPT =
+            "<script>const sendMessage = (action) => {" +
+                    "if (window.parent) {" +
+                    "window.parent.postMessage({ type: \"fromForm\", action: action, }, \"*\");" +
+                    "}}</script>";
+
     @Override
     public void service(HttpServletRequest req, HttpServletResponse res)
             throws IOException, ServletException {
@@ -54,7 +74,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
     }
 
     private boolean isLegacyRequest(String path) {
-        return path != null && path.toLowerCase().endsWith(".html");
+        return path != null && path.toLowerCase().endsWith(HTML_EXTENSION);
     }
 
     private boolean isLegacyFollowupRequest(HttpServletRequest req) {
@@ -64,7 +84,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
 
     private void processLegacyRequest(HttpServletRequest req, HttpServletResponse res, String path)
             throws IOException {
-        String token = req.getParameter("token");
+        String token = req.getParameter(TOKEN_PARAM);
         req.getSession(true);
         if (token != null) {
             req.getSession().setAttribute("LEGACY_TOKEN", token);
@@ -82,7 +102,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
 
             @Override
             public String getParameter(String name) {
-                if ("token".equals(name) && token != null) {
+                if (TOKEN_PARAM.equals(name) && token != null) {
                     return token;
                 }
                 return super.getParameter(name);
@@ -90,17 +110,17 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
 
             @Override
             public String getHeader(String name) {
-                if ("Authorization".equalsIgnoreCase(name) && token != null) {
-                    return "Bearer " + token;
+                if (AUTHORIZATION_HEADER.equalsIgnoreCase(name) && token != null) {
+                    return BEARER_PREFIX + token;
                 }
                 return super.getHeader(name);
             }
 
             @Override
             public Enumeration<String> getHeaders(String name) {
-                if ("Authorization".equalsIgnoreCase(name) && token != null) {
+                if (AUTHORIZATION_HEADER.equalsIgnoreCase(name) && token != null) {
                     return Collections.enumeration(
-                            Arrays.asList("Bearer " + token)
+                            Arrays.asList(BEARER_PREFIX + token)
                     );
                 }
                 return super.getHeaders(name);
@@ -156,8 +176,8 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         HttpServletRequestWrapper wrappedRequest = new HttpServletRequestWrapper(req) {
             @Override
             public String getHeader(String name) {
-                if ("Authorization".equalsIgnoreCase(name)) {
-                    return "Bearer " + token;
+                if (AUTHORIZATION_HEADER.equalsIgnoreCase(name)) {
+                    return BEARER_PREFIX + token;
                 }
                 return super.getHeader(name);
             }
@@ -181,7 +201,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             String targetPath = null;
             String pathInfo = req.getPathInfo();
 
-            if (pathInfo != null && pathInfo.endsWith(".html")) {
+            if (pathInfo != null && pathInfo.endsWith(HTML_EXTENSION)) {
                 if (servletDir != null) {
                     targetPath = servletDir + pathInfo;
                 } else {
@@ -214,9 +234,9 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
     private String extractTargetPathFromReferer(String referer) {
         if (referer == null) return null;
         try {
-            int legacyIndex = referer.indexOf("/meta/legacy/");
+            int legacyIndex = referer.indexOf(META_LEGACY_PATH + "/");
             if (legacyIndex != -1) {
-                String afterLegacy = referer.substring(legacyIndex + "/meta/legacy".length());
+                String afterLegacy = referer.substring(legacyIndex + META_LEGACY_PATH.length());
                 int queryIndex = afterLegacy.indexOf('?');
                 if (queryIndex != -1) {
                     afterLegacy = afterLegacy.substring(0, queryIndex);
@@ -230,7 +250,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
                 if (queryIndex != -1) {
                     afterMeta = afterMeta.substring(0, queryIndex);
                 }
-                if (afterMeta.endsWith(".html") && !afterMeta.contains("/")) {
+                if (afterMeta.endsWith(HTML_EXTENSION) && !afterMeta.contains("/")) {
                     return "/SalesOrder" + afterMeta;
                 }
                 return afterMeta;
@@ -243,7 +263,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
     }
 
     private void handleTokenConsistency(HttpServletRequest req, HttpServletRequestWrapper request) {
-        String token = req.getParameter("token");
+        String token = req.getParameter(TOKEN_PARAM);
         if (token != null) {
             req.getSession().setAttribute(JWT_TOKEN, token);
         } else {
@@ -289,14 +309,20 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         try {
             String expected = deriveLegacyClass(pathInfo);
             if (expected != null) {
-                try {
-                    Class.forName(expected);
-                } catch (ClassNotFoundException e) {
-                    throw new OBException("Legacy WAD servlet not found: " + expected
-                            + ". Please run './gradlew wad compile.complete' and redeploy.");
-                }
+                validateLegacyClassExists(expected);
             }
-        } catch (Exception ignore) {
+        } catch (Exception e) {
+            // Log the exception for debugging but don't fail the request
+            log4j.debug("Legacy class validation failed: {}", e.getMessage());
+        }
+    }
+
+    private void validateLegacyClassExists(String className) {
+        try {
+            Class.forName(className);
+        } catch (ClassNotFoundException e) {
+            throw new OBException("Legacy WAD servlet not found: " + className
+                    + ". Please run './gradlew wad compile.complete' and redeploy.");
         }
     }
 
@@ -309,21 +335,23 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         if (parts.length < 2) return null;
         String window = parts[0];
         String page = parts[1];
-        if (page.endsWith(".html")) page = page.substring(0, page.length() - 5);
+        if (page.endsWith(HTML_EXTENSION)) {
+            page = page.substring(0, page.length() - HTML_EXTENSION.length());
+        }
         String base = page.contains("_") ? page.substring(0, page.indexOf('_')) : page;
         return "org.openbravo.erpWindows." + window + "." + base;
     }
 
     private String getInjectedContent(String path, String responseString) {
         responseString = responseString
-                .replace("/meta/legacy", "/meta/legacy" + path)
+                .replace("/meta/legacy", META_LEGACY_PATH + path)
                 .replace("src=\"../web/", "src=\"../../../web/")
                 .replace("href=\"../web/", "href=\"../../../web/");
         if (responseString.contains(FRAMESET_CLOSE_TAG)) {
-            return responseString.replace(HEAD_CLOSE_TAG, (generateReceiveAndPostMessageScript()).concat(HEAD_CLOSE_TAG));
+            return responseString.replace(HEAD_CLOSE_TAG, RECEIVE_AND_POST_MESSAGE_SCRIPT.concat(HEAD_CLOSE_TAG));
         }
         if (responseString.contains(FORM_CLOSE_TAG)) {
-            String resWithNewScript = responseString.replace(FORM_CLOSE_TAG, FORM_CLOSE_TAG.concat(generatePostMessageScript()));
+            String resWithNewScript = responseString.replace(FORM_CLOSE_TAG, FORM_CLOSE_TAG.concat(POST_MESSAGE_SCRIPT));
             resWithNewScript = resWithNewScript.replace("src=\"../web/", "src=\"../../../web/");
             resWithNewScript = resWithNewScript.replace("href=\"../web/", "href=\"../../../web/");
             return injectCodeAfterFunctionCall(
@@ -336,15 +364,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         return responseString;
     }
 
-    private String generateReceiveAndPostMessageScript() {
-        return "<script>window.addEventListener(\"message\", (event) => {if (event.data?.type === \"fromForm\" && window.parent) {window.parent.postMessage({ type: \"fromIframe\", action: event.data.action }, \"*\");}});</script>";
-    }
-
-    private String generatePostMessageScript() {
-        return "<script>const sendMessage = (action) => {if (window.parent) {window.parent.postMessage({ type: \"fromForm\", action: action, }, \"*\");}}</script>";
-    }
-
-    private String injectCodeAfterFunctionCall(String originalRes, String originalFunctionCall, String newFunctionCall, Boolean isRegex) {
+    private String injectCodeAfterFunctionCall(String originalRes, String originalFunctionCall, String newFunctionCall, boolean isRegex) {
         Pattern pattern = isRegex ? Pattern.compile(originalFunctionCall) : Pattern.compile(Pattern.quote(originalFunctionCall));
         Matcher matcher = pattern.matcher(originalRes);
         StringBuilder result = new StringBuilder();
