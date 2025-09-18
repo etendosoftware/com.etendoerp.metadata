@@ -90,28 +90,30 @@ public class MetadataFilter implements Filter {
 
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
-        if (!(request instanceof HttpServletRequest httpReq) || !(response instanceof HttpServletResponse httpRes)) {
-            throw new ServletException("This filter only supports HTTP requests");
-        }
+        if (request instanceof HttpServletRequest httpReq && response instanceof HttpServletResponse httpRes) {
 
-        String pathInfo = httpReq.getPathInfo();
+            String pathInfo = httpReq.getPathInfo();
 
-        try {
-            if (pathInfo != null) {
-                if (pathInfo.toLowerCase().endsWith(HTML)) {
-                    new LegacyProcessServlet().service(httpReq, httpRes);
-                    return;
-                } else if (pathInfo.startsWith(forwardPath)) {
-                    new ForwarderServlet().process(httpReq, httpRes);
-                    return;
+            try {
+                if (pathInfo != null) {
+                    if (pathInfo.toLowerCase().endsWith(HTML)) {
+                        new LegacyProcessServlet().service(httpReq, httpRes);
+                        return;
+                    } else if (pathInfo.startsWith(forwardPath)) {
+                        new ForwarderServlet().process(httpReq, httpRes);
+                        return;
+                    }
                 }
-            }
-            chain.doFilter(httpReq, httpRes);
+                chain.doFilter(httpReq, httpRes);
 
-        } catch (Throwable t) {
-            handleException(request, response, t);
-        } finally {
-            MetadataService.clear();
+            } catch (Throwable t) {
+                handleException(request, response, t);
+            } finally {
+                MetadataService.clear();
+            }
+
+        } else {
+            throw new ServletException("This filter only supports HTTP requests");
         }
     }
 
