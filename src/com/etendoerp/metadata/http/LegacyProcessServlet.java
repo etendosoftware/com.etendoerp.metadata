@@ -1,188 +1,79 @@
 package com.etendoerp.metadata.http;
 
+import com.auth0.jwt.interfaces.Claim;
+import com.auth0.jwt.interfaces.DecodedJWT;
+import com.etendoerp.metadata.data.RequestVariables;
+import com.smf.securewebservices.utils.SecureWebServicesUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.openbravo.base.exception.OBException;
+import org.openbravo.base.secureApp.HttpSecureAppServlet;
+import org.openbravo.client.kernel.RequestContext;
+import org.openbravo.dal.core.OBContext;
+
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSession;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-import org.openbravo.base.secureApp.HttpSecureAppServlet;
-import static com.etendoerp.metadata.utils.Constants.*;
+
 import static com.etendoerp.metadata.utils.Constants.FORM_CLOSE_TAG;
+import static com.etendoerp.metadata.utils.Constants.FRAMESET_CLOSE_TAG;
+import static com.etendoerp.metadata.utils.Constants.HEAD_CLOSE_TAG;
 
 /**
  * Legacy servlet that uses existing HttpServletRequestWrapper infrastructure
+ * to handle legacy HTML pages and their follow-up requests.
  */
 public class LegacyProcessServlet extends HttpSecureAppServlet {
     private static final Logger log4j = LogManager.getLogger(LegacyProcessServlet.class);
+    private static final String JWT_TOKEN = "#JWT_TOKEN";
 
     @Override
     public void service(HttpServletRequest req, HttpServletResponse res)
             throws IOException, ServletException {
-
-        String path = req.getPathInfo();
-
-        if (isLegacyRequest(path)) {
-            processLegacyRequest(req, res, path);
-        } else if (isLegacyFollowupRequest(req)) {
-            // Handle follow-up requests from legacy processes (like form submissions)
-            processLegacyFollowupRequest(req, res);
-        } else {
-            super.service(req, res);
+        try {
+            String path = req.getPathInfo();
+            if (isLegacyRequest(path)) {
+                processLegacyRequest(req, res, path);
+            } else if (isLegacyFollowupRequest(req)) {
+                processLegacyFollowupRequest(req, res);
+            } else {
+                super.service(req, res);
+            }
+        } catch (Exception e) {
+            log4j.error(e.getMessage(), e);
+            throw new ServletException(e);
         }
     }
 
+    private boolean isLegacyRequest(String path) {
+        return path != null && path.toLowerCase().endsWith(".html");
+    }
+
     private boolean isLegacyFollowupRequest(HttpServletRequest req) {
-        // Detect follow-up requests from legacy processes
         String command = req.getParameter("Command");
         return command != null && command.startsWith("BUTTON");
     }
 
-    private void processLegacyFollowupRequest(HttpServletRequest req, HttpServletResponse res)
-            throws ServletException, IOException {
-
-        // Get token from session (should have been stored during initial request)
-        String token = (String) req.getSession(false).getAttribute("LEGACY_TOKEN");
-        String servletDir = (String) req.getSession(false).getAttribute("LEGACY_SERVLET_DIR");
-
-        if (token == null) {
-            log4j.error("No token found in session for legacy follow-up request");
-            res.sendError(HttpServletResponse.SC_UNAUTHORIZED, "No authentication token for follow-up request");
-            return;
-        }
-
-        log4j.debug("Processing legacy follow-up request with token from session");
-
-        // Create wrapper similar to main legacy request
-        HttpServletRequestWrapper wrappedRequest = new HttpServletRequestWrapper(req) {
-            @Override
-            public String getHeader(String name) {
-                if ("Authorization".equalsIgnoreCase(name)) {
-                    return "Bearer " + token;
-                }
-                return super.getHeader(name);
-            }
-
-            @Override
-            public HttpSession getSession() {
-                return req.getSession(true);
-            }
-
-            @Override
-            public HttpSession getSession(boolean create) {
-                return req.getSession(create);
-            }
-        };
-
-        try {
-            String targetPath = null;
-            String pathInfo = req.getPathInfo();
-
-            // Case 1: Direct .html request like /Header_Edition.html
-            if (pathInfo != null && pathInfo.endsWith(".html")) {
-                if (servletDir != null) {
-                    targetPath = servletDir + pathInfo;
-                } else {
-                    // Fallback: try to determine from referer
-                    targetPath = extractTargetPathFromReferer(req.getHeader("Referer"));
-                    if (targetPath == null) {
-                        targetPath = pathInfo; // Last resort
-                    }
-                }
-            }
-
-            // Case 2: Command request - extract from referer
-            if (targetPath == null) {
-                targetPath = extractTargetPathFromReferer(req.getHeader("Referer"));
-            }
-
-            if (targetPath != null) {
-                log4j.debug("Forwarding follow-up request to: {}", targetPath);
-                wrappedRequest.getRequestDispatcher(targetPath).forward(wrappedRequest, res);
-            } else {
-                log4j.error("Could not determine target path for follow-up request. PathInfo: {}, ServletDir: {}",
-                        pathInfo, servletDir);
-                res.sendError(HttpServletResponse.SC_BAD_REQUEST, "Could not determine target servlet");
-            }
-
-        } catch (Exception e) {
-            log4j.error("Error processing legacy follow-up request: {}", e.getMessage(), e);
-            res.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Error processing follow-up request");
-        }
-    }
-
-    private String extractTargetPathFromReferer(String referer) {
-        if (referer == null) return null;
-
-        try {
-            // Extract path from referer URL
-            // Example: http://localhost:8080/etendo/meta/legacy/SalesOrder/Header_Edition.html?...
-            // Should return: /SalesOrder/Header_Edition.html
-
-            int legacyIndex = referer.indexOf("/meta/legacy/");
-            if (legacyIndex != -1) {
-                String afterLegacy = referer.substring(legacyIndex + "/meta/legacy".length());
-                int queryIndex = afterLegacy.indexOf('?');
-                if (queryIndex != -1) {
-                    afterLegacy = afterLegacy.substring(0, queryIndex);
-                }
-                return afterLegacy;
-            }
-
-            // Fallback: if no /legacy/ in referer, try to extract from /meta/
-            int metaIndex = referer.indexOf("/meta/");
-            if (metaIndex != -1) {
-                String afterMeta = referer.substring(metaIndex + "/meta".length());
-                int queryIndex = afterMeta.indexOf('?');
-                if (queryIndex != -1) {
-                    afterMeta = afterMeta.substring(0, queryIndex);
-                }
-                // If it's a direct .html file, assume it's in the same servlet directory
-                if (afterMeta.endsWith(".html") && !afterMeta.contains("/")) {
-                    // Try to get the servlet directory from session or use a default
-                    return "/SalesOrder" + afterMeta; // You might need to make this more dynamic
-                }
-                return afterMeta;
-            }
-
-            return null;
-
-        } catch (Exception e) {
-            log4j.warn("Error extracting target path from referer: {}", referer, e);
-            return null;
-        }
-    }
-
     private void processLegacyRequest(HttpServletRequest req, HttpServletResponse res, String path)
-            throws ServletException, IOException {
-
-        // Debug: Check if token is present in original request
+            throws IOException {
         String token = req.getParameter("token");
-        String inpKey = req.getParameter("inpKey");
-        log4j.debug("Original request has token parameter: {}", token != null ? "yes" : "no");
-
-        // Ensure session exists - this is critical for VariablesSecureApp
         req.getSession(true);
-
-        // Store token and servlet path in session for follow-up requests
         if (token != null) {
             req.getSession().setAttribute("LEGACY_TOKEN", token);
         }
-
-        // Store the servlet directory for follow-up requests
         if (path != null && path.contains("/")) {
             String servletDir = path.substring(0, path.lastIndexOf("/"));
             req.getSession().setAttribute("LEGACY_SERVLET_DIR", servletDir);
-            log4j.debug("Stored servlet directory: {}", servletDir);
         }
 
-        // Create a wrapper that preserves the token parameter AND adds Authorization header
         HttpServletRequestWrapper wrappedRequest = new HttpServletRequestWrapper(req) {
             @Override
             public String getPathInfo() {
@@ -191,7 +82,6 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
 
             @Override
             public String getParameter(String name) {
-                // Ensure token parameter is always available
                 if ("token".equals(name) && token != null) {
                     return token;
                 }
@@ -200,7 +90,6 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
 
             @Override
             public String getHeader(String name) {
-                // Ensure Authorization header is always available
                 if ("Authorization".equalsIgnoreCase(name) && token != null) {
                     return "Bearer " + token;
                 }
@@ -231,13 +120,10 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         var responseWrapper = new HttpServletResponseLegacyWrapper(res);
 
         try {
-            log4j.debug("Processing legacy request: {}", path);
-            log4j.debug("Wrapped request has token parameter: {}",
-                    wrappedRequest.getParameter("token") != null ? "yes" : "no");
-            log4j.debug("Wrapped request has Authorization header: {}",
-                    wrappedRequest.getHeader("Authorization") != null ? "yes" : "no");
-            log4j.debug("Wrapped request has session: {}",
-                    wrappedRequest.getSession(false) != null ? "yes" : "no");
+            handleTokenConsistency(req, wrappedRequest);
+            handleRecordIdentifier(wrappedRequest);
+            handleRequestContext(res, wrappedRequest);
+            maybeValidateLegacyClass(wrappedRequest.getPathInfo());
 
             wrappedRequest.getRequestDispatcher(path).include(wrappedRequest, responseWrapper);
 
@@ -255,20 +141,184 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         }
     }
 
-    private boolean isLegacyRequest(String path) {
-        return path != null && path.toLowerCase().endsWith(".html");
+    private void processLegacyFollowupRequest(HttpServletRequest req, HttpServletResponse res)
+            throws IOException {
+
+        String token = (String) req.getSession(false).getAttribute("LEGACY_TOKEN");
+        String servletDir = (String) req.getSession(false).getAttribute("LEGACY_SERVLET_DIR");
+
+        if (token == null) {
+            log4j.error("No token found in session for legacy follow-up request");
+            res.sendError(HttpServletResponse.SC_UNAUTHORIZED, "No authentication token for follow-up request");
+            return;
+        }
+
+        HttpServletRequestWrapper wrappedRequest = new HttpServletRequestWrapper(req) {
+            @Override
+            public String getHeader(String name) {
+                if ("Authorization".equalsIgnoreCase(name)) {
+                    return "Bearer " + token;
+                }
+                return super.getHeader(name);
+            }
+
+            @Override
+            public HttpSession getSession() {
+                return req.getSession(true);
+            }
+
+            @Override
+            public HttpSession getSession(boolean create) {
+                return req.getSession(create);
+            }
+        };
+
+        try {
+            handleTokenConsistency(req, wrappedRequest);
+            handleRecordIdentifier(wrappedRequest);
+            handleRequestContext(res, wrappedRequest);
+
+            String targetPath = null;
+            String pathInfo = req.getPathInfo();
+
+            if (pathInfo != null && pathInfo.endsWith(".html")) {
+                if (servletDir != null) {
+                    targetPath = servletDir + pathInfo;
+                } else {
+                    targetPath = extractTargetPathFromReferer(req.getHeader("Referer"));
+                    if (targetPath == null) {
+                        targetPath = pathInfo;
+                    }
+                }
+            }
+
+            if (targetPath == null) {
+                targetPath = extractTargetPathFromReferer(req.getHeader("Referer"));
+            }
+
+            if (targetPath != null) {
+                log4j.debug("Forwarding follow-up request to: {}", targetPath);
+                wrappedRequest.getRequestDispatcher(targetPath).forward(wrappedRequest, res);
+            } else {
+                log4j.error("Could not determine target path for follow-up request. PathInfo: {}, ServletDir: {}",
+                        pathInfo, servletDir);
+                res.sendError(HttpServletResponse.SC_BAD_REQUEST, "Could not determine target servlet");
+            }
+
+        } catch (Exception e) {
+            log4j.error("Error processing legacy follow-up request: {}", e.getMessage(), e);
+            res.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Error processing follow-up request");
+        }
     }
 
-    /**
-     * Reincorporated private methods from original ForwarderServlet
-     */
+    private String extractTargetPathFromReferer(String referer) {
+        if (referer == null) return null;
+        try {
+            int legacyIndex = referer.indexOf("/meta/legacy/");
+            if (legacyIndex != -1) {
+                String afterLegacy = referer.substring(legacyIndex + "/meta/legacy".length());
+                int queryIndex = afterLegacy.indexOf('?');
+                if (queryIndex != -1) {
+                    afterLegacy = afterLegacy.substring(0, queryIndex);
+                }
+                return afterLegacy;
+            }
+            int metaIndex = referer.indexOf("/meta/");
+            if (metaIndex != -1) {
+                String afterMeta = referer.substring(metaIndex + "/meta".length());
+                int queryIndex = afterMeta.indexOf('?');
+                if (queryIndex != -1) {
+                    afterMeta = afterMeta.substring(0, queryIndex);
+                }
+                if (afterMeta.endsWith(".html") && !afterMeta.contains("/")) {
+                    return "/SalesOrder" + afterMeta;
+                }
+                return afterMeta;
+            }
+            return null;
+        } catch (Exception e) {
+            log4j.warn("Error extracting target path from referer: {}", referer, e);
+            return null;
+        }
+    }
+
+    private void handleTokenConsistency(HttpServletRequest req, HttpServletRequestWrapper request) {
+        String token = req.getParameter("token");
+        if (token != null) {
+            req.getSession().setAttribute(JWT_TOKEN, token);
+        } else {
+            Object sessionToken = req.getSession().getAttribute(JWT_TOKEN);
+            if (sessionToken != null) {
+                try {
+                    DecodedJWT decodedJWT = SecureWebServicesUtils.decodeToken(sessionToken.toString());
+                    Claim jtiClaim = decodedJWT.getClaims().get("jti");
+                    if (jtiClaim != null) {
+                        request.setSessionId(jtiClaim.asString());
+                    } else {
+                        log4j.warn("JWT token in session does not contain 'jti' claim.");
+                    }
+                } catch (Exception e) {
+                    throw new OBException("Error decoding token", e);
+                }
+            }
+        }
+    }
+
+    private static void handleRecordIdentifier(HttpServletRequestWrapper request) {
+        String inpKeyId = request.getParameter("inpKey");
+        String inpWindowId = request.getParameter("inpwindowId");
+        String inpKeyColumnId = request.getParameter("inpkeyColumnId");
+        if (StringUtils.isNoneEmpty(inpKeyId, inpWindowId, inpKeyColumnId)) {
+            request.getSession().setAttribute(inpWindowId + "|" + inpKeyColumnId.toUpperCase(), inpKeyId);
+        }
+    }
+
+    private static void handleRequestContext(HttpServletResponse res, HttpServletRequestWrapper request) {
+        RequestVariables vars = new RequestVariables(request);
+        RequestContext requestContext = RequestContext.get();
+        requestContext.setRequest(request);
+        requestContext.setVariableSecureApp(vars);
+        requestContext.setResponse(res);
+        OBContext.setOBContext(request);
+    }
+
+    private void maybeValidateLegacyClass(String pathInfo) {
+        if (pathInfo == null || !isLegacyRequest(pathInfo)) {
+            return;
+        }
+        try {
+            String expected = deriveLegacyClass(pathInfo);
+            if (expected != null) {
+                try {
+                    Class.forName(expected);
+                } catch (ClassNotFoundException e) {
+                    throw new OBException("Legacy WAD servlet not found: " + expected
+                            + ". Please run './gradlew wad compile.complete' and redeploy.");
+                }
+            }
+        } catch (Exception ignore) {
+        }
+    }
+
+    private String deriveLegacyClass(String pathInfo) {
+        String tail = pathInfo;
+        if (tail.startsWith("/")) {
+            tail = tail.substring(1);
+        }
+        String[] parts = tail.split("/");
+        if (parts.length < 2) return null;
+        String window = parts[0];
+        String page = parts[1];
+        if (page.endsWith(".html")) page = page.substring(0, page.length() - 5);
+        String base = page.contains("_") ? page.substring(0, page.indexOf('_')) : page;
+        return "org.openbravo.erpWindows." + window + "." + base;
+    }
 
     private String getInjectedContent(String path, String responseString) {
         responseString = responseString
                 .replace("/meta/legacy", "/meta/legacy" + path)
                 .replace("src=\"../web/", "src=\"../../../web/")
                 .replace("href=\"../web/", "href=\"../../../web/");
-
         if (responseString.contains(FRAMESET_CLOSE_TAG)) {
             return responseString.replace(HEAD_CLOSE_TAG, (generateReceiveAndPostMessageScript()).concat(HEAD_CLOSE_TAG));
         }
@@ -285,7 +335,6 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         }
         return responseString;
     }
-
 
     private String generateReceiveAndPostMessageScript() {
         return "<script>window.addEventListener(\"message\", (event) => {if (event.data?.type === \"fromForm\" && window.parent) {window.parent.postMessage({ type: \"fromIframe\", action: event.data.action }, \"*\");}});</script>";
@@ -307,5 +356,4 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         matcher.appendTail(result);
         return result.toString();
     }
-
 }
