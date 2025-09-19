@@ -85,9 +85,7 @@ public class HttpServletRequestWrapper extends RequestContext.HttpServletRequest
       throw new OBException("Error decoding token", e);
     }
     this.userId = decodedJWT.getClaim("user").asString();
-    if (request.getSession(false) == null ) {
-      this.sessionId = request.getSession(false) != null ? request.getSession(false).getId() : null;
-    }
+    this.sessionId = decodedJWT.getClaim("jti").asString();
   }
 
   /**

@@ -22,7 +22,9 @@ import static org.mockito.Mockito.mockStatic;
  * Unit tests for the new simplified {@link ForwarderServlet}.
  * <p>
  * This test class validates that all incoming requests are correctly delegated
- * to the {@link DataSourceServlet}, as per the new design.
+ * to the {@link DataSourceServlet}, as per the new design. All tests mock the
+ * {@link WeldUtils} dependency to avoid servlet context initialization issues
+ * in the test environment.
  * </p>
  */
 @RunWith(MockitoJUnitRunner.class)
@@ -59,6 +61,7 @@ public class ForwarderServletTest {
    * <p>
    * The {@link DataSourceServlet#doGet(HttpServletRequest, HttpServletResponse)}
    * method is expected to be called with the original request and response.
+   * This test mocks {@link WeldUtils} to prevent servlet context access issues.
    * </p>
    *
    * @throws ServletException if the delegation fails
@@ -70,7 +73,6 @@ public class ForwarderServletTest {
       weldUtilsMock.when(() -> WeldUtils.getInstanceFromStaticBeanManager(DataSourceServlet.class))
               .thenReturn(dataSourceServlet);
 
-      // Call the protected method directly since we're testing the base functionality
       forwarderServlet.process(request, response);
 
       verify(dataSourceServlet).doGet(request, response);
@@ -80,60 +82,96 @@ public class ForwarderServletTest {
   /**
    * Tests that the {@link ForwarderServlet#doGet(String, HttpServletRequest, HttpServletResponse)}
    * method correctly calls the {@link ForwarderServlet#process(HttpServletRequest, HttpServletResponse)} method.
+   * <p>
+   * This test verifies that HTTP GET requests are properly delegated to the main processing method.
+   * {@link WeldUtils} is mocked to prevent servlet context initialization requirements during testing.
+   * </p>
    *
    * @throws Exception if an error occurs during method invocation
    */
   @Test
   public void doGetShouldCallProcessMethod() throws Exception {
-    ForwarderServlet spyServlet = spy(forwarderServlet);
+    try (MockedStatic<WeldUtils> weldUtilsMock = mockStatic(WeldUtils.class)) {
+      weldUtilsMock.when(() -> WeldUtils.getInstanceFromStaticBeanManager(DataSourceServlet.class))
+              .thenReturn(dataSourceServlet);
 
-    spyServlet.doGet(TEST_PATH, request, response);
+      ForwarderServlet spyServlet = spy(forwarderServlet);
 
-    verify(spyServlet).process(request, response);
+      spyServlet.doGet(TEST_PATH, request, response);
+
+      verify(spyServlet).process(request, response);
+    }
   }
 
   /**
    * Tests that the {@link ForwarderServlet#doPost(String, HttpServletRequest, HttpServletResponse)}
    * method correctly calls the {@link ForwarderServlet#process(HttpServletRequest, HttpServletResponse)} method.
+   * <p>
+   * This test verifies that HTTP POST requests are properly delegated to the main processing method.
+   * {@link WeldUtils} is mocked to prevent servlet context initialization requirements during testing.
+   * </p>
    *
    * @throws Exception if an error occurs during method invocation
    */
   @Test
   public void doPostShouldCallProcessMethod() throws Exception {
-    ForwarderServlet spyServlet = spy(forwarderServlet);
+    try (MockedStatic<WeldUtils> weldUtilsMock = mockStatic(WeldUtils.class)) {
+      weldUtilsMock.when(() -> WeldUtils.getInstanceFromStaticBeanManager(DataSourceServlet.class))
+              .thenReturn(dataSourceServlet);
 
-    spyServlet.doPost(TEST_PATH, request, response);
+      ForwarderServlet spyServlet = spy(forwarderServlet);
 
-    verify(spyServlet).process(request, response);
+      spyServlet.doPost(TEST_PATH, request, response);
+
+      verify(spyServlet).process(request, response);
+    }
   }
 
   /**
    * Tests that the {@link ForwarderServlet#doPut(String, HttpServletRequest, HttpServletResponse)}
    * method correctly calls the {@link ForwarderServlet#process(HttpServletRequest, HttpServletResponse)} method.
+   * <p>
+   * This test verifies that HTTP PUT requests are properly delegated to the main processing method.
+   * {@link WeldUtils} is mocked to prevent servlet context initialization requirements during testing.
+   * </p>
    *
    * @throws Exception if an error occurs during method invocation
    */
   @Test
   public void doPutShouldCallProcessMethod() throws Exception {
-    ForwarderServlet spyServlet = spy(forwarderServlet);
+    try (MockedStatic<WeldUtils> weldUtilsMock = mockStatic(WeldUtils.class)) {
+      weldUtilsMock.when(() -> WeldUtils.getInstanceFromStaticBeanManager(DataSourceServlet.class))
+              .thenReturn(dataSourceServlet);
 
-    spyServlet.doPut(TEST_PATH, request, response);
+      ForwarderServlet spyServlet = spy(forwarderServlet);
 
-    verify(spyServlet).process(request, response);
+      spyServlet.doPut(TEST_PATH, request, response);
+
+      verify(spyServlet).process(request, response);
+    }
   }
 
   /**
    * Tests that the {@link ForwarderServlet#doDelete(String, HttpServletRequest, HttpServletResponse)}
    * method correctly calls the {@link ForwarderServlet#process(HttpServletRequest, HttpServletResponse)} method.
+   * <p>
+   * This test verifies that HTTP DELETE requests are properly delegated to the main processing method.
+   * {@link WeldUtils} is mocked to prevent servlet context initialization requirements during testing.
+   * </p>
    *
    * @throws Exception if an error occurs during method invocation
    */
   @Test
   public void doDeleteShouldCallProcessMethod() throws Exception {
-    ForwarderServlet spyServlet = spy(forwarderServlet);
+    try (MockedStatic<WeldUtils> weldUtilsMock = mockStatic(WeldUtils.class)) {
+      weldUtilsMock.when(() -> WeldUtils.getInstanceFromStaticBeanManager(DataSourceServlet.class))
+              .thenReturn(dataSourceServlet);
 
-    spyServlet.doDelete(TEST_PATH, request, response);
+      ForwarderServlet spyServlet = spy(forwarderServlet);
 
-    verify(spyServlet).process(request, response);
+      spyServlet.doDelete(TEST_PATH, request, response);
+
+      verify(spyServlet).process(request, response);
+    }
   }
 }

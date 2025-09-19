@@ -34,15 +34,12 @@ import static com.etendoerp.metadata.utils.Constants.HEAD_CLOSE_TAG;
 public class LegacyProcessServlet extends HttpSecureAppServlet {
     private static final Logger log4j = LogManager.getLogger(LegacyProcessServlet.class);
     private static final String JWT_TOKEN = "#JWT_TOKEN";
-
-    // Constants for duplicated literals
     private static final String HTML_EXTENSION = ".html";
     private static final String TOKEN_PARAM = "token";
     private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String BEARER_PREFIX = "Bearer ";
     private static final String META_LEGACY_PATH = "/meta/legacy";
 
-    // JavaScript constants
     private static final String RECEIVE_AND_POST_MESSAGE_SCRIPT =
             "<script>window.addEventListener(\"message\", (event) => {" +
                     "if (event.data?.type === \"fromForm\" && window.parent) {" +
@@ -312,7 +309,6 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
                 validateLegacyClassExists(expected);
             }
         } catch (Exception e) {
-            // Log the exception for debugging but don't fail the request
             log4j.debug("Legacy class validation failed: {}", e.getMessage());
         }
     }

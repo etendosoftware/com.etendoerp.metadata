@@ -16,7 +16,6 @@ public final class MetadataTestConstants {
   public static final String TOKEN = "token";
   public static final String TEST_JWT_TOKEN = "test-jwt-token";
   public static final String AUTHORIZATION = "Authorization";
-
   public static final String USER_ID = "user-id";
   public static final String ROLE_ID = "role-id";
   public static final String DEFAULT_ROLE_ID = "default-role-id";

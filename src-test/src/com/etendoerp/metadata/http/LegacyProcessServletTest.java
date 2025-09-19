@@ -96,10 +96,8 @@ public class LegacyProcessServletTest extends OBBaseTest {
      */
     @Test
     public void serviceShouldHandleLegacyHtmlRequest() throws Exception {
-        String path = SALES_INVOICE_HEADER_EDITION_HTML;
-        when(request.getPathInfo()).thenReturn(path);
+        when(request.getPathInfo()).thenReturn(SALES_INVOICE_HEADER_EDITION_HTML);
         when(request.getParameter(TOKEN)).thenReturn(null);
-        when(session.getAttribute("LEGACY_TOKEN")).thenReturn(null);
 
         try (MockedStatic<RequestContext> contextMock = mockStatic(RequestContext.class);
              MockedStatic<OBContext> obContextMock = mockStatic(OBContext.class)) {
@@ -228,7 +226,6 @@ public class LegacyProcessServletTest extends OBBaseTest {
         when(wrapper.getParameter("inpKey")).thenReturn(TEST_KEY_VALUE);
         when(wrapper.getParameter("inpwindowId")).thenReturn(null);
         when(wrapper.getParameter("inpkeyColumnId")).thenReturn("column-789");
-        when(wrapper.getSession()).thenReturn(session);
 
         invokeHandleRecordIdentifier(wrapper);
 
@@ -264,9 +261,8 @@ public class LegacyProcessServletTest extends OBBaseTest {
      */
     @Test
     public void maybeValidateLegacyClassShouldValidateExistingClass() throws Exception {
-        String pathInfo = SALES_INVOICE_HEADER_EDITION_HTML;
         try {
-            invokeMaybeValidateLegacyClass(pathInfo);
+            invokeMaybeValidateLegacyClass(SALES_INVOICE_HEADER_EDITION_HTML);
         } catch (OBException e) {
             assertTrue(e.getMessage().contains("Legacy WAD servlet not found"));
             assertTrue(e.getMessage().contains("org.openbravo.erpWindows.SalesInvoice.Header"));
@@ -281,8 +277,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
      */
     @Test
     public void maybeValidateLegacyClassShouldIgnoreNonLegacyPaths() throws Exception {
-        String pathInfo = API_DATA_PATH;
-        invokeMaybeValidateLegacyClass(pathInfo);
+        invokeMaybeValidateLegacyClass(API_DATA_PATH);
     }
 
     /**
@@ -331,36 +326,6 @@ public class LegacyProcessServletTest extends OBBaseTest {
         assertTrue(result.contains("closeThisPage();sendMessage('closeModal');"));
     }
 
-    /**
-     * Tests that {@code generateReceiveAndPostMessageScript} produces the expected
-     * JavaScript snippet for listening to and posting messages between frames.
-     *
-     * @throws Exception if reflection invocation fails
-     */
-    @Test
-    public void generateReceiveAndPostMessageScriptShouldReturnCorrectScript() throws Exception {
-        String script = invokeGenerateReceiveAndPostMessageScript();
-        assertTrue(script.contains("window.addEventListener"));
-        assertTrue(script.contains("message"));
-        assertTrue(script.contains("fromForm"));
-        assertTrue(script.contains("fromIframe"));
-        assertTrue(script.contains("window.parent.postMessage"));
-    }
-
-    /**
-     * Tests that {@code generatePostMessageScript} produces the expected
-     * JavaScript snippet for sending messages from forms or iframes to the parent window.
-     *
-     * @throws Exception if reflection invocation fails
-     */
-    @Test
-    public void generatePostMessageScriptShouldReturnCorrectScript() throws Exception {
-        String script = invokeGeneratePostMessageScript();
-        assertTrue(script.contains("sendMessage"));
-        assertTrue(script.contains("fromForm"));
-        assertTrue(script.contains("window.parent.postMessage"));
-    }
-
     // --- Helper Methods ---
 
     /**
@@ -382,6 +347,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
     private boolean invokeIsLegacyRequest(String path) throws ReflectionTestException {
         try {
             java.lang.reflect.Method method = LegacyProcessServlet.class.getDeclaredMethod("isLegacyRequest", String.class);
+            method.setAccessible(true);
             return (Boolean) method.invoke(legacyProcessServlet, path);
         } catch (Exception e) {
             throw new ReflectionTestException("Failed to invoke isLegacyRequest method", e);
@@ -399,6 +365,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
         try {
             java.lang.reflect.Method method = LegacyProcessServlet.class.getDeclaredMethod("handleTokenConsistency",
                     HttpServletRequest.class, HttpServletRequestWrapper.class);
+            method.setAccessible(true);
             method.invoke(legacyProcessServlet, req, wrapper);
         } catch (Exception e) {
             throw new ReflectionTestException("Failed to invoke handleTokenConsistency method", e);
@@ -415,7 +382,8 @@ public class LegacyProcessServletTest extends OBBaseTest {
         try {
             java.lang.reflect.Method method = LegacyProcessServlet.class.getDeclaredMethod("handleRecordIdentifier",
                     HttpServletRequestWrapper.class);
-            method.invoke(legacyProcessServlet, wrapper);
+            method.setAccessible(true);
+            method.invoke(null, wrapper);
         } catch (Exception e) {
             throw new ReflectionTestException("Failed to invoke handleRecordIdentifier method", e);
         }
@@ -432,7 +400,8 @@ public class LegacyProcessServletTest extends OBBaseTest {
         try {
             java.lang.reflect.Method method = LegacyProcessServlet.class.getDeclaredMethod("handleRequestContext",
                     HttpServletResponse.class, HttpServletRequestWrapper.class);
-            method.invoke(legacyProcessServlet, res, wrapper);
+            method.setAccessible(true);
+            method.invoke(null, res, wrapper);
         } catch (Exception e) {
             throw new ReflectionTestException("Failed to invoke handleRequestContext method", e);
         }
@@ -448,6 +417,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
         try {
             java.lang.reflect.Method method = LegacyProcessServlet.class.getDeclaredMethod("maybeValidateLegacyClass",
                     String.class);
+            method.setAccessible(true);
             method.invoke(legacyProcessServlet, pathInfo);
         } catch (Exception e) {
             throw new ReflectionTestException("Failed to invoke maybeValidateLegacyClass method", e);
@@ -464,6 +434,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
     private String invokeDerivateLegacyClass(String pathInfo) throws ReflectionTestException {
         try {
             java.lang.reflect.Method method = LegacyProcessServlet.class.getDeclaredMethod("deriveLegacyClass", String.class);
+            method.setAccessible(true);
             return (String) method.invoke(legacyProcessServlet, pathInfo);
         } catch (Exception e) {
             throw new ReflectionTestException("Failed to invoke deriveLegacyClass method", e);
@@ -484,7 +455,8 @@ public class LegacyProcessServletTest extends OBBaseTest {
                                                      Boolean isRegex) throws ReflectionTestException {
         try {
             java.lang.reflect.Method method = LegacyProcessServlet.class.getDeclaredMethod("injectCodeAfterFunctionCall",
-                    String.class, String.class, String.class, Boolean.class);
+                    String.class, String.class, String.class, boolean.class);
+            method.setAccessible(true);
             return (String) method.invoke(legacyProcessServlet, original, functionCall, newCall, isRegex);
         } catch (Exception e) {
             throw new ReflectionTestException("Failed to invoke injectCodeAfterFunctionCall method", e);

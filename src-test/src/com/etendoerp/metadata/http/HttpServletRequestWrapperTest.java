@@ -24,10 +24,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Enumeration;
-import java.util.List;
+import java.util.*;
 
 import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServletRequest;
@@ -119,9 +116,13 @@ public class HttpServletRequestWrapperTest extends OBBaseTest {
    * Sets up the mocked JWT and related claims with test data.
    * This includes configuring the decoded JWT to return test session and user IDs.
    */
+  /**
+   * Sets up the mocked JWT and related claims with test data.
+   * This includes configuring the decoded JWT to return test session and user IDs.
+   */
   private void setupMockJWT() {
-    when(mockDecodedJWT.getClaims()).thenReturn(
-        Collections.singletonMap("jti", mockJtiClaim));
+    // Setup individual claims
+    when(mockDecodedJWT.getClaim("jti")).thenReturn(mockJtiClaim);
     when(mockDecodedJWT.getClaim("user")).thenReturn(mockUserClaim);
     when(mockJtiClaim.asString()).thenReturn(TEST_SESSION_ID);
     when(mockUserClaim.asString()).thenReturn(TEST_USER_ID);
