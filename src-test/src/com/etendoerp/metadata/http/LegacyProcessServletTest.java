@@ -29,6 +29,9 @@ import static org.mockito.Mockito.*;
  */
 @RunWith(MockitoJUnitRunner.class)
 public class LegacyProcessServletTest extends OBBaseTest {
+    private static final String PARAM_INP_KEY = "inpKey";
+    private static final String PARAM_INP_WINDOW_ID = "inpwindowId";
+    private static final String PARAM_INP_KEY_COLUMN_ID = "inpkeyColumnId";
 
     @Mock
     private HttpServletRequest request;
@@ -69,7 +72,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
     @Test
     public void servletShouldInstantiateSuccessfully() {
         LegacyProcessServlet servlet = new LegacyProcessServlet();
-        assertNotNull(servlet);
+        assertNotNull("Servlet should be instantiated", servlet);
     }
 
     /**
@@ -83,9 +86,10 @@ public class LegacyProcessServletTest extends OBBaseTest {
     public void servletShouldProcessBasicParameters() throws Exception {
         when(request.getPathInfo()).thenReturn("/simple/test.html");
         when(request.getParameter(TOKEN)).thenReturn(null);
-        when(request.getParameter("inpKey")).thenReturn("test-key");
-        when(request.getParameter("inpwindowId")).thenReturn("test-window");
-        when(request.getParameter("inpkeyColumnId")).thenReturn("test-column");
+        when(request.getParameter(PARAM_INP_KEY)).thenReturn("test-key");
+        when(request.getParameter(PARAM_INP_WINDOW_ID)).thenReturn("test-window");
+        when(request.getParameter(PARAM_INP_KEY_COLUMN_ID)).thenReturn("test-column");
+
         try {
             legacyProcessServlet.service(request, response);
         } catch (Exception e) {
@@ -105,9 +109,9 @@ public class LegacyProcessServletTest extends OBBaseTest {
     public void servletShouldInteractWithSession() throws Exception {
         when(request.getPathInfo()).thenReturn("/test/page.html");
         when(request.getParameter(TOKEN)).thenReturn(null);
-        when(request.getParameter("inpKey")).thenReturn("session-test-key");
-        when(request.getParameter("inpwindowId")).thenReturn("session-window");
-        when(request.getParameter("inpkeyColumnId")).thenReturn("session-column");
+        when(request.getParameter(PARAM_INP_KEY)).thenReturn("session-test-key");
+        when(request.getParameter(PARAM_INP_WINDOW_ID)).thenReturn("session-window");
+        when(request.getParameter(PARAM_INP_KEY_COLUMN_ID)).thenReturn("session-column");
 
         try {
             legacyProcessServlet.service(request, response);
@@ -220,22 +224,22 @@ public class LegacyProcessServletTest extends OBBaseTest {
     public void servletShouldProcessCompleteRecordIdentifiers() throws Exception {
         when(request.getPathInfo()).thenReturn("/record/test.html");
         when(request.getParameter(TOKEN)).thenReturn(null);
-        when(request.getParameter("inpKey")).thenReturn("complete-key");
-        when(request.getParameter("inpwindowId")).thenReturn("complete-window");
-        when(request.getParameter("inpkeyColumnId")).thenReturn("complete-column");
+        when(request.getParameter(PARAM_INP_KEY)).thenReturn("complete-key");
+        when(request.getParameter(PARAM_INP_WINDOW_ID)).thenReturn("complete-window");
+        when(request.getParameter(PARAM_INP_KEY_COLUMN_ID)).thenReturn("complete-column");
 
         try {
             legacyProcessServlet.service(request, response);
         } catch (Exception e) {
-            verify(request).getParameter("inpKey");
-            verify(request).getParameter("inpwindowId");
-            verify(request).getParameter("inpkeyColumnId");
+            verify(request).getParameter(PARAM_INP_KEY);
+            verify(request).getParameter(PARAM_INP_WINDOW_ID);
+            verify(request).getParameter(PARAM_INP_KEY_COLUMN_ID);
         }
     }
 
-    private void assertNotNull(Object object) {
+    private void assertNotNull(String message, Object object) {
         if (object == null) {
-            throw new AssertionError("Servlet should be instantiated");
+            throw new AssertionError(message);
         }
     }
 }
