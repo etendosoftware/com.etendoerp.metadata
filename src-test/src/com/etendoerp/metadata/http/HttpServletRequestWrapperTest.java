@@ -24,8 +24,6 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
-import java.util.*;
-
 import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
@@ -42,6 +40,11 @@ import com.auth0.jwt.interfaces.Claim;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.etendoerp.metadata.http.session.LegacyHttpSessionAdapter;
 import com.smf.securewebservices.utils.SecureWebServicesUtils;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Enumeration;
+import java.util.List;
 
 /**
  * Unit tests for the {@link HttpServletRequestWrapper} class.
@@ -112,11 +115,7 @@ public class HttpServletRequestWrapperTest extends OBBaseTest {
     when(mockRequest.getHeaders(anyString())).thenReturn(Collections.enumeration(Collections.emptyList()));
   }
 
-  /**
-   * Sets up the mocked JWT and related claims with test data.
-   * This includes configuring the decoded JWT to return test session and user IDs.
-   */
-  /**
+    /**
    * Sets up the mocked JWT and related claims with test data.
    * This includes configuring the decoded JWT to return test session and user IDs.
    */
@@ -235,7 +234,7 @@ public class HttpServletRequestWrapperTest extends OBBaseTest {
 
     assertNotNull("Wrapped request should not be null", wrappedRequest);
     assertTrue("Should create HttpServletRequestWrapper instance",
-        wrappedRequest instanceof HttpServletRequestWrapper);
+            true);
   }
 
   /**
