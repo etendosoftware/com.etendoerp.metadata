@@ -34,7 +34,7 @@ public class MetadataServletTest extends WeldBaseTest {
     StringWriter sw = new StringWriter();
     when(res.getWriter()).thenReturn(new PrintWriter(sw));
 
-    servlet.doGet(req, res);
+    servlet.doGet("", req, res);
 
     verify(res).setStatus(eq(Utils.getHttpStatusFor(new com.etendoerp.metadata.exceptions.NotFoundException())));
     verify(res).setContentType(contains("application/json"));
@@ -47,7 +47,7 @@ public class MetadataServletTest extends WeldBaseTest {
     StringWriter sw = new StringWriter();
     when(res.getWriter()).thenReturn(new PrintWriter(sw));
 
-    servlet.doGet(req, res);
+    servlet.doGet("", req, res);
 
     verify(res).setStatus(anyInt());
     verify(res).setContentType(contains("text/html"));
