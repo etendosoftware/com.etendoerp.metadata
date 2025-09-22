@@ -1,22 +1,16 @@
 package com.etendoerp.metadata.service;
 
 import static org.junit.Assert.*;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 
-import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.codehaus.jettison.json.JSONObject;
-import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.openbravo.dal.core.OBContext;
-import org.openbravo.test.base.OBBaseTest;
 
 /**
  * Test class for {@link LanguageService}.
@@ -28,46 +22,21 @@ import org.openbravo.test.base.OBBaseTest;
  *
  * @author Generated Test
  */
-public class LanguageServiceTest extends OBBaseTest {
+public class LanguageServiceTest extends BaseMetadataServiceTest {
+
+    private static final String MOCK_LANGUAGE_IO_EXCEPTION_MESSAGE = "Mock IO Exception";
 
     private LanguageService languageService;
-    private HttpServletRequest mockRequest;
-    private HttpServletResponse mockResponse;
-    private StringWriter responseWriter;
 
-    /**
-     * Sets up the test environment before each test method execution.
-     * <p>
-     * Initializes mock objects for HTTP request and response, configures the response writer
-     * for capturing output, and sets up the necessary OBContext for database operations.
-     * Also configures mock request paths for language service testing.
-     */
-    @Before
-    public void setUp() throws Exception {
-        setTestUserContext();
-
-        mockRequest = mock(HttpServletRequest.class);
-        mockResponse = mock(HttpServletResponse.class);
-
-        responseWriter = new StringWriter();
-        PrintWriter printWriter = new PrintWriter(responseWriter);
-        when(mockResponse.getWriter()).thenReturn(printWriter);
-
-        when(mockRequest.getPathInfo()).thenReturn("/meta/language/en_US");
-
-        languageService = new LanguageService(mockRequest, mockResponse);
+    @Override
+    protected String getServicePath() {
+        return "/meta/language/en_US";
     }
 
-    /**
-     * Cleans up the test environment after each test method execution.
-     * <p>
-     * Restores the previous OBContext mode and clears any thread-local variables
-     * to prevent memory leaks and ensure proper test isolation.
-     */
-    @After
-    public void tearDown() {
-        OBContext.restorePreviousMode();
-        MetadataService.clear();
+    @Before
+    public void setUpLanguageService() throws Exception {
+        when(mockRequest.getPathInfo()).thenReturn("/meta/language/en_US");
+        languageService = new LanguageService(mockRequest, mockResponse);
     }
 
     /**
@@ -189,25 +158,32 @@ public class LanguageServiceTest extends OBBaseTest {
     @Test
     public void testLanguageProcessingIOErrorHandling() {
         try {
-            HttpServletResponse errorResponse = mock(HttpServletResponse.class);
-            when(errorResponse.getWriter()).thenThrow(new IOException("Mock IO Exception"));
-
+            HttpServletResponse errorResponse = createErrorResponseMock(MOCK_LANGUAGE_IO_EXCEPTION_MESSAGE);
             LanguageService errorService = new LanguageService(mockRequest, errorResponse);
 
-            boolean exceptionThrown = false;
-            try {
-                errorService.process();
-            } catch (IOException e) {
-                exceptionThrown = true;
-                assertNotNull("Exception message should be provided", e.getMessage());
-                assertEquals("Exception message should match expected", "Mock IO Exception", e.getMessage());
-            }
-
-            assertTrue("IOException should be properly propagated", exceptionThrown);
-
+            assertIOExceptionIsHandledForLanguage(errorService);
         } catch (Exception e) {
             fail("Unexpected exception occurred: " + e.getMessage());
         }
+    }
+
+    /**
+     * Helper method to test IOException handling during language processing.
+     * This method extracts the nested try-catch logic to improve code organization
+     * and maintainability.
+     *
+     * @param errorService The LanguageService instance to test with error conditions
+     */
+    private void assertIOExceptionIsHandledForLanguage(LanguageService errorService) {
+        boolean exceptionThrown = false;
+        try {
+            errorService.process();
+        } catch (IOException e) {
+            exceptionThrown = true;
+            assertNotNull("Exception message should be provided", e.getMessage());
+            assertEquals("Exception message should match expected", MOCK_LANGUAGE_IO_EXCEPTION_MESSAGE, e.getMessage());
+        }
+        assertTrue("IOException should be properly propagated", exceptionThrown);
     }
 
     /**

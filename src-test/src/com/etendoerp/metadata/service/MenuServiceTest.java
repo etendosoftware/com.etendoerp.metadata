@@ -5,18 +5,14 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.codehaus.jettison.json.JSONObject;
-import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.openbravo.dal.core.OBContext;
-import org.openbravo.test.base.OBBaseTest;
 
 /**
  * Test class for {@link MenuService}.
@@ -26,43 +22,20 @@ import org.openbravo.test.base.OBBaseTest;
  *
  * @author Generated Test
  */
-public class MenuServiceTest extends OBBaseTest {
+public class MenuServiceTest extends BaseMetadataServiceTest {
+
+    private static final String MOCK_MENU_IO_EXCEPTION_MESSAGE = "Mock IO Exception";
 
     private MenuService menuService;
-    private StringWriter responseWriter;
 
-    /**
-     * Sets up the test environment before each test method execution.
-     * <p>
-     * Initializes mock objects for HTTP request and response, configures the response writer
-     * for capturing output, and sets up the necessary OBContext for database operations.
-     */
-    @Before
-    public void setUp() throws Exception {
-        setTestUserContext();
-
-        HttpServletRequest mockRequest = mock(HttpServletRequest.class);
-        HttpServletResponse mockResponse = mock(HttpServletResponse.class);
-
-        responseWriter = new StringWriter();
-        PrintWriter printWriter = new PrintWriter(responseWriter);
-        when(mockResponse.getWriter()).thenReturn(printWriter);
-
-        when(mockRequest.getPathInfo()).thenReturn("/meta/menu");
-
-        menuService = new MenuService(mockRequest, mockResponse);
+    @Override
+    protected String getServicePath() {
+        return "/meta/menu";
     }
 
-    /**
-     * Cleans up the test environment after each test method execution.
-     * <p>
-     * Restores the previous OBContext mode and clears any thread-local variables
-     * to prevent memory leaks and ensure test isolation.
-     */
-    @After
-    public void tearDown() {
-        OBContext.restorePreviousMode();
-        MetadataService.clear();
+    @Before
+    public void setUpMenuService() throws Exception {
+        menuService = new MenuService(mockRequest, mockResponse);
     }
 
     /**
@@ -138,25 +111,32 @@ public class MenuServiceTest extends OBBaseTest {
     public void testMenuProcessingErrorHandling() {
         try {
             HttpServletRequest invalidRequest = mock(HttpServletRequest.class);
-            HttpServletResponse invalidResponse = mock(HttpServletResponse.class);
-
-            when(invalidResponse.getWriter()).thenThrow(new IOException("Mock IO Exception"));
+            HttpServletResponse invalidResponse = createErrorResponseMock(MOCK_MENU_IO_EXCEPTION_MESSAGE);
             when(invalidRequest.getPathInfo()).thenReturn("/meta/menu");
 
             MenuService errorTestService = new MenuService(invalidRequest, invalidResponse);
 
-            boolean exceptionThrown = false;
-            try {
-                errorTestService.process();
-            } catch (IOException e) {
-                exceptionThrown = true;
-                assertNotNull("Exception message should be provided", e.getMessage());
-            }
-
-            assertTrue("IOException should be properly handled", exceptionThrown);
-
+            assertIOExceptionIsHandledForMenu(errorTestService);
         } catch (Exception e) {
             fail("Unexpected exception occurred: " + e.getMessage());
         }
+    }
+
+    /**
+     * Helper method to test IOException handling during menu processing.
+     * This method extracts the nested try-catch logic to improve code organization
+     * and maintainability.
+     *
+     * @param errorTestService The MenuService instance to test with error conditions
+     */
+    private void assertIOExceptionIsHandledForMenu(MenuService errorTestService) {
+        boolean exceptionThrown = false;
+        try {
+            errorTestService.process();
+        } catch (IOException e) {
+            exceptionThrown = true;
+            assertNotNull("Exception message should be provided", e.getMessage());
+        }
+        assertTrue("IOException should be properly handled", exceptionThrown);
     }
 }

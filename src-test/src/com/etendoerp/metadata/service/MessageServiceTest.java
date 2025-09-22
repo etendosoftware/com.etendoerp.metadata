@@ -5,18 +5,13 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 
-import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.codehaus.jettison.json.JSONObject;
-import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.openbravo.dal.core.OBContext;
-import org.openbravo.test.base.OBBaseTest;
 
 /**
  * Test class for {@link MessageService}.
@@ -28,43 +23,20 @@ import org.openbravo.test.base.OBBaseTest;
  *
  * @author Generated Test
  */
-public class MessageServiceTest extends OBBaseTest {
+public class MessageServiceTest extends BaseMetadataServiceTest {
+
+    private static final String MOCK_MESSAGE_IO_EXCEPTION = "Mock Message IO Exception";
 
     private MessageService messageService;
-    private HttpServletRequest mockRequest;
-    private HttpServletResponse mockResponse;
-    private StringWriter responseWriter;
 
-    /**
-     * Sets up the test environment before each test method execution.
-     * <p>
-     * Initializes mock objects for HTTP request and response, configures the response writer
-     * for capturing output, and sets up the necessary OBContext for database operations.
-     * Also configures mock request parameters for message service testing.
-     */
-    @Before
-    public void setUp() throws Exception {
-        setTestUserContext();
-        mockRequest = mock(HttpServletRequest.class);
-        mockResponse = mock(HttpServletResponse.class);
-        responseWriter = new StringWriter();
-        PrintWriter printWriter = new PrintWriter(responseWriter);
-        when(mockResponse.getWriter()).thenReturn(printWriter);
-        when(mockRequest.getPathInfo()).thenReturn("/meta/message");
-        when(mockRequest.getMethod()).thenReturn("GET");
-        messageService = new MessageService(mockRequest, mockResponse);
+    @Override
+    protected String getServicePath() {
+        return "/meta/message";
     }
 
-    /**
-     * Cleans up the test environment after each test method execution.
-     * <p>
-     * Restores the previous OBContext mode and clears any thread-local variables
-     * to prevent memory leaks and ensure proper test isolation between test methods.
-     */
-    @After
-    public void tearDown() {
-        OBContext.restorePreviousMode();
-        MetadataService.clear();
+    @Before
+    public void setUpMessageService() throws Exception {
+        messageService = new MessageService(mockRequest, mockResponse);
     }
 
     /**
@@ -206,24 +178,33 @@ public class MessageServiceTest extends OBBaseTest {
     @Test
     public void testMessageProcessingIOErrorHandling() {
         try {
-            HttpServletResponse errorResponse = mock(HttpServletResponse.class);
-            when(errorResponse.getWriter()).thenThrow(new IOException("Mock Message IO Exception"));
+            HttpServletResponse errorResponse = createErrorResponseMock(MOCK_MESSAGE_IO_EXCEPTION);
             MessageService errorService = new MessageService(mockRequest, errorResponse);
-            boolean exceptionThrown = false;
-            try {
-                errorService.process();
-            } catch (IOException e) {
-                exceptionThrown = true;
-                assertNotNull("Exception message should be provided", e.getMessage());
-                assertTrue("Exception should contain expected message",
-                        e.getMessage().contains("Mock Message IO Exception"));
-            }
 
-            assertTrue("IOException should be properly propagated", exceptionThrown);
-
+            assertIOExceptionIsHandledForMessage(errorService);
         } catch (Exception e) {
             fail("Unexpected exception occurred: " + e.getMessage());
         }
+    }
+
+    /**
+     * Helper method to test IOException handling during message processing.
+     * This method extracts the nested try-catch logic to improve code organization
+     * and maintainability.
+     *
+     * @param errorService The MessageService instance to test with error conditions
+     */
+    private void assertIOExceptionIsHandledForMessage(MessageService errorService) {
+        boolean exceptionThrown = false;
+        try {
+            errorService.process();
+        } catch (IOException e) {
+            exceptionThrown = true;
+            assertNotNull("Exception message should be provided", e.getMessage());
+            assertTrue("Exception should contain expected message",
+                    e.getMessage().contains(MOCK_MESSAGE_IO_EXCEPTION));
+        }
+        assertTrue("IOException should be properly propagated", exceptionThrown);
     }
 
     /**
