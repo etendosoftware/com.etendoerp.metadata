@@ -1,5 +1,6 @@
 package com.etendoerp.metadata.service;
 
+import static com.etendoerp.metadata.MetadataTestConstants.LEGACY_REQUEST_FAILED;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.when;
@@ -88,7 +89,7 @@ public class LegacyServiceTest extends BaseMetadataServiceTest {
         } catch (InternalServerException e) {
             // Expected to fail since we don't have actual servlet implementation
             assertTrue("Should contain legacy request message",
-                e.getMessage().contains("Failed to process legacy request"));
+                e.getMessage().contains(LEGACY_REQUEST_FAILED));
         }
     }
 
@@ -107,7 +108,7 @@ public class LegacyServiceTest extends BaseMetadataServiceTest {
             legacyService.process();
         } catch (InternalServerException e) {
             assertTrue("Should handle null path info",
-                e.getMessage().contains("Failed to process legacy request"));
+                e.getMessage().contains(LEGACY_REQUEST_FAILED));
         }
     }
 
@@ -126,7 +127,7 @@ public class LegacyServiceTest extends BaseMetadataServiceTest {
             legacyService.process();
         } catch (InternalServerException e) {
             assertTrue("Should handle non-legacy path",
-                e.getMessage().contains("Failed to process legacy request"));
+                e.getMessage().contains(LEGACY_REQUEST_FAILED));
         }
     }
 
@@ -144,7 +145,7 @@ public class LegacyServiceTest extends BaseMetadataServiceTest {
             legacyService.process();
         } catch (InternalServerException e) {
             assertTrue("Should handle empty legacy path",
-                e.getMessage().contains("Failed to process legacy request"));
+                e.getMessage().contains(LEGACY_REQUEST_FAILED));
         }
     }
 
@@ -162,7 +163,7 @@ public class LegacyServiceTest extends BaseMetadataServiceTest {
             legacyService.process();
         } catch (InternalServerException e) {
             assertTrue("Should handle legacy path with trailing slash",
-                e.getMessage().contains("Failed to process legacy request"));
+                e.getMessage().contains(LEGACY_REQUEST_FAILED));
         }
     }
 
@@ -181,7 +182,7 @@ public class LegacyServiceTest extends BaseMetadataServiceTest {
             legacyService.process();
         } catch (InternalServerException e) {
             assertTrue("Should handle complex nested legacy path",
-                e.getMessage().contains("Failed to process legacy request"));
+                e.getMessage().contains(LEGACY_REQUEST_FAILED));
         }
     }
 
@@ -202,7 +203,7 @@ public class LegacyServiceTest extends BaseMetadataServiceTest {
         } catch (InternalServerException e) {
             // This is expected - we're testing the wrapper creation logic
             assertTrue("Process should fail with expected message",
-                e.getMessage().contains("Failed to process legacy request"));
+                e.getMessage().contains(LEGACY_REQUEST_FAILED));
         }
     }
 
@@ -223,7 +224,7 @@ public class LegacyServiceTest extends BaseMetadataServiceTest {
         } catch (InternalServerException e) {
             // Expected behavior - testing URI transformation logic
             assertTrue("Should handle URI transformation",
-                e.getMessage().contains("Failed to process legacy request"));
+                e.getMessage().contains(LEGACY_REQUEST_FAILED));
         }
     }
 
@@ -255,7 +256,7 @@ public class LegacyServiceTest extends BaseMetadataServiceTest {
             } catch (InternalServerException e) {
                 // Expected - we're testing path processing logic
                 assertTrue("Should handle path: " + testPath,
-                    e.getMessage().contains("Failed to process legacy request"));
+                    e.getMessage().contains(LEGACY_REQUEST_FAILED));
             }
         }
     }

@@ -1,6 +1,14 @@
 package com.etendoerp.metadata.service;
 
-import static org.junit.Assert.*;
+import static com.etendoerp.metadata.MetadataTestConstants.SINGLETON_NOT_SET_ERROR;
+import static com.etendoerp.metadata.MetadataTestConstants.TAB_PATH;
+import static com.etendoerp.metadata.MetadataTestConstants.WELD_CONTAINER_NOT_INITIALIZED_ERROR;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -40,16 +48,15 @@ public class TabServiceTest extends BaseMetadataServiceTest {
      */
     @Override
     protected String getServicePath() {
-        return "/tab/" + VALID_TAB_ID;
+        return TAB_PATH + VALID_TAB_ID;
     }
 
     /**
      * Initializes the TabService instance used in the tests.
      *
-     * @throws Exception if initialization or dependency preparation fails
      */
     @Before
-    public void setUpTabService() throws Exception {
+    public void setUpTabService() {
         tabService = new TabService(mockRequest, mockResponse);
     }
 
@@ -76,7 +83,7 @@ public class TabServiceTest extends BaseMetadataServiceTest {
      */
     @Test
     public void testProcessTabWithValidId() throws IOException {
-        when(mockRequest.getPathInfo()).thenReturn("/tab/" + VALID_TAB_ID);
+        when(mockRequest.getPathInfo()).thenReturn(TAB_PATH + VALID_TAB_ID);
 
         try {
             tabService.process();
@@ -96,8 +103,8 @@ public class TabServiceTest extends BaseMetadataServiceTest {
             assertTrue("NotFoundException is expected for non-existent tabs", true);
         } catch (IllegalStateException e) {
             // This can occur when Weld container is not initialized (in unit test environment)
-            if (e.getMessage() != null && e.getMessage().contains("Singleton not set for STATIC_INSTANCE")) {
-                assertTrue("IllegalStateException due to Weld container not being initialized is expected in unit tests", true);
+            if (e.getMessage() != null && e.getMessage().contains(SINGLETON_NOT_SET_ERROR)) {
+                assertTrue(WELD_CONTAINER_NOT_INITIALIZED_ERROR, true);
             } else {
                 throw e;
             }
@@ -115,7 +122,7 @@ public class TabServiceTest extends BaseMetadataServiceTest {
      */
     @Test(expected = NotFoundException.class)
     public void testProcessTabWithInvalidId() throws IOException {
-        when(mockRequest.getPathInfo()).thenReturn("/tab/" + INVALID_TAB_ID);
+        when(mockRequest.getPathInfo()).thenReturn(TAB_PATH + INVALID_TAB_ID);
         tabService.process();
     }
 
@@ -173,17 +180,17 @@ public class TabServiceTest extends BaseMetadataServiceTest {
         assertEquals("Should extract tab ID from full path", VALID_TAB_ID, extractedId);
 
         // Test simple path
-        when(mockRequest.getPathInfo()).thenReturn("/tab/" + VALID_TAB_ID);
+        when(mockRequest.getPathInfo()).thenReturn(TAB_PATH + VALID_TAB_ID);
         extractedId = extractTabIdUsingReflection();
         assertEquals("Should extract tab ID from simple path", VALID_TAB_ID, extractedId);
 
         // Test path with query parameters
-        when(mockRequest.getPathInfo()).thenReturn("/tab/" + VALID_TAB_ID + "?param=value");
+        when(mockRequest.getPathInfo()).thenReturn(TAB_PATH + VALID_TAB_ID + "?param=value");
         extractedId = extractTabIdUsingReflection();
         assertEquals("Should extract tab ID ignoring query parameters", VALID_TAB_ID, extractedId);
 
         // Test path with trailing slash
-        when(mockRequest.getPathInfo()).thenReturn("/tab/" + VALID_TAB_ID + "/");
+        when(mockRequest.getPathInfo()).thenReturn(TAB_PATH + VALID_TAB_ID + "/");
         extractedId = extractTabIdUsingReflection();
         assertEquals("Should extract tab ID removing trailing slash", VALID_TAB_ID, extractedId);
     }
@@ -218,7 +225,7 @@ public class TabServiceTest extends BaseMetadataServiceTest {
      */
     @Test
     public void testProcessTabWithDifferentContext() throws IOException {
-        when(mockRequest.getPathInfo()).thenReturn("/tab/" + VALID_TAB_ID);
+        when(mockRequest.getPathInfo()).thenReturn(TAB_PATH + VALID_TAB_ID);
 
         try {
             tabService.process();
@@ -229,8 +236,8 @@ public class TabServiceTest extends BaseMetadataServiceTest {
             assertTrue("NotFoundException is expected for non-existent tabs", true);
         } catch (IllegalStateException e) {
             // This can occur when Weld container is not initialized (in unit test environment)
-            if (e.getMessage() != null && e.getMessage().contains("Singleton not set for STATIC_INSTANCE")) {
-                assertTrue("IllegalStateException due to Weld container not being initialized is expected in unit tests", true);
+            if (e.getMessage() != null && e.getMessage().contains(SINGLETON_NOT_SET_ERROR)) {
+                assertTrue(WELD_CONTAINER_NOT_INITIALIZED_ERROR, true);
             } else {
                 throw e;
             }
@@ -248,15 +255,15 @@ public class TabServiceTest extends BaseMetadataServiceTest {
         try {
             HttpServletRequest invalidRequest = mock(HttpServletRequest.class);
             HttpServletResponse invalidResponse = createErrorResponseMock(MOCK_TAB_IO_EXCEPTION_MESSAGE);
-            when(invalidRequest.getPathInfo()).thenReturn("/tab/" + VALID_TAB_ID);
+            when(invalidRequest.getPathInfo()).thenReturn(TAB_PATH + VALID_TAB_ID);
 
             TabService errorTestService = new TabService(invalidRequest, invalidResponse);
 
             assertIOExceptionIsHandledForTab(errorTestService);
         } catch (IllegalStateException e) {
             // Handle Weld container initialization issue in unit tests
-            if (e.getMessage() != null && e.getMessage().contains("Singleton not set for STATIC_INSTANCE")) {
-                assertTrue("IllegalStateException due to Weld container not being initialized is expected in unit tests", true);
+            if (e.getMessage() != null && e.getMessage().contains(SINGLETON_NOT_SET_ERROR)) {
+                assertTrue(WELD_CONTAINER_NOT_INITIALIZED_ERROR, true);
             } else {
                 fail("Unexpected IllegalStateException: " + e.getMessage());
             }
