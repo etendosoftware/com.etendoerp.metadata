@@ -161,6 +161,40 @@ public final class MetadataTestConstants {
   public static final String LANGUAGE_CONST = "language";
   public static final String SINGLE_LANGUAGE_ID = "single-language-id";
 
+  public static final String CURRENT_ROLE = "currentRole";
+  public static final String CURRENT_CLIENT = "currentClient";
+  public static final String CURRENT_ORGANIZATION = "currentOrganization";
+  public static final String CURRENT_WAREHOUSE = "currentWarehouse";
+  public static final String ROLES = "roles";
+  public static final String DATABASE_ERROR = "Database error";
+  public static final String WAREHOUSES = "warehouses";
+  public static final String TOOLBAR1_ID = "toolbar1-id";
+  public static final String TEST_TOOLBAR_1 = "Test Toolbar 1";
+  public static final String RESPONSE = "response";
+  public static final String START_ROW = "startRow";
+  public static final String END_ROW = "endRow";
+  public static final String TOTAL_ROWS = "totalRows";
+  public static final String STATUS = "status";
+  public static final String CLIENT = "client";
+  public static final String ORGANIZATION = "organization";
+  public static final String ORGANIZATIONS = "organizations";
+  public static final String ACTIVE = "active";
+  public static final String SEQNO = "seqno";
+  public static final String DESCRIPTION = "description";
+  public static final String ETMETA_ACTION_HANDLER = "etmetaActionHandler";
+  public static final String NAME_KEY = "nameKey";
+  public static final String ACTION = "action";
+  public static final String BUTTON_TYPE = "buttonType";
+  public static final String SECTION = "section";
+  public static final String MODULE = "module";
+
+  public static final String WELD_CONTAINER_NOT_INITIALIZED_ERROR = "IllegalStateException due to Weld container not being initialized is expected in unit tests";
+  public static final String SINGLETON_NOT_SET_ERROR = "Singleton not set for STATIC_INSTANCE";
+  public static final String TAB_PATH = "/tab/";
+  public static final String LEGACY_REQUEST_FAILED = "Failed to process legacy request";
+  public static final String ENTITY_NAME_PROPERTY = "entityName";
+  public static final String IDENTIFIER_PROPERTY = "identifier";
+
   /**
    * Private constructor to prevent instantiation of this utility class.
    * This class is not meant to be instantiated, as it only contains static constants.
