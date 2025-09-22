@@ -195,30 +195,14 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             handleRecordIdentifier(wrappedRequest);
             handleRequestContext(res, wrappedRequest);
 
-            String targetPath = null;
-            String pathInfo = req.getPathInfo();
-
-            if (pathInfo != null && pathInfo.endsWith(HTML_EXTENSION)) {
-                if (servletDir != null) {
-                    targetPath = servletDir + pathInfo;
-                } else {
-                    targetPath = extractTargetPathFromReferer(req.getHeader("Referer"));
-                    if (targetPath == null) {
-                        targetPath = pathInfo;
-                    }
-                }
-            }
-
-            if (targetPath == null) {
-                targetPath = extractTargetPathFromReferer(req.getHeader("Referer"));
-            }
+            String targetPath = extractTargetPath(req, servletDir);
 
             if (targetPath != null) {
                 log4j.debug("Forwarding follow-up request to: {}", targetPath);
                 wrappedRequest.getRequestDispatcher(targetPath).forward(wrappedRequest, res);
             } else {
                 log4j.error("Could not determine target path for follow-up request. PathInfo: {}, ServletDir: {}",
-                        pathInfo, servletDir);
+                        req.getPathInfo(), servletDir);
                 res.sendError(HttpServletResponse.SC_BAD_REQUEST, "Could not determine target servlet");
             }
 
@@ -226,6 +210,19 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             log4j.error("Error processing legacy follow-up request: {}", e.getMessage(), e);
             res.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Error processing follow-up request");
         }
+    }
+
+    private String extractTargetPath(HttpServletRequest req, String servletDir) {
+        String pathInfo = req.getPathInfo();
+        if (pathInfo != null && pathInfo.endsWith(HTML_EXTENSION)) {
+            if (servletDir != null) {
+                return servletDir + pathInfo;
+            } else {
+                String refererTargetPath = extractTargetPathFromReferer(req.getHeader("Referer"));
+                return (refererTargetPath != null) ? refererTargetPath : pathInfo;
+            }
+        }
+        return extractTargetPathFromReferer(req.getHeader("Referer"));
     }
 
     private String extractTargetPathFromReferer(String referer) {
