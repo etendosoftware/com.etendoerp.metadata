@@ -161,7 +161,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
     private void processLegacyFollowupRequest(HttpServletRequest req, HttpServletResponse res)
             throws IOException {
 
-        String token = (String) req.getSession(false).getAttribute("LEGACY_TOKEN");
+        String token = (String) (req.getSession(false) != null ? req.getSession(false).getAttribute("LEGACY_TOKEN") : null);
         String servletDir = (String) req.getSession(false).getAttribute("LEGACY_SERVLET_DIR");
 
         if (token == null) {

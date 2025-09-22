@@ -30,7 +30,7 @@ import static com.etendoerp.metadata.utils.Constants.*;
 public class ServiceFactory {
 
     public static MetadataService getService(final HttpServletRequest req, final HttpServletResponse res) {
-        final String path = req.getPathInfo().replace("/com.etendoerp.metadata.meta/", "/");
+        final String path = req.getPathInfo() != null ? req.getPathInfo().replace("/com.etendoerp.metadata.meta/", "/") : "";
 
         if (path.equals(SESSION_PATH)) {
             return new SessionService(req, res);
