@@ -1,9 +1,27 @@
 package com.etendoerp.metadata.builders;
 
+import static com.etendoerp.metadata.MetadataTestConstants.ACTION;
+import static com.etendoerp.metadata.MetadataTestConstants.ACTIVE;
+import static com.etendoerp.metadata.MetadataTestConstants.BUTTON_TYPE;
+import static com.etendoerp.metadata.MetadataTestConstants.CLIENT;
 import static com.etendoerp.metadata.MetadataTestConstants.CLIENT_ID;
+import static com.etendoerp.metadata.MetadataTestConstants.DESCRIPTION;
+import static com.etendoerp.metadata.MetadataTestConstants.END_ROW;
+import static com.etendoerp.metadata.MetadataTestConstants.ETMETA_ACTION_HANDLER;
 import static com.etendoerp.metadata.MetadataTestConstants.LANGUAGE_CODE;
+import static com.etendoerp.metadata.MetadataTestConstants.MODULE;
+import static com.etendoerp.metadata.MetadataTestConstants.NAME_KEY;
+import static com.etendoerp.metadata.MetadataTestConstants.ORGANIZATION;
 import static com.etendoerp.metadata.MetadataTestConstants.ORG_ID;
+import static com.etendoerp.metadata.MetadataTestConstants.RESPONSE;
+import static com.etendoerp.metadata.MetadataTestConstants.SECTION;
+import static com.etendoerp.metadata.MetadataTestConstants.SEQNO;
+import static com.etendoerp.metadata.MetadataTestConstants.START_ROW;
+import static com.etendoerp.metadata.MetadataTestConstants.STATUS;
 import static com.etendoerp.metadata.MetadataTestConstants.TEST_DATE;
+import static com.etendoerp.metadata.MetadataTestConstants.TEST_TOOLBAR_1;
+import static com.etendoerp.metadata.MetadataTestConstants.TOOLBAR1_ID;
+import static com.etendoerp.metadata.MetadataTestConstants.TOTAL_ROWS;
 import static com.etendoerp.metadata.MetadataTestConstants.USER_ID;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -91,7 +109,7 @@ class ToolbarBuilderTest {
     when(language.getLanguage()).thenReturn(LANGUAGE_CODE);
 
     // Setup toolbar1 mock
-    when(toolbar1.getId()).thenReturn("toolbar1-id");
+    when(toolbar1.getId()).thenReturn(TOOLBAR1_ID);
     when(toolbar1.getClient()).thenReturn(client);
     when(toolbar1.getOrganization()).thenReturn(organization);
     when(toolbar1.isActive()).thenReturn(true);
@@ -101,7 +119,7 @@ class ToolbarBuilderTest {
     when(toolbar1.getUpdatedBy()).thenReturn(user);
     when(toolbar1.getIdentifier()).thenReturn("toolbar1-identifier");
     when(toolbar1.getEntityName()).thenReturn("Toolbar1");
-    when(toolbar1.getName()).thenReturn("Test Toolbar 1");
+    when(toolbar1.getName()).thenReturn(TEST_TOOLBAR_1);
     when(toolbar1.getIcon()).thenReturn("icon1.png");
     when(toolbar1.getSeqno()).thenReturn(10L);
     when(toolbar1.getDescription()).thenReturn("Test toolbar description 1");
@@ -168,60 +186,60 @@ class ToolbarBuilderTest {
       JSONObject result = toolbarBuilder.toJSON();
 
       assertNotNull(result);
-      assertTrue(result.has("response"));
+      assertTrue(result.has(RESPONSE));
 
-      JSONObject response = result.getJSONObject("response");
+      JSONObject response = result.getJSONObject(RESPONSE);
       assertTrue(response.has("data"));
-      assertTrue(response.has("startRow"));
-      assertTrue(response.has("endRow"));
-      assertTrue(response.has("totalRows"));
-      assertTrue(response.has("status"));
+      assertTrue(response.has(START_ROW));
+      assertTrue(response.has(END_ROW));
+      assertTrue(response.has(TOTAL_ROWS));
+      assertTrue(response.has(STATUS));
 
-      assertEquals(0, response.getInt("startRow"));
-      assertEquals(1, response.getInt("endRow"));
-      assertEquals(2, response.getInt("totalRows"));
-      assertEquals(0, response.getInt("status"));
+      assertEquals(0, response.getInt(START_ROW));
+      assertEquals(1, response.getInt(END_ROW));
+      assertEquals(2, response.getInt(TOTAL_ROWS));
+      assertEquals(0, response.getInt(STATUS));
 
       JSONArray data = response.getJSONArray("data");
       assertEquals(2, data.length());
 
       // Verify first toolbar
       JSONObject toolbar1Json = data.getJSONObject(0);
-      assertEquals("toolbar1-id", toolbar1Json.getString("id"));
-      assertEquals(CLIENT_ID, toolbar1Json.getString("client"));
-      assertEquals(ORG_ID, toolbar1Json.getString("organization"));
-      assertTrue(toolbar1Json.getBoolean("active"));
+      assertEquals(TOOLBAR1_ID, toolbar1Json.getString("id"));
+      assertEquals(CLIENT_ID, toolbar1Json.getString(CLIENT));
+      assertEquals(ORG_ID, toolbar1Json.getString(ORGANIZATION));
+      assertTrue(toolbar1Json.getBoolean(ACTIVE));
       assertEquals("toolbar1-identifier", toolbar1Json.getString("identifier"));
       assertEquals("Toolbar1", toolbar1Json.getString("entityName"));
-      assertEquals("Test Toolbar 1", toolbar1Json.getString("name"));
+      assertEquals(TEST_TOOLBAR_1, toolbar1Json.getString("name"));
       assertEquals("icon1.png", toolbar1Json.getString("icon"));
-      assertEquals(10, toolbar1Json.getLong("seqno"));
-      assertEquals("Test toolbar description 1", toolbar1Json.getString("description"));
-      assertEquals("actionHandler1", toolbar1Json.getString("etmetaActionHandler"));
-      assertEquals("toolbar1.name", toolbar1Json.getString("nameKey"));
-      assertEquals("action1", toolbar1Json.getString("action"));
-      assertEquals("button", toolbar1Json.getString("buttonType"));
-      assertEquals("section1", toolbar1Json.getString("section"));
-      assertEquals("module-id", toolbar1Json.getString("module"));
+      assertEquals(10, toolbar1Json.getLong(SEQNO));
+      assertEquals("Test toolbar description 1", toolbar1Json.getString(DESCRIPTION));
+      assertEquals("actionHandler1", toolbar1Json.getString(ETMETA_ACTION_HANDLER));
+      assertEquals("toolbar1.name", toolbar1Json.getString(NAME_KEY));
+      assertEquals("action1", toolbar1Json.getString(ACTION));
+      assertEquals("button", toolbar1Json.getString(BUTTON_TYPE));
+      assertEquals("section1", toolbar1Json.getString(SECTION));
+      assertEquals("module-id", toolbar1Json.getString(MODULE));
 
       // Verify second toolbar
       JSONObject toolbar2Json = data.getJSONObject(1);
       assertEquals("toolbar2-id", toolbar2Json.getString("id"));
-      assertEquals(CLIENT_ID, toolbar2Json.getString("client"));
-      assertEquals(ORG_ID, toolbar2Json.getString("organization"));
-      assertEquals(false, toolbar2Json.getBoolean("active"));
+      assertEquals(CLIENT_ID, toolbar2Json.getString(CLIENT));
+      assertEquals(ORG_ID, toolbar2Json.getString(ORGANIZATION));
+      assertEquals(false, toolbar2Json.getBoolean(ACTIVE));
       assertEquals("toolbar2-identifier", toolbar2Json.getString("identifier"));
       assertEquals("Toolbar2", toolbar2Json.getString("entityName"));
       assertEquals("Test Toolbar 2", toolbar2Json.getString("name"));
       assertEquals("icon2.png", toolbar2Json.getString("icon"));
-      assertEquals(20, toolbar2Json.getLong("seqno"));
-      assertEquals("Test toolbar description 2", toolbar2Json.getString("description"));
-      assertEquals("actionHandler2", toolbar2Json.getString("etmetaActionHandler"));
-      assertTrue(toolbar2Json.isNull("nameKey"));
-      assertEquals("action2", toolbar2Json.getString("action"));
-      assertEquals("link", toolbar2Json.getString("buttonType"));
-      assertEquals("section2", toolbar2Json.getString("section"));
-      assertTrue(toolbar2Json.isNull("module"));
+      assertEquals(20, toolbar2Json.getLong(SEQNO));
+      assertEquals("Test toolbar description 2", toolbar2Json.getString(DESCRIPTION));
+      assertEquals("actionHandler2", toolbar2Json.getString(ETMETA_ACTION_HANDLER));
+      assertTrue(toolbar2Json.isNull(NAME_KEY));
+      assertEquals("action2", toolbar2Json.getString(ACTION));
+      assertEquals("link", toolbar2Json.getString(BUTTON_TYPE));
+      assertEquals("section2", toolbar2Json.getString(SECTION));
+      assertTrue(toolbar2Json.isNull(MODULE));
     }
   }
 
@@ -249,13 +267,13 @@ class ToolbarBuilderTest {
       JSONObject result = toolbarBuilder.toJSON();
 
       assertNotNull(result);
-      assertTrue(result.has("response"));
+      assertTrue(result.has(RESPONSE));
 
-      JSONObject response = result.getJSONObject("response");
-      assertEquals(0, response.getInt("startRow"));
-      assertEquals(-1, response.getInt("endRow"));
-      assertEquals(0, response.getInt("totalRows"));
-      assertEquals(0, response.getInt("status"));
+      JSONObject response = result.getJSONObject(RESPONSE);
+      assertEquals(0, response.getInt(START_ROW));
+      assertEquals(-1, response.getInt(END_ROW));
+      assertEquals(0, response.getInt(TOTAL_ROWS));
+      assertEquals(0, response.getInt(STATUS));
 
       JSONArray data = response.getJSONArray("data");
       assertEquals(0, data.length());
@@ -284,20 +302,20 @@ class ToolbarBuilderTest {
       JSONObject result = toolbarBuilder.toJSON();
 
       assertNotNull(result);
-      assertTrue(result.has("response"));
+      assertTrue(result.has(RESPONSE));
 
-      JSONObject response = result.getJSONObject("response");
-      assertEquals(0, response.getInt("startRow"));
-      assertEquals(0, response.getInt("endRow"));
-      assertEquals(1, response.getInt("totalRows"));
-      assertEquals(0, response.getInt("status"));
+      JSONObject response = result.getJSONObject(RESPONSE);
+      assertEquals(0, response.getInt(START_ROW));
+      assertEquals(0, response.getInt(END_ROW));
+      assertEquals(1, response.getInt(TOTAL_ROWS));
+      assertEquals(0, response.getInt(STATUS));
 
       JSONArray data = response.getJSONArray("data");
       assertEquals(1, data.length());
 
       JSONObject toolbarJson = data.getJSONObject(0);
-      assertEquals("toolbar1-id", toolbarJson.getString("id"));
-      assertEquals("Test Toolbar 1", toolbarJson.getString("name"));
+      assertEquals(TOOLBAR1_ID, toolbarJson.getString("id"));
+      assertEquals(TEST_TOOLBAR_1, toolbarJson.getString("name"));
     }
   }
 
@@ -323,11 +341,11 @@ class ToolbarBuilderTest {
       JSONObject result = toolbarBuilder.toJSON();
 
       assertNotNull(result);
-      JSONObject response = result.getJSONObject("response");
+      JSONObject response = result.getJSONObject(RESPONSE);
       JSONArray data = response.getJSONArray("data");
       JSONObject toolbarJson = data.getJSONObject(0);
 
-      assertTrue(toolbarJson.isNull("module"));
+      assertTrue(toolbarJson.isNull(MODULE));
     }
   }
 
@@ -364,15 +382,15 @@ class ToolbarBuilderTest {
       ToolbarBuilder toolbarBuilder = new ToolbarBuilder();
       JSONObject result = toolbarBuilder.toJSON();
 
-      JSONObject response = result.getJSONObject("response");
+      JSONObject response = result.getJSONObject(RESPONSE);
       JSONArray data = response.getJSONArray("data");
       JSONObject toolbarJson = data.getJSONObject(0);
 
       // Verify all expected properties are present
       assertTrue(toolbarJson.has("id"));
-      assertTrue(toolbarJson.has("client"));
-      assertTrue(toolbarJson.has("organization"));
-      assertTrue(toolbarJson.has("active"));
+      assertTrue(toolbarJson.has(CLIENT));
+      assertTrue(toolbarJson.has(ORGANIZATION));
+      assertTrue(toolbarJson.has(ACTIVE));
       assertTrue(toolbarJson.has("creationDate"));
       assertTrue(toolbarJson.has("createdBy"));
       assertTrue(toolbarJson.has("updated"));
@@ -381,14 +399,14 @@ class ToolbarBuilderTest {
       assertTrue(toolbarJson.has("entityName"));
       assertTrue(toolbarJson.has("name"));
       assertTrue(toolbarJson.has("icon"));
-      assertTrue(toolbarJson.has("seqno"));
-      assertTrue(toolbarJson.has("description"));
-      assertTrue(toolbarJson.has("etmetaActionHandler"));
-      assertTrue(toolbarJson.has("nameKey"));
-      assertTrue(toolbarJson.has("action"));
-      assertTrue(toolbarJson.has("buttonType"));
-      assertTrue(toolbarJson.has("section"));
-      assertTrue(toolbarJson.has("module"));
+      assertTrue(toolbarJson.has(SEQNO));
+      assertTrue(toolbarJson.has(DESCRIPTION));
+      assertTrue(toolbarJson.has(ETMETA_ACTION_HANDLER));
+      assertTrue(toolbarJson.has(NAME_KEY));
+      assertTrue(toolbarJson.has(ACTION));
+      assertTrue(toolbarJson.has(BUTTON_TYPE));
+      assertTrue(toolbarJson.has(SECTION));
+      assertTrue(toolbarJson.has(MODULE));
 
       // Verify date fields are converted to strings
       assertEquals(TEST_DATE.toString(), toolbarJson.getString("creationDate"));
@@ -417,21 +435,21 @@ class ToolbarBuilderTest {
       ToolbarBuilder toolbarBuilder = new ToolbarBuilder();
       JSONObject result = toolbarBuilder.toJSON();
 
-      assertTrue(result.has("response"));
-      JSONObject response = result.getJSONObject("response");
+      assertTrue(result.has(RESPONSE));
+      JSONObject response = result.getJSONObject(RESPONSE);
 
       // Verify response structure
       assertTrue(response.has("data"));
-      assertTrue(response.has("startRow"));
-      assertTrue(response.has("endRow"));
-      assertTrue(response.has("totalRows"));
-      assertTrue(response.has("status"));
+      assertTrue(response.has(START_ROW));
+      assertTrue(response.has(END_ROW));
+      assertTrue(response.has(TOTAL_ROWS));
+      assertTrue(response.has(STATUS));
 
       // Verify response values
-      assertEquals(0, response.getInt("startRow"));
-      assertEquals(1, response.getInt("endRow")); // length - 1
-      assertEquals(2, response.getInt("totalRows"));
-      assertEquals(0, response.getInt("status"));
+      assertEquals(0, response.getInt(START_ROW));
+      assertEquals(1, response.getInt(END_ROW)); // length - 1
+      assertEquals(2, response.getInt(TOTAL_ROWS));
+      assertEquals(0, response.getInt(STATUS));
 
       // Verify data is an array
       assertTrue(response.get("data") instanceof JSONArray);

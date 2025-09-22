@@ -1,10 +1,18 @@
 package com.etendoerp.metadata.builders;
 
 import static com.etendoerp.metadata.MetadataTestConstants.CLIENT_ID;
+import static com.etendoerp.metadata.MetadataTestConstants.CURRENT_CLIENT;
+import static com.etendoerp.metadata.MetadataTestConstants.CURRENT_ORGANIZATION;
+import static com.etendoerp.metadata.MetadataTestConstants.CURRENT_ROLE;
+import static com.etendoerp.metadata.MetadataTestConstants.CURRENT_WAREHOUSE;
+import static com.etendoerp.metadata.MetadataTestConstants.DATABASE_ERROR;
 import static com.etendoerp.metadata.MetadataTestConstants.LANGUAGE_CODE;
+import static com.etendoerp.metadata.MetadataTestConstants.ORGANIZATIONS;
 import static com.etendoerp.metadata.MetadataTestConstants.ORG_ID;
+import static com.etendoerp.metadata.MetadataTestConstants.ROLES;
 import static com.etendoerp.metadata.MetadataTestConstants.ROLE_ID;
 import static com.etendoerp.metadata.MetadataTestConstants.USER_ID;
+import static com.etendoerp.metadata.MetadataTestConstants.WAREHOUSES;
 import static com.etendoerp.metadata.MetadataTestConstants.WAREHOUSE_ID;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -212,20 +220,20 @@ class SessionBuilderTest {
 
       assertNotNull(result);
       assertTrue(result.has("user"));
-      assertTrue(result.has("currentRole"));
-      assertTrue(result.has("currentClient"));
-      assertTrue(result.has("currentOrganization"));
-      assertTrue(result.has("currentWarehouse"));
-      assertTrue(result.has("roles"));
+      assertTrue(result.has(CURRENT_ROLE));
+      assertTrue(result.has(CURRENT_CLIENT));
+      assertTrue(result.has(CURRENT_ORGANIZATION));
+      assertTrue(result.has(CURRENT_WAREHOUSE));
+      assertTrue(result.has(ROLES));
       assertTrue(result.has("languages"));
 
       assertEquals(USER_ID, result.getJSONObject("user").getString("id"));
-      assertEquals(ROLE_ID, result.getJSONObject("currentRole").getString("id"));
-      assertEquals(CLIENT_ID, result.getJSONObject("currentClient").getString("id"));
-      assertEquals(ORG_ID, result.getJSONObject("currentOrganization").getString("id"));
-      assertEquals(WAREHOUSE_ID, result.getJSONObject("currentWarehouse").getString("id"));
+      assertEquals(ROLE_ID, result.getJSONObject(CURRENT_ROLE).getString("id"));
+      assertEquals(CLIENT_ID, result.getJSONObject(CURRENT_CLIENT).getString("id"));
+      assertEquals(ORG_ID, result.getJSONObject(CURRENT_ORGANIZATION).getString("id"));
+      assertEquals(WAREHOUSE_ID, result.getJSONObject(CURRENT_WAREHOUSE).getString("id"));
 
-      JSONArray roles = result.getJSONArray("roles");
+      JSONArray roles = result.getJSONArray(ROLES);
       assertEquals(2, roles.length());
     }
   }
@@ -252,7 +260,7 @@ class SessionBuilderTest {
       JSONObject result = sessionBuilder.toJSON();
 
       assertNotNull(result);
-      JSONArray roles = result.getJSONArray("roles");
+      JSONArray roles = result.getJSONArray(ROLES);
       assertEquals(0, roles.length());
     }
   }
@@ -279,11 +287,11 @@ class SessionBuilderTest {
 
       assertNotNull(result);
       assertTrue(result.has("user"));
-      assertTrue(result.has("currentRole"));
-      assertTrue(result.has("currentClient"));
-      assertTrue(result.has("currentOrganization"));
-      assertTrue(result.has("currentWarehouse"));
-      assertTrue(result.has("roles"));
+      assertTrue(result.has(CURRENT_ROLE));
+      assertTrue(result.has(CURRENT_CLIENT));
+      assertTrue(result.has(CURRENT_ORGANIZATION));
+      assertTrue(result.has(CURRENT_WAREHOUSE));
+      assertTrue(result.has(ROLES));
       assertTrue(result.has("languages"));
     }
   }
@@ -295,7 +303,7 @@ class SessionBuilderTest {
    */
   @Test
   void testGetRolesHandlesExceptionGracefully() throws JSONException {
-    when(user.getADUserRolesList()).thenThrow(new RuntimeException("Database error"));
+    when(user.getADUserRolesList()).thenThrow(new RuntimeException(DATABASE_ERROR));
 
     try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
          MockedStatic<Utils> utilsStatic = mockStatic(Utils.class)) {
@@ -307,7 +315,7 @@ class SessionBuilderTest {
       JSONObject result = sessionBuilder.toJSON();
 
       assertNotNull(result);
-      JSONArray roles = result.getJSONArray("roles");
+      JSONArray roles = result.getJSONArray(ROLES);
       assertEquals(0, roles.length());
     }
   }
@@ -320,7 +328,7 @@ class SessionBuilderTest {
    */
   @Test
   void testGetOrganizationsHandlesExceptionGracefully() throws JSONException {
-    when(role1.getADRoleOrganizationList()).thenThrow(new RuntimeException("Database error"));
+    when(role1.getADRoleOrganizationList()).thenThrow(new RuntimeException(DATABASE_ERROR));
 
     try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
          MockedStatic<Utils> utilsStatic = mockStatic(Utils.class)) {
@@ -332,14 +340,14 @@ class SessionBuilderTest {
       JSONObject result = sessionBuilder.toJSON();
 
       assertNotNull(result);
-      JSONArray roles = result.getJSONArray("roles");
+      JSONArray roles = result.getJSONArray(ROLES);
       assertEquals(2, roles.length());
 
       // The role with exception should have empty organizations array
       boolean foundRoleWithEmptyOrgs = false;
       for (int i = 0; i < roles.length(); i++) {
         JSONObject roleObj = roles.getJSONObject(i);
-        if (roleObj.has("organizations") && roleObj.getJSONArray("organizations").length() == 0) {
+        if (roleObj.has(ORGANIZATIONS) && roleObj.getJSONArray(ORGANIZATIONS).length() == 0) {
           foundRoleWithEmptyOrgs = true;
           break;
         }
@@ -356,7 +364,7 @@ class SessionBuilderTest {
    */
   @Test
   void testGetWarehousesHandlesExceptionGracefully() throws JSONException {
-    when(org1.getOrganizationWarehouseList()).thenThrow(new RuntimeException("Database error"));
+    when(org1.getOrganizationWarehouseList()).thenThrow(new RuntimeException(DATABASE_ERROR));
 
     try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
          MockedStatic<Utils> utilsStatic = mockStatic(Utils.class)) {
@@ -368,17 +376,17 @@ class SessionBuilderTest {
       JSONObject result = sessionBuilder.toJSON();
 
       assertNotNull(result);
-      JSONArray roles = result.getJSONArray("roles");
+      JSONArray roles = result.getJSONArray(ROLES);
       assertEquals(2, roles.length());
 
       // Find the role with organization that has error and verify it has empty warehouses
       boolean foundOrgWithEmptyWarehouses = false;
       for (int i = 0; i < roles.length(); i++) {
         JSONObject roleObj = roles.getJSONObject(i);
-        JSONArray orgs = roleObj.getJSONArray("organizations");
+        JSONArray orgs = roleObj.getJSONArray(ORGANIZATIONS);
         for (int j = 0; j < orgs.length(); j++) {
           JSONObject orgObj = orgs.getJSONObject(j);
-          if (orgObj.has("warehouses") && orgObj.getJSONArray("warehouses").length() == 0) {
+          if (orgObj.has(WAREHOUSES) && orgObj.getJSONArray(WAREHOUSES).length() == 0) {
             foundOrgWithEmptyWarehouses = true;
             break;
           }
@@ -418,24 +426,24 @@ class SessionBuilderTest {
       SessionBuilder sessionBuilder = new SessionBuilder();
       JSONObject result = sessionBuilder.toJSON();
 
-      JSONArray roles = result.getJSONArray("roles");
+      JSONArray roles = result.getJSONArray(ROLES);
       assertEquals(2, roles.length());
 
       for (int i = 0; i < roles.length(); i++) {
         JSONObject roleObj = roles.getJSONObject(i);
         assertTrue(roleObj.has("id"));
         assertTrue(roleObj.has("name"));
-        assertTrue(roleObj.has("organizations"));
+        assertTrue(roleObj.has(ORGANIZATIONS));
         assertTrue(roleObj.has("client"));
 
-        JSONArray orgs = roleObj.getJSONArray("organizations");
+        JSONArray orgs = roleObj.getJSONArray(ORGANIZATIONS);
         for (int j = 0; j < orgs.length(); j++) {
           JSONObject orgObj = orgs.getJSONObject(j);
           assertTrue(orgObj.has("id"));
           assertTrue(orgObj.has("name"));
-          assertTrue(orgObj.has("warehouses"));
+          assertTrue(orgObj.has(WAREHOUSES));
 
-          JSONArray warehouses = orgObj.getJSONArray("warehouses");
+          JSONArray warehouses = orgObj.getJSONArray(WAREHOUSES);
           for (int k = 0; k < warehouses.length(); k++) {
             JSONObject warehouseObj = warehouses.getJSONObject(k);
             assertTrue(warehouseObj.has("id"));

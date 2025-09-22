@@ -1,5 +1,6 @@
 package com.etendoerp.metadata.service;
 
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -55,9 +56,9 @@ public abstract class BaseMetadataServiceTest extends OBBaseTest {
 
         responseWriter = new StringWriter();
         PrintWriter printWriter = new PrintWriter(responseWriter);
-        when(mockResponse.getWriter()).thenReturn(printWriter);
-        when(mockRequest.getMethod()).thenReturn("GET");
-        when(mockRequest.getPathInfo()).thenReturn(getServicePath());
+        lenient().when(mockResponse.getWriter()).thenReturn(printWriter);
+        lenient().when(mockRequest.getMethod()).thenReturn("GET");
+        lenient().when(mockRequest.getPathInfo()).thenReturn(getServicePath());
     }
 
     /**
