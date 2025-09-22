@@ -23,19 +23,18 @@ import org.openbravo.dal.core.OBContext;
  * @author Generated Test
  */
 public class LanguageServiceTest extends BaseMetadataServiceTest {
-
+    private static final String ENGLISH_META_PATH = "/meta/language/en_US";
     private static final String MOCK_LANGUAGE_IO_EXCEPTION_MESSAGE = "Mock IO Exception";
-
     private LanguageService languageService;
 
     @Override
     protected String getServicePath() {
-        return "/meta/language/en_US";
+        return ENGLISH_META_PATH;
     }
 
     @Before
     public void setUpLanguageService() throws Exception {
-        when(mockRequest.getPathInfo()).thenReturn("/meta/language/en_US");
+        when(mockRequest.getPathInfo()).thenReturn(ENGLISH_META_PATH);
         languageService = new LanguageService(mockRequest, mockResponse);
     }
 
@@ -195,7 +194,7 @@ public class LanguageServiceTest extends BaseMetadataServiceTest {
     @Test
     public void testLanguagePathExtraction() throws IOException {
         String[] testPaths = {
-                "/meta/language/en_US",
+                ENGLISH_META_PATH,
                 "/meta/language/es_ES",
                 "/meta/language/fr_FR",
                 "/meta/language/de_DE"
