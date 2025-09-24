@@ -99,7 +99,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             HttpSession session = req.getSession(true);
 
             // Enviar cookie JSESSIONID al frontend con configuración cross-origin
-            //setSessionCookie(res, session.getId());
+            setSessionCookie(res, session.getId());
 
             if (isLegacyRequest(path)) {
                 processLegacyRequest(req, res, path);
