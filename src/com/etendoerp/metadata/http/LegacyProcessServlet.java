@@ -8,7 +8,9 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.openbravo.base.exception.OBException;
+import org.openbravo.base.provider.OBConfigFileProvider;
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
+import org.openbravo.base.session.OBPropertiesProvider;
 import org.openbravo.client.kernel.RequestContext;
 import org.openbravo.dal.core.OBContext;
 
@@ -54,22 +56,38 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
                     "}}</script>";
 
     private void setSessionCookie(HttpServletResponse res, String sessionId) {
+        String host = OBPropertiesProvider.getInstance()
+                .getOpenbravoProperties()
+                .getProperty("CLASSIC_URL");
+
+        // Fallback por si CLASSIC_URL no está configurada
+        if (StringUtils.isEmpty(host)) {
+            host = "localhost";
+        }
+
+        // Extraer solo el hostname (sin puerto ni protocolo)
+        if (host.contains("://")) host = host.split("://")[1];
+        if (host.contains("/")) host = host.split("/")[0];
+        if (host.contains(":")) host = host.split(":")[0];
+
         Cookie cookie = new Cookie("JSESSIONID", sessionId);
-
-        // Dominio compartido
-        cookie.setDomain("localhost"); // Muy importante: no pongas el puerto acá
         cookie.setPath("/");
+        cookie.setHttpOnly(true); // Evitar acceso por JS
 
-        // Requerido para compartir cookies entre distintos puertos/dominos
-        cookie.setSecure(true); // HTTPS obligatorio cuando SameSite=None
-        cookie.setHttpOnly(true); // La cookie no es accesible por JS
-        cookie.setMaxAge(-1); // Sesión: se elimina al cerrar el browser
+        // Detectar si estamos en producción (HTTPS obligatorio para SameSite=None)
+        boolean isProduction = !host.equalsIgnoreCase("localhost") && !host.startsWith("127.");
+        cookie.setSecure(isProduction);
 
-        // SameSite=None no está en el API de Cookie, así que se agrega manualmente
+        // Agregar SameSite=None para cross-domain
         res.setHeader("Set-Cookie",
-                    String.format("JSESSIONID=%s; Path=/; Domain=localhost; HttpOnly; Secure; SameSite=None", sessionId)
+                String.format("JSESSIONID=%s; Path=/; Domain=%s; HttpOnly; %s; SameSite=None",
+                        sessionId,
+                        host,
+                        isProduction ? "Secure" : ""
+                )
         );
     }
+
     @Override
     public void service(HttpServletRequest req, HttpServletResponse res)
             throws IOException, ServletException {
@@ -80,7 +98,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             HttpSession session = req.getSession(true);
 
             // Enviar cookie JSESSIONID al frontend con configuración cross-origin
-            setSessionCookie(res, session.getId());
+            //setSessionCookie(res, session.getId());
 
             if (isLegacyRequest(path)) {
                 processLegacyRequest(req, res, path);
