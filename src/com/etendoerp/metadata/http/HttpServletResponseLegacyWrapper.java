@@ -39,6 +39,9 @@ package com.etendoerp.metadata.http;
    private PrintWriter writer;
    private boolean outputStreamUsed = false;
    private boolean writerUsed = false;
+   private String redirectLocation = null;
+   private boolean redirected = false;
+
 
    /**
     * Constructs a new HttpServletResponseLegacyWrapper.
@@ -68,6 +71,37 @@ package com.etendoerp.metadata.http;
      }
      outputStreamUsed = true;
      return capturingStream;
+   }
+
+   /**
+    * Sends a temporary redirect response to the client using the specified redirect location URL.
+    * This implementation captures the redirect location without actually sending the redirect to the client.
+    *
+    * @param location The redirect location URL.
+    * @throws IOException If an I/O error occurs.
+    */
+   @Override
+   public void sendRedirect(String location) throws IOException {
+     this.redirectLocation = location;
+     this.redirected = true;
+   }
+
+   /**
+    * Indicates whether a redirect has been sent for this response.
+    *
+    * @return true if sendRedirect() has been called, false otherwise.
+    */
+   public boolean isRedirected() {
+     return redirected;
+   }
+
+   /**
+    * Returns the redirect location URL that was set by sendRedirect().
+    *
+    * @return The redirect location URL, or null if no redirect has been set.
+    */
+   public String getRedirectLocation() {
+     return redirectLocation;
    }
 
    /**

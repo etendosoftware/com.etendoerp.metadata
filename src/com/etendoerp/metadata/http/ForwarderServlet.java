@@ -40,41 +40,41 @@ import org.openbravo.base.weld.WeldUtils;
  *
  */
 public class ForwarderServlet extends BaseWebService {
-    private static final Logger log4j = LogManager.getLogger(ForwarderServlet.class);
+  private static final Logger log4j = LogManager.getLogger(ForwarderServlet.class);
 
-    /**
-     * Main entry point for HTTP requests. All requests are forwarded to DataSourceServlet
-     * as this servlet is exclusively for modern SWS-authenticated API endpoints.
-     *
-     * @param req  the HttpServletRequest object
-     * @param res  the HttpServletResponse object
-     * @throws IOException if an input or output error occurs
-     * @throws ServletException if a servlet error occurs
-     */
-    @Override
-    protected void process(HttpServletRequest req, HttpServletResponse res) throws IOException, ServletException {
-        try {
-            // All requests are forwarded to DataSourceServlet for modern API processing
-            String path = req.getPathInfo();
-            processForwardRequest(path, req, res);
-        } catch (IOException | ServletException e) {
-            log4j.error("Error processing forward request: " + e.getMessage(), e);
-            throw e;
-        }
+  /**
+   * Main entry point for HTTP requests. All requests are forwarded to DataSourceServlet
+   * as this servlet is exclusively for modern SWS-authenticated API endpoints.
+   *
+   * @param req  the HttpServletRequest object
+   * @param res  the HttpServletResponse object
+   * @throws IOException if an input or output error occurs
+   * @throws ServletException if a servlet error occurs
+   */
+  @Override
+  protected void process(HttpServletRequest req, HttpServletResponse res) throws IOException, ServletException {
+    try {
+      // All requests are forwarded to DataSourceServlet for modern API processing
+      String path = req.getPathInfo();
+      processForwardRequest(path, req, res);
+    } catch (IOException | ServletException e) {
+      log4j.error("Error processing forward request: " + e.getMessage(), e);
+      throw e;
     }
+  }
 
-    /**
-     * Delegates all requests to DataSourceServlet for processing.
-     * This method handles modern API endpoints that require SWS authentication.
-     *
-     * @param path     the request path
-     * @param request  the HttpServletRequest
-     * @param response the HttpServletResponse
-     * @throws IOException      if an input or output error occurs
-     * @throws ServletException if a servlet error occurs
-     */
-    private void processForwardRequest(String path, HttpServletRequest request, HttpServletResponse response)
-            throws IOException, ServletException {
-        WeldUtils.getInstanceFromStaticBeanManager(org.openbravo.service.datasource.DataSourceServlet.class).doGet(request, response);
-    }
+  /**
+   * Delegates all requests to DataSourceServlet for processing.
+   * This method handles modern API endpoints that require SWS authentication.
+   *
+   * @param path     the request path
+   * @param request  the HttpServletRequest
+   * @param response the HttpServletResponse
+   * @throws IOException      if an input or output error occurs
+   * @throws ServletException if a servlet error occurs
+   */
+  private void processForwardRequest(String path, HttpServletRequest request, HttpServletResponse response)
+          throws IOException, ServletException {
+    WeldUtils.getInstanceFromStaticBeanManager(org.openbravo.service.datasource.DataSourceServlet.class).doGet(request, response);
+  }
 }

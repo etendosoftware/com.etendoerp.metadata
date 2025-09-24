@@ -40,6 +40,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
     private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String BEARER_PREFIX = "Bearer ";
     private static final String META_LEGACY_PATH = "/meta/legacy";
+    private static final String BASE_PATH = "/etendo";
 
     private static final String RECEIVE_AND_POST_MESSAGE_SCRIPT =
             "<script>window.addEventListener(\"message\", (event) => {" +
@@ -171,6 +172,16 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             wrappedRequest.getRequestDispatcher(path).include(wrappedRequest, responseWrapper);
 
             String output = responseWrapper.getCapturedOutputAsString();
+            if (responseWrapper.isRedirected()) {
+                String redirectLocation = responseWrapper.getRedirectLocation();
+                String htmlRedirect = getHtmlRedirect(redirectLocation);
+
+                res.setContentType(responseWrapper.getContentType());
+                res.setStatus(responseWrapper.getStatus());
+                res.getWriter().write(htmlRedirect);
+                res.getWriter().flush();
+                return;
+            }
             output = getInjectedContent(path, output);
 
             res.setContentType(responseWrapper.getContentType());
@@ -359,6 +370,28 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         }
         String base = page.contains("_") ? page.substring(0, page.indexOf('_')) : page;
         return "org.openbravo.erpWindows." + window + "." + base;
+    }
+
+    /**
+     * Generates an HTML redirect page that automatically redirects the browser to a modified URL.
+     * The method inserts the "/meta/forward" path into the redirect location and creates
+     * a simple HTML page with a meta refresh tag.
+     *
+     * @param redirectLocation the original redirect URL to be modified
+     * @return an HTML string containing the redirect page with meta refresh
+     */
+    private static String getHtmlRedirect(String redirectLocation) {
+        String forwardedUrl = redirectLocation.replace(BASE_PATH, BASE_PATH + META_LEGACY_PATH);
+        return String.format(
+                "<!DOCTYPE html>\n" +
+                        "<html>\n" +
+                        "    <head>\n" +
+                        "        <meta charset='UTF-8'/>\n" +
+                        "        <meta http-equiv=\"refresh\" content=\"0; url='%s'\"/>\n" +
+                        "    </head>\n" +
+                        "</html>",
+                forwardedUrl
+        );
     }
 
     private String getInjectedContent(String path, String responseString) {
