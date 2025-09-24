@@ -13,6 +13,7 @@ import org.openbravo.client.kernel.RequestContext;
 import org.openbravo.dal.core.OBContext;
 
 import javax.servlet.ServletException;
+import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
@@ -52,11 +53,35 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
                     "window.parent.postMessage({ type: \"fromForm\", action: action, }, \"*\");" +
                     "}}</script>";
 
+    private void setSessionCookie(HttpServletResponse res, String sessionId) {
+        Cookie cookie = new Cookie("JSESSIONID", sessionId);
+
+        // Dominio compartido
+        cookie.setDomain("localhost"); // Muy importante: no pongas el puerto acá
+        cookie.setPath("/");
+
+        // Requerido para compartir cookies entre distintos puertos/dominos
+        cookie.setSecure(true); // HTTPS obligatorio cuando SameSite=None
+        cookie.setHttpOnly(true); // La cookie no es accesible por JS
+        cookie.setMaxAge(-1); // Sesión: se elimina al cerrar el browser
+
+        // SameSite=None no está en el API de Cookie, así que se agrega manualmente
+        res.setHeader("Set-Cookie",
+                    String.format("JSESSIONID=%s; Path=/; Domain=localhost; HttpOnly; Secure; SameSite=None", sessionId)
+        );
+    }
     @Override
     public void service(HttpServletRequest req, HttpServletResponse res)
             throws IOException, ServletException {
         try {
             String path = req.getPathInfo();
+
+            // Si no existe sesión, la crea
+            HttpSession session = req.getSession(true);
+
+            // Enviar cookie JSESSIONID al frontend con configuración cross-origin
+            setSessionCookie(res, session.getId());
+
             if (isLegacyRequest(path)) {
                 processLegacyRequest(req, res, path);
             } else if (isLegacyFollowupRequest(req)) {
@@ -69,6 +94,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             throw new ServletException(e);
         }
     }
+
 
     private boolean isLegacyRequest(String path) {
         return path != null && path.toLowerCase().endsWith(HTML_EXTENSION);
