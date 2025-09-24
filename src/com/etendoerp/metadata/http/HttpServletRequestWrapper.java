@@ -76,7 +76,6 @@ public class HttpServletRequestWrapper extends RequestContext.HttpServletRequest
     }
     if (token == null) {
       this.userId = null;
-      this.sessionId = null;
       return;
     }
     DecodedJWT decodedJWT;
@@ -85,8 +84,8 @@ public class HttpServletRequestWrapper extends RequestContext.HttpServletRequest
     } catch (Exception e) {
       throw new OBException("Error decoding token", e);
     }
-    this.sessionId = decodedJWT.getClaims().get("jti").asString();
     this.userId = decodedJWT.getClaim("user").asString();
+    this.sessionId = decodedJWT.getClaim("jti").asString();
   }
 
   /**

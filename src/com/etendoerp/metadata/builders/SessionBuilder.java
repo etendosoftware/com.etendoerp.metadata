@@ -24,7 +24,6 @@ import java.util.List;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
-import org.openbravo.client.kernel.RequestContext;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.model.ad.access.Role;
 import org.openbravo.model.ad.access.RoleOrganization;
@@ -35,14 +34,12 @@ import org.openbravo.model.common.enterprise.OrgWarehouse;
 import org.openbravo.model.common.enterprise.Organization;
 import org.openbravo.model.common.enterprise.Warehouse;
 
-import com.etendoerp.metadata.data.RequestVariables;
 import com.etendoerp.metadata.exceptions.InternalServerException;
 
 /**
  * @author luuchorocha
  */
 public class SessionBuilder extends Builder {
-    private final RequestVariables vars = (RequestVariables) RequestContext.get().getVariablesSecureApp();
 
     public JSONObject toJSON() {
         try {
@@ -60,7 +57,6 @@ public class SessionBuilder extends Builder {
             json.put("currentOrganization", getJsonObject(organization));
             json.put("currentWarehouse", getJsonObject(warehouse));
             json.put("roles", getRoles(user));
-            json.put("attributes", vars.getCasedSessionAttributes());
             json.put("languages", new LanguageBuilder().toJSON());
 
             return json;

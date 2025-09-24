@@ -26,6 +26,7 @@ import java.util.List;
 public class Constants {
     public static final String MODULE_BASE_PATH = "/meta";
     public static final String SERVLET_PATH = "/forward";
+    public static final String LEGACY_PATH = "/legacy";
     public static final String SERVLET_FULL_PATH = MODULE_BASE_PATH.concat(SERVLET_PATH);
     public static final String SESSION_PATH = "/session";
     public static final String MENU_PATH = "/menu";
