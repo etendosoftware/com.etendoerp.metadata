@@ -61,25 +61,21 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
                 .getOpenbravoProperties()
                 .getProperty("CLASSIC_URL");
 
-        // Fallback por si CLASSIC_URL no está configurada
         if (StringUtils.isEmpty(host)) {
             host = "localhost";
         }
 
-        // Extraer solo el hostname (sin puerto ni protocolo)
         if (host.contains("://")) host = host.split("://")[1];
         if (host.contains("/")) host = host.split("/")[0];
         if (host.contains(":")) host = host.split(":")[0];
 
         Cookie cookie = new Cookie("JSESSIONID", sessionId);
         cookie.setPath("/");
-        cookie.setHttpOnly(true); // Evitar acceso por JS
+        cookie.setHttpOnly(true);
 
-        // Detectar si estamos en producción (HTTPS obligatorio para SameSite=None)
         boolean isProduction = !host.equalsIgnoreCase("localhost") && !host.startsWith("127.");
         cookie.setSecure(isProduction);
 
-        // Agregar SameSite=None para cross-domain
         res.setHeader("Set-Cookie",
                 String.format("JSESSIONID=%s; Path=/; Domain=%s; HttpOnly; %s; SameSite=None",
                         sessionId,
@@ -94,11 +90,8 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             throws IOException, ServletException {
         try {
             String path = req.getPathInfo();
-
-            // Si no existe sesión, la crea
             HttpSession session = req.getSession(true);
 
-            // Enviar cookie JSESSIONID al frontend con configuración cross-origin
             setSessionCookie(res, session.getId());
 
             if (isLegacyRequest(path)) {
