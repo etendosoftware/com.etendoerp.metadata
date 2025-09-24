@@ -22,15 +22,7 @@ import javax.servlet.http.HttpServletResponse;
 
 import com.etendoerp.metadata.exceptions.NotFoundException;
 
-import static com.etendoerp.metadata.utils.Constants.LABELS_PATH;
-import static com.etendoerp.metadata.utils.Constants.LANGUAGE_PATH;
-import static com.etendoerp.metadata.utils.Constants.LOCATION_PATH;
-import static com.etendoerp.metadata.utils.Constants.MENU_PATH;
-import static com.etendoerp.metadata.utils.Constants.MESSAGE_PATH;
-import static com.etendoerp.metadata.utils.Constants.SESSION_PATH;
-import static com.etendoerp.metadata.utils.Constants.TAB_PATH;
-import static com.etendoerp.metadata.utils.Constants.TOOLBAR_PATH;
-import static com.etendoerp.metadata.utils.Constants.WINDOW_PATH;
+import static com.etendoerp.metadata.utils.Constants.*;
 
 /**
  * @author luuchorocha
@@ -38,7 +30,7 @@ import static com.etendoerp.metadata.utils.Constants.WINDOW_PATH;
 public class ServiceFactory {
 
     public static MetadataService getService(final HttpServletRequest req, final HttpServletResponse res) {
-        final String path = req.getPathInfo();
+        final String path = req.getPathInfo() != null ? req.getPathInfo().replace("/com.etendoerp.metadata.meta/", "/") : "";
 
         if (path.equals(SESSION_PATH)) {
             return new SessionService(req, res);
@@ -58,6 +50,8 @@ public class ServiceFactory {
             return new LocationMetadataService(req, res);
         } else if (path.startsWith(TOOLBAR_PATH)) {
             return new ToolbarService(req, res);
+        } else if (path.startsWith(LEGACY_PATH)) {
+            return new LegacyService(req, res);
         } else {
             throw new NotFoundException();
         }
