@@ -35,14 +35,16 @@ import com.etendoerp.metadata.data.TabProcessor;
 import com.etendoerp.metadata.exceptions.InternalServerException;
 
 public class TabBuilder extends Builder {
+  private static final String CREATION_DATE = "creationDate";
+  private static final String UPDATED = "updated";
   private static final String[] AUDIT_FIELDS = {
-          "creationDate", "createdBy", "updated", "updatedBy"
+          CREATION_DATE, "createdBy", UPDATED, "updatedBy"
   };
 
   private static final Map<String, String> AUDIT_DB_COLUMNS = Map.of(
-          "creationDate", "Created",
+          CREATION_DATE, "Created",
           "createdBy", "CreatedBy",
-          "updated", "Updated",
+          UPDATED, "Updated",
           "updatedBy", "UpdatedBy"
   );
 
@@ -146,7 +148,7 @@ public class TabBuilder extends Builder {
    * @return true if the field should be visible in grid, false otherwise
    */
   private boolean shouldShowInGrid(String fieldName) {
-    return "creationDate".equals(fieldName) || "updated".equals(fieldName);
+    return CREATION_DATE.equals(fieldName) || UPDATED.equals(fieldName);
   }
 
   /**
