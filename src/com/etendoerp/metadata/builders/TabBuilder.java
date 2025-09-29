@@ -20,6 +20,7 @@ package com.etendoerp.metadata.builders;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.lang.StringUtils;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
@@ -36,16 +37,21 @@ import com.etendoerp.metadata.exceptions.InternalServerException;
 
 public class TabBuilder extends Builder {
   private static final String CREATION_DATE = "creationDate";
+  private static final String CREATED_BY = "createdBy";
   private static final String UPDATED = "updated";
+  private static final String UPDATED_BY = "updatedBy";
+  private static final String DB_CREATED = "Created";
+  private static final String DB_CREATED_BY = "CreatedBy";
+  private static final String DB_UPDATED = "Updated";
+  private static final String DB_UPDATED_BY = "UpdatedBy";
   private static final String[] AUDIT_FIELDS = {
-          CREATION_DATE, "createdBy", UPDATED, "updatedBy"
+          CREATION_DATE, CREATED_BY, UPDATED, UPDATED_BY
   };
-
   private static final Map<String, String> AUDIT_DB_COLUMNS = Map.of(
-          CREATION_DATE, "Created",
-          "createdBy", "CreatedBy",
-          UPDATED, "Updated",
-          "updatedBy", "UpdatedBy"
+          CREATION_DATE, DB_CREATED,
+          CREATED_BY, DB_CREATED_BY,
+          UPDATED, DB_UPDATED,
+          UPDATED_BY, DB_UPDATED_BY
   );
 
   private final Tab tab;
@@ -112,6 +118,7 @@ public class TabBuilder extends Builder {
   /**
    * Enriches the fields object with standard audit fields if they are not already defined.
    * Only creationDate and updated are visible in grid by default.
+   * Skips audit fields if the corresponding database columns don't exist in the table.
    *
    * @param fieldsJson the JSON object containing the tab's fields
    * @throws JSONException if there is an error manipulating the JSON structure
@@ -132,23 +139,15 @@ public class TabBuilder extends Builder {
 
         if (column != null) {
           boolean showInGrid = shouldShowInGrid(auditField);
-          JSONObject syntheticField = createAuditField(column, auditField, baseGridPosition + order, showInGrid);
+          JSONObject syntheticField = createAuditField(column, auditField, baseGridPosition + order,
+                  showInGrid);
           fieldsJson.put(auditField, syntheticField);
           order++;
+        } else {
+            logger.debug("Audit column '{}' not found in table '{}'- skipping audit field '{}'", dbColumnName, table.getName(), auditField);
         }
       }
     }
-  }
-
-  /**
-   * Determines if an audit field should be visible in the grid by default.
-   * Only creationDate and updated are shown by default.
-   *
-   * @param fieldName the name of the audit field
-   * @return true if the field should be visible in grid, false otherwise
-   */
-  private boolean shouldShowInGrid(String fieldName) {
-    return CREATION_DATE.equals(fieldName) || UPDATED.equals(fieldName);
   }
 
   /**
@@ -160,23 +159,39 @@ public class TabBuilder extends Builder {
    */
   private Column findColumnByDBName(Table table, String dbColumnName) {
     return table.getADColumnList().stream()
-            .filter(col -> col.getDBColumnName().equals(dbColumnName))
+            .filter(col -> StringUtils.equals(col.getDBColumnName(), dbColumnName))
             .findFirst()
             .orElse(null);
   }
 
   /**
+   * Determines if an audit field should be visible in the grid by default.
+   * Only creationDate and updated are shown by default.
+   *
+   * @param fieldName the name of the audit field
+   * @return true if the field should be visible in grid, false otherwise
+   */
+  private boolean shouldShowInGrid(String fieldName) {
+    return StringUtils.equals(fieldName, CREATION_DATE) || StringUtils.equals(fieldName, UPDATED);
+  }
+
+  /**
    * Creates a JSON object representing a synthetic audit field with all required metadata.
    *
-   * @param column the database column object
+   * @param column the database column object (must not be null)
    * @param hqlName the HQL property name for the field
    * @param gridPosition the position in the grid (used for ordering)
    * @param showInGrid whether the field should be visible in the grid view
    * @return a complete JSON object representing the audit field
    * @throws JSONException if there is an error creating the JSON structure
    */
-  private JSONObject createAuditField(Column column, String hqlName, int gridPosition, boolean showInGrid)
+  private JSONObject createAuditField(Column column, String hqlName, int gridPosition, boolean
+          showInGrid)
           throws JSONException {
+    if (column == null) {
+      throw new IllegalArgumentException("Column cannot be null when creating audit field: " + hqlName);
+    }
+
     JSONObject field = new JSONObject();
     field.put("id", "audit_" + column.getId());
     field.put("name", column.getName());
@@ -199,6 +214,13 @@ public class TabBuilder extends Builder {
     JSONObject columnJson = converter.toJsonObject(column, DataResolvingMode.FULL_TRANSLATABLE);
     field.put("column", columnJson);
     field.put("column$_identifier", column.getIdentifier());
+    if (isUserField(hqlName)) {
+      JSONObject selector = new JSONObject();
+      selector.put("displayField", "_identifier");
+      selector.put("valueField", "id");
+      field.put("selector", selector);
+      field.put("referencedEntity", "ADUser");
+    }
     field.put("centralMaintenance", true);
     field.put("ignoreInWad", false);
     field.put("fieldGroup", JSONObject.NULL);
@@ -213,5 +235,15 @@ public class TabBuilder extends Builder {
     field.put("tab$_identifier", tab.getIdentifier());
 
     return field;
+  }
+
+  /**
+   * Determines if a field is a user reference type based on its name.
+   *
+   * @param hqlName the HQL property name
+   * @return true if the field is a user reference, false otherwise
+   */
+  private boolean isUserField(String hqlName) {
+    return StringUtils.equals(hqlName, CREATED_BY) || StringUtils.equals(hqlName, UPDATED_BY);
   }
 }
