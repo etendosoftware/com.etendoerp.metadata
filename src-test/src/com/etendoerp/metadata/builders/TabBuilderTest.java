@@ -29,6 +29,42 @@ import com.etendoerp.metadata.data.TabProcessor;
 @ExtendWith(MockitoExtension.class)
 class TabBuilderAuditFieldsTest {
 
+    // Column IDs and DB names
+    private static final String CREATED_ID = "Created";
+    private static final String CREATED_BY_ID = "CreatedBy";
+    private static final String UPDATED_ID = "Updated";
+    private static final String UPDATED_BY_ID = "UpdatedBy";
+
+    // Column display names
+    private static final String CREATION_DATE_NAME = "Creation Date";
+    private static final String CREATED_BY_NAME = "Created By";
+    private static final String UPDATED_NAME = "Updated";
+    private static final String UPDATED_BY_NAME = "Updated By";
+
+    // Field names (HQL property names)
+    private static final String CREATION_DATE_FIELD = "creationDate";
+    private static final String CREATED_BY_FIELD = "createdBy";
+    private static final String UPDATED_FIELD = "updated";
+    private static final String UPDATED_BY_FIELD = "updatedBy";
+
+    // JSON keys
+    private static final String FIELDS_KEY = "fields";
+    private static final String SHOW_IN_GRID_VIEW_KEY = "showInGridView";
+    private static final String REFERENCED_ENTITY_KEY = "referencedEntity";
+    private static final String GRID_POSITION_KEY = "gridPosition";
+    private static final String IS_READ_ONLY_KEY = "isReadOnly";
+    private static final String IS_EDITABLE_KEY = "isEditable";
+    private static final String IS_UPDATABLE_KEY = "isUpdatable";
+    private static final String SELECTOR_KEY = "selector";
+    private static final String NAME_KEY = "name";
+
+    // Test data
+    private static final String TEST_TABLE_NAME = "TestTable";
+    private static final String TEST_DESCRIPTION = "Test description";
+    private static final String TEST_HELP = "Test help";
+    private static final String AD_USER_ENTITY = "ADUser";
+    private static final String CUSTOM_CREATION_DATE_NAME = "Custom Creation Date";
+
     /**
      * Tests that audit fields are automatically added to the fields JSON
      * when they are not already present.
@@ -41,10 +77,10 @@ class TabBuilderAuditFieldsTest {
         Table mockTable = mock(Table.class);
         KernelUtils mockKernelUtils = mock(KernelUtils.class);
 
-        Column createdColumn = createMockColumn("Created", "Created", "Creation Date");
-        Column createdByColumn = createMockColumn("CreatedBy", "CreatedBy", "Created By");
-        Column updatedColumn = createMockColumn("Updated", "Updated", "Updated");
-        Column updatedByColumn = createMockColumn("UpdatedBy", "UpdatedBy", "Updated By");
+        Column createdColumn = createMockColumn(CREATED_ID, CREATED_ID, CREATION_DATE_NAME);
+        Column createdByColumn = createMockColumn(CREATED_BY_ID, CREATED_BY_ID, CREATED_BY_NAME);
+        Column updatedColumn = createMockColumn(UPDATED_ID, UPDATED_ID, UPDATED_NAME);
+        Column updatedByColumn = createMockColumn(UPDATED_BY_ID, UPDATED_BY_ID, UPDATED_BY_NAME);
 
         List<Column> columns = new ArrayList<>();
         columns.add(createdColumn);
@@ -56,7 +92,7 @@ class TabBuilderAuditFieldsTest {
         when(mockTab.getFilterClause()).thenReturn("");
         when(mockTab.getDisplayLogic()).thenReturn("");
         when(mockTab.getTable()).thenReturn(mockTable);
-        when(mockTable.getName()).thenReturn("TestTable");
+        when(mockTable.getName()).thenReturn(TEST_TABLE_NAME);
         when(mockTable.getADColumnList()).thenReturn(columns);
         when(mockTab.getTabLevel()).thenReturn(0L);
         when(mockKernelUtils.getParentTab(mockTab)).thenReturn(null);
@@ -78,11 +114,11 @@ class TabBuilderAuditFieldsTest {
             TabBuilder tabBuilder = new TabBuilder(mockTab, null);
             JSONObject result = tabBuilder.toJSON();
 
-            JSONObject fields = result.getJSONObject("fields");
-            assertTrue(fields.has("creationDate"), "Should have creationDate field");
-            assertTrue(fields.has("createdBy"), "Should have createdBy field");
-            assertTrue(fields.has("updated"), "Should have updated field");
-            assertTrue(fields.has("updatedBy"), "Should have updatedBy field");
+            JSONObject fields = result.getJSONObject(FIELDS_KEY);
+            assertTrue(fields.has(CREATION_DATE_FIELD), "Should have creationDate field");
+            assertTrue(fields.has(CREATED_BY_FIELD), "Should have createdBy field");
+            assertTrue(fields.has(UPDATED_FIELD), "Should have updated field");
+            assertTrue(fields.has(UPDATED_BY_FIELD), "Should have updatedBy field");
         }
     }
 
@@ -97,10 +133,10 @@ class TabBuilderAuditFieldsTest {
         Table mockTable = mock(Table.class);
         KernelUtils mockKernelUtils = mock(KernelUtils.class);
 
-        Column createdColumn = createMockColumn("Created", "Created", "Creation Date");
-        Column createdByColumn = createMockColumn("CreatedBy", "CreatedBy", "Created By");
-        Column updatedColumn = createMockColumn("Updated", "Updated", "Updated");
-        Column updatedByColumn = createMockColumn("UpdatedBy", "UpdatedBy", "Updated By");
+        Column createdColumn = createMockColumn(CREATED_ID, CREATED_ID, CREATION_DATE_NAME);
+        Column createdByColumn = createMockColumn(CREATED_BY_ID, CREATED_BY_ID, CREATED_BY_NAME);
+        Column updatedColumn = createMockColumn(UPDATED_ID, UPDATED_ID, UPDATED_NAME);
+        Column updatedByColumn = createMockColumn(UPDATED_BY_ID, UPDATED_BY_ID, UPDATED_BY_NAME);
 
         List<Column> columns = List.of(createdColumn, createdByColumn, updatedColumn, updatedByColumn);
 
@@ -123,15 +159,15 @@ class TabBuilderAuditFieldsTest {
             TabBuilder tabBuilder = new TabBuilder(mockTab, null);
             JSONObject result = tabBuilder.toJSON();
 
-            JSONObject fields = result.getJSONObject("fields");
+            JSONObject fields = result.getJSONObject(FIELDS_KEY);
 
-            assertTrue(fields.getJSONObject("creationDate").getBoolean("showInGridView"),
+            assertTrue(fields.getJSONObject(CREATION_DATE_FIELD).getBoolean(SHOW_IN_GRID_VIEW_KEY),
                     "creationDate should be visible in grid");
-            assertTrue(fields.getJSONObject("updated").getBoolean("showInGridView"),
+            assertTrue(fields.getJSONObject(UPDATED_FIELD).getBoolean(SHOW_IN_GRID_VIEW_KEY),
                     "updated should be visible in grid");
-            assertFalse(fields.getJSONObject("createdBy").getBoolean("showInGridView"),
+            assertFalse(fields.getJSONObject(CREATED_BY_FIELD).getBoolean(SHOW_IN_GRID_VIEW_KEY),
                     "createdBy should NOT be visible in grid");
-            assertFalse(fields.getJSONObject("updatedBy").getBoolean("showInGridView"),
+            assertFalse(fields.getJSONObject(UPDATED_BY_FIELD).getBoolean(SHOW_IN_GRID_VIEW_KEY),
                     "updatedBy should NOT be visible in grid");
         }
     }
@@ -166,13 +202,13 @@ class TabBuilderAuditFieldsTest {
 
             TabBuilder tabBuilder = new TabBuilder(mockTab, null);
             JSONObject result = tabBuilder.toJSON();
-            JSONObject fields = result.getJSONObject("fields");
+            JSONObject fields = result.getJSONObject(FIELDS_KEY);
 
-            for (String fieldName : new String[]{"creationDate", "createdBy", "updated", "updatedBy"}) {
+            for (String fieldName : new String[]{CREATION_DATE_FIELD, CREATED_BY_FIELD, UPDATED_FIELD, UPDATED_BY_FIELD}) {
                 JSONObject field = fields.getJSONObject(fieldName);
-                assertTrue(field.getBoolean("isReadOnly"), fieldName + " should be read-only");
-                assertFalse(field.getBoolean("isEditable"), fieldName + " should not be editable");
-                assertFalse(field.getBoolean("isUpdatable"), fieldName + " should not be updatable");
+                assertTrue(field.getBoolean(IS_READ_ONLY_KEY), fieldName + " should be read-only");
+                assertFalse(field.getBoolean(IS_EDITABLE_KEY), fieldName + " should not be editable");
+                assertFalse(field.getBoolean(IS_UPDATABLE_KEY), fieldName + " should not be updatable");
             }
         }
     }
@@ -207,22 +243,22 @@ class TabBuilderAuditFieldsTest {
 
             TabBuilder tabBuilder = new TabBuilder(mockTab, null);
             JSONObject result = tabBuilder.toJSON();
-            JSONObject fields = result.getJSONObject("fields");
+            JSONObject fields = result.getJSONObject(FIELDS_KEY);
 
             // Check createdBy
-            JSONObject createdBy = fields.getJSONObject("createdBy");
-            assertTrue(createdBy.has("referencedEntity"), "createdBy should have referencedEntity");
-            assertEquals("ADUser", createdBy.getString("referencedEntity"));
-            assertTrue(createdBy.has("selector"), "createdBy should have selector");
+            JSONObject createdBy = fields.getJSONObject(CREATED_BY_FIELD);
+            assertTrue(createdBy.has(REFERENCED_ENTITY_KEY), "createdBy should have referencedEntity");
+            assertEquals(AD_USER_ENTITY, createdBy.getString(REFERENCED_ENTITY_KEY));
+            assertTrue(createdBy.has(SELECTOR_KEY), "createdBy should have selector");
 
             // Check updatedBy
-            JSONObject updatedBy = fields.getJSONObject("updatedBy");
-            assertTrue(updatedBy.has("referencedEntity"), "updatedBy should have referencedEntity");
-            assertEquals("ADUser", updatedBy.getString("referencedEntity"));
-            assertTrue(updatedBy.has("selector"), "updatedBy should have selector");
+            JSONObject updatedBy = fields.getJSONObject(UPDATED_BY_FIELD);
+            assertTrue(updatedBy.has(REFERENCED_ENTITY_KEY), "updatedBy should have referencedEntity");
+            assertEquals(AD_USER_ENTITY, updatedBy.getString(REFERENCED_ENTITY_KEY));
+            assertTrue(updatedBy.has(SELECTOR_KEY), "updatedBy should have selector");
 
             // Date fields should not have referencedEntity
-            assertFalse(fields.getJSONObject("creationDate").has("referencedEntity"),
+            assertFalse(fields.getJSONObject(CREATION_DATE_FIELD).has(REFERENCED_ENTITY_KEY),
                     "creationDate should not have referencedEntity");
         }
     }
@@ -257,25 +293,25 @@ class TabBuilderAuditFieldsTest {
             // Return existing creationDate field
             JSONObject existingFields = new JSONObject();
             JSONObject customCreationDate = new JSONObject();
-            customCreationDate.put("name", "Custom Creation Date");
-            customCreationDate.put("showInGridView", false);
-            existingFields.put("creationDate", customCreationDate);
+            customCreationDate.put(NAME_KEY, CUSTOM_CREATION_DATE_NAME);
+            customCreationDate.put(SHOW_IN_GRID_VIEW_KEY, false);
+            existingFields.put(CREATION_DATE_FIELD, customCreationDate);
 
             mockedTabProcessor.when(() -> TabProcessor.getTabFields(mockTab))
                     .thenReturn(existingFields);
 
             TabBuilder tabBuilder = new TabBuilder(mockTab, null);
             JSONObject result = tabBuilder.toJSON();
-            JSONObject fields = result.getJSONObject("fields");
+            JSONObject fields = result.getJSONObject(FIELDS_KEY);
 
             // Existing field should not be overwritten
-            assertEquals("Custom Creation Date", fields.getJSONObject("creationDate").getString("name"));
-            assertFalse(fields.getJSONObject("creationDate").getBoolean("showInGridView"));
+            assertEquals(CUSTOM_CREATION_DATE_NAME, fields.getJSONObject(CREATION_DATE_FIELD).getString(NAME_KEY));
+            assertFalse(fields.getJSONObject(CREATION_DATE_FIELD).getBoolean(SHOW_IN_GRID_VIEW_KEY));
 
             // Other audit fields should still be added
-            assertTrue(fields.has("createdBy"));
-            assertTrue(fields.has("updated"));
-            assertTrue(fields.has("updatedBy"));
+            assertTrue(fields.has(CREATED_BY_FIELD));
+            assertTrue(fields.has(UPDATED_FIELD));
+            assertTrue(fields.has(UPDATED_BY_FIELD));
         }
     }
 
@@ -291,7 +327,7 @@ class TabBuilderAuditFieldsTest {
         KernelUtils mockKernelUtils = mock(KernelUtils.class);
 
         // Only include creationDate column
-        List<Column> columns = List.of(createMockColumn("Created", "Created", "Creation Date"));
+        List<Column> columns = List.of(createMockColumn(CREATED_ID, CREATED_ID, CREATION_DATE_NAME));
         setupBasicMocks(mockContext, mockLanguage, mockTab, mockTable, mockKernelUtils, columns);
 
         try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
@@ -310,13 +346,13 @@ class TabBuilderAuditFieldsTest {
 
             TabBuilder tabBuilder = new TabBuilder(mockTab, null);
             JSONObject result = tabBuilder.toJSON();
-            JSONObject fields = result.getJSONObject("fields");
+            JSONObject fields = result.getJSONObject(FIELDS_KEY);
 
             // Only creationDate should be present
-            assertTrue(fields.has("creationDate"));
-            assertFalse(fields.has("createdBy"));
-            assertFalse(fields.has("updated"));
-            assertFalse(fields.has("updatedBy"));
+            assertTrue(fields.has(CREATION_DATE_FIELD));
+            assertFalse(fields.has(CREATED_BY_FIELD));
+            assertFalse(fields.has(UPDATED_FIELD));
+            assertFalse(fields.has(UPDATED_BY_FIELD));
         }
     }
 
@@ -350,12 +386,12 @@ class TabBuilderAuditFieldsTest {
 
             TabBuilder tabBuilder = new TabBuilder(mockTab, null);
             JSONObject result = tabBuilder.toJSON();
-            JSONObject fields = result.getJSONObject("fields");
+            JSONObject fields = result.getJSONObject(FIELDS_KEY);
 
-            assertEquals(9000, fields.getJSONObject("creationDate").getInt("gridPosition"));
-            assertEquals(9001, fields.getJSONObject("createdBy").getInt("gridPosition"));
-            assertEquals(9002, fields.getJSONObject("updated").getInt("gridPosition"));
-            assertEquals(9003, fields.getJSONObject("updatedBy").getInt("gridPosition"));
+            assertEquals(9000, fields.getJSONObject(CREATION_DATE_FIELD).getInt(GRID_POSITION_KEY));
+            assertEquals(9001, fields.getJSONObject(CREATED_BY_FIELD).getInt(GRID_POSITION_KEY));
+            assertEquals(9002, fields.getJSONObject(UPDATED_FIELD).getInt(GRID_POSITION_KEY));
+            assertEquals(9003, fields.getJSONObject(UPDATED_BY_FIELD).getInt(GRID_POSITION_KEY));
         }
     }
 
@@ -365,8 +401,8 @@ class TabBuilderAuditFieldsTest {
         when(column.getId()).thenReturn(id);
         when(column.getDBColumnName()).thenReturn(dbName);
         when(column.getName()).thenReturn(name);
-        when(column.getDescription()).thenReturn("Test description");
-        when(column.getHelpComment()).thenReturn("Test help");
+        when(column.getDescription()).thenReturn(TEST_DESCRIPTION);
+        when(column.getHelpComment()).thenReturn(TEST_HELP);
         when(column.isMandatory()).thenReturn(true);
         when(column.getIdentifier()).thenReturn(name);
         return column;
@@ -377,8 +413,8 @@ class TabBuilderAuditFieldsTest {
         lenient().when(column.getId()).thenReturn(id);
         lenient().when(column.getDBColumnName()).thenReturn(dbName);
         lenient().when(column.getName()).thenReturn(name);
-        lenient().when(column.getDescription()).thenReturn("Test description");
-        lenient().when(column.getHelpComment()).thenReturn("Test help");
+        lenient().when(column.getDescription()).thenReturn(TEST_DESCRIPTION);
+        lenient().when(column.getHelpComment()).thenReturn(TEST_HELP);
         lenient().when(column.isMandatory()).thenReturn(true);
         lenient().when(column.getIdentifier()).thenReturn(name);
         return column;
@@ -386,19 +422,19 @@ class TabBuilderAuditFieldsTest {
 
     private List<Column> createAllAuditColumns() {
         return List.of(
-                createMockColumn("Created", "Created", "Creation Date"),
-                createMockColumn("CreatedBy", "CreatedBy", "Created By"),
-                createMockColumn("Updated", "Updated", "Updated"),
-                createMockColumn("UpdatedBy", "UpdatedBy", "Updated By")
+                createMockColumn(CREATED_ID, CREATED_ID, CREATION_DATE_NAME),
+                createMockColumn(CREATED_BY_ID, CREATED_BY_ID, CREATED_BY_NAME),
+                createMockColumn(UPDATED_ID, UPDATED_ID, UPDATED_NAME),
+                createMockColumn(UPDATED_BY_ID, UPDATED_BY_ID, UPDATED_BY_NAME)
         );
     }
 
     private List<Column> createAllAuditColumnsLenient() {
         return List.of(
-                createMockColumnLenient("Created", "Created", "Creation Date"),
-                createMockColumnLenient("CreatedBy", "CreatedBy", "Created By"),
-                createMockColumnLenient("Updated", "Updated", "Updated"),
-                createMockColumnLenient("UpdatedBy", "UpdatedBy", "Updated By")
+                createMockColumnLenient(CREATED_ID, CREATED_ID, CREATION_DATE_NAME),
+                createMockColumnLenient(CREATED_BY_ID, CREATED_BY_ID, CREATED_BY_NAME),
+                createMockColumnLenient(UPDATED_ID, UPDATED_ID, UPDATED_NAME),
+                createMockColumnLenient(UPDATED_BY_ID, UPDATED_BY_ID, UPDATED_BY_NAME)
         );
     }
 
@@ -408,7 +444,7 @@ class TabBuilderAuditFieldsTest {
         when(mockTab.getFilterClause()).thenReturn("");
         when(mockTab.getDisplayLogic()).thenReturn("");
         when(mockTab.getTable()).thenReturn(mockTable);
-        when(mockTable.getName()).thenReturn("TestTable");
+        when(mockTable.getName()).thenReturn(TEST_TABLE_NAME);
         when(mockTable.getADColumnList()).thenReturn(columns);
         when(mockTab.getTabLevel()).thenReturn(0L);
         when(mockKernelUtils.getParentTab(mockTab)).thenReturn(null);
@@ -420,7 +456,7 @@ class TabBuilderAuditFieldsTest {
         lenient().when(mockTab.getFilterClause()).thenReturn("");
         lenient().when(mockTab.getDisplayLogic()).thenReturn("");
         lenient().when(mockTab.getTable()).thenReturn(mockTable);
-        lenient().when(mockTable.getName()).thenReturn("TestTable");
+        lenient().when(mockTable.getName()).thenReturn(TEST_TABLE_NAME);
         lenient().when(mockTable.getADColumnList()).thenReturn(columns);
         lenient().when(mockTab.getTabLevel()).thenReturn(0L);
         lenient().when(mockKernelUtils.getParentTab(mockTab)).thenReturn(null);
