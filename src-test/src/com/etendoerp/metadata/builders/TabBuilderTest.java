@@ -6,7 +6,9 @@ import static org.mockito.Mockito.*;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 
+import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -97,29 +99,17 @@ class TabBuilderAuditFieldsTest {
         when(mockTab.getTabLevel()).thenReturn(0L);
         when(mockKernelUtils.getParentTab(mockTab)).thenReturn(null);
 
-        try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
-             MockedStatic<KernelUtils> mockedKernelUtils = mockStatic(KernelUtils.class);
-             MockedStatic<TabProcessor> mockedTabProcessor = mockStatic(TabProcessor.class);
-             MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class,
-                     (mock, context) -> {
-                         JSONObject tabJson = new JSONObject();
-                         when(mock.toJsonObject(any(), any())).thenReturn(tabJson);
-                     })) {
-
-            mockedOBContext.when(OBContext::getOBContext).thenReturn(mockContext);
-            mockedKernelUtils.when(KernelUtils::getInstance).thenReturn(mockKernelUtils);
-            mockedTabProcessor.when(() -> TabProcessor.getTabFields(mockTab))
-                    .thenReturn(new JSONObject());
-
-            TabBuilder tabBuilder = new TabBuilder(mockTab, null);
-            JSONObject result = tabBuilder.toJSON();
-
-            JSONObject fields = result.getJSONObject(FIELDS_KEY);
-            assertTrue(fields.has(CREATION_DATE_FIELD), "Should have creationDate field");
-            assertTrue(fields.has(CREATED_BY_FIELD), "Should have createdBy field");
-            assertTrue(fields.has(UPDATED_FIELD), "Should have updated field");
-            assertTrue(fields.has(UPDATED_BY_FIELD), "Should have updatedBy field");
-        }
+        executeTabBuilderTest(mockContext, mockKernelUtils, mockTab, new JSONObject(), result -> {
+            try {
+                JSONObject fields = result.getJSONObject(FIELDS_KEY);
+                assertTrue(fields.has(CREATION_DATE_FIELD), "Should have creationDate field");
+                assertTrue(fields.has(CREATED_BY_FIELD), "Should have createdBy field");
+                assertTrue(fields.has(UPDATED_FIELD), "Should have updated field");
+                assertTrue(fields.has(UPDATED_BY_FIELD), "Should have updatedBy field");
+            } catch (JSONException e) {
+                fail("JSON exception: " + e.getMessage());
+            }
+        });
     }
 
     /**
@@ -127,11 +117,7 @@ class TabBuilderAuditFieldsTest {
      */
     @Test
     void auditFieldsHaveCorrectDefaultVisibility() throws Exception {
-        OBContext mockContext = mock(OBContext.class);
-        Language mockLanguage = mock(Language.class);
-        Tab mockTab = mock(Tab.class);
-        Table mockTable = mock(Table.class);
-        KernelUtils mockKernelUtils = mock(KernelUtils.class);
+        TestContext ctx = setupTestContext();
 
         Column createdColumn = createMockColumn(CREATED_ID, CREATED_ID, CREATION_DATE_NAME);
         Column createdByColumn = createMockColumn(CREATED_BY_ID, CREATED_BY_ID, CREATED_BY_NAME);
@@ -139,37 +125,24 @@ class TabBuilderAuditFieldsTest {
         Column updatedByColumn = createMockColumn(UPDATED_BY_ID, UPDATED_BY_ID, UPDATED_BY_NAME);
 
         List<Column> columns = List.of(createdColumn, createdByColumn, updatedColumn, updatedByColumn);
+        setupBasicMocks(ctx.context, ctx.language, ctx.tab, ctx.table, ctx.kernelUtils, columns);
 
-        setupBasicMocks(mockContext, mockLanguage, mockTab, mockTable, mockKernelUtils, columns);
+        executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), result -> {
+            try {
+                JSONObject fields = result.getJSONObject(FIELDS_KEY);
 
-        try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
-             MockedStatic<KernelUtils> mockedKernelUtils = mockStatic(KernelUtils.class);
-             MockedStatic<TabProcessor> mockedTabProcessor = mockStatic(TabProcessor.class);
-             MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class,
-                     (mock, context) -> {
-                         JSONObject tabJson = new JSONObject();
-                         when(mock.toJsonObject(any(), any())).thenReturn(tabJson);
-                     })) {
-
-            mockedOBContext.when(OBContext::getOBContext).thenReturn(mockContext);
-            mockedKernelUtils.when(KernelUtils::getInstance).thenReturn(mockKernelUtils);
-            mockedTabProcessor.when(() -> TabProcessor.getTabFields(mockTab))
-                    .thenReturn(new JSONObject());
-
-            TabBuilder tabBuilder = new TabBuilder(mockTab, null);
-            JSONObject result = tabBuilder.toJSON();
-
-            JSONObject fields = result.getJSONObject(FIELDS_KEY);
-
-            assertTrue(fields.getJSONObject(CREATION_DATE_FIELD).getBoolean(SHOW_IN_GRID_VIEW_KEY),
-                    "creationDate should be visible in grid");
-            assertTrue(fields.getJSONObject(UPDATED_FIELD).getBoolean(SHOW_IN_GRID_VIEW_KEY),
-                    "updated should be visible in grid");
-            assertFalse(fields.getJSONObject(CREATED_BY_FIELD).getBoolean(SHOW_IN_GRID_VIEW_KEY),
-                    "createdBy should NOT be visible in grid");
-            assertFalse(fields.getJSONObject(UPDATED_BY_FIELD).getBoolean(SHOW_IN_GRID_VIEW_KEY),
-                    "updatedBy should NOT be visible in grid");
-        }
+                assertTrue(fields.getJSONObject(CREATION_DATE_FIELD).getBoolean(SHOW_IN_GRID_VIEW_KEY),
+                        "creationDate should be visible in grid");
+                assertTrue(fields.getJSONObject(UPDATED_FIELD).getBoolean(SHOW_IN_GRID_VIEW_KEY),
+                        "updated should be visible in grid");
+                assertFalse(fields.getJSONObject(CREATED_BY_FIELD).getBoolean(SHOW_IN_GRID_VIEW_KEY),
+                        "createdBy should NOT be visible in grid");
+                assertFalse(fields.getJSONObject(UPDATED_BY_FIELD).getBoolean(SHOW_IN_GRID_VIEW_KEY),
+                        "updatedBy should NOT be visible in grid");
+            } catch (JSONException e) {
+                fail("JSON exception: " + e.getMessage());
+            }
+        });
     }
 
     /**
@@ -177,40 +150,24 @@ class TabBuilderAuditFieldsTest {
      */
     @Test
     void auditFieldsAreAlwaysReadOnly() throws Exception {
-        OBContext mockContext = mock(OBContext.class);
-        Language mockLanguage = mock(Language.class);
-        Tab mockTab = mock(Tab.class);
-        Table mockTable = mock(Table.class);
-        KernelUtils mockKernelUtils = mock(KernelUtils.class);
-
+        TestContext ctx = setupTestContext();
         List<Column> columns = createAllAuditColumns();
-        setupBasicMocks(mockContext, mockLanguage, mockTab, mockTable, mockKernelUtils, columns);
+        setupBasicMocks(ctx.context, ctx.language, ctx.tab, ctx.table, ctx.kernelUtils, columns);
 
-        try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
-             MockedStatic<KernelUtils> mockedKernelUtils = mockStatic(KernelUtils.class);
-             MockedStatic<TabProcessor> mockedTabProcessor = mockStatic(TabProcessor.class);
-             MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class,
-                     (mock, context) -> {
-                         JSONObject tabJson = new JSONObject();
-                         when(mock.toJsonObject(any(), any())).thenReturn(tabJson);
-                     })) {
+        executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), result -> {
+            try {
+                JSONObject fields = result.getJSONObject(FIELDS_KEY);
 
-            mockedOBContext.when(OBContext::getOBContext).thenReturn(mockContext);
-            mockedKernelUtils.when(KernelUtils::getInstance).thenReturn(mockKernelUtils);
-            mockedTabProcessor.when(() -> TabProcessor.getTabFields(mockTab))
-                    .thenReturn(new JSONObject());
-
-            TabBuilder tabBuilder = new TabBuilder(mockTab, null);
-            JSONObject result = tabBuilder.toJSON();
-            JSONObject fields = result.getJSONObject(FIELDS_KEY);
-
-            for (String fieldName : new String[]{CREATION_DATE_FIELD, CREATED_BY_FIELD, UPDATED_FIELD, UPDATED_BY_FIELD}) {
-                JSONObject field = fields.getJSONObject(fieldName);
-                assertTrue(field.getBoolean(IS_READ_ONLY_KEY), fieldName + " should be read-only");
-                assertFalse(field.getBoolean(IS_EDITABLE_KEY), fieldName + " should not be editable");
-                assertFalse(field.getBoolean(IS_UPDATABLE_KEY), fieldName + " should not be updatable");
+                for (String fieldName : new String[]{CREATION_DATE_FIELD, CREATED_BY_FIELD, UPDATED_FIELD, UPDATED_BY_FIELD}) {
+                    JSONObject field = fields.getJSONObject(fieldName);
+                    assertTrue(field.getBoolean(IS_READ_ONLY_KEY), fieldName + " should be read-only");
+                    assertFalse(field.getBoolean(IS_EDITABLE_KEY), fieldName + " should not be editable");
+                    assertFalse(field.getBoolean(IS_UPDATABLE_KEY), fieldName + " should not be updatable");
+                }
+            } catch (JSONException e) {
+                fail("JSON exception: " + e.getMessage());
             }
-        }
+        });
     }
 
     /**
@@ -218,49 +175,30 @@ class TabBuilderAuditFieldsTest {
      */
     @Test
     void userReferenceFieldsHaveCorrectMetadata() throws Exception {
-        OBContext mockContext = mock(OBContext.class);
-        Language mockLanguage = mock(Language.class);
-        Tab mockTab = mock(Tab.class);
-        Table mockTable = mock(Table.class);
-        KernelUtils mockKernelUtils = mock(KernelUtils.class);
-
+        TestContext ctx = setupTestContext();
         List<Column> columns = createAllAuditColumns();
-        setupBasicMocks(mockContext, mockLanguage, mockTab, mockTable, mockKernelUtils, columns);
+        setupBasicMocks(ctx.context, ctx.language, ctx.tab, ctx.table, ctx.kernelUtils, columns);
 
-        try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
-             MockedStatic<KernelUtils> mockedKernelUtils = mockStatic(KernelUtils.class);
-             MockedStatic<TabProcessor> mockedTabProcessor = mockStatic(TabProcessor.class);
-             MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class,
-                     (mock, context) -> {
-                         JSONObject tabJson = new JSONObject();
-                         when(mock.toJsonObject(any(), any())).thenReturn(tabJson);
-                     })) {
+        executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), result -> {
+            try {
+                JSONObject fields = result.getJSONObject(FIELDS_KEY);
 
-            mockedOBContext.when(OBContext::getOBContext).thenReturn(mockContext);
-            mockedKernelUtils.when(KernelUtils::getInstance).thenReturn(mockKernelUtils);
-            mockedTabProcessor.when(() -> TabProcessor.getTabFields(mockTab))
-                    .thenReturn(new JSONObject());
+                JSONObject createdBy = fields.getJSONObject(CREATED_BY_FIELD);
+                assertTrue(createdBy.has(REFERENCED_ENTITY_KEY), "createdBy should have referencedEntity");
+                assertEquals(AD_USER_ENTITY, createdBy.getString(REFERENCED_ENTITY_KEY));
+                assertTrue(createdBy.has(SELECTOR_KEY), "createdBy should have selector");
 
-            TabBuilder tabBuilder = new TabBuilder(mockTab, null);
-            JSONObject result = tabBuilder.toJSON();
-            JSONObject fields = result.getJSONObject(FIELDS_KEY);
+                JSONObject updatedBy = fields.getJSONObject(UPDATED_BY_FIELD);
+                assertTrue(updatedBy.has(REFERENCED_ENTITY_KEY), "updatedBy should have referencedEntity");
+                assertEquals(AD_USER_ENTITY, updatedBy.getString(REFERENCED_ENTITY_KEY));
+                assertTrue(updatedBy.has(SELECTOR_KEY), "updatedBy should have selector");
 
-            // Check createdBy
-            JSONObject createdBy = fields.getJSONObject(CREATED_BY_FIELD);
-            assertTrue(createdBy.has(REFERENCED_ENTITY_KEY), "createdBy should have referencedEntity");
-            assertEquals(AD_USER_ENTITY, createdBy.getString(REFERENCED_ENTITY_KEY));
-            assertTrue(createdBy.has(SELECTOR_KEY), "createdBy should have selector");
-
-            // Check updatedBy
-            JSONObject updatedBy = fields.getJSONObject(UPDATED_BY_FIELD);
-            assertTrue(updatedBy.has(REFERENCED_ENTITY_KEY), "updatedBy should have referencedEntity");
-            assertEquals(AD_USER_ENTITY, updatedBy.getString(REFERENCED_ENTITY_KEY));
-            assertTrue(updatedBy.has(SELECTOR_KEY), "updatedBy should have selector");
-
-            // Date fields should not have referencedEntity
-            assertFalse(fields.getJSONObject(CREATION_DATE_FIELD).has(REFERENCED_ENTITY_KEY),
-                    "creationDate should not have referencedEntity");
-        }
+                assertFalse(fields.getJSONObject(CREATION_DATE_FIELD).has(REFERENCED_ENTITY_KEY),
+                        "creationDate should not have referencedEntity");
+            } catch (JSONException e) {
+                fail("JSON exception: " + e.getMessage());
+            }
+        });
     }
 
     /**
@@ -268,51 +206,30 @@ class TabBuilderAuditFieldsTest {
      */
     @Test
     void existingAuditFieldsAreNotOverwritten() throws Exception {
-        OBContext mockContext = mock(OBContext.class);
-        Language mockLanguage = mock(Language.class);
-        Tab mockTab = mock(Tab.class);
-        Table mockTable = mock(Table.class);
-        KernelUtils mockKernelUtils = mock(KernelUtils.class);
-
-        // Use lenient stubs since these columns won't be accessed in this test path
+        TestContext ctx = setupTestContext();
         List<Column> columns = createAllAuditColumnsLenient();
-        setupBasicMocksLenient(mockContext, mockLanguage, mockTab, mockTable, mockKernelUtils, columns);
+        setupBasicMocksLenient(ctx.context, ctx.language, ctx.tab, ctx.table, ctx.kernelUtils, columns);
 
-        try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
-             MockedStatic<KernelUtils> mockedKernelUtils = mockStatic(KernelUtils.class);
-             MockedStatic<TabProcessor> mockedTabProcessor = mockStatic(TabProcessor.class);
-             MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class,
-                     (mock, context) -> {
-                         JSONObject tabJson = new JSONObject();
-                         when(mock.toJsonObject(any(), any())).thenReturn(tabJson);
-                     })) {
+        JSONObject existingFields = new JSONObject();
+        JSONObject customCreationDate = new JSONObject();
+        customCreationDate.put(NAME_KEY, CUSTOM_CREATION_DATE_NAME);
+        customCreationDate.put(SHOW_IN_GRID_VIEW_KEY, false);
+        existingFields.put(CREATION_DATE_FIELD, customCreationDate);
 
-            mockedOBContext.when(OBContext::getOBContext).thenReturn(mockContext);
-            mockedKernelUtils.when(KernelUtils::getInstance).thenReturn(mockKernelUtils);
+        executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, existingFields, result -> {
+            try {
+                JSONObject fields = result.getJSONObject(FIELDS_KEY);
 
-            // Return existing creationDate field
-            JSONObject existingFields = new JSONObject();
-            JSONObject customCreationDate = new JSONObject();
-            customCreationDate.put(NAME_KEY, CUSTOM_CREATION_DATE_NAME);
-            customCreationDate.put(SHOW_IN_GRID_VIEW_KEY, false);
-            existingFields.put(CREATION_DATE_FIELD, customCreationDate);
+                assertEquals(CUSTOM_CREATION_DATE_NAME, fields.getJSONObject(CREATION_DATE_FIELD).getString(NAME_KEY));
+                assertFalse(fields.getJSONObject(CREATION_DATE_FIELD).getBoolean(SHOW_IN_GRID_VIEW_KEY));
 
-            mockedTabProcessor.when(() -> TabProcessor.getTabFields(mockTab))
-                    .thenReturn(existingFields);
-
-            TabBuilder tabBuilder = new TabBuilder(mockTab, null);
-            JSONObject result = tabBuilder.toJSON();
-            JSONObject fields = result.getJSONObject(FIELDS_KEY);
-
-            // Existing field should not be overwritten
-            assertEquals(CUSTOM_CREATION_DATE_NAME, fields.getJSONObject(CREATION_DATE_FIELD).getString(NAME_KEY));
-            assertFalse(fields.getJSONObject(CREATION_DATE_FIELD).getBoolean(SHOW_IN_GRID_VIEW_KEY));
-
-            // Other audit fields should still be added
-            assertTrue(fields.has(CREATED_BY_FIELD));
-            assertTrue(fields.has(UPDATED_FIELD));
-            assertTrue(fields.has(UPDATED_BY_FIELD));
-        }
+                assertTrue(fields.has(CREATED_BY_FIELD));
+                assertTrue(fields.has(UPDATED_FIELD));
+                assertTrue(fields.has(UPDATED_BY_FIELD));
+            } catch (JSONException e) {
+                fail("JSON exception: " + e.getMessage());
+            }
+        });
     }
 
     /**
@@ -320,40 +237,22 @@ class TabBuilderAuditFieldsTest {
      */
     @Test
     void missingAuditColumnsAreSkippedGracefully() throws Exception {
-        OBContext mockContext = mock(OBContext.class);
-        Language mockLanguage = mock(Language.class);
-        Tab mockTab = mock(Tab.class);
-        Table mockTable = mock(Table.class);
-        KernelUtils mockKernelUtils = mock(KernelUtils.class);
-
-        // Only include creationDate column
+        TestContext ctx = setupTestContext();
         List<Column> columns = List.of(createMockColumn(CREATED_ID, CREATED_ID, CREATION_DATE_NAME));
-        setupBasicMocks(mockContext, mockLanguage, mockTab, mockTable, mockKernelUtils, columns);
+        setupBasicMocks(ctx.context, ctx.language, ctx.tab, ctx.table, ctx.kernelUtils, columns);
 
-        try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
-             MockedStatic<KernelUtils> mockedKernelUtils = mockStatic(KernelUtils.class);
-             MockedStatic<TabProcessor> mockedTabProcessor = mockStatic(TabProcessor.class);
-             MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class,
-                     (mock, context) -> {
-                         JSONObject tabJson = new JSONObject();
-                         when(mock.toJsonObject(any(), any())).thenReturn(tabJson);
-                     })) {
+        executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), result -> {
+            try {
+                JSONObject fields = result.getJSONObject(FIELDS_KEY);
 
-            mockedOBContext.when(OBContext::getOBContext).thenReturn(mockContext);
-            mockedKernelUtils.when(KernelUtils::getInstance).thenReturn(mockKernelUtils);
-            mockedTabProcessor.when(() -> TabProcessor.getTabFields(mockTab))
-                    .thenReturn(new JSONObject());
-
-            TabBuilder tabBuilder = new TabBuilder(mockTab, null);
-            JSONObject result = tabBuilder.toJSON();
-            JSONObject fields = result.getJSONObject(FIELDS_KEY);
-
-            // Only creationDate should be present
-            assertTrue(fields.has(CREATION_DATE_FIELD));
-            assertFalse(fields.has(CREATED_BY_FIELD));
-            assertFalse(fields.has(UPDATED_FIELD));
-            assertFalse(fields.has(UPDATED_BY_FIELD));
-        }
+                assertTrue(fields.has(CREATION_DATE_FIELD));
+                assertFalse(fields.has(CREATED_BY_FIELD));
+                assertFalse(fields.has(UPDATED_FIELD));
+                assertFalse(fields.has(UPDATED_BY_FIELD));
+            } catch (JSONException e) {
+                fail("JSON exception: " + e.getMessage());
+            }
+        });
     }
 
     /**
@@ -361,15 +260,32 @@ class TabBuilderAuditFieldsTest {
      */
     @Test
     void auditFieldsHaveCorrectGridPositions() throws Exception {
-        OBContext mockContext = mock(OBContext.class);
-        Language mockLanguage = mock(Language.class);
-        Tab mockTab = mock(Tab.class);
-        Table mockTable = mock(Table.class);
-        KernelUtils mockKernelUtils = mock(KernelUtils.class);
-
+        TestContext ctx = setupTestContext();
         List<Column> columns = createAllAuditColumns();
-        setupBasicMocks(mockContext, mockLanguage, mockTab, mockTable, mockKernelUtils, columns);
+        setupBasicMocks(ctx.context, ctx.language, ctx.tab, ctx.table, ctx.kernelUtils, columns);
 
+        executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), result -> {
+            try {
+                JSONObject fields = result.getJSONObject(FIELDS_KEY);
+
+                assertEquals(9000, fields.getJSONObject(CREATION_DATE_FIELD).getInt(GRID_POSITION_KEY));
+                assertEquals(9001, fields.getJSONObject(CREATED_BY_FIELD).getInt(GRID_POSITION_KEY));
+                assertEquals(9002, fields.getJSONObject(UPDATED_FIELD).getInt(GRID_POSITION_KEY));
+                assertEquals(9003, fields.getJSONObject(UPDATED_BY_FIELD).getInt(GRID_POSITION_KEY));
+            } catch (JSONException e) {
+                fail("JSON exception: " + e.getMessage());
+            }
+        });
+    }
+
+    // Helper methods
+
+    /**
+     * Executes a TabBuilder test with common mock setup
+     */
+    private void executeTabBuilderTest(OBContext mockContext, KernelUtils mockKernelUtils,
+                                       Tab mockTab, JSONObject tabFields,
+                                       Consumer<JSONObject> assertions) {
         try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
              MockedStatic<KernelUtils> mockedKernelUtils = mockStatic(KernelUtils.class);
              MockedStatic<TabProcessor> mockedTabProcessor = mockStatic(TabProcessor.class);
@@ -381,21 +297,27 @@ class TabBuilderAuditFieldsTest {
 
             mockedOBContext.when(OBContext::getOBContext).thenReturn(mockContext);
             mockedKernelUtils.when(KernelUtils::getInstance).thenReturn(mockKernelUtils);
-            mockedTabProcessor.when(() -> TabProcessor.getTabFields(mockTab))
-                    .thenReturn(new JSONObject());
+            mockedTabProcessor.when(() -> TabProcessor.getTabFields(mockTab)).thenReturn(tabFields);
 
             TabBuilder tabBuilder = new TabBuilder(mockTab, null);
             JSONObject result = tabBuilder.toJSON();
-            JSONObject fields = result.getJSONObject(FIELDS_KEY);
 
-            assertEquals(9000, fields.getJSONObject(CREATION_DATE_FIELD).getInt(GRID_POSITION_KEY));
-            assertEquals(9001, fields.getJSONObject(CREATED_BY_FIELD).getInt(GRID_POSITION_KEY));
-            assertEquals(9002, fields.getJSONObject(UPDATED_FIELD).getInt(GRID_POSITION_KEY));
-            assertEquals(9003, fields.getJSONObject(UPDATED_BY_FIELD).getInt(GRID_POSITION_KEY));
+            assertions.accept(result);
+        } catch (Exception e) {
+            fail("Unexpected exception: " + e.getMessage());
         }
     }
 
-    // Helper methods
+    private TestContext setupTestContext() {
+        return new TestContext(
+                mock(OBContext.class),
+                mock(Language.class),
+                mock(Tab.class),
+                mock(Table.class),
+                mock(KernelUtils.class)
+        );
+    }
+
     private Column createMockColumn(String id, String dbName, String name) {
         Column column = mock(Column.class);
         when(column.getId()).thenReturn(id);
@@ -460,5 +382,24 @@ class TabBuilderAuditFieldsTest {
         lenient().when(mockTable.getADColumnList()).thenReturn(columns);
         lenient().when(mockTab.getTabLevel()).thenReturn(0L);
         lenient().when(mockKernelUtils.getParentTab(mockTab)).thenReturn(null);
+    }
+
+    /**
+     * Context holder for test mocks
+     */
+    private static class TestContext {
+        final OBContext context;
+        final Language language;
+        final Tab tab;
+        final Table table;
+        final KernelUtils kernelUtils;
+
+        TestContext(OBContext context, Language language, Tab tab, Table table, KernelUtils kernelUtils) {
+            this.context = context;
+            this.language = language;
+            this.tab = tab;
+            this.table = table;
+            this.kernelUtils = kernelUtils;
+        }
     }
 }
