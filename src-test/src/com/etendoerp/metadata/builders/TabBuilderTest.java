@@ -59,6 +59,7 @@ class TabBuilderAuditFieldsTest {
     private static final String IS_UPDATABLE_KEY = "isUpdatable";
     private static final String SELECTOR_KEY = "selector";
     private static final String NAME_KEY = "name";
+    private static final String JSON_EXCEPTION = "JSON exception";
 
     // Test data
     private static final String TEST_TABLE_NAME = "TestTable";
@@ -107,7 +108,7 @@ class TabBuilderAuditFieldsTest {
                 assertTrue(fields.has(UPDATED_FIELD), "Should have updated field");
                 assertTrue(fields.has(UPDATED_BY_FIELD), "Should have updatedBy field");
             } catch (JSONException e) {
-                fail("JSON exception: " + e.getMessage());
+                fail(JSON_EXCEPTION + ": " + e.getMessage());
             }
         });
     }
@@ -140,7 +141,7 @@ class TabBuilderAuditFieldsTest {
                 assertFalse(fields.getJSONObject(UPDATED_BY_FIELD).getBoolean(SHOW_IN_GRID_VIEW_KEY),
                         "updatedBy should NOT be visible in grid");
             } catch (JSONException e) {
-                fail("JSON exception: " + e.getMessage());
+                fail(JSON_EXCEPTION + ": " + e.getMessage());
             }
         });
     }
@@ -165,7 +166,7 @@ class TabBuilderAuditFieldsTest {
                     assertFalse(field.getBoolean(IS_UPDATABLE_KEY), fieldName + " should not be updatable");
                 }
             } catch (JSONException e) {
-                fail("JSON exception: " + e.getMessage());
+                fail(JSON_EXCEPTION + ": " + e.getMessage());
             }
         });
     }
@@ -196,7 +197,7 @@ class TabBuilderAuditFieldsTest {
                 assertFalse(fields.getJSONObject(CREATION_DATE_FIELD).has(REFERENCED_ENTITY_KEY),
                         "creationDate should not have referencedEntity");
             } catch (JSONException e) {
-                fail("JSON exception: " + e.getMessage());
+                fail(JSON_EXCEPTION + ": " + e.getMessage());
             }
         });
     }
@@ -227,7 +228,7 @@ class TabBuilderAuditFieldsTest {
                 assertTrue(fields.has(UPDATED_FIELD));
                 assertTrue(fields.has(UPDATED_BY_FIELD));
             } catch (JSONException e) {
-                fail("JSON exception: " + e.getMessage());
+                fail(JSON_EXCEPTION + ": " + e.getMessage());
             }
         });
     }
@@ -250,7 +251,7 @@ class TabBuilderAuditFieldsTest {
                 assertFalse(fields.has(UPDATED_FIELD));
                 assertFalse(fields.has(UPDATED_BY_FIELD));
             } catch (JSONException e) {
-                fail("JSON exception: " + e.getMessage());
+                fail(JSON_EXCEPTION + ": " + e.getMessage());
             }
         });
     }
@@ -273,7 +274,7 @@ class TabBuilderAuditFieldsTest {
                 assertEquals(9002, fields.getJSONObject(UPDATED_FIELD).getInt(GRID_POSITION_KEY));
                 assertEquals(9003, fields.getJSONObject(UPDATED_BY_FIELD).getInt(GRID_POSITION_KEY));
             } catch (JSONException e) {
-                fail("JSON exception: " + e.getMessage());
+                fail(JSON_EXCEPTION + ": " + e.getMessage());
             }
         });
     }
