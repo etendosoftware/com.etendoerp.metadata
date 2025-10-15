@@ -34,7 +34,8 @@ public class LegacyUtils {
     private static final Set<String> LEGACY_PROCESS_IDS = Set.of(
             "3663",
             "4242",
-            "3670"
+            "3670",
+            "4248"
     );
 
     /**
