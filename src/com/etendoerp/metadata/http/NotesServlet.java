@@ -420,19 +420,16 @@ public class NotesServlet extends BaseWebServiceServlet {
         }
     }
 
-    @Override
     public void doGet(String path, HttpServletRequest request, HttpServletResponse response)
             throws Exception {
         handleGet(request, response);
     }
 
-    @Override
     public void doPost(String path, HttpServletRequest request, HttpServletResponse response)
             throws Exception {
         handlePost(request, response);
     }
 
-    @Override
     public void doDelete(String path, HttpServletRequest request, HttpServletResponse response)
             throws Exception {
         handleDelete(request, response);
