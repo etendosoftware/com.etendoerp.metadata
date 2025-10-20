@@ -1,5 +1,6 @@
 package com.etendoerp.metadata.http;
 
+import static com.etendoerp.metadata.MetadataTestConstants.*;
 import static org.junit.Assert.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -16,7 +17,9 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.http.HttpStatus;
+import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONObject;
+import org.hibernate.criterion.Restrictions;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -63,7 +66,6 @@ public class NoteServletTest extends OBBaseTest {
     private static final String PARAM_RECORD = "record";
     private static final String PARAM_NOTE = "note";
 
-
     @Mock
     private HttpServletRequest mockRequest;
 
@@ -94,15 +96,13 @@ public class NoteServletTest extends OBBaseTest {
     @Mock
     private OBCriteria<Note> mockCriteria;
 
-    @Mock
-    private java.sql.Connection mockConnection;
-
     private NotesServlet servlet;
     private StringWriter stringWriter;
+    private PrintWriter printWriter;
 
     /**
      * Sets up the test environment before each test method execution.
-     * Initialize mocks and configures common behavior.
+     * Initializes mocks and configures common behavior.
      */
     @Override
     @Before
@@ -110,7 +110,7 @@ public class NoteServletTest extends OBBaseTest {
         super.setUp();
         servlet = new NotesServlet();
         stringWriter = new StringWriter();
-        PrintWriter printWriter = new PrintWriter(stringWriter);
+        printWriter = new PrintWriter(stringWriter);
 
         when(mockResponse.getWriter()).thenReturn(printWriter);
         when(mockContext.getUser()).thenReturn(mockUser);
@@ -375,7 +375,6 @@ public class NoteServletTest extends OBBaseTest {
     public void testDeleteNote_Success() throws Exception {
         // Arrange
         when(mockRequest.getPathInfo()).thenReturn("/" + TEST_NOTE_ID);
-        when(mockDal.getConnection()).thenReturn(mockConnection);
         when(mockDal.get(Note.class, TEST_NOTE_ID)).thenReturn(mockNote);
         when(mockNote.getCreatedBy()).thenReturn(mockUser);
         when(mockUser.getId()).thenReturn(TEST_USER_ID);
@@ -391,10 +390,8 @@ public class NoteServletTest extends OBBaseTest {
 
             // Assert
             verify(mockResponse).setStatus(HttpStatus.SC_OK);
-            verify(mockConnection).setAutoCommit(false);
             verify(mockDal).remove(mockNote);
             verify(mockDal).flush();
-            verify(mockDal).commitAndClose();
 
             String responseContent = stringWriter.toString();
             assertTrue("Response should indicate success",
@@ -429,6 +426,7 @@ public class NoteServletTest extends OBBaseTest {
     public void testDeleteNote_NoteNotFound() throws Exception {
         // Arrange
         when(mockRequest.getPathInfo()).thenReturn("/" + TEST_NOTE_ID);
+        when(mockDal.get(Note.class, TEST_NOTE_ID)).thenReturn(null);
 
         try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
              MockedStatic<OBContext> contextMock = mockStatic(OBContext.class)) {
@@ -436,16 +434,11 @@ public class NoteServletTest extends OBBaseTest {
             dalMock.when(OBDal::getInstance).thenReturn(mockDal);
             contextMock.when(OBContext::getOBContext).thenReturn(mockContext);
 
-            when(mockDal.getConnection()).thenReturn(mockConnection);
-            when(mockDal.get(Note.class, TEST_NOTE_ID)).thenReturn(null);
-
             // Act
             servlet.doDelete(mockRequest, mockResponse);
 
             // Assert
             verify(mockResponse).setStatus(HttpStatus.SC_NOT_FOUND);
-            verify(mockConnection).setAutoCommit(false);
-            verify(mockDal).rollbackAndClose();
 
             String responseContent = stringWriter.toString();
             assertTrue("Error message should mention note not found",
@@ -464,25 +457,23 @@ public class NoteServletTest extends OBBaseTest {
         User differentUser = mock(User.class);
         when(differentUser.getId()).thenReturn(DIFFERENT_USER_ID);
 
+        when(mockDal.get(Note.class, TEST_NOTE_ID)).thenReturn(mockNote);
+        when(mockNote.getCreatedBy()).thenReturn(differentUser);
+        when(mockUser.getId()).thenReturn(TEST_USER_ID);
+
         try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
              MockedStatic<OBContext> contextMock = mockStatic(OBContext.class)) {
 
             dalMock.when(OBDal::getInstance).thenReturn(mockDal);
             contextMock.when(OBContext::getOBContext).thenReturn(mockContext);
 
-            when(mockDal.getConnection()).thenReturn(mockConnection);
-            when(mockDal.get(Note.class, TEST_NOTE_ID)).thenReturn(mockNote);
-            when(mockNote.getCreatedBy()).thenReturn(differentUser);
-            when(mockUser.getId()).thenReturn(TEST_USER_ID);
-
             // Act
             servlet.doDelete(mockRequest, mockResponse);
 
             // Assert
             verify(mockResponse).setStatus(HttpStatus.SC_FORBIDDEN);
-            verify(mockConnection).setAutoCommit(false);
-            verify(mockDal).rollbackAndClose();
             verify(mockDal, never()).remove(any());
+            verify(mockDal).rollbackAndClose();
 
             String responseContent = stringWriter.toString();
             assertTrue("Error message should mention insufficient permissions",
@@ -497,6 +488,9 @@ public class NoteServletTest extends OBBaseTest {
     public void testDeleteNote_NullCreator() throws Exception {
         // Arrange
         when(mockRequest.getPathInfo()).thenReturn("/" + TEST_NOTE_ID);
+        when(mockDal.get(Note.class, TEST_NOTE_ID)).thenReturn(mockNote);
+        when(mockNote.getCreatedBy()).thenReturn(null); // Null creator
+        when(mockNote.getId()).thenReturn(TEST_NOTE_ID);
 
         try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
              MockedStatic<OBContext> contextMock = mockStatic(OBContext.class)) {
@@ -504,19 +498,13 @@ public class NoteServletTest extends OBBaseTest {
             dalMock.when(OBDal::getInstance).thenReturn(mockDal);
             contextMock.when(OBContext::getOBContext).thenReturn(mockContext);
 
-            when(mockDal.getConnection()).thenReturn(mockConnection);
-            when(mockDal.get(Note.class, TEST_NOTE_ID)).thenReturn(mockNote);
-            when(mockNote.getCreatedBy()).thenReturn(null); // Null creator
-            when(mockNote.getId()).thenReturn(TEST_NOTE_ID);
-
             // Act
             servlet.doDelete(mockRequest, mockResponse);
 
             // Assert
             verify(mockResponse).setStatus(HttpStatus.SC_FORBIDDEN);
-            verify(mockConnection).setAutoCommit(false);
-            verify(mockDal).rollbackAndClose();
             verify(mockDal, never()).remove(any());
+            verify(mockDal).rollbackAndClose();
 
             String responseContent = stringWriter.toString();
             assertTrue("Error message should mention insufficient permissions",

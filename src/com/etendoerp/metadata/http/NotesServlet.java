@@ -192,13 +192,11 @@ public class NotesServlet extends BaseWebServiceServlet {
 
         try {
             OBContext.setAdminMode(true);
-            OBDal.getInstance().getConnection().setAutoCommit(false);
             Note note = OBDal.getInstance().get(Note.class, noteId);
 
             if (note == null) {
                 sendErrorResponse(response, HttpStatus.SC_NOT_FOUND,
                         "Note not found: " + noteId);
-                OBDal.getInstance().rollbackAndClose();
                 return;
             }
 
@@ -210,7 +208,6 @@ public class NotesServlet extends BaseWebServiceServlet {
             }
 
             deleteNote(note);
-            OBDal.getInstance().commitAndClose();
             JSONObject successResponse = new JSONObject();
             successResponse.put("success", true);
             successResponse.put("id", noteId);
