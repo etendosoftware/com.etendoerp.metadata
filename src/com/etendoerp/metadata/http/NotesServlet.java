@@ -203,7 +203,6 @@ public class NotesServlet extends BaseWebServiceServlet {
             if (!canDeleteNote(note)) {
                 sendErrorResponse(response, HttpStatus.SC_FORBIDDEN,
                         "Insufficient permissions to delete note");
-                OBDal.getInstance().rollbackAndClose();
                 return;
             }
 
@@ -215,7 +214,6 @@ public class NotesServlet extends BaseWebServiceServlet {
             sendJsonResponse(response, HttpStatus.SC_OK, successResponse);
         } catch (Exception e) {
             log.error("Error in handleDelete", e);
-            OBDal.getInstance().rollbackAndClose();
             sendErrorResponse(response, HttpStatus.SC_INTERNAL_SERVER_ERROR,
                     ERROR_PROCESSING_REQUEST + e.getMessage());
         } finally {

@@ -17,9 +17,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.http.HttpStatus;
-import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONObject;
-import org.hibernate.criterion.Restrictions;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -98,11 +96,10 @@ public class NoteServletTest extends OBBaseTest {
 
     private NotesServlet servlet;
     private StringWriter stringWriter;
-    private PrintWriter printWriter;
 
     /**
      * Sets up the test environment before each test method execution.
-     * Initializes mocks and configures common behavior.
+     * Initialize mocks and configures common behavior.
      */
     @Override
     @Before
@@ -110,7 +107,7 @@ public class NoteServletTest extends OBBaseTest {
         super.setUp();
         servlet = new NotesServlet();
         stringWriter = new StringWriter();
-        printWriter = new PrintWriter(stringWriter);
+        PrintWriter printWriter = new PrintWriter(stringWriter);
 
         when(mockResponse.getWriter()).thenReturn(printWriter);
         when(mockContext.getUser()).thenReturn(mockUser);
@@ -473,7 +470,6 @@ public class NoteServletTest extends OBBaseTest {
             // Assert
             verify(mockResponse).setStatus(HttpStatus.SC_FORBIDDEN);
             verify(mockDal, never()).remove(any());
-            verify(mockDal).rollbackAndClose();
 
             String responseContent = stringWriter.toString();
             assertTrue("Error message should mention insufficient permissions",
@@ -504,7 +500,6 @@ public class NoteServletTest extends OBBaseTest {
             // Assert
             verify(mockResponse).setStatus(HttpStatus.SC_FORBIDDEN);
             verify(mockDal, never()).remove(any());
-            verify(mockDal).rollbackAndClose();
 
             String responseContent = stringWriter.toString();
             assertTrue("Error message should mention insufficient permissions",
