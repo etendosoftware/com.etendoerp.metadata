@@ -75,6 +75,20 @@ public class ForwarderServlet extends BaseWebService {
    */
   private void processForwardRequest(String path, HttpServletRequest request, HttpServletResponse response)
           throws IOException, ServletException {
-    WeldUtils.getInstanceFromStaticBeanManager(org.openbravo.service.datasource.DataSourceServlet.class).doGet(request, response);
+
+    org.openbravo.service.datasource.DataSourceServlet dataSourceServlet =
+            WeldUtils.getInstanceFromStaticBeanManager(org.openbravo.service.datasource.DataSourceServlet.class);
+
+    String method = request.getMethod();
+
+    if ("POST".equalsIgnoreCase(method)) {
+      dataSourceServlet.doPost(request, response);
+    } else if ("DELETE".equalsIgnoreCase(method)) {
+      dataSourceServlet.doDelete(request, response);
+    } else if ("PUT".equalsIgnoreCase(method)) {
+      dataSourceServlet.doPut(request, response);
+    } else {
+      dataSourceServlet.doGet(request, response);
+    }
   }
 }
