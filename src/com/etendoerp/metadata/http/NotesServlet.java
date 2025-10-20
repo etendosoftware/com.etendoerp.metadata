@@ -192,21 +192,25 @@ public class NotesServlet extends BaseWebServiceServlet {
 
         try {
             OBContext.setAdminMode(true);
+            OBDal.getInstance().getConnection().setAutoCommit(false);
             Note note = OBDal.getInstance().get(Note.class, noteId);
 
             if (note == null) {
                 sendErrorResponse(response, HttpStatus.SC_NOT_FOUND,
                         "Note not found: " + noteId);
+                OBDal.getInstance().rollbackAndClose();
                 return;
             }
 
             if (!canDeleteNote(note)) {
                 sendErrorResponse(response, HttpStatus.SC_FORBIDDEN,
                         "Insufficient permissions to delete note");
+                OBDal.getInstance().rollbackAndClose();
                 return;
             }
 
             deleteNote(note);
+            OBDal.getInstance().commitAndClose();
             JSONObject successResponse = new JSONObject();
             successResponse.put("success", true);
             successResponse.put("id", noteId);
@@ -214,6 +218,7 @@ public class NotesServlet extends BaseWebServiceServlet {
             sendJsonResponse(response, HttpStatus.SC_OK, successResponse);
         } catch (Exception e) {
             log.error("Error in handleDelete", e);
+            OBDal.getInstance().rollbackAndClose();
             sendErrorResponse(response, HttpStatus.SC_INTERNAL_SERVER_ERROR,
                     ERROR_PROCESSING_REQUEST + e.getMessage());
         } finally {
@@ -306,6 +311,10 @@ public class NotesServlet extends BaseWebServiceServlet {
     private boolean canDeleteNote(Note note) {
         try {
             String currentUserId = OBContext.getOBContext().getUser().getId();
+            if (note.getCreatedBy() == null) {
+                log.error("Note creator is null for note: " + note.getId());
+                return false;
+            }
             String creatorId = note.getCreatedBy().getId();
 
             return currentUserId.equals(creatorId);
