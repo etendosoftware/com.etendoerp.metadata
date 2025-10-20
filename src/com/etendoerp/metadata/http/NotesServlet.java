@@ -400,16 +400,7 @@ public class NotesServlet extends BaseWebServiceServlet {
         response.setContentType(CONTENT_TYPE_JSON);
         response.setCharacterEncoding(CHARSET_UTF8);
 
-        String jsonString;
-        if (jsonData instanceof JSONObject) {
-            jsonString = jsonData.toString();
-        } else if (jsonData instanceof JSONArray) {
-            jsonString = jsonData.toString();
-        } else {
-            jsonString = jsonData.toString();
-        }
-
-        response.getWriter().write(jsonString);
+        response.getWriter().write(jsonData.toString());
         response.getWriter().flush();
     }
 
