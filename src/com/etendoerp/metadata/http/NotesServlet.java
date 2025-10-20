@@ -19,7 +19,6 @@ package com.etendoerp.metadata.http;
 
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.Serial;
 import java.text.SimpleDateFormat;
 import java.util.List;
 import java.util.TimeZone;
@@ -54,15 +53,14 @@ import org.openbravo.service.web.BaseWebServiceServlet;
  */
 public class NotesServlet extends BaseWebServiceServlet {
     private static final Logger log = LogManager.getLogger(NotesServlet.class);
-    @Serial
     private static final long serialVersionUID = 1L;
-
     private static final String PARAM_TABLE = "table";
     private static final String PARAM_RECORD = "record";
     private static final String PARAM_NOTE = "note";
     private static final String CONTENT_TYPE_JSON = "application/json";
     private static final String CHARSET_UTF8 = "UTF-8";
     private static final String ISO_DATE_FORMAT = "yyyy-MM-dd'T'HH:mm:ss'Z'";
+    private static final String ERROR_PROCESSING_REQUEST = "Error processing request: ";
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
@@ -72,7 +70,7 @@ public class NotesServlet extends BaseWebServiceServlet {
         } catch (Exception e) {
             log.error("Error processing GET request", e);
             sendErrorResponse(response, HttpStatus.SC_INTERNAL_SERVER_ERROR,
-                    "Error processing request: " + e.getMessage());
+                    ERROR_PROCESSING_REQUEST + e.getMessage());
         }
     }
 
@@ -84,7 +82,7 @@ public class NotesServlet extends BaseWebServiceServlet {
         } catch (Exception e) {
             log.error("Error processing POST request", e);
             sendErrorResponse(response, HttpStatus.SC_INTERNAL_SERVER_ERROR,
-                    "Error processing request: " + e.getMessage());
+                    ERROR_PROCESSING_REQUEST + e.getMessage());
         }
     }
 
@@ -96,7 +94,7 @@ public class NotesServlet extends BaseWebServiceServlet {
         } catch (Exception e) {
             log.error("Error processing DELETE request", e);
             sendErrorResponse(response, HttpStatus.SC_INTERNAL_SERVER_ERROR,
-                    "Error processing request: " + e.getMessage());
+                    ERROR_PROCESSING_REQUEST + e.getMessage());
         }
     }
 
@@ -201,6 +199,13 @@ public class NotesServlet extends BaseWebServiceServlet {
                         "Note not found: " + noteId);
                 return;
             }
+
+            if (!canDeleteNote(note)) {
+                sendErrorResponse(response, HttpStatus.SC_FORBIDDEN,
+                        "Insufficient permissions to delete note");
+                return;
+            }
+
             deleteNote(note);
             JSONObject successResponse = new JSONObject();
             successResponse.put("success", true);
@@ -210,7 +215,7 @@ public class NotesServlet extends BaseWebServiceServlet {
         } catch (Exception e) {
             log.error("Error in handleDelete", e);
             sendErrorResponse(response, HttpStatus.SC_INTERNAL_SERVER_ERROR,
-                    "Error processing request: " + e.getMessage());
+                    ERROR_PROCESSING_REQUEST + e.getMessage());
         } finally {
             OBContext.restorePreviousMode();
         }
@@ -269,11 +274,9 @@ public class NotesServlet extends BaseWebServiceServlet {
 
             OBDal.getInstance().save(note);
             OBDal.getInstance().flush();
-            OBDal.getInstance().commitAndClose();
 
             return note;
         } catch (Exception e) {
-            OBDal.getInstance().rollbackAndClose();
             throw new OBException("Error creating note", e);
         } finally {
             OBContext.restorePreviousMode();
@@ -302,14 +305,11 @@ public class NotesServlet extends BaseWebServiceServlet {
      * Checks if the current user can delete a note
      * Validates if user is the creator or has appropriate permissions
      */
-    @SuppressWarnings("unused")
     private boolean canDeleteNote(Note note) {
         try {
             String currentUserId = OBContext.getOBContext().getUser().getId();
             String creatorId = note.getCreatedBy().getId();
 
-            // User can delete if they created the note
-            // Add additional permission checks here if needed
             return currentUserId.equals(creatorId);
         } catch (Exception e) {
             log.error("Error checking delete permissions", e);
@@ -341,8 +341,8 @@ public class NotesServlet extends BaseWebServiceServlet {
 
         json.put("id", note.getId());
         json.put("note", note.getNote());
-        json.put("table", note.getTable().getId());
-        json.put("record", note.getRecord());
+        json.put(PARAM_TABLE, note.getTable().getId());
+        json.put(PARAM_RECORD, note.getRecord());
         json.put("createdBy", note.getCreatedBy().getId());
         json.put("createdBy$_identifier", note.getCreatedBy().getIdentifier());
 
@@ -397,16 +397,16 @@ public class NotesServlet extends BaseWebServiceServlet {
      * Sends a JSON response
      */
     private void sendJsonResponse(HttpServletResponse response, int statusCode, Object jsonData)
-            throws IOException, JSONException {
+            throws IOException {
         response.setStatus(statusCode);
         response.setContentType(CONTENT_TYPE_JSON);
         response.setCharacterEncoding(CHARSET_UTF8);
 
         String jsonString;
         if (jsonData instanceof JSONObject) {
-            jsonString = ((JSONObject) jsonData).toString();
+            jsonString = jsonData.toString();
         } else if (jsonData instanceof JSONArray) {
-            jsonString = ((JSONArray) jsonData).toString();
+            jsonString = jsonData.toString();
         } else {
             jsonString = jsonData.toString();
         }
