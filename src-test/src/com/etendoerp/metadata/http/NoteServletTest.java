@@ -63,6 +63,7 @@ public class NoteServletTest extends OBBaseTest {
     private static final String PARAM_RECORD = "record";
     private static final String PARAM_NOTE = "note";
 
+
     @Mock
     private HttpServletRequest mockRequest;
 
@@ -98,11 +99,10 @@ public class NoteServletTest extends OBBaseTest {
 
     private NotesServlet servlet;
     private StringWriter stringWriter;
-    private PrintWriter printWriter;
 
     /**
      * Sets up the test environment before each test method execution.
-     * Initializes mocks and configures common behavior.
+     * Initialize mocks and configures common behavior.
      */
     @Override
     @Before
@@ -110,7 +110,7 @@ public class NoteServletTest extends OBBaseTest {
         super.setUp();
         servlet = new NotesServlet();
         stringWriter = new StringWriter();
-        printWriter = new PrintWriter(stringWriter);
+        PrintWriter printWriter = new PrintWriter(stringWriter);
 
         when(mockResponse.getWriter()).thenReturn(printWriter);
         when(mockContext.getUser()).thenReturn(mockUser);
