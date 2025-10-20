@@ -292,9 +292,7 @@ public class NotesServlet extends BaseWebServiceServlet {
 
             OBDal.getInstance().remove(note);
             OBDal.getInstance().flush();
-            OBDal.getInstance().commitAndClose();
         } catch (Exception e) {
-            OBDal.getInstance().rollbackAndClose();
             throw new OBException("Error deleting note", e);
         } finally {
             OBContext.restorePreviousMode();
