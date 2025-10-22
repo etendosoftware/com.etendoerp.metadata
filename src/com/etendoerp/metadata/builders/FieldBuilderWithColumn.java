@@ -135,6 +135,9 @@ public class FieldBuilderWithColumn extends FieldBuilder {
             referenced = KernelUtils.getProperty(field).getReferencedProperty();
         } catch (Exception e) {
             // If any error occurs while getting the referenced property, skip adding referenced property info
+            String errorMessage = String.format("Error retrieving referenced property for field %s: %s",
+                    field.getId(), e.getMessage());
+            logger.warn(errorMessage, e);
             return;
         }
 
@@ -199,6 +202,9 @@ public class FieldBuilderWithColumn extends FieldBuilder {
             referenced = KernelUtils.getProperty(field).getReferencedProperty();
         } catch (Exception e) {
             // If any error occurs while getting the referenced property, skip adding referenced table info
+            String errorMessage = String.format("Error retrieving referenced property for field %s: %s",
+                    field.getId(), e.getMessage());
+            logger.warn(errorMessage, e);
             return;
         }
 
