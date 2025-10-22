@@ -315,6 +315,7 @@ public abstract class FieldBuilder extends Builder {
             listJson.put("id", list.getId());
             listJson.put("value", list.getSearchKey());
             listJson.put("label", list.get(org.openbravo.model.ad.domain.List.PROPERTY_NAME, language, list.getId()));
+            listJson.put("color", list.get(org.openbravo.model.ad.domain.List.PROPERTY_ETMETACOLOR, language, list.getId()));
 
             result.put(listJson);
         }
