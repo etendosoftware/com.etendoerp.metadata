@@ -814,13 +814,23 @@ public class AttachmentsServletTest extends OBBaseTest {
             contextMock.when(OBContext::getOBContext).thenReturn(mockContext);
             when(mockDal.get(Tab.class, INVALID_TAB_ID)).thenReturn(null);
 
-            // Act
             servlet.doPost(mockRequest, mockResponse);
 
-            // Assert
             verify(mockResponse).setStatus(HttpStatus.SC_BAD_REQUEST);
-            String responseContent = stringWriter.toString();
-            assertTrue("Error message should mention invalid tabId",
+
+            String fromWriter = stringWriter.toString();
+            String fromStream = outputStream.toString();
+
+            System.out.println("=== RESPONSE DEBUG ===");
+            System.out.println("From Writer: [" + fromWriter + "]");
+            System.out.println("From Stream: [" + fromStream + "]");
+            System.out.println("=====================");
+
+            String responseContent = !fromWriter.isEmpty() ? fromWriter : fromStream;
+
+            assertFalse("Response should not be empty", responseContent.isEmpty());
+
+            assertTrue(ERROR_MSG_INVALID_TAB,
                     responseContent.contains("Invalid tabId"));
         }
     }
