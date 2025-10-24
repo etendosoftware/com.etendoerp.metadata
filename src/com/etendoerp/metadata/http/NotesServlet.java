@@ -37,21 +37,21 @@ import org.codehaus.jettison.json.JSONObject;
 import org.hibernate.criterion.Restrictions;
 import org.openbravo.base.exception.OBException;
 import org.openbravo.base.provider.OBProvider;
+import org.openbravo.base.secureApp.HttpSecureAppServlet;
 import org.openbravo.client.application.Note;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBCriteria;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.datamodel.Table;
-import org.openbravo.service.web.BaseWebServiceServlet;
 
 /**
  * Servlet to handle notes operations as a REST API endpoint.
  * Provides GET (fetch), POST (create), and DELETE operations for AD_Note entities.
  * This servlet expects JWT authentication to be handled by the surrounding infrastructure.
  * The OBContext should already be established when requests reach this servlet.
- * Registered path: /sws/com.etendoerp.metadata.notes
+ * Registered path: /notes/*
  */
-public class NotesServlet extends BaseWebServiceServlet {
+public class NotesServlet extends HttpSecureAppServlet {
     private static final Logger log = LogManager.getLogger(NotesServlet.class);
     private static final long serialVersionUID = 1L;
     private static final String PARAM_TABLE = "table";
@@ -63,7 +63,7 @@ public class NotesServlet extends BaseWebServiceServlet {
     private static final String ERROR_PROCESSING_REQUEST = "Error processing request: ";
 
     @Override
-    protected void doGet(HttpServletRequest request, HttpServletResponse response)
+    public void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         try {
             handleGet(request, response);
