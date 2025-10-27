@@ -123,12 +123,23 @@ public class FieldBuilderWithColumn extends FieldBuilder {
      * Adds referenced entity information to the field JSON for foreign key fields.
      * Determines the referenced entity, window, and tab for navigation purposes.
      * Only processes fields that have a referenced property (foreign key relationship).
+     * Any errors during retrieval are silently ignored to avoid breaking the JSON structure.
      *
      * @param field The field that may reference another entity
      * @throws JSONException if there's an error updating the JSON structure
      */
     private void addReferencedProperty(Field field) throws JSONException {
-        Property referenced = KernelUtils.getProperty(field).getReferencedProperty();
+        Property referenced = null;
+
+        try {
+            referenced = KernelUtils.getProperty(field).getReferencedProperty();
+        } catch (Exception e) {
+            // If any error occurs while getting the referenced property, skip adding referenced property info
+            String errorMessage = String.format("Error retrieving referenced property for field %s: %s",
+                    field.getId(), e.getMessage());
+            logger.warn(errorMessage, e);
+            return;
+        }
 
         if (referenced != null) {
             String tableId = referenced.getEntity().getTableId();
@@ -179,12 +190,23 @@ public class FieldBuilderWithColumn extends FieldBuilder {
      * Adds referenced table information using utility methods.
      * Alternative approach to addReferencedProperty that uses Utils.getReferencedTab.
      * Provides referenced entity, window, and tab information for foreign key fields.
+     * Any errors during retrieval are silently ignored to avoid breaking the JSON structure.
      *
      * @param field The field that may reference another table
      * @throws JSONException if there's an error updating the JSON structure
      */
     private void addReferencedTableInfo(Field field) throws JSONException {
-        Property referenced = KernelUtils.getProperty(field).getReferencedProperty();
+        Property referenced = null;
+
+        try {
+            referenced = KernelUtils.getProperty(field).getReferencedProperty();
+        } catch (Exception e) {
+            // If any error occurs while getting the referenced property, skip adding referenced table info
+            String errorMessage = String.format("Error retrieving referenced property for field %s: %s",
+                    field.getId(), e.getMessage());
+            logger.warn(errorMessage, e);
+            return;
+        }
 
         if (referenced != null) {
             Tab referencedTab = getReferencedTab(referenced);
