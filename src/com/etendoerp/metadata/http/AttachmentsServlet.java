@@ -1,3 +1,22 @@
+/*
+ *************************************************************************
+ * The contents of this file are subject to the Openbravo  Public  License
+ * Version  1.1  (the  "License"),  being   the  Mozilla   Public  License
+ * Version 1.1  with a permitted attribution clause; you may not  use this
+ * file except in compliance with the License. You  may  obtain  a copy of
+ * the License at http://www.openbravo.com/legal/license.html
+ * Software distributed under the License  is  distributed  on  an "AS IS"
+ * basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See the
+ * License for the specific  language  governing  rights  and  limitations
+ * under the License.
+ * The Original Code is Openbravo ERP.
+ * The Initial Developer of the Original Code is Openbravo SLU
+ * All portions are Copyright (C) 2025 Openbravo SLU
+ * All Rights Reserved.
+ * Contributor(s):  ______________________________________.
+ ************************************************************************
+ */
+
 package com.etendoerp.metadata.http;
 
 import java.io.IOException;
@@ -107,8 +126,32 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
     private static final String DEFAULT_FILENAME = "unknown";
     private static final String CORE_DESC_PARAMETER_ID = "E22E8E3B737D4A47A691A073951BBF16";
 
+    // Temp directory for secure file handling
+    private static final String APP_TEMP_DIR = System.getProperty("catalina.base", System.getProperty("user.home")) + "/temp/attachments";
+
     @Inject
     private AttachImplementationManager attachManager;
+
+    @Override
+    public void init() throws ServletException {
+        super.init();
+        // Initialize secure temp directory
+        java.io.File tempDir = new java.io.File(APP_TEMP_DIR);
+        if (!tempDir.exists()) {
+            if (tempDir.mkdirs()) {
+                // Set restrictive permissions (owner only)
+                tempDir.setReadable(false, false);
+                tempDir.setWritable(false, false);
+                tempDir.setExecutable(false, false);
+                tempDir.setReadable(true, true);
+                tempDir.setWritable(true, true);
+                tempDir.setExecutable(true, true);
+                log.info("Created secure temp directory: {}", APP_TEMP_DIR);
+            } else {
+                log.warn("Failed to create temp directory: {}", APP_TEMP_DIR);
+            }
+        }
+    }
 
     @Override
     public void doGet(HttpServletRequest request, HttpServletResponse response)
@@ -198,17 +241,15 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
         String tabId = request.getParameter(PARAM_TAB_ID);
         String recordId = request.getParameter(PARAM_RECORD_ID);
 
-        if (tabId == null || recordId == null) {
-            sendErrorResponse(response, HttpStatus.SC_BAD_REQUEST, MSG_TAB_RECORD_REQUIRED);
+        if (!validateTabAndRecord(tabId, recordId, response)) {
             return;
         }
 
         try {
             OBContext.setAdminMode(true);
 
-            Tab tab = OBDal.getInstance().get(Tab.class, tabId);
+            Tab tab = validateAndGetTab(tabId, response);
             if (tab == null) {
-                sendErrorResponse(response, HttpStatus.SC_BAD_REQUEST, MSG_INVALID_TAB_ID);
                 return;
             }
 
@@ -252,6 +293,7 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
             return;
         }
 
+        java.io.File tempFile = null;
         try {
             OBContext.setAdminMode(true);
 
@@ -269,26 +311,44 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
             }
 
             String fileName = getFileName(filePart);
-            java.io.File tempFile = java.io.File.createTempFile("attachment_", "_" + fileName);
-            IOUtils.copy(filePart.getInputStream(), new java.io.FileOutputStream(tempFile));
 
-            try {
-                attachManager.upload(params, tabId, recordId, orgId, tempFile);
+            // Create temp file in secure directory with restrictive permissions
+            java.io.File tempDir = new java.io.File(APP_TEMP_DIR);
+            tempFile = java.io.File.createTempFile("attachment_", "_" + fileName, tempDir);
 
-                JSONObject result = new JSONObject();
-                result.put(JSON_KEY_SUCCESS, true);
+            // Set restrictive permissions (owner only: rw-------)
+            tempFile.setReadable(false, false);
+            tempFile.setWritable(false, false);
+            tempFile.setReadable(true, true);
+            tempFile.setWritable(true, true);
 
-                sendJsonResponse(response, HttpStatus.SC_OK, result);
-            } finally {
-                if (tempFile.exists()) {
-                    tempFile.delete();
-                }
+            try (java.io.FileOutputStream fos = new java.io.FileOutputStream(tempFile)) {
+                IOUtils.copy(filePart.getInputStream(), fos);
             }
+
+            attachManager.upload(params, tabId, recordId, orgId, tempFile);
+
+            JSONObject result = new JSONObject();
+            result.put(JSON_KEY_SUCCESS, true);
+
+            sendJsonResponse(response, HttpStatus.SC_OK, result);
         } catch (Exception e) {
             log.error("Error uploading attachment", e);
             sendErrorResponse(response, HttpStatus.SC_INTERNAL_SERVER_ERROR,
                     MSG_ERROR_PROCESSING_REQUEST + e.getMessage());
         } finally {
+            // Ensure temp file is deleted
+            if (tempFile != null && tempFile.exists()) {
+                try {
+                    if (!tempFile.delete()) {
+                        log.warn("Failed to delete temporary file: " + tempFile.getAbsolutePath());
+                        // Fallback: mark for deletion on JVM exit
+                        tempFile.deleteOnExit();
+                    }
+                } catch (Exception e) {
+                    log.error("Error deleting temporary file: " + tempFile.getAbsolutePath(), e);
+                }
+            }
             OBContext.restorePreviousMode();
         }
     }
@@ -297,58 +357,57 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
      * Download a single attachment
      */
     private void handleDownload(HttpServletRequest request, HttpServletResponse response)
-            throws IOException {
+            throws IOException, JSONException {
         String attachmentId = request.getParameter(PARAM_ATTACHMENT_ID);
-
-        if (attachmentId == null) {
-            sendErrorResponse(response, HttpStatus.SC_BAD_REQUEST, MSG_ATTACHMENT_REQUIRED);
-            return;
-        }
 
         try {
             OBContext.setAdminMode(true);
 
-            Attachment attachment = OBDal.getInstance().get(Attachment.class, attachmentId);
+            Attachment attachment = validateAndGetAttachment(attachmentId, response);
             if (attachment == null) {
-                sendErrorResponse(response, HttpStatus.SC_NOT_FOUND, MSG_ATTACHMENT_NOT_FOUND);
                 return;
             }
 
-            String fileName = attachment.getName();
-            String contentType = attachment.getDataType() != null ? attachment.getDataType() : CONTENT_TYPE_OCTET_STREAM;
-            response.setContentType(contentType);
-            response.setHeader(CONTENT_DISPOSITION_HEADER, "attachment; filename=\"" + fileName + "\"");
+            response.setContentType(CONTENT_TYPE_OCTET_STREAM);
+            response.setHeader(CONTENT_DISPOSITION_HEADER,
+                    "attachment; filename=\"" + attachment.getName() + "\"");
 
-            OutputStream os = response.getOutputStream();
-            attachManager.download(attachmentId, os);
-            os.flush();
+            try (OutputStream out = response.getOutputStream()) {
+                attachManager.download(attachmentId, out);
+                out.flush();
+            }
         } finally {
             OBContext.restorePreviousMode();
         }
     }
 
     /**
-     * Download all attachments for a record as ZIP
+     * Download all attachments as a zip file
      */
     private void handleDownloadAll(HttpServletRequest request, HttpServletResponse response)
-            throws IOException {
+            throws IOException, JSONException {
         String tabId = request.getParameter(PARAM_TAB_ID);
         String recordId = request.getParameter(PARAM_RECORD_ID);
 
-        if (tabId == null || recordId == null) {
-            sendErrorResponse(response, HttpStatus.SC_BAD_REQUEST, MSG_TAB_RECORD_REQUIRED);
+        if (!validateTabAndRecord(tabId, recordId, response)) {
             return;
         }
 
         try {
             OBContext.setAdminMode(true);
 
+            Tab tab = validateAndGetTab(tabId, response);
+            if (tab == null) {
+                return;
+            }
+
             response.setContentType(CONTENT_TYPE_ZIP);
             response.setHeader(CONTENT_DISPOSITION_HEADER, CONTENT_DISPOSITION_VALUE);
 
-            OutputStream os = response.getOutputStream();
-            attachManager.downloadAll(tabId, recordId, os);
-            os.flush();
+            try (OutputStream out = response.getOutputStream()) {
+                attachManager.downloadAll(tabId, recordId, out);
+                out.flush();
+            }
         } finally {
             OBContext.restorePreviousMode();
         }
@@ -406,17 +465,11 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
             throws IOException, JSONException {
         String attachmentId = request.getParameter(PARAM_ATTACHMENT_ID);
 
-        if (attachmentId == null) {
-            sendErrorResponse(response, HttpStatus.SC_BAD_REQUEST, MSG_ATTACHMENT_REQUIRED);
-            return;
-        }
-
         try {
             OBContext.setAdminMode(true);
 
-            Attachment attachment = OBDal.getInstance().get(Attachment.class, attachmentId);
+            Attachment attachment = validateAndGetAttachment(attachmentId, response);
             if (attachment == null) {
-                sendErrorResponse(response, HttpStatus.SC_NOT_FOUND, MSG_ATTACHMENT_NOT_FOUND);
                 return;
             }
 
@@ -440,17 +493,15 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
         String tabId = request.getParameter(PARAM_TAB_ID);
         String recordId = request.getParameter(PARAM_RECORD_ID);
 
-        if (tabId == null || recordId == null) {
-            sendErrorResponse(response, HttpStatus.SC_BAD_REQUEST, MSG_TAB_RECORD_REQUIRED);
+        if (!validateTabAndRecord(tabId, recordId, response)) {
             return;
         }
 
         try {
             OBContext.setAdminMode(true);
 
-            Tab tab = OBDal.getInstance().get(Tab.class, tabId);
+            Tab tab = validateAndGetTab(tabId, response);
             if (tab == null) {
-                sendErrorResponse(response, HttpStatus.SC_BAD_REQUEST, MSG_INVALID_TAB_ID);
                 return;
             }
 
@@ -476,14 +527,81 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
     }
 
     /**
-     * Extract filename from Part header
+     * Validates tabId and recordId parameters
+     * @return true if valid, false if invalid (error response already sent)
+     */
+    private boolean validateTabAndRecord(String tabId, String recordId, HttpServletResponse response)
+            throws IOException, JSONException {
+        if (tabId == null || recordId == null) {
+            sendErrorResponse(response, HttpStatus.SC_BAD_REQUEST, MSG_TAB_RECORD_REQUIRED);
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Validates and retrieves a Tab by ID
+     * @return The Tab object or null if validation fails (error response already sent)
+     */
+    private Tab validateAndGetTab(String tabId, HttpServletResponse response)
+            throws IOException, JSONException {
+        if (tabId == null) {
+            sendErrorResponse(response, HttpStatus.SC_BAD_REQUEST, "tabId is required");
+            return null;
+        }
+
+        Tab tab = OBDal.getInstance().get(Tab.class, tabId);
+        if (tab == null) {
+            sendErrorResponse(response, HttpStatus.SC_BAD_REQUEST, MSG_INVALID_TAB_ID);
+            return null;
+        }
+
+        return tab;
+    }
+
+    /**
+     * Validates and retrieves an Attachment by ID
+     * @return The Attachment object or null if validation fails (error response already sent)
+     */
+    private Attachment validateAndGetAttachment(String attachmentId, HttpServletResponse response)
+            throws IOException, JSONException {
+        if (attachmentId == null) {
+            sendErrorResponse(response, HttpStatus.SC_BAD_REQUEST, MSG_ATTACHMENT_REQUIRED);
+            return null;
+        }
+
+        Attachment attachment = OBDal.getInstance().get(Attachment.class, attachmentId);
+        if (attachment == null) {
+            sendErrorResponse(response, HttpStatus.SC_NOT_FOUND, MSG_ATTACHMENT_NOT_FOUND);
+            return null;
+        }
+
+        return attachment;
+    }
+
+    /**
+     * Extract filename from Part header with improved sanitization
      */
     private String getFileName(Part part) {
         String contentDisposition = part.getHeader(CONTENT_DISPOSITION_TOKEN);
         if (contentDisposition != null) {
             for (String token : contentDisposition.split(";")) {
                 if (token.trim().startsWith(FILENAME_TOKEN)) {
-                    return token.substring(token.indexOf('=') + 1).trim().replace("\"", "");
+                    String candidate = token.substring(token.indexOf('=') + 1).trim().replace("\"", "");
+
+                    // Prevent path traversal attacks
+                    candidate = candidate.replaceAll("\\.\\.", "");
+                    candidate = candidate.replaceAll("[/\\\\]", "");
+
+                    // Sanitize special characters
+                    String sanitized = candidate.replaceAll("[^a-zA-Z0-9._-]", "_");
+
+                    // Limit length to prevent issues
+                    if (sanitized.length() > 255) {
+                        sanitized = sanitized.substring(0, 255);
+                    }
+
+                    return sanitized.isEmpty() ? DEFAULT_FILENAME : sanitized;
                 }
             }
         }
