@@ -91,7 +91,6 @@ class UtilsTest {
   @Test
   void formatMessageWithValidParametersReturnsFormattedString() {
     String result = Utils.formatMessage(TEST_MESSAGE, TEST_PARAM_1, TEST_PARAM_2);
-
     assertEquals(EXPECTED_FORMATTED_MESSAGE, result);
   }
 
@@ -102,7 +101,6 @@ class UtilsTest {
   void formatMessageWithNoParametersReturnsOriginalMessage() {
     String message = "Simple message";
     String result = Utils.formatMessage(message);
-
     assertEquals(message, result);
   }
 
@@ -452,8 +450,8 @@ class UtilsTest {
     OBCriteria<Language> mockCriteria = mock(OBCriteria.class);
 
     when(mockRequest.getParameter(LANGUAGE)).thenReturn(null);
-        when(mockRequest.getHeader(LANGUAGE)).thenReturn(LANGUAGE_CODE);
-            when(mockContext.getUser()).thenReturn(mockUser);
+    when(mockRequest.getHeader(LANGUAGE)).thenReturn(LANGUAGE_CODE);
+    when(mockContext.getUser()).thenReturn(mockUser);
     when(mockContext.getRole()).thenReturn(mockRole);
     when(mockContext.getCurrentClient()).thenReturn(mockClient);
     when(mockContext.getCurrentOrganization()).thenReturn(mockOrganization);
@@ -477,10 +475,7 @@ class UtilsTest {
       mockedOBContext.when(OBContext::getOBContext).thenReturn(mockContext);
       mockedOBDal.when(OBDal::getInstance).thenReturn(mockOBDal);
 
-      // This should not throw any exception
       Utils.setContext(mockRequest);
-
-      // The test passes if no exception is thrown
       assertTrue(true);
     }
   }
@@ -491,12 +486,12 @@ class UtilsTest {
   @Test
   void getHttpStatusForWithDifferentExceptionsReturnsCorrectStatusCodes() {
     assertEquals(HttpStatus.SC_UNAUTHORIZED, Utils.getHttpStatusFor(new AuthenticationException("auth error")));
-        assertEquals(HttpStatus.SC_UNAUTHORIZED, Utils.getHttpStatusFor(new OBSecurityException("security error")));
-            assertEquals(HttpStatus.SC_UNAUTHORIZED, Utils.getHttpStatusFor(new UnauthorizedException("unauthorized")));
-                assertEquals(HttpStatus.SC_METHOD_NOT_ALLOWED, Utils.getHttpStatusFor(new MethodNotAllowedException("method not allowed")));
-                    assertEquals(HttpStatus.SC_UNPROCESSABLE_ENTITY, Utils.getHttpStatusFor(new UnprocessableContentException("unprocessable")));
-                        assertEquals(HttpStatus.SC_NOT_FOUND, Utils.getHttpStatusFor(new NotFoundException("not found")));
-                            assertEquals(HttpStatus.SC_INTERNAL_SERVER_ERROR, Utils.getHttpStatusFor(new RuntimeException("unknown error")));
+    assertEquals(HttpStatus.SC_UNAUTHORIZED, Utils.getHttpStatusFor(new OBSecurityException("security error")));
+    assertEquals(HttpStatus.SC_UNAUTHORIZED, Utils.getHttpStatusFor(new UnauthorizedException("unauthorized")));
+    assertEquals(HttpStatus.SC_METHOD_NOT_ALLOWED, Utils.getHttpStatusFor(new MethodNotAllowedException("method not allowed")));
+    assertEquals(HttpStatus.SC_UNPROCESSABLE_ENTITY, Utils.getHttpStatusFor(new UnprocessableContentException("unprocessable")));
+    assertEquals(HttpStatus.SC_NOT_FOUND, Utils.getHttpStatusFor(new NotFoundException("not found")));
+    assertEquals(HttpStatus.SC_INTERNAL_SERVER_ERROR, Utils.getHttpStatusFor(new RuntimeException("unknown error")));
   }
 
   /**
@@ -523,7 +518,7 @@ class UtilsTest {
    */
   @Test
   void convertToJsonWithExceptionWithCauseReturnsJsonWithCauseMessage() {
-    String causeMessage ="Root cause message";
+    String causeMessage = "Root cause message";
     String wrapperMessage = "Wrapper message";
     Exception cause = new RuntimeException(causeMessage);
     Exception wrapper = new RuntimeException(wrapperMessage, cause);
@@ -576,11 +571,11 @@ class UtilsTest {
    * @throws Exception if request processing fails
    */
   @Test
-  void readRequestBodyWithEmptyRequestReturnsEmptyString() throws Exception {
+  void readRequestBodyWithEmptyRequestReturnsEmptyString() throws IOException {
     HttpServletRequest mockRequest = mock(HttpServletRequest.class);
-    BufferedReader mockReader = new BufferedReader(new StringReader(""));
+    BufferedReader reader = new BufferedReader(new StringReader(""));
 
-        when(mockRequest.getReader()).thenReturn(mockReader);
+    when(mockRequest.getReader()).thenReturn(reader);
 
     String result = Utils.readRequestBody(mockRequest);
 
@@ -777,5 +772,154 @@ class UtilsTest {
       // This is also acceptable behavior
       assertTrue(true);
     }
+  }
+
+  /**
+   * Test para formatMessage con parámetros null
+   */
+  @Test
+  void formatMessageWithNullParametersHandlesGracefully() {
+    String message = "Message with {} and {}";
+    String result = Utils.formatMessage(message, null, null);
+
+    assertNotNull(result);
+    assertTrue(result.contains("null") || result.contains("{}"));
+  }
+
+  /**
+   * Test para formatMessage con muchos parámetros
+   */
+  @Test
+  void formatMessageWithMultipleParametersFormatsCorrectly() {
+    String message = "Test {} {} {} {}";
+    String result = Utils.formatMessage(message, "one", "two", "three", "four");
+
+    assertNotNull(result);
+    assertTrue(result.contains("one"));
+    assertTrue(result.contains("two"));
+    assertTrue(result.contains("three"));
+    assertTrue(result.contains("four"));
+  }
+
+  /**
+   * Test para formatMessage con parámetros que contienen caracteres especiales
+   */
+  @Test
+  void formatMessageWithSpecialCharactersInParameters() {
+    String message = "Message: {}";
+    String specialParam = "Special <>&\"' characters";
+    String result = Utils.formatMessage(message, specialParam);
+
+    assertNotNull(result);
+    assertTrue(result.contains("Special"));
+  }
+
+  /**
+   * Test para readRequestBody con request válido
+   */
+  @Test
+  void readRequestBodyWithValidRequestReturnsBody() throws IOException {
+    HttpServletRequest mockRequest = mock(HttpServletRequest.class);
+    String bodyContent = "{\"test\":\"data\"}";
+    BufferedReader reader = new BufferedReader(new StringReader(bodyContent));
+
+    when(mockRequest.getReader()).thenReturn(reader);
+
+    String result = Utils.readRequestBody(mockRequest);
+
+    assertEquals(bodyContent, result);
+  }
+
+  /**
+   * Test para readRequestBody cuando IOException ocurre
+   */
+  @Test
+  void readRequestBodyWithIOExceptionThrowsException() throws IOException {
+    HttpServletRequest mockRequest = mock(HttpServletRequest.class);
+
+    when(mockRequest.getReader()).thenThrow(new IOException("Read error"));
+
+    assertThrows(IOException.class, () -> Utils.readRequestBody(mockRequest));
+  }
+
+  /**
+   * Test para convertToJson con excepción que tiene causa nula pero mensaje largo
+   */
+  @Test
+  void convertToJsonWithExceptionWithLongMessage() {
+    String longMessage = "A".repeat(1000);
+    Exception exception = new RuntimeException(longMessage);
+
+    JSONObject result = Utils.convertToJson(exception);
+
+    assertNotNull(result);
+    assertTrue(result.has(ERROR));
+  }
+
+  /**
+   * Test para convertToJson con excepción anidada múltiples niveles
+   */
+  @Test
+  void convertToJsonWithDeeplyNestedException() {
+    Exception level3 = new RuntimeException("Level 3");
+    Exception level2 = new RuntimeException("Level 2", level3);
+    Exception level1 = new RuntimeException("Level 1", level2);
+
+    JSONObject result = Utils.convertToJson(level1);
+
+    assertNotNull(result);
+    assertTrue(result.has(ERROR));
+  }
+
+  /**
+   * Test para formatMessage con template que no tiene placeholders
+   */
+  @Test
+  void formatMessageWithNoPlaceholdersIgnoresParameters() {
+    String message = "Message without placeholders";
+    String result = Utils.formatMessage(message, "param1", "param2");
+
+    assertEquals(message, result);
+  }
+
+  /**
+   * Test para validación de encoding en diferentes charsets
+   */
+  @Test
+  void readRequestBodyWithDifferentEncodingsHandlesCorrectly() throws IOException {
+    HttpServletRequest mockRequest = mock(HttpServletRequest.class);
+    String utf8Content = "Contenido con ñ y acentos: á é í ó ú";
+    BufferedReader reader = new BufferedReader(new StringReader(utf8Content));
+
+    when(mockRequest.getReader()).thenReturn(reader);
+
+    String result = Utils.readRequestBody(mockRequest);
+
+    assertEquals(utf8Content, result);
+  }
+
+  /**
+   * Test para convertToJson con excepción con mensaje vacío
+   */
+  @Test
+  void convertToJsonWithEmptyMessageException() {
+    Exception exception = new RuntimeException("");
+
+    JSONObject result = Utils.convertToJson(exception);
+
+    assertNotNull(result);
+    assertTrue(result.has(ERROR));
+  }
+
+  /**
+   * Test para formatMessage con excepciones en el formateo
+   */
+  @Test
+  void formatMessageWithFormattingIssuesReturnsMessage() {
+    String message = "Message with invalid {} format {}";
+    String result = Utils.formatMessage(message, (Object) null);
+
+    assertNotNull(result);
+    assertTrue(result.contains("Message"));
   }
 }
