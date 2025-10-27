@@ -114,6 +114,7 @@ public class AttachmentsServletTest extends OBBaseTest {
 
             @Override
             public void setWriteListener(WriteListener writeListener) {
+                // This should be used in an implementation test
             }
         });
 

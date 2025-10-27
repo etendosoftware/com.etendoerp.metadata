@@ -140,13 +140,19 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
         if (!tempDir.exists()) {
             if (tempDir.mkdirs()) {
                 // Set restrictive permissions (owner only)
-                tempDir.setReadable(false, false);
-                tempDir.setWritable(false, false);
-                tempDir.setExecutable(false, false);
-                tempDir.setReadable(true, true);
-                tempDir.setWritable(true, true);
-                tempDir.setExecutable(true, true);
-                log.info("Created secure temp directory: {}", APP_TEMP_DIR);
+                boolean success = true;
+                success &= tempDir.setReadable(false, false);
+                success &= tempDir.setWritable(false, false);
+                success &= tempDir.setExecutable(false, false);
+                success &= tempDir.setReadable(true, true);
+                success &= tempDir.setWritable(true, true);
+                success &= tempDir.setExecutable(true, true);
+
+                if (success) {
+                    log.info("Created secure temp directory: {}", APP_TEMP_DIR);
+                } else {
+                    log.warn("Created temp directory but failed to set all permissions: {}", APP_TEMP_DIR);
+                }
             } else {
                 log.warn("Failed to create temp directory: {}", APP_TEMP_DIR);
             }
@@ -241,7 +247,7 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
         String tabId = request.getParameter(PARAM_TAB_ID);
         String recordId = request.getParameter(PARAM_RECORD_ID);
 
-        if (!validateTabAndRecord(tabId, recordId, response)) {
+        if (validateTabAndRecord(tabId, recordId, response)) {
             return;
         }
 
@@ -317,10 +323,15 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
             tempFile = java.io.File.createTempFile("attachment_", "_" + fileName, tempDir);
 
             // Set restrictive permissions (owner only: rw-------)
-            tempFile.setReadable(false, false);
-            tempFile.setWritable(false, false);
-            tempFile.setReadable(true, true);
-            tempFile.setWritable(true, true);
+            boolean permissionsSet = true;
+            permissionsSet &= tempFile.setReadable(false, false);
+            permissionsSet &= tempFile.setWritable(false, false);
+            permissionsSet &= tempFile.setReadable(true, true);
+            permissionsSet &= tempFile.setWritable(true, true);
+
+            if (!permissionsSet) {
+                log.warn("Failed to set restrictive permissions on temp file: {}", tempFile.getAbsolutePath());
+            }
 
             try (java.io.FileOutputStream fos = new java.io.FileOutputStream(tempFile)) {
                 IOUtils.copy(filePart.getInputStream(), fos);
@@ -340,13 +351,11 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
             // Ensure temp file is deleted
             if (tempFile != null && tempFile.exists()) {
                 try {
-                    if (!tempFile.delete()) {
-                        log.warn("Failed to delete temporary file: " + tempFile.getAbsolutePath());
-                        // Fallback: mark for deletion on JVM exit
-                        tempFile.deleteOnExit();
-                    }
-                } catch (Exception e) {
-                    log.error("Error deleting temporary file: " + tempFile.getAbsolutePath(), e);
+                    java.nio.file.Files.delete(tempFile.toPath());
+                } catch (IOException e) {
+                    log.error("Error deleting temporary file: {}", tempFile.getAbsolutePath(), e);
+                    // Fallback: mark for deletion on JVM exit
+                    tempFile.deleteOnExit();
                 }
             }
             OBContext.restorePreviousMode();
@@ -389,7 +398,7 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
         String tabId = request.getParameter(PARAM_TAB_ID);
         String recordId = request.getParameter(PARAM_RECORD_ID);
 
-        if (!validateTabAndRecord(tabId, recordId, response)) {
+        if (validateTabAndRecord(tabId, recordId, response)) {
             return;
         }
 
@@ -493,7 +502,7 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
         String tabId = request.getParameter(PARAM_TAB_ID);
         String recordId = request.getParameter(PARAM_RECORD_ID);
 
-        if (!validateTabAndRecord(tabId, recordId, response)) {
+        if (validateTabAndRecord(tabId, recordId, response)) {
             return;
         }
 
@@ -531,12 +540,12 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
      * @return true if valid, false if invalid (error response already sent)
      */
     private boolean validateTabAndRecord(String tabId, String recordId, HttpServletResponse response)
-            throws IOException, JSONException {
+            throws  JSONException {
         if (tabId == null || recordId == null) {
             sendErrorResponse(response, HttpStatus.SC_BAD_REQUEST, MSG_TAB_RECORD_REQUIRED);
-            return false;
+            return true;
         }
-        return true;
+        return false;
     }
 
     /**
@@ -590,7 +599,7 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
                     String candidate = token.substring(token.indexOf('=') + 1).trim().replace("\"", "");
 
                     // Prevent path traversal attacks
-                    candidate = candidate.replaceAll("\\.\\.", "");
+                    candidate = candidate.replace("\\.\\.", "");
                     candidate = candidate.replaceAll("[/\\\\]", "");
 
                     // Sanitize special characters
@@ -622,7 +631,7 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
         }
 
         String requestBody = buffer.toString();
-        if (requestBody == null || requestBody.isEmpty()) {
+        if (requestBody.isEmpty()) {
             return new JSONObject();
         }
 
