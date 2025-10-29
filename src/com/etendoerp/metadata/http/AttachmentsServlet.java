@@ -22,6 +22,7 @@ package com.etendoerp.metadata.http;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintWriter;
+import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -290,87 +291,24 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
      */
     private void handleUpload(HttpServletRequest request, HttpServletResponse response)
             throws IOException, JSONException {
-        String tabId = request.getParameter(PARAM_TAB_ID);
-        String recordId = request.getParameter(PARAM_RECORD_ID);
-        String orgId = request.getParameter(PARAM_ORG_ID);
-
-        if (tabId == null || recordId == null || orgId == null) {
-            sendErrorResponse(response, HttpStatus.SC_BAD_REQUEST, MSG_TAB_RECORD_ORG_REQUIRED);
+        if (!validateUploadParameters(request, response)) {
             return;
         }
 
         java.io.File tempFile = null;
         try {
             OBContext.setAdminMode(true);
-
-            Map<String, String> params = new HashMap<>();
-            Part filePart = request.getPart(PARAM_FILE);
-
-            if (filePart == null) {
-                sendErrorResponse(response, HttpStatus.SC_BAD_REQUEST, MSG_NO_FILE_UPLOADED);
-                return;
-            }
-
-            String description = request.getParameter(PARAM_DESCRIPTION);
-            if (description != null) {
-                params.put(PARAM_DESCRIPTION, description);
-            }
-
-            String fileName = getFileName(filePart);
-
-            // Create temp file in secure directory with restrictive permissions
-            java.io.File tempDir = new java.io.File(APP_TEMP_DIR);
-            // Create unique temp file first
-            tempFile = java.io.File.createTempFile("attachment_", ".tmp", tempDir);
-
-            // Set restrictive permissions (owner only: rw-------)
-            boolean permissionsSet = true;
-            permissionsSet &= tempFile.setReadable(false, false);
-            permissionsSet &= tempFile.setWritable(false, false);
-            permissionsSet &= tempFile.setReadable(true, true);
-            permissionsSet &= tempFile.setWritable(true, true);
-
-            if (!permissionsSet) {
-                log.warn("Failed to set restrictive permissions on temp file: {}", tempFile.getAbsolutePath());
-            }
-
-            try (java.io.FileOutputStream fos = new java.io.FileOutputStream(tempFile)) {
-                IOUtils.copy(filePart.getInputStream(), fos);
-            }
-
-            // Create a file with the original name for the attachment manager
-            java.io.File finalFile = new java.io.File(tempDir, fileName);
-            if (finalFile.exists()) {
-                // If file exists, create a unique name
-                String baseName = fileName;
-                String extension = "";
-                int lastDot = fileName.lastIndexOf('.');
-                if (lastDot > 0) {
-                    baseName = fileName.substring(0, lastDot);
-                    extension = fileName.substring(lastDot);
-                }
-                int counter = 1;
-                while (finalFile.exists()) {
-                    finalFile = new java.io.File(tempDir, baseName + "_" + counter + extension);
-                    counter++;
-                }
-            }
             
-            // Rename temp file to final name
-            if (!tempFile.renameTo(finalFile)) {
-                // If rename fails, copy the file
-                try (java.io.FileInputStream fis = new java.io.FileInputStream(tempFile);
-                     java.io.FileOutputStream fos = new java.io.FileOutputStream(finalFile)) {
-                    IOUtils.copy(fis, fos);
-                }
-                // Delete original temp file
-                tempFile.delete();
+            UploadContext uploadContext = prepareUploadContext(request, response);
+            if (uploadContext == null) {
+                return; // Error response already sent
             }
-            
-            // Update tempFile reference for cleanup
-            tempFile = finalFile;
 
-            attachManager.upload(params, tabId, recordId, orgId, finalFile);
+            tempFile = createSecureTempFile(uploadContext.filePart);
+            java.io.File finalFile = createFinalFile(tempFile, uploadContext.fileName);
+            
+            attachManager.upload(uploadContext.params, uploadContext.tabId, 
+                               uploadContext.recordId, uploadContext.orgId, finalFile);
 
             JSONObject result = new JSONObject();
             result.put(JSON_KEY_SUCCESS, true);
@@ -619,6 +557,157 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
         }
 
         return attachment;
+    }
+
+    /**
+     * Validates upload parameters
+     */
+    private boolean validateUploadParameters(HttpServletRequest request, HttpServletResponse response) 
+            throws IOException, JSONException {
+        String tabId = request.getParameter(PARAM_TAB_ID);
+        String recordId = request.getParameter(PARAM_RECORD_ID);
+        String orgId = request.getParameter(PARAM_ORG_ID);
+
+        if (tabId == null || recordId == null || orgId == null) {
+            sendErrorResponse(response, HttpStatus.SC_BAD_REQUEST, MSG_TAB_RECORD_ORG_REQUIRED);
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Context class for upload operations
+     */
+    private static class UploadContext {
+        final String tabId;
+        final String recordId;
+        final String orgId;
+        final String fileName;
+        final Part filePart;
+        final Map<String, String> params;
+
+        UploadContext(String tabId, String recordId, String orgId, String fileName, 
+                     Part filePart, Map<String, String> params) {
+            this.tabId = tabId;
+            this.recordId = recordId;
+            this.orgId = orgId;
+            this.fileName = fileName;
+            this.filePart = filePart;
+            this.params = params;
+        }
+    }
+
+    /**
+     * Prepares upload context from request
+     */
+    private UploadContext prepareUploadContext(HttpServletRequest request, HttpServletResponse response) 
+            throws IOException, JSONException, ServletException {
+        String tabId = request.getParameter(PARAM_TAB_ID);
+        String recordId = request.getParameter(PARAM_RECORD_ID);
+        String orgId = request.getParameter(PARAM_ORG_ID);
+        
+        Part filePart = request.getPart(PARAM_FILE);
+        if (filePart == null) {
+            sendErrorResponse(response, HttpStatus.SC_BAD_REQUEST, MSG_NO_FILE_UPLOADED);
+            return null;
+        }
+
+        Map<String, String> params = new HashMap<>();
+        String description = request.getParameter(PARAM_DESCRIPTION);
+        if (description != null) {
+            params.put(CORE_DESC_PARAMETER_ID, description);
+        }
+
+        String fileName = getFileName(filePart);
+        return new UploadContext(tabId, recordId, orgId, fileName, filePart, params);
+    }
+
+    /**
+     * Creates secure temporary file
+     */
+    private java.io.File createSecureTempFile(Part filePart) throws IOException {
+        java.io.File tempDir = new java.io.File(APP_TEMP_DIR);
+        java.io.File tempFile = java.io.File.createTempFile("attachment_", ".tmp", tempDir);
+
+        setRestrictivePermissions(tempFile);
+
+        try (java.io.FileOutputStream fos = new java.io.FileOutputStream(tempFile)) {
+            IOUtils.copy(filePart.getInputStream(), fos);
+        }
+        
+        return tempFile;
+    }
+
+    /**
+     * Sets restrictive permissions on file
+     */
+    private void setRestrictivePermissions(java.io.File file) {
+        boolean permissionsSet = true;
+        permissionsSet &= file.setReadable(false, false);
+        permissionsSet &= file.setWritable(false, false);
+        permissionsSet &= file.setReadable(true, true);
+        permissionsSet &= file.setWritable(true, true);
+
+        if (!permissionsSet) {
+            log.warn("Failed to set restrictive permissions on temp file: {}", file.getAbsolutePath());
+        }
+    }
+
+    /**
+     * Creates final file with unique name if needed
+     */
+    private java.io.File createFinalFile(java.io.File tempFile, String fileName) throws IOException {
+        java.io.File tempDir = tempFile.getParentFile();
+        java.io.File finalFile = generateUniqueFileName(tempDir, fileName);
+        
+        if (!tempFile.renameTo(finalFile)) {
+            copyAndDeleteTemp(tempFile, finalFile);
+        }
+        
+        return finalFile;
+    }
+
+    /**
+     * Generates unique file name if file already exists
+     */
+    private java.io.File generateUniqueFileName(java.io.File tempDir, String fileName) {
+        java.io.File finalFile = new java.io.File(tempDir, fileName);
+        
+        if (!finalFile.exists()) {
+            return finalFile;
+        }
+
+        String baseName = fileName;
+        String extension = "";
+        int lastDot = fileName.lastIndexOf('.');
+        if (lastDot > 0) {
+            baseName = fileName.substring(0, lastDot);
+            extension = fileName.substring(lastDot);
+        }
+        
+        int counter = 1;
+        while (finalFile.exists()) {
+            finalFile = new java.io.File(tempDir, baseName + "_" + counter + extension);
+            counter++;
+        }
+        
+        return finalFile;
+    }
+
+    /**
+     * Copies temp file to final location and deletes temp
+     */
+    private void copyAndDeleteTemp(java.io.File tempFile, java.io.File finalFile) throws IOException {
+        try (java.io.FileInputStream fis = new java.io.FileInputStream(tempFile);
+             java.io.FileOutputStream fos = new java.io.FileOutputStream(finalFile)) {
+            IOUtils.copy(fis, fos);
+        }
+        
+        try {
+            Files.delete(tempFile.toPath());
+        } catch (Exception deleteEx) {
+            log.warn("Failed to delete temporary file: " + tempFile.getAbsolutePath(), deleteEx);
+        }
     }
 
     /**
