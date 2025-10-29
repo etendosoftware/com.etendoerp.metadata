@@ -48,6 +48,9 @@ public class ServiceFactoryTest {
         // Common setup if needed
     }
 
+    /**
+     * Tests that ServiceFactory returns SessionService for session path.
+     */
     @Test
     public void testGetSessionService() {
         when(mockRequest.getPathInfo()).thenReturn("/com.etendoerp.metadata.meta/session");
@@ -58,6 +61,9 @@ public class ServiceFactoryTest {
         assertTrue("Should return SessionService", service instanceof SessionService);
     }
 
+    /**
+     * Tests that ServiceFactory returns MenuService for menu path.
+     */
     @Test
     public void testGetMenuService() {
         when(mockRequest.getPathInfo()).thenReturn("/com.etendoerp.metadata.meta/menu");
@@ -68,6 +74,9 @@ public class ServiceFactoryTest {
         assertTrue("Should return MenuService", service instanceof MenuService);
     }
 
+    /**
+     * Tests that ServiceFactory returns WindowService for window path.
+     */
     @Test
     public void testGetWindowService() {
         when(mockRequest.getPathInfo()).thenReturn("/com.etendoerp.metadata.meta/window/123");
@@ -78,6 +87,9 @@ public class ServiceFactoryTest {
         assertTrue("Should return WindowService", service instanceof WindowService);
     }
 
+    /**
+     * Tests that ServiceFactory returns TabService for tab path.
+     */
     @Test
     public void testGetTabService() {
         when(mockRequest.getPathInfo()).thenReturn("/com.etendoerp.metadata.meta/tab/456");
@@ -88,6 +100,9 @@ public class ServiceFactoryTest {
         assertTrue("Should return TabService", service instanceof TabService);
     }
 
+    /**
+     * Tests that ServiceFactory returns LanguageService for language path.
+     */
     @Test
     public void testGetLanguageService() {
         when(mockRequest.getPathInfo()).thenReturn("/com.etendoerp.metadata.meta/language/en_US");
@@ -98,6 +113,9 @@ public class ServiceFactoryTest {
         assertTrue("Should return LanguageService", service instanceof LanguageService);
     }
 
+    /**
+     * Tests that ServiceFactory returns MessageService for message path.
+     */
     @Test
     public void testGetMessageService() {
         when(mockRequest.getPathInfo()).thenReturn("/com.etendoerp.metadata.meta/message");
@@ -108,6 +126,9 @@ public class ServiceFactoryTest {
         assertTrue("Should return MessageService", service instanceof MessageService);
     }
 
+    /**
+     * Tests that ServiceFactory returns LabelsService for labels path.
+     */
     @Test
     public void testGetLabelsService() {
         when(mockRequest.getPathInfo()).thenReturn("/com.etendoerp.metadata.meta/labels");
@@ -118,6 +139,9 @@ public class ServiceFactoryTest {
         assertTrue("Should return LabelsService", service instanceof LabelsService);
     }
 
+    /**
+     * Tests that ServiceFactory returns LocationMetadataService for location path.
+     */
     @Test
     public void testGetLocationMetadataService() {
         when(mockRequest.getPathInfo()).thenReturn("/com.etendoerp.metadata.meta/location/test");
@@ -128,6 +152,9 @@ public class ServiceFactoryTest {
         assertTrue("Should return LocationMetadataService", service instanceof LocationMetadataService);
     }
 
+    /**
+     * Tests that ServiceFactory returns ToolbarService for toolbar path.
+     */
     @Test
     public void testGetToolbarService() {
         when(mockRequest.getPathInfo()).thenReturn("/com.etendoerp.metadata.meta/toolbar");
@@ -138,6 +165,9 @@ public class ServiceFactoryTest {
         assertTrue("Should return ToolbarService", service instanceof ToolbarService);
     }
 
+    /**
+     * Tests that ServiceFactory returns LegacyService for legacy path.
+     */
     @Test
     public void testGetLegacyService() {
         when(mockRequest.getPathInfo()).thenReturn("/com.etendoerp.metadata.meta/legacy/test");
@@ -148,6 +178,9 @@ public class ServiceFactoryTest {
         assertTrue("Should return LegacyService", service instanceof LegacyService);
     }
 
+    /**
+     * Tests that ServiceFactory throws NotFoundException for unknown paths.
+     */
     @Test(expected = NotFoundException.class)
     public void testGetService_UnknownPath() {
         when(mockRequest.getPathInfo()).thenReturn("/com.etendoerp.metadata.meta/unknown");
@@ -155,6 +188,9 @@ public class ServiceFactoryTest {
         ServiceFactory.getService(mockRequest, mockResponse);
     }
 
+    /**
+     * Tests that ServiceFactory throws NotFoundException for null path.
+     */
     @Test(expected = NotFoundException.class)
     public void testGetService_NullPath() {
         when(mockRequest.getPathInfo()).thenReturn(null);
@@ -162,6 +198,9 @@ public class ServiceFactoryTest {
         ServiceFactory.getService(mockRequest, mockResponse);
     }
 
+    /**
+     * Tests that ServiceFactory throws NotFoundException for empty path.
+     */
     @Test(expected = NotFoundException.class)
     public void testGetService_EmptyPath() {
         when(mockRequest.getPathInfo()).thenReturn("");
@@ -169,6 +208,9 @@ public class ServiceFactoryTest {
         ServiceFactory.getService(mockRequest, mockResponse);
     }
 
+    /**
+     * Tests that ServiceFactory throws NotFoundException for root path.
+     */
     @Test(expected = NotFoundException.class)
     public void testGetService_RootPath() {
         when(mockRequest.getPathInfo()).thenReturn("/");

@@ -38,6 +38,9 @@ public class ReferenceSelectorsTest {
     @Mock
     private ReferencedTree mockTreeSelector;
 
+    /**
+     * Tests ReferenceSelectors constructor with mock objects.
+     */
     @Test
     public void testConstructor() {
         ReferenceSelectors referenceSelectors = new ReferenceSelectors(mockSelector, mockTreeSelector);
@@ -47,6 +50,9 @@ public class ReferenceSelectorsTest {
         assertEquals("Tree selector should match", mockTreeSelector, referenceSelectors.treeSelector);
     }
 
+    /**
+     * Tests ReferenceSelectors constructor with null values.
+     */
     @Test
     public void testConstructorWithNullValues() {
         ReferenceSelectors referenceSelectors = new ReferenceSelectors(null, null);
@@ -56,6 +62,9 @@ public class ReferenceSelectorsTest {
         assertNull("Tree selector should be null", referenceSelectors.treeSelector);
     }
 
+    /**
+     * Tests ReferenceSelectors constructor with mixed null and non-null values.
+     */
     @Test
     public void testConstructorWithMixedNullValues() {
         // Test with null selector, non-null tree selector
@@ -69,6 +78,9 @@ public class ReferenceSelectorsTest {
         assertNull("Tree selector should be null", referenceSelectors2.treeSelector);
     }
 
+    /**
+     * Tests that ReferenceSelectors fields are accessible (public).
+     */
     @Test
     public void testFieldsArePublicAndFinal() {
         ReferenceSelectors referenceSelectors = new ReferenceSelectors(mockSelector, mockTreeSelector);

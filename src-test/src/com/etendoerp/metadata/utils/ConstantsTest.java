@@ -26,6 +26,9 @@ import static org.junit.Assert.*;
  */
 public class ConstantsTest {
 
+    /**
+     * Tests all path-related constants for correct values.
+     */
     @Test
     public void testPathConstants() {
         assertEquals("/meta", Constants.MODULE_BASE_PATH);
@@ -43,6 +46,9 @@ public class ConstantsTest {
         assertEquals("/toolbar", Constants.TOOLBAR_PATH);
     }
 
+    /**
+     * Tests default boolean and string values.
+     */
     @Test
     public void testDefaultValues() {
         assertTrue("Default check on save should be true", Constants.DEFAULT_CHECKON_SAVE);
@@ -51,6 +57,9 @@ public class ConstantsTest {
         assertEquals("Locale key should be Locale", "Locale", Constants.LOCALE_KEY);
     }
 
+    /**
+     * Tests reference ID constants for correct values.
+     */
     @Test
     public void testReferenceIds() {
         assertEquals("List reference ID", "17", Constants.LIST_REFERENCE_ID);
@@ -60,6 +69,9 @@ public class ConstantsTest {
         assertEquals("Window reference ID", "FF80818132D8F0F30132D9BC395D0038", Constants.WINDOW_REFERENCE_ID);
     }
 
+    /**
+     * Tests property name constants for correct values.
+     */
     @Test
     public void testPropertyNames() {
         assertEquals("Datasource property", "datasourceName", Constants.DATASOURCE_PROPERTY);
@@ -71,6 +83,9 @@ public class ConstantsTest {
         assertEquals("Input name prefix", "inp", Constants.INPUT_NAME_PREFIX);
     }
 
+    /**
+     * Tests HTTP method constants for correct values.
+     */
     @Test
     public void testHttpMethods() {
         assertEquals("OPTIONS method", "OPTIONS", Constants.OPTIONS);
@@ -81,6 +96,9 @@ public class ConstantsTest {
         assertEquals("DELETE method", "DELETE", Constants.DELETE);
     }
 
+    /**
+     * Tests HTML tag constants for correct values.
+     */
     @Test
     public void testHtmlTags() {
         assertEquals("Form close tag", "</FORM>", Constants.FORM_CLOSE_TAG);
@@ -88,6 +106,9 @@ public class ConstantsTest {
         assertEquals("Head close tag", "</HEAD>", Constants.HEAD_CLOSE_TAG);
     }
 
+    /**
+     * Tests selector reference list for correct size and content.
+     */
     @Test
     public void testSelectorReferences() {
         assertNotNull("Selector references should not be null", Constants.SELECTOR_REFERENCES);
@@ -99,12 +120,18 @@ public class ConstantsTest {
         assertTrue("Should contain tree reference", Constants.SELECTOR_REFERENCES.contains("8C57A4A2E05F4261A1FADF47C30398AD"));
     }
 
+    /**
+     * Tests that servlet path length constant matches actual path length.
+     */
     @Test
     public void testServletPathLength() {
         assertEquals("Servlet path length should match actual length", 
                      Constants.SERVLET_PATH.length(), Constants.SERVLET_PATH_LENGTH);
     }
 
+    /**
+     * Tests error message constants for correct values.
+     */
     @Test
     public void testErrorMessages() {
         assertEquals("SWS misconfigured message", "SWS - SWS are misconfigured", Constants.SWS_SWS_ARE_MISCONFIGURED);

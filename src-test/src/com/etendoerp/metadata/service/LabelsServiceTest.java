@@ -43,6 +43,9 @@ public class LabelsServiceTest {
     @Mock
     private HttpServletResponse mockResponse;
 
+    /**
+     * Tests LabelsService constructor and inheritance.
+     */
     @Test
     public void testConstructor() {
         LabelsService service = new LabelsService(mockRequest, mockResponse);
@@ -51,6 +54,10 @@ public class LabelsServiceTest {
         assertTrue("Should be instance of MetadataService", service instanceof MetadataService);
     }
 
+    /**
+     * Tests LabelsService process method execution.
+     * Expects exceptions in test environment due to missing dependencies.
+     */
     @Test
     public void testProcess() throws IOException {
         LabelsService service = new LabelsService(mockRequest, mockResponse);
@@ -65,6 +72,9 @@ public class LabelsServiceTest {
         }
     }
 
+    /**
+     * Tests LabelsService process method exception handling.
+     */
     @Test
     public void testProcessWithException() throws IOException {
         LabelsService service = new LabelsService(mockRequest, mockResponse);

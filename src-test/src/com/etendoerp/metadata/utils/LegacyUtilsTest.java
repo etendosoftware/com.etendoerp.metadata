@@ -29,6 +29,10 @@ import static org.junit.Assert.*;
  */
 public class LegacyUtilsTest extends OBBaseTest {
 
+    /**
+     * Tests isLegacyProcess method with known legacy process IDs.
+     * Verifies that all predefined legacy IDs return true.
+     */
     @Test
     public void testIsLegacyProcess_WithLegacyIds() {
         // Test known legacy process IDs
@@ -38,6 +42,10 @@ public class LegacyUtilsTest extends OBBaseTest {
         assertTrue("Process 4248 should be legacy", LegacyUtils.isLegacyProcess("4248"));
     }
 
+    /**
+     * Tests isLegacyProcess method with non-legacy process IDs.
+     * Verifies that unknown IDs return false.
+     */
     @Test
     public void testIsLegacyProcess_WithNonLegacyIds() {
         // Test non-legacy process IDs
@@ -47,6 +55,10 @@ public class LegacyUtilsTest extends OBBaseTest {
         // Note: null check removed as Set.contains() doesn't handle null well
     }
 
+    /**
+     * Tests isLegacyProcess method with null input.
+     * Verifies proper handling of null values.
+     */
     @Test
     public void testIsLegacyProcess_WithNull() {
         // Test null separately to handle NullPointerException
@@ -59,6 +71,10 @@ public class LegacyUtilsTest extends OBBaseTest {
         }
     }
 
+    /**
+     * Tests getLegacyProcess method with a test process ID.
+     * Verifies that a properly configured Process object is returned.
+     */
     @Test
     public void testGetLegacyProcess() {
         String testProcessId = "TEST123";
@@ -71,6 +87,10 @@ public class LegacyUtilsTest extends OBBaseTest {
         assertTrue("Process should be active", legacyProcess.isActive());
     }
 
+    /**
+     * Tests getLegacyProcess method with different process IDs.
+     * Verifies that each ID creates a separate Process with correct properties.
+     */
     @Test
     public void testGetLegacyProcess_WithDifferentIds() {
         // Test with different process IDs

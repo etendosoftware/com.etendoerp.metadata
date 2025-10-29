@@ -58,6 +58,9 @@ public class AuthDataTest {
         authData = new AuthData(mockUser, mockRole, mockOrg, mockWarehouse, mockClient);
     }
 
+    /**
+     * Tests AuthData constructor with all parameters.
+     */
     @Test
     public void testConstructor() {
         assertNotNull("AuthData should not be null", authData);
@@ -68,11 +71,17 @@ public class AuthDataTest {
         assertEquals("Client should match", mockClient, authData.getClient());
     }
 
+    /**
+     * Tests getUser method returns correct user.
+     */
     @Test
     public void testGetUser() {
         assertEquals("User should match", mockUser, authData.getUser());
     }
 
+    /**
+     * Tests getRole and setRole methods.
+     */
     @Test
     public void testGetAndSetRole() {
         assertEquals("Initial role should match", mockRole, authData.getRole());

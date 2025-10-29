@@ -26,6 +26,9 @@ import static org.junit.Assert.*;
  */
 public class ExceptionsTest {
 
+    /**
+     * Tests InternalServerException with custom message, empty message, and default constructor.
+     */
     @Test
     public void testInternalServerException() {
         // Test with custom message
@@ -41,6 +44,9 @@ public class ExceptionsTest {
         assertEquals("Internal server error", exceptionDefault.getMessage());
     }
 
+    /**
+     * Tests MethodNotAllowedException with custom message, empty message, and default constructor.
+     */
     @Test
     public void testMethodNotAllowedException() {
         // Test with custom message
@@ -56,6 +62,9 @@ public class ExceptionsTest {
         assertEquals("Method not allowed", exceptionDefault.getMessage());
     }
 
+    /**
+     * Tests NotFoundException with custom message, empty message, and default constructor.
+     */
     @Test
     public void testNotFoundException() {
         // Test with custom message
@@ -71,6 +80,9 @@ public class ExceptionsTest {
         assertEquals("Not found", exceptionDefault.getMessage());
     }
 
+    /**
+     * Tests UnauthorizedException with custom message, empty message, and default constructor.
+     */
     @Test
     public void testUnauthorizedException() {
         // Test with custom message
@@ -86,6 +98,9 @@ public class ExceptionsTest {
         assertEquals("Invalid or missing token", exceptionDefault.getMessage());
     }
 
+    /**
+     * Tests UnprocessableContentException with custom message, empty message, and default constructor.
+     */
     @Test
     public void testUnprocessableContentException() {
         // Test with custom message
