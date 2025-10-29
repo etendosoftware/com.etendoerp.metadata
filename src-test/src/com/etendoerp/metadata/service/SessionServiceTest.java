@@ -57,6 +57,12 @@ public class SessionServiceTest {
         assertTrue("Should be instance of MetadataService", service instanceof MetadataService);
     }
 
+    /**
+     * Tests SessionService process method execution.
+     * Expects exceptions in test environment due to missing dependencies.
+     * 
+     * @throws IOException if an I/O error occurs during processing
+     */
     @Test
     public void testProcess() throws IOException {
         SessionService service = new SessionService(mockRequest, mockResponse);
@@ -73,6 +79,8 @@ public class SessionServiceTest {
 
     /**
      * Tests SessionService process method exception handling.
+     * 
+     * @throws IOException if an I/O error occurs during processing
      */
     @Test
     public void testProcessWithException() throws IOException {

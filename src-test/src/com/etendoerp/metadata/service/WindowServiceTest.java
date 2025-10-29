@@ -41,6 +41,8 @@ import static org.mockito.Mockito.*;
 @MockitoSettings(strictness = Strictness.LENIENT)
 public class WindowServiceTest {
 
+    private static final String EXCEPTION_NOT_NULL_MESSAGE = "Exception should not be null";
+
     @Mock
     private HttpServletRequest mockRequest;
 
@@ -58,6 +60,11 @@ public class WindowServiceTest {
         assertTrue("Should be instance of MetadataService", service instanceof MetadataService);
     }
 
+    /**
+     * Tests WindowService process method with valid window ID.
+     * 
+     * @throws IOException if an I/O error occurs during processing
+     */
     @Test
     public void testProcessWithValidWindowId() throws IOException {
         when(mockRequest.getPathInfo()).thenReturn("/com.etendoerp.metadata.meta/window/123");
@@ -70,12 +77,14 @@ public class WindowServiceTest {
             assertTrue("Process method executed without throwing exception", true);
         } catch (Exception e) {
             // Expected in test environment due to missing dependencies
-            assertNotNull("Exception should not be null", e);
+            assertNotNull(EXCEPTION_NOT_NULL_MESSAGE, e);
         }
     }
 
     /**
      * Tests WindowService process method throws OBException for null path info.
+     * 
+     * @throws IOException if an I/O error occurs during processing
      */
     @Test(expected = OBException.class)
     public void testProcessWithNullPathInfo() throws IOException {
@@ -87,6 +96,8 @@ public class WindowServiceTest {
 
     /**
      * Tests WindowService process method throws OBException for empty window ID.
+     * 
+     * @throws IOException if an I/O error occurs during processing
      */
     @Test(expected = OBException.class)
     public void testProcessWithEmptyWindowId() throws IOException {
@@ -98,6 +109,8 @@ public class WindowServiceTest {
 
     /**
      * Tests WindowService process method throws OBException for invalid path.
+     * 
+     * @throws IOException if an I/O error occurs during processing
      */
     @Test(expected = OBException.class)
     public void testProcessWithInvalidPath() throws IOException {
@@ -107,6 +120,11 @@ public class WindowServiceTest {
         service.process();
     }
 
+    /**
+     * Tests WindowService process method with window ID and query parameters.
+     * 
+     * @throws IOException if an I/O error occurs during processing
+     */
     @Test
     public void testProcessWithWindowIdAndQueryParams() throws IOException {
         when(mockRequest.getPathInfo()).thenReturn("/com.etendoerp.metadata.meta/window/123?param=value");
@@ -119,12 +137,14 @@ public class WindowServiceTest {
             assertTrue("Process method executed without throwing exception", true);
         } catch (Exception e) {
             // Expected in test environment due to missing dependencies
-            assertNotNull("Exception should not be null", e);
+            assertNotNull(EXCEPTION_NOT_NULL_MESSAGE, e);
         }
     }
 
     /**
      * Tests WindowService process method exception handling.
+     * 
+     * @throws IOException if an I/O error occurs during processing
      */
     @Test
     public void testProcessWithException() throws IOException {
@@ -136,7 +156,7 @@ public class WindowServiceTest {
             service.process();
         } catch (Exception e) {
             // Any exception is acceptable in test environment
-            assertNotNull("Exception should not be null", e);
+            assertNotNull(EXCEPTION_NOT_NULL_MESSAGE, e);
         }
     }
 }

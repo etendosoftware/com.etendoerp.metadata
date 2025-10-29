@@ -61,6 +61,8 @@ public class ToolbarServiceTest {
     /**
      * Tests ToolbarService process method execution.
      * Expects exceptions in test environment due to missing dependencies.
+     * 
+     * @throws IOException if an I/O error occurs during processing
      */
     @Test
     public void testProcess() throws IOException {
@@ -96,6 +98,8 @@ public class ToolbarServiceTest {
 
     /**
      * Tests ToolbarService process method exception handling.
+     * 
+     * @throws IOException if an I/O error occurs during processing
      */
     @Test
     public void testProcessIOException() throws IOException {

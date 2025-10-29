@@ -57,6 +57,8 @@ public class LabelsServiceTest {
     /**
      * Tests LabelsService process method execution.
      * Expects exceptions in test environment due to missing dependencies.
+     * 
+     * @throws IOException if an I/O error occurs during processing
      */
     @Test
     public void testProcess() throws IOException {
@@ -74,6 +76,8 @@ public class LabelsServiceTest {
 
     /**
      * Tests LabelsService process method exception handling.
+     * 
+     * @throws IOException if an I/O error occurs during processing
      */
     @Test
     public void testProcessWithException() throws IOException {

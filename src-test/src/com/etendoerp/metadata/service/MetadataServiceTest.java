@@ -57,6 +57,9 @@ public class MetadataServiceTest {
         }
     }
 
+    /**
+     * Cleans up ThreadLocal variables after each test.
+     */
     @After
     public void tearDown() {
         MetadataService.clear();
@@ -106,6 +109,8 @@ public class MetadataServiceTest {
 
     /**
      * Tests write method outputs JSON correctly.
+     * 
+     * @throws IOException if an I/O error occurs during writing
      */
     @Test
     public void testWriteJSON() throws IOException {
@@ -140,6 +145,8 @@ public class MetadataServiceTest {
 
     /**
      * Tests write method propagates IOException correctly.
+     * 
+     * @throws IOException if an I/O error occurs during writing
      */
     @Test
     public void testWriteJSONIOException() throws IOException {

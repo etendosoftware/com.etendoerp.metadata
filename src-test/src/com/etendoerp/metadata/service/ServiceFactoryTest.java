@@ -36,7 +36,7 @@ import static org.mockito.Mockito.when;
  */
 @RunWith(MockitoJUnitRunner.class)
 public class ServiceFactoryTest {
-    private final static String SERVICE_NOT_NULL = "Service should not be null";
+    private static final String SERVICE_NOT_NULL = "Service should not be null";
 
     @Mock
     private HttpServletRequest mockRequest;
@@ -44,6 +44,9 @@ public class ServiceFactoryTest {
     @Mock
     private HttpServletResponse mockResponse;
 
+    /**
+     * Sets up test fixtures before each test method.
+     */
     @Before
     public void setUp() {
         // Common setup if needed
@@ -183,7 +186,7 @@ public class ServiceFactoryTest {
      * Tests that ServiceFactory throws NotFoundException for unknown paths.
      */
     @Test(expected = NotFoundException.class)
-    public void testGetService_UnknownPath() {
+    public void testGetServiceUnknownPath() {
         when(mockRequest.getPathInfo()).thenReturn("/com.etendoerp.metadata.meta/unknown");
         
         ServiceFactory.getService(mockRequest, mockResponse);
@@ -193,7 +196,7 @@ public class ServiceFactoryTest {
      * Tests that ServiceFactory throws NotFoundException for null path.
      */
     @Test(expected = NotFoundException.class)
-    public void testGetService_NullPath() {
+    public void testGetServiceNullPath() {
         when(mockRequest.getPathInfo()).thenReturn(null);
         
         ServiceFactory.getService(mockRequest, mockResponse);
@@ -203,7 +206,7 @@ public class ServiceFactoryTest {
      * Tests that ServiceFactory throws NotFoundException for empty path.
      */
     @Test(expected = NotFoundException.class)
-    public void testGetService_EmptyPath() {
+    public void testGetServiceEmptyPath() {
         when(mockRequest.getPathInfo()).thenReturn("");
         
         ServiceFactory.getService(mockRequest, mockResponse);
@@ -213,7 +216,7 @@ public class ServiceFactoryTest {
      * Tests that ServiceFactory throws NotFoundException for root path.
      */
     @Test(expected = NotFoundException.class)
-    public void testGetService_RootPath() {
+    public void testGetServiceRootPath() {
         when(mockRequest.getPathInfo()).thenReturn("/");
         
         ServiceFactory.getService(mockRequest, mockResponse);
