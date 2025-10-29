@@ -36,6 +36,9 @@ public class HttpServletRequestWrapperSimpleTest {
     @Mock
     private HttpServletRequest mockRequest;
 
+    /**
+     * Tests HttpServletRequestWrapper constructor.
+     */
     @Test
     public void testConstructor() {
         HttpServletRequestWrapper wrapper = new HttpServletRequestWrapper(mockRequest);
@@ -43,6 +46,9 @@ public class HttpServletRequestWrapperSimpleTest {
         assertNotNull("Wrapper should not be null", wrapper);
     }
 
+    /**
+     * Tests HttpServletRequestWrapper constructor with null request.
+     */
     @Test
     public void testConstructorWithNull() {
         try {
@@ -54,6 +60,9 @@ public class HttpServletRequestWrapperSimpleTest {
         }
     }
 
+    /**
+     * Tests getMethod method delegates to wrapped request.
+     */
     @Test
     public void testGetMethod() {
         when(mockRequest.getMethod()).thenReturn("GET");
@@ -64,6 +73,9 @@ public class HttpServletRequestWrapperSimpleTest {
         verify(mockRequest).getMethod();
     }
 
+    /**
+     * Tests getRequestURI method delegates to wrapped request.
+     */
     @Test
     public void testGetRequestURI() {
         when(mockRequest.getRequestURI()).thenReturn("/test/uri");
@@ -74,6 +86,9 @@ public class HttpServletRequestWrapperSimpleTest {
         verify(mockRequest).getRequestURI();
     }
 
+    /**
+     * Tests getPathInfo method delegates to wrapped request.
+     */
     @Test
     public void testGetPathInfo() {
         when(mockRequest.getPathInfo()).thenReturn("/path/info");

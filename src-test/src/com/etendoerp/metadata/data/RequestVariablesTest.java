@@ -44,6 +44,9 @@ public class RequestVariablesTest {
         requestVariables = new RequestVariables(mockRequest);
     }
 
+    /**
+     * Tests RequestVariables constructor and initial state.
+     */
     @Test
     public void testConstructor() {
         assertNotNull("RequestVariables should not be null", requestVariables);
@@ -51,6 +54,9 @@ public class RequestVariablesTest {
         assertTrue("Cased session attributes should be empty initially", requestVariables.getCasedSessionAttributes().isEmpty());
     }
 
+    /**
+     * Tests setSessionValue method stores values correctly.
+     */
     @Test
     public void testSetSessionValue() {
         String attribute = "testAttribute";
@@ -63,6 +69,9 @@ public class RequestVariablesTest {
         assertEquals("Cased attribute value should match", value, casedAttributes.get(attribute));
     }
 
+    /**
+     * Tests setSessionValue method with multiple values.
+     */
     @Test
     public void testSetMultipleSessionValues() {
         requestVariables.setSessionValue("attr1", "value1");
@@ -76,6 +85,9 @@ public class RequestVariablesTest {
         assertEquals("Third attribute should match", "value3", casedAttributes.get("attr3"));
     }
 
+    /**
+     * Tests setSessionValue method with null value.
+     */
     @Test
     public void testSetSessionValueWithNullValue() {
         String attribute = "testAttribute";
@@ -87,6 +99,9 @@ public class RequestVariablesTest {
         assertNull("Cased attribute value should be null", casedAttributes.get(attribute));
     }
 
+    /**
+     * Tests setSessionValue method overwrites existing values.
+     */
     @Test
     public void testSetSessionValueOverwrite() {
         String attribute = "testAttribute";
@@ -101,6 +116,9 @@ public class RequestVariablesTest {
         assertEquals("Attribute should have the latest value", value2, casedAttributes.get(attribute));
     }
 
+    /**
+     * Tests getCasedSessionAttributes returns a Map instance.
+     */
     @Test
     public void testGetCasedSessionAttributesReturnsMap() {
         Map<String, Object> casedAttributes = requestVariables.getCasedSessionAttributes();
@@ -109,6 +127,9 @@ public class RequestVariablesTest {
         assertTrue("Should be a Map", casedAttributes instanceof Map);
     }
 
+    /**
+     * Tests setSessionValue method with empty string value.
+     */
     @Test
     public void testSetSessionValueWithEmptyString() {
         String attribute = "testAttribute";

@@ -92,6 +92,9 @@ public class AuthDataTest {
         assertEquals("Updated role should match", newRole, authData.getRole());
     }
 
+    /**
+     * Tests getOrg and setOrg methods.
+     */
     @Test
     public void testGetAndSetOrg() {
         assertEquals("Initial org should match", mockOrg, authData.getOrg());
@@ -102,6 +105,9 @@ public class AuthDataTest {
         assertEquals("Updated org should match", newOrg, authData.getOrg());
     }
 
+    /**
+     * Tests getWarehouse and setWarehouse methods.
+     */
     @Test
     public void testGetAndSetWarehouse() {
         assertEquals("Initial warehouse should match", mockWarehouse, authData.getWarehouse());
@@ -112,6 +118,9 @@ public class AuthDataTest {
         assertEquals("Updated warehouse should match", newWarehouse, authData.getWarehouse());
     }
 
+    /**
+     * Tests getClient and setClient methods.
+     */
     @Test
     public void testGetAndSetClient() {
         assertEquals("Initial client should match", mockClient, authData.getClient());
@@ -122,6 +131,9 @@ public class AuthDataTest {
         assertEquals("Updated client should match", newClient, authData.getClient());
     }
 
+    /**
+     * Tests AuthData constructor with all null values.
+     */
     @Test
     public void testConstructorWithNullValues() {
         AuthData authDataWithNulls = new AuthData(null, null, null, null, null);
@@ -134,6 +146,9 @@ public class AuthDataTest {
         assertNull("Client should be null", authDataWithNulls.getClient());
     }
 
+    /**
+     * Tests setter methods with null values.
+     */
     @Test
     public void testSettersWithNull() {
         authData.setRole(null);

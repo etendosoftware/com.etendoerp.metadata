@@ -62,6 +62,9 @@ public class MetadataServiceTest {
         MetadataService.clear();
     }
 
+    /**
+     * Tests MetadataService constructor sets request and response correctly.
+     */
     @Test
     public void testConstructor() {
         TestMetadataService service = new TestMetadataService(mockRequest, mockResponse);
@@ -71,6 +74,9 @@ public class MetadataServiceTest {
         assertEquals("Response should be set", mockResponse, service.getResponse());
     }
 
+    /**
+     * Tests getRequest and getResponse methods return correct objects.
+     */
     @Test
     public void testGetRequestAndResponse() {
         TestMetadataService service = new TestMetadataService(mockRequest, mockResponse);
@@ -79,6 +85,9 @@ public class MetadataServiceTest {
         assertSame("Should return the same response", mockResponse, service.getResponse());
     }
 
+    /**
+     * Tests clear method clears ThreadLocal variables.
+     */
     @Test
     public void testClear() {
         TestMetadataService service = new TestMetadataService(mockRequest, mockResponse);
@@ -95,6 +104,9 @@ public class MetadataServiceTest {
         assertNotNull("Service should still exist", service);
     }
 
+    /**
+     * Tests write method outputs JSON correctly.
+     */
     @Test
     public void testWriteJSON() throws IOException {
         StringWriter stringWriter = new StringWriter();
@@ -126,6 +138,9 @@ public class MetadataServiceTest {
         }
     }
 
+    /**
+     * Tests write method propagates IOException correctly.
+     */
     @Test
     public void testWriteJSONIOException() throws IOException {
         when(mockResponse.getWriter()).thenThrow(new IOException("Test IO Exception"));
@@ -144,6 +159,9 @@ public class MetadataServiceTest {
         }
     }
 
+    /**
+     * Tests multiple service instances handle ThreadLocal correctly.
+     */
     @Test
     public void testMultipleServices() {
         TestMetadataService service1 = new TestMetadataService(mockRequest, mockResponse);

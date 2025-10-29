@@ -47,6 +47,9 @@ public class ToolbarServiceTest {
     @Mock
     private HttpServletResponse mockResponse;
 
+    /**
+     * Tests ToolbarService constructor and inheritance.
+     */
     @Test
     public void testConstructor() {
         ToolbarService service = new ToolbarService(mockRequest, mockResponse);
@@ -55,6 +58,10 @@ public class ToolbarServiceTest {
         assertTrue("Should be instance of MetadataService", service instanceof MetadataService);
     }
 
+    /**
+     * Tests ToolbarService process method execution.
+     * Expects exceptions in test environment due to missing dependencies.
+     */
     @Test
     public void testProcess() throws IOException {
         StringWriter stringWriter = new StringWriter();
@@ -87,6 +94,9 @@ public class ToolbarServiceTest {
         }
     }
 
+    /**
+     * Tests ToolbarService process method exception handling.
+     */
     @Test
     public void testProcessIOException() throws IOException {
         when(mockResponse.getWriter()).thenThrow(new IOException("Test IO Exception"));

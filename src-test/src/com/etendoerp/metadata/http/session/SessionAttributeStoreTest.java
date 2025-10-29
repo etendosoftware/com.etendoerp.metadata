@@ -29,6 +29,9 @@ import static org.junit.Assert.*;
  */
 public class SessionAttributeStoreTest {
 
+    /**
+     * Tests setAttribute and getAttribute methods work correctly.
+     */
     @Test
     public void testSetAndGetAttribute() {
         SessionAttributeStore store = new SessionAttributeStore();
@@ -42,6 +45,9 @@ public class SessionAttributeStoreTest {
         assertEquals("Retrieved value should match set value", attributeValue, retrievedValue);
     }
 
+    /**
+     * Tests getAttributes returns empty map for new session.
+     */
     @Test
     public void testGetAttributesReturnsEmptyMapForNewSession() {
         SessionAttributeStore store = new SessionAttributeStore();
@@ -53,6 +59,9 @@ public class SessionAttributeStoreTest {
         assertTrue("Attributes map should be empty for new session", attributes.isEmpty());
     }
 
+    /**
+     * Tests getAttributes returns correct map with all stored attributes.
+     */
     @Test
     public void testGetAttributesReturnsCorrectMap() {
         SessionAttributeStore store = new SessionAttributeStore();
@@ -69,6 +78,9 @@ public class SessionAttributeStoreTest {
         assertEquals("Second attribute should match", "value2", attributes.get("attr2"));
     }
 
+    /**
+     * Tests removeAttribute method removes specific attribute only.
+     */
     @Test
     public void testRemoveAttribute() {
         SessionAttributeStore store = new SessionAttributeStore();
@@ -83,6 +95,9 @@ public class SessionAttributeStoreTest {
         assertEquals("Other attribute should still exist", "keepValue", store.getAttribute(sessionId, "keep"));
     }
 
+    /**
+     * Tests removeAllAttributes method clears all session attributes.
+     */
     @Test
     public void testRemoveAllAttributes() {
         SessionAttributeStore store = new SessionAttributeStore();
@@ -97,6 +112,9 @@ public class SessionAttributeStoreTest {
         assertTrue("All attributes should be removed", attributes.isEmpty());
     }
 
+    /**
+     * Tests multiple sessions maintain separate attribute stores.
+     */
     @Test
     public void testMultipleSessions() {
         SessionAttributeStore store = new SessionAttributeStore();
@@ -110,6 +128,9 @@ public class SessionAttributeStoreTest {
         assertEquals("Session 2 attribute should be correct", "value2", store.getAttribute(session2, "attr"));
     }
 
+    /**
+     * Tests getAttribute returns null for non-existent attributes.
+     */
     @Test
     public void testGetNonExistentAttribute() {
         SessionAttributeStore store = new SessionAttributeStore();
@@ -120,6 +141,9 @@ public class SessionAttributeStoreTest {
         assertNull("Non-existent attribute should be null", value);
     }
 
+    /**
+     * Tests removeAttribute handles non-existent attributes gracefully.
+     */
     @Test
     public void testRemoveNonExistentAttribute() {
         SessionAttributeStore store = new SessionAttributeStore();

@@ -46,6 +46,9 @@ public class SessionServiceTest {
     @Mock
     private HttpServletResponse mockResponse;
 
+    /**
+     * Tests SessionService constructor and inheritance.
+     */
     @Test
     public void testConstructor() {
         SessionService service = new SessionService(mockRequest, mockResponse);
@@ -68,6 +71,9 @@ public class SessionServiceTest {
         }
     }
 
+    /**
+     * Tests SessionService process method exception handling.
+     */
     @Test
     public void testProcessWithException() throws IOException {
         SessionService service = new SessionService(mockRequest, mockResponse);

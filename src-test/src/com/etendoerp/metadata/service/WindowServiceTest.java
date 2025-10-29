@@ -47,6 +47,9 @@ public class WindowServiceTest {
     @Mock
     private HttpServletResponse mockResponse;
 
+    /**
+     * Tests WindowService constructor and inheritance.
+     */
     @Test
     public void testConstructor() {
         WindowService service = new WindowService(mockRequest, mockResponse);
@@ -71,6 +74,9 @@ public class WindowServiceTest {
         }
     }
 
+    /**
+     * Tests WindowService process method throws OBException for null path info.
+     */
     @Test(expected = OBException.class)
     public void testProcessWithNullPathInfo() throws IOException {
         when(mockRequest.getPathInfo()).thenReturn(null);
@@ -79,6 +85,9 @@ public class WindowServiceTest {
         service.process();
     }
 
+    /**
+     * Tests WindowService process method throws OBException for empty window ID.
+     */
     @Test(expected = OBException.class)
     public void testProcessWithEmptyWindowId() throws IOException {
         when(mockRequest.getPathInfo()).thenReturn("/com.etendoerp.metadata.meta/window/");
@@ -87,6 +96,9 @@ public class WindowServiceTest {
         service.process();
     }
 
+    /**
+     * Tests WindowService process method throws OBException for invalid path.
+     */
     @Test(expected = OBException.class)
     public void testProcessWithInvalidPath() throws IOException {
         when(mockRequest.getPathInfo()).thenReturn("/com.etendoerp.metadata.meta/invalid/path");
@@ -111,6 +123,9 @@ public class WindowServiceTest {
         }
     }
 
+    /**
+     * Tests WindowService process method exception handling.
+     */
     @Test
     public void testProcessWithException() throws IOException {
         when(mockRequest.getPathInfo()).thenReturn("/com.etendoerp.metadata.meta/window/123");
