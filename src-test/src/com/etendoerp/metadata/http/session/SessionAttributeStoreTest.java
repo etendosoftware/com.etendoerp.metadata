@@ -28,6 +28,11 @@ import static org.junit.Assert.*;
  * Uses unique session IDs to avoid state conflicts between tests.
  */
 public class SessionAttributeStoreTest {
+    private static final String VALUE_1 = "value1";
+    private static final String VALUE_2 = "value2";
+    private static final String ATTR_1 = "attr1";
+    private static final String ATTR_2 = "attr2";
+    private static final String REMOVE = "remove";
 
     /**
      * Tests setAttribute and getAttribute methods work correctly.
@@ -67,15 +72,15 @@ public class SessionAttributeStoreTest {
         SessionAttributeStore store = new SessionAttributeStore();
         String sessionId = "unique-session-" + System.nanoTime();
         
-        store.setAttribute(sessionId, "attr1", "value1");
-        store.setAttribute(sessionId, "attr2", "value2");
+        store.setAttribute(sessionId, ATTR_1, VALUE_1);
+        store.setAttribute(sessionId, ATTR_2, VALUE_2);
         
         Map<String, Object> attributes = store.getAttributes(sessionId);
         
         assertNotNull("Attributes map should not be null", attributes);
         assertEquals("Should have 2 attributes", 2, attributes.size());
-        assertEquals("First attribute should match", "value1", attributes.get("attr1"));
-        assertEquals("Second attribute should match", "value2", attributes.get("attr2"));
+        assertEquals("First attribute should match", VALUE_1, attributes.get(ATTR_1));
+        assertEquals("Second attribute should match", VALUE_2, attributes.get(ATTR_2));
     }
 
     /**
@@ -87,11 +92,11 @@ public class SessionAttributeStoreTest {
         String sessionId = "remove-test-" + System.nanoTime();
         
         store.setAttribute(sessionId, "keep", "keepValue");
-        store.setAttribute(sessionId, "remove", "removeValue");
+        store.setAttribute(sessionId, REMOVE, "removeValue");
         
-        store.removeAttribute(sessionId, "remove");
+        store.removeAttribute(sessionId, REMOVE);
         
-        assertNull("Removed attribute should be null", store.getAttribute(sessionId, "remove"));
+        assertNull("Removed attribute should be null", store.getAttribute(sessionId, REMOVE));
         assertEquals("Other attribute should still exist", "keepValue", store.getAttribute(sessionId, "keep"));
     }
 
@@ -103,8 +108,8 @@ public class SessionAttributeStoreTest {
         SessionAttributeStore store = new SessionAttributeStore();
         String sessionId = "remove-all-" + System.nanoTime();
         
-        store.setAttribute(sessionId, "attr1", "value1");
-        store.setAttribute(sessionId, "attr2", "value2");
+        store.setAttribute(sessionId, ATTR_1, VALUE_1);
+        store.setAttribute(sessionId, ATTR_2, VALUE_2);
         
         store.removeAllAttributes(sessionId);
         
@@ -121,11 +126,11 @@ public class SessionAttributeStoreTest {
         String session1 = "session1-" + System.nanoTime();
         String session2 = "session2-" + System.nanoTime();
         
-        store.setAttribute(session1, "attr", "value1");
-        store.setAttribute(session2, "attr", "value2");
+        store.setAttribute(session1, "attr", VALUE_1);
+        store.setAttribute(session2, "attr", VALUE_2);
         
-        assertEquals("Session 1 attribute should be correct", "value1", store.getAttribute(session1, "attr"));
-        assertEquals("Session 2 attribute should be correct", "value2", store.getAttribute(session2, "attr"));
+        assertEquals("Session 1 attribute should be correct", VALUE_1, store.getAttribute(session1, "attr"));
+        assertEquals("Session 2 attribute should be correct", VALUE_2, store.getAttribute(session2, "attr"));
     }
 
     /**

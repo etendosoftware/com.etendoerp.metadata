@@ -36,6 +36,7 @@ import static org.mockito.Mockito.when;
  */
 @RunWith(MockitoJUnitRunner.class)
 public class ServiceFactoryTest {
+    private final static String SERVICE_NOT_NULL = "Service should not be null";
 
     @Mock
     private HttpServletRequest mockRequest;
@@ -57,7 +58,7 @@ public class ServiceFactoryTest {
         
         MetadataService service = ServiceFactory.getService(mockRequest, mockResponse);
         
-        assertNotNull("Service should not be null", service);
+        assertNotNull(SERVICE_NOT_NULL, service);
         assertTrue("Should return SessionService", service instanceof SessionService);
     }
 
@@ -70,7 +71,7 @@ public class ServiceFactoryTest {
         
         MetadataService service = ServiceFactory.getService(mockRequest, mockResponse);
         
-        assertNotNull("Service should not be null", service);
+        assertNotNull(SERVICE_NOT_NULL, service);
         assertTrue("Should return MenuService", service instanceof MenuService);
     }
 
@@ -83,7 +84,7 @@ public class ServiceFactoryTest {
         
         MetadataService service = ServiceFactory.getService(mockRequest, mockResponse);
         
-        assertNotNull("Service should not be null", service);
+        assertNotNull(SERVICE_NOT_NULL, service);
         assertTrue("Should return WindowService", service instanceof WindowService);
     }
 
@@ -96,7 +97,7 @@ public class ServiceFactoryTest {
         
         MetadataService service = ServiceFactory.getService(mockRequest, mockResponse);
         
-        assertNotNull("Service should not be null", service);
+        assertNotNull(SERVICE_NOT_NULL, service);
         assertTrue("Should return TabService", service instanceof TabService);
     }
 
@@ -109,7 +110,7 @@ public class ServiceFactoryTest {
         
         MetadataService service = ServiceFactory.getService(mockRequest, mockResponse);
         
-        assertNotNull("Service should not be null", service);
+        assertNotNull(SERVICE_NOT_NULL, service);
         assertTrue("Should return LanguageService", service instanceof LanguageService);
     }
 
@@ -122,7 +123,7 @@ public class ServiceFactoryTest {
         
         MetadataService service = ServiceFactory.getService(mockRequest, mockResponse);
         
-        assertNotNull("Service should not be null", service);
+        assertNotNull(SERVICE_NOT_NULL, service);
         assertTrue("Should return MessageService", service instanceof MessageService);
     }
 
@@ -135,7 +136,7 @@ public class ServiceFactoryTest {
         
         MetadataService service = ServiceFactory.getService(mockRequest, mockResponse);
         
-        assertNotNull("Service should not be null", service);
+        assertNotNull(SERVICE_NOT_NULL, service);
         assertTrue("Should return LabelsService", service instanceof LabelsService);
     }
 
@@ -148,7 +149,7 @@ public class ServiceFactoryTest {
         
         MetadataService service = ServiceFactory.getService(mockRequest, mockResponse);
         
-        assertNotNull("Service should not be null", service);
+        assertNotNull(SERVICE_NOT_NULL, service);
         assertTrue("Should return LocationMetadataService", service instanceof LocationMetadataService);
     }
 
@@ -161,7 +162,7 @@ public class ServiceFactoryTest {
         
         MetadataService service = ServiceFactory.getService(mockRequest, mockResponse);
         
-        assertNotNull("Service should not be null", service);
+        assertNotNull(SERVICE_NOT_NULL, service);
         assertTrue("Should return ToolbarService", service instanceof ToolbarService);
     }
 
@@ -174,7 +175,7 @@ public class ServiceFactoryTest {
         
         MetadataService service = ServiceFactory.getService(mockRequest, mockResponse);
         
-        assertNotNull("Service should not be null", service);
+        assertNotNull(SERVICE_NOT_NULL, service);
         assertTrue("Should return LegacyService", service instanceof LegacyService);
     }
 

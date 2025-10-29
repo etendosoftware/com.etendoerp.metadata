@@ -33,12 +33,18 @@ import static org.junit.Assert.*;
  */
 @RunWith(MockitoJUnitRunner.class)
 public class RequestVariablesTest {
+    private static final String TEST_ATTRIBUTES = "testAttribute";
+    private static final String VALUE_1 = "value1";
+    private static final String VALUE_2 = "value2";
 
     @Mock
     private HttpServletRequest mockRequest;
 
     private RequestVariables requestVariables;
 
+    /**
+     * Tests AuthData constructor with all parameters.
+     */
     @Before
     public void setUp() {
         requestVariables = new RequestVariables(mockRequest);
@@ -59,7 +65,7 @@ public class RequestVariablesTest {
      */
     @Test
     public void testSetSessionValue() {
-        String attribute = "testAttribute";
+        String attribute = TEST_ATTRIBUTES;
         String value = "testValue";
         
         requestVariables.setSessionValue(attribute, value);
@@ -74,14 +80,14 @@ public class RequestVariablesTest {
      */
     @Test
     public void testSetMultipleSessionValues() {
-        requestVariables.setSessionValue("attr1", "value1");
-        requestVariables.setSessionValue("attr2", "value2");
+        requestVariables.setSessionValue("attr1", VALUE_1);
+        requestVariables.setSessionValue("attr2", VALUE_1);
         requestVariables.setSessionValue("attr3", "value3");
         
         Map<String, Object> casedAttributes = requestVariables.getCasedSessionAttributes();
         assertEquals("Should have 3 attributes", 3, casedAttributes.size());
-        assertEquals("First attribute should match", "value1", casedAttributes.get("attr1"));
-        assertEquals("Second attribute should match", "value2", casedAttributes.get("attr2"));
+        assertEquals("First attribute should match", VALUE_1, casedAttributes.get("attr1"));
+        assertEquals("Second attribute should match", VALUE_1, casedAttributes.get("attr2"));
         assertEquals("Third attribute should match", "value3", casedAttributes.get("attr3"));
     }
 
@@ -90,7 +96,7 @@ public class RequestVariablesTest {
      */
     @Test
     public void testSetSessionValueWithNullValue() {
-        String attribute = "testAttribute";
+        String attribute = TEST_ATTRIBUTES;
         
         requestVariables.setSessionValue(attribute, null);
         
@@ -104,9 +110,9 @@ public class RequestVariablesTest {
      */
     @Test
     public void testSetSessionValueOverwrite() {
-        String attribute = "testAttribute";
-        String value1 = "value1";
-        String value2 = "value2";
+        String attribute = TEST_ATTRIBUTES;
+        String value1 = VALUE_1;
+        String value2 = VALUE_2;
         
         requestVariables.setSessionValue(attribute, value1);
         requestVariables.setSessionValue(attribute, value2);
@@ -132,7 +138,7 @@ public class RequestVariablesTest {
      */
     @Test
     public void testSetSessionValueWithEmptyString() {
-        String attribute = "testAttribute";
+        String attribute = TEST_ATTRIBUTES;
         String value = "";
         
         requestVariables.setSessionValue(attribute, value);

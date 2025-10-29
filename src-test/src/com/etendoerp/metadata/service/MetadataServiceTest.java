@@ -164,8 +164,6 @@ public class MetadataServiceTest {
      */
     @Test
     public void testMultipleServices() {
-        TestMetadataService service1 = new TestMetadataService(mockRequest, mockResponse);
-        
         HttpServletRequest mockRequest2 = mock(HttpServletRequest.class);
         HttpServletResponse mockResponse2 = mock(HttpServletResponse.class);
         TestMetadataService service2 = new TestMetadataService(mockRequest2, mockResponse2);

@@ -53,6 +53,9 @@ public class AuthDataTest {
 
     private AuthData authData;
 
+    /**
+     * Set up the data
+     */
     @Before
     public void setUp() {
         authData = new AuthData(mockUser, mockRole, mockOrg, mockWarehouse, mockClient);
