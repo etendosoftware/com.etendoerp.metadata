@@ -320,7 +320,8 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
 
             // Create temp file in secure directory with restrictive permissions
             java.io.File tempDir = new java.io.File(APP_TEMP_DIR);
-            tempFile = java.io.File.createTempFile("attachment_", "_" + fileName, tempDir);
+            // Create unique temp file first
+            tempFile = java.io.File.createTempFile("attachment_", ".tmp", tempDir);
 
             // Set restrictive permissions (owner only: rw-------)
             boolean permissionsSet = true;
@@ -337,7 +338,39 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
                 IOUtils.copy(filePart.getInputStream(), fos);
             }
 
-            attachManager.upload(params, tabId, recordId, orgId, tempFile);
+            // Create a file with the original name for the attachment manager
+            java.io.File finalFile = new java.io.File(tempDir, fileName);
+            if (finalFile.exists()) {
+                // If file exists, create a unique name
+                String baseName = fileName;
+                String extension = "";
+                int lastDot = fileName.lastIndexOf('.');
+                if (lastDot > 0) {
+                    baseName = fileName.substring(0, lastDot);
+                    extension = fileName.substring(lastDot);
+                }
+                int counter = 1;
+                while (finalFile.exists()) {
+                    finalFile = new java.io.File(tempDir, baseName + "_" + counter + extension);
+                    counter++;
+                }
+            }
+            
+            // Rename temp file to final name
+            if (!tempFile.renameTo(finalFile)) {
+                // If rename fails, copy the file
+                try (java.io.FileInputStream fis = new java.io.FileInputStream(tempFile);
+                     java.io.FileOutputStream fos = new java.io.FileOutputStream(finalFile)) {
+                    IOUtils.copy(fis, fos);
+                }
+                // Delete original temp file
+                tempFile.delete();
+            }
+            
+            // Update tempFile reference for cleanup
+            tempFile = finalFile;
+
+            attachManager.upload(params, tabId, recordId, orgId, finalFile);
 
             JSONObject result = new JSONObject();
             result.put(JSON_KEY_SUCCESS, true);
