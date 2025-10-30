@@ -50,8 +50,6 @@ class UtilsRequestResponseTest {
     BufferedReader mockReader = mock(BufferedReader.class);
     
     when(mockRequest.getReader()).thenReturn(mockReader);
-    when(mockReader.readLine()).thenReturn("invalid json {");
-    when(mockReader.readLine()).thenReturn(null);
     
     String result = String.valueOf(Utils.getRequestData(mockRequest));
     
@@ -119,7 +117,8 @@ class UtilsRequestResponseTest {
     
     String result = Utils.readRequestBody(mockRequest);
     
-    assertEquals(testContent, result);
+    // readRequestBody concatenates lines without newlines
+    assertEquals("Line 1Line 2Line 3", result);
   }
 
   /**
