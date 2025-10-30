@@ -25,6 +25,7 @@ import org.junit.jupiter.api.Test;
  * Additional simple tests for custom exception classes.
  */
 class ExceptionsSimpleTest {
+    private final static String MODULE_EXCEPTIONS = "com.etendoerp.metadata.exceptions";
 
     /**
      * Tests NotFoundException can be created with message.
@@ -91,11 +92,11 @@ class ExceptionsSimpleTest {
      */
     @Test
     void exceptionClassesHaveCorrectPackage() {
-        assertEquals("com.etendoerp.metadata.exceptions", NotFoundException.class.getPackage().getName());
-        assertEquals("com.etendoerp.metadata.exceptions", UnauthorizedException.class.getPackage().getName());
-        assertEquals("com.etendoerp.metadata.exceptions", MethodNotAllowedException.class.getPackage().getName());
-        assertEquals("com.etendoerp.metadata.exceptions", UnprocessableContentException.class.getPackage().getName());
-        assertEquals("com.etendoerp.metadata.exceptions", InternalServerException.class.getPackage().getName());
+        assertEquals(MODULE_EXCEPTIONS, NotFoundException.class.getPackage().getName());
+        assertEquals(MODULE_EXCEPTIONS, UnauthorizedException.class.getPackage().getName());
+        assertEquals(MODULE_EXCEPTIONS, MethodNotAllowedException.class.getPackage().getName());
+        assertEquals(MODULE_EXCEPTIONS, UnprocessableContentException.class.getPackage().getName());
+        assertEquals(MODULE_EXCEPTIONS, InternalServerException.class.getPackage().getName());
     }
 
     /**

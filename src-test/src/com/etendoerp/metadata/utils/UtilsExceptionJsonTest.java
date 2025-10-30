@@ -35,8 +35,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class UtilsExceptionJsonTest {
 
   private static final String TEST_ERROR_MESSAGE = "Test error message";
-  private static final String MESSAGE = "message";
-  private static final String SUCCESS = "success";
+  private static final String ERROR = "error";
 
   /**
    * Tests the getHttpStatusFor method with different exception types.
@@ -60,8 +59,8 @@ class UtilsExceptionJsonTest {
     JSONObject result = Utils.convertToJson(exception);
     
     assertNotNull(result);
-    assertTrue(result.has("error"));
-    assertEquals(errorMessage, result.optString("error"));
+    assertTrue(result.has(ERROR));
+    assertEquals(errorMessage, result.optString(ERROR));
   }
 
   /**
@@ -76,8 +75,8 @@ class UtilsExceptionJsonTest {
     JSONObject result = Utils.convertToJson(exception);
     
     assertNotNull(result);
-    assertTrue(result.has("error"));
-    assertEquals(causeMessage, result.optString("error")); // Uses "error" key and cause message
+    assertTrue(result.has(ERROR));
+    assertEquals(causeMessage, result.optString(ERROR)); // Uses ERROR key and cause message
   }
 
   /**
@@ -98,9 +97,7 @@ class UtilsExceptionJsonTest {
   @Test
   void convertToJsonWithNullExceptionHandlesGracefully() {
     // Based on our earlier tests, convertToJson with null throws NPE
-    assertThrows(NullPointerException.class, () -> {
-      Utils.convertToJson(null);
-    });
+    assertThrows(NullPointerException.class, () -> Utils.convertToJson(null));
   }
 
   /**
@@ -114,8 +111,8 @@ class UtilsExceptionJsonTest {
     JSONObject result = Utils.convertToJson(exception);
     
     assertNotNull(result);
-    assertTrue(result.has("error"));
-    assertEquals(longMessage, result.optString("error"));
+    assertTrue(result.has(ERROR));
+    assertEquals(longMessage, result.optString(ERROR));
   }
 
   /**
@@ -130,9 +127,9 @@ class UtilsExceptionJsonTest {
     JSONObject result = Utils.convertToJson(level1);
     
     assertNotNull(result);
-    assertTrue(result.has("error"));
+    assertTrue(result.has(ERROR));
     // The implementation goes one level deep, not all the way to the root
-    assertEquals("Level 2", result.optString("error"));
+    assertEquals("Level 2", result.optString(ERROR));
   }
 
   /**
@@ -145,8 +142,8 @@ class UtilsExceptionJsonTest {
     JSONObject result = Utils.convertToJson(exception);
     
     assertNotNull(result);
-    assertTrue(result.has("error"));
+    assertTrue(result.has(ERROR));
     // Should handle empty message gracefully
-    assertEquals("", result.optString("error"));
+    assertEquals("", result.optString(ERROR));
   }
 }

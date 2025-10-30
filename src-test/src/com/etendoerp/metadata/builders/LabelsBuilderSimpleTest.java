@@ -135,9 +135,7 @@ class LabelsBuilderSimpleTest {
             mockedWeldUtils.when(() -> WeldUtils.getInstanceFromStaticBeanManager(I18NComponent.class))
                 .thenReturn(null);
 
-            assertThrows(Exception.class, () -> {
-                labelsBuilder.toJSON();
-            });
+            assertThrows(Exception.class, () -> labelsBuilder.toJSON());
         }
     }
 

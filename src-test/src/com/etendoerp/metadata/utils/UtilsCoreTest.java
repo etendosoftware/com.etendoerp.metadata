@@ -73,14 +73,9 @@ class UtilsCoreTest {
   @Test
   void evaluateDisplayLogicAtServerLevelWithValidLogicReturnsTrue() {
     Field mockField = mock(Field.class);
-    Tab mockTab = mock(Tab.class);
     when(mockField.getDisplayLogicEvaluatedInTheServer()).thenReturn("1=1");
-    
-    // This method requires ServletContext and complex framework setup
-    // In test environment, it will throw NullPointerException 
-    assertThrows(NullPointerException.class, () -> {
-      Utils.evaluateDisplayLogicAtServerLevel(mockField);
-    });
+
+    assertThrows(NullPointerException.class, () -> Utils.evaluateDisplayLogicAtServerLevel(mockField));
   }
 
   /**
@@ -92,9 +87,7 @@ class UtilsCoreTest {
     
     // This method requires SessionFactoryController which is not available in test environment
     // So we expect it to throw NullPointerException in test context
-    assertThrows(NullPointerException.class, () -> {
-      Utils.setContext(mockRequest);
-    });
+    assertThrows(NullPointerException.class, () -> Utils.setContext(mockRequest));
   }
 
   /**
@@ -104,8 +97,6 @@ class UtilsCoreTest {
   void setContextWithNoLanguageProvidedStillSetsContext() {
     HttpServletRequest mockRequest = mock(HttpServletRequest.class);
 
-    assertThrows(NullPointerException.class, () -> {
-      Utils.setContext(mockRequest);
-    });
+    assertThrows(NullPointerException.class, () -> Utils.setContext(mockRequest));
   }
 }

@@ -44,13 +44,10 @@ class FieldBuilderWithoutColumnSimpleTest {
      */
     @Test 
     void hasExpectedConstructor() throws Exception {
-        // Verify constructor exists with expected parameters
-        assertDoesNotThrow(() -> {
             FieldBuilderWithoutColumn.class.getDeclaredConstructor(
                 org.openbravo.model.ad.ui.Field.class,
                 org.openbravo.model.ad.access.FieldAccess.class
             );
-        });
     }
 
     /**

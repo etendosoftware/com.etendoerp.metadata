@@ -33,6 +33,8 @@ import com.etendoerp.metadata.exceptions.UnauthorizedException;
  * Simple unit tests for Utils class focusing on static methods and exception handling.
  */
 class UtilsSimpleTest {
+    private static final String ERROR = "error";
+
 
     /**
      * Tests that Utils class exists and has correct structure.
@@ -54,9 +56,7 @@ class UtilsSimpleTest {
         assertEquals(HttpStatus.SC_INTERNAL_SERVER_ERROR, Utils.getHttpStatusFor(new RuntimeException("test")));
         
         // Test null case - should not crash but the actual implementation might not handle null
-        assertThrows(NullPointerException.class, () -> {
-            Utils.getHttpStatusFor(null);
-        });
+        assertThrows(NullPointerException.class, () -> Utils.getHttpStatusFor(null));
     }
 
     /**
@@ -68,8 +68,8 @@ class UtilsSimpleTest {
         JSONObject result = Utils.convertToJson(testException);
         
         assertNotNull(result);
-        assertTrue(result.has("error"));
-        assertEquals("Test error message", result.getString("error"));
+        assertTrue(result.has(ERROR));
+        assertEquals("Test error message", result.getString(ERROR));
     }
 
     /**
@@ -83,8 +83,8 @@ class UtilsSimpleTest {
         JSONObject result = Utils.convertToJson(wrapper);
         
         assertNotNull(result);
-        assertTrue(result.has("error"));
-        assertEquals("Root cause", result.getString("error"));
+        assertTrue(result.has(ERROR));
+        assertEquals("Root cause", result.getString(ERROR));
     }
 
     /**
@@ -135,8 +135,6 @@ class UtilsSimpleTest {
     @Test
     void convertToJsonWithNullShouldThrowException() throws Exception {
         // The actual implementation might not handle null gracefully
-        assertThrows(NullPointerException.class, () -> {
-            Utils.convertToJson((Throwable) null);
-        });
+        assertThrows(NullPointerException.class, () -> Utils.convertToJson((Throwable) null));
     }
 }
