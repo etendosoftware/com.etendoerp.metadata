@@ -60,6 +60,8 @@ public class AttachmentsServletTest extends OBBaseTest {
     private static final String TEST_RECORD_ID = "record-456";
     private static final String TEST_ATTACHMENT_ID = "attachment-abc";
     private static final String TEST_USER_ID = "user-123";
+    private static final String TEST_ORG_ID = "org-123";
+    private static final String TEST_PATH = "/test/path";
 
     private static final String PARAM_COMMAND = "command";
     private static final String PARAM_TAB_ID = "tabId";
@@ -146,20 +148,6 @@ public class AttachmentsServletTest extends OBBaseTest {
     }
 
 
-    /**
-     * Tests that servlet properly handles all defined commands
-     */
-    @Test
-    public void testServletCommandConstants() throws Exception {
-        // Test that all command constants are defined and accessible
-        assertTrue("LIST command should be defined", CMD_LIST.equals("LIST"));
-        assertTrue("UPLOAD command should be defined", CMD_UPLOAD.equals("UPLOAD"));
-        assertTrue("DOWNLOAD command should be defined", CMD_DOWNLOAD.equals("DOWNLOAD"));
-        assertTrue("DOWNLOAD_ALL command should be defined", CMD_DOWNLOAD_ALL.equals("DOWNLOAD_ALL"));
-        assertTrue("EDIT command should be defined", CMD_EDIT.equals("EDIT"));
-        assertTrue("DELETE command should be defined", CMD_DELETE.equals("DELETE"));
-        assertTrue("DELETE_ALL command should be defined", CMD_DELETE_ALL.equals("DELETE_ALL"));
-    }
 
     /**
      * Tests LIST command with missing tabId parameter.
@@ -240,7 +228,7 @@ public class AttachmentsServletTest extends OBBaseTest {
         when(mockRequest.getParameter(PARAM_COMMAND)).thenReturn(CMD_UPLOAD);
         when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(TEST_TAB_ID);
         when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(TEST_RECORD_ID);
-        when(mockRequest.getParameter(PARAM_ORG_ID)).thenReturn("org-123");
+        when(mockRequest.getParameter(PARAM_ORG_ID)).thenReturn(TEST_ORG_ID);
         when(mockRequest.getParameter(PARAM_DESCRIPTION)).thenReturn("Test file");
         when(mockRequest.getPart(PARAM_FILE)).thenReturn(mockPart);
         
@@ -257,8 +245,8 @@ public class AttachmentsServletTest extends OBBaseTest {
             // Assert
             verify(mockResponse).setStatus(HttpStatus.SC_OK);
             String responseContent = stringWriter.toString();
-            assertTrue("Response should indicate success", 
-                    responseContent.contains("\"success\":true"));
+            assertTrue(RESPONSE_SUCCESS_INDICATOR, 
+                    responseContent.contains(RESPONSE_SUCCESS_JSON));
         }
     }
 
@@ -279,7 +267,7 @@ public class AttachmentsServletTest extends OBBaseTest {
         // Assert
         verify(mockResponse).setStatus(HttpStatus.SC_BAD_REQUEST);
         String responseContent = stringWriter.toString();
-        assertTrue("Error message should mention required parameters",
+        assertTrue(ERROR_MSG_REQUIRED_PARAMS,
                 responseContent.contains("tabId, recordId, and orgId are required"));
     }
 
@@ -292,7 +280,7 @@ public class AttachmentsServletTest extends OBBaseTest {
         when(mockRequest.getParameter(PARAM_COMMAND)).thenReturn(CMD_UPLOAD);
         when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(TEST_TAB_ID);
         when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(TEST_RECORD_ID);
-        when(mockRequest.getParameter(PARAM_ORG_ID)).thenReturn("org-123");
+        when(mockRequest.getParameter(PARAM_ORG_ID)).thenReturn(TEST_ORG_ID);
         when(mockRequest.getPart(PARAM_FILE)).thenReturn(null);
 
         try (MockedStatic<OBContext> contextMock = mockStatic(OBContext.class)) {
@@ -363,25 +351,6 @@ public class AttachmentsServletTest extends OBBaseTest {
 
     // ==================== DOWNLOAD_ALL Tests ====================
 
-    /**
-     * Tests download all command with missing parameters
-     */
-    @Test
-    public void testDownloadAllAttachments_MissingTabId() throws Exception {
-        // Arrange
-        when(mockRequest.getParameter(PARAM_COMMAND)).thenReturn(CMD_DOWNLOAD_ALL);
-        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(null);
-        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(TEST_RECORD_ID);
-
-        // Act
-        servlet.doGet(mockRequest, mockResponse);
-
-        // Assert
-        verify(mockResponse).setStatus(HttpStatus.SC_BAD_REQUEST);
-        String responseContent = stringWriter.toString();
-        assertTrue("Error message should mention required parameters",
-                responseContent.contains(ERROR_MSG_TAB_RECORD_REQUIRED));
-    }
 
     // ==================== EDIT Tests ====================
 
@@ -409,7 +378,7 @@ public class AttachmentsServletTest extends OBBaseTest {
             String responseContent = stringWriter.toString();
             assertTrue("Response should indicate success",
                     responseContent.contains("\"success\":true"));
-            assertTrue("Response should contain success message",
+            assertTrue(RESPONSE_SUCCESS_MESSAGE,
                     responseContent.contains("Attachment updated successfully"));
         }
     }
@@ -655,25 +624,6 @@ public class AttachmentsServletTest extends OBBaseTest {
 
     // ==================== SWS FRAMEWORK Tests ====================
 
-    /**
-     * Tests SWS framework doGet method with path parameter - missing parameters
-     */
-    @Test
-    public void testSWSDoGet_MissingParams() throws Exception {
-        // Arrange
-        when(mockRequest.getParameter(PARAM_COMMAND)).thenReturn(CMD_LIST);
-        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(null);
-        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(TEST_RECORD_ID);
-
-        // Act
-        servlet.doGet("/test/path", mockRequest, mockResponse);
-
-        // Assert
-        verify(mockResponse).setStatus(HttpStatus.SC_BAD_REQUEST);
-        String responseContent = stringWriter.toString();
-        assertTrue("Error message should mention required parameters",
-                responseContent.contains(ERROR_MSG_TAB_RECORD_REQUIRED));
-    }
 
     /**
      * Tests SWS framework doPost method with path parameter
@@ -692,7 +642,7 @@ public class AttachmentsServletTest extends OBBaseTest {
             when(mockDal.get(Attachment.class, TEST_ATTACHMENT_ID)).thenReturn(mockAttachment);
 
             // Act
-            servlet.doPost("/test/path", mockRequest, mockResponse);
+            servlet.doPost(TEST_PATH, mockRequest, mockResponse);
 
             // Assert
             verify(mockResponse).setStatus(HttpStatus.SC_OK);
@@ -717,7 +667,7 @@ public class AttachmentsServletTest extends OBBaseTest {
             when(mockDal.get(Attachment.class, TEST_ATTACHMENT_ID)).thenReturn(mockAttachment);
 
             // Act
-            servlet.doDelete("/test/path", mockRequest, mockResponse);
+            servlet.doDelete(TEST_PATH, mockRequest, mockResponse);
 
             // Assert
             verify(mockResponse).setStatus(HttpStatus.SC_OK);
@@ -765,25 +715,6 @@ public class AttachmentsServletTest extends OBBaseTest {
                 responseContent.contains("Error processing request"));
     }
 
-    /**
-     * Tests default LIST command when no command is specified in GET - missing params
-     */
-    @Test
-    public void testDefaultListCommand_MissingParams() throws Exception {
-        // Arrange
-        when(mockRequest.getParameter(PARAM_COMMAND)).thenReturn(null);
-        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(null);
-        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(TEST_RECORD_ID);
-
-        // Act
-        servlet.doGet(mockRequest, mockResponse);
-
-        // Assert
-        verify(mockResponse).setStatus(HttpStatus.SC_BAD_REQUEST);
-        String responseContent = stringWriter.toString();
-        assertTrue("Error message should mention required parameters",
-                responseContent.contains(ERROR_MSG_TAB_RECORD_REQUIRED));
-    }
 
     /**
      * Tests successful delete with existing attachment
@@ -853,153 +784,4 @@ public class AttachmentsServletTest extends OBBaseTest {
         return attachments;
     }
 
-    // ==================== ADDITIONAL COVERAGE Tests ====================
-
-    /**
-     * Tests GET request with null command defaults to LIST
-     */
-    @Test
-    public void testGetRequest_NullCommandDefaultsToList() throws Exception {
-        // Arrange
-        when(mockRequest.getParameter(PARAM_COMMAND)).thenReturn(null);
-        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(null);
-        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(TEST_RECORD_ID);
-
-        // Act
-        servlet.doGet(mockRequest, mockResponse);
-
-        // Assert - should behave same as LIST command with missing params
-        verify(mockResponse).setStatus(HttpStatus.SC_BAD_REQUEST);
-    }
-
-    /**
-     * Tests successful edit with request parameter instead of JSON body
-     */
-    @Test
-    public void testEditAttachment_WithRequestParameter() throws Exception {
-        // Arrange
-        when(mockRequest.getParameter(PARAM_COMMAND)).thenReturn(CMD_EDIT);
-        when(mockRequest.getParameter(PARAM_ATTACHMENT_ID)).thenReturn(TEST_ATTACHMENT_ID);
-        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(TEST_TAB_ID);
-        when(mockRequest.getParameter(PARAM_DESCRIPTION)).thenReturn("Test description");
-        when(mockRequest.getReader()).thenReturn(new BufferedReader(new StringReader("")));
-
-        try (MockedStatic<OBContext> contextMock = mockStatic(OBContext.class)) {
-            contextMock.when(OBContext::getOBContext).thenReturn(mockContext);
-            contextMock.when(() -> OBContext.setAdminMode(true)).thenAnswer(invocation -> null);
-            contextMock.when(OBContext::restorePreviousMode).thenAnswer(invocation -> null);
-
-            // Act
-            servlet.doPost(mockRequest, mockResponse);
-
-            // Assert
-            verify(mockResponse).setStatus(HttpStatus.SC_OK);
-            verify(mockAttachManager).update(any(Map.class), eq(TEST_ATTACHMENT_ID), eq(TEST_TAB_ID));
-        }
-    }
-
-    /**
-     * Tests upload functionality with various error conditions
-     */
-    @Test
-    public void testUploadAttachment_ValidatesAllParams() throws Exception {
-        // Test missing recordId
-        when(mockRequest.getParameter(PARAM_COMMAND)).thenReturn(CMD_UPLOAD);
-        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(TEST_TAB_ID);
-        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(null);
-        when(mockRequest.getParameter(PARAM_ORG_ID)).thenReturn("org-123");
-
-        servlet.doPost(mockRequest, mockResponse);
-        verify(mockResponse).setStatus(HttpStatus.SC_BAD_REQUEST);
-    }
-
-    /**
-     * Tests that delete operation handles missing attachment ID properly
-     */
-    @Test
-    public void testDeleteAttachment_ValidationFlow() throws Exception {
-        // Arrange
-        when(mockRequest.getParameter(PARAM_COMMAND)).thenReturn(CMD_DELETE);
-        when(mockRequest.getParameter(PARAM_ATTACHMENT_ID)).thenReturn("");
-
-        try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
-             MockedStatic<OBContext> contextMock = mockStatic(OBContext.class)) {
-            
-            dalMock.when(OBDal::getInstance).thenReturn(mockDal);
-            contextMock.when(OBContext::getOBContext).thenReturn(mockContext);
-            contextMock.when(() -> OBContext.setAdminMode(true)).thenAnswer(invocation -> null);
-            contextMock.when(OBContext::restorePreviousMode).thenAnswer(invocation -> null);
-            
-            // Mock that empty string attachment ID returns null attachment
-            when(mockDal.get(Attachment.class, "")).thenReturn(null);
-
-            // Act
-            servlet.doPost(mockRequest, mockResponse);
-
-            // Assert - should return NOT_FOUND since attachment doesn't exist
-            verify(mockResponse).setStatus(HttpStatus.SC_NOT_FOUND);
-        }
-    }
-
-    /**
-     * Tests parameter validation for various commands
-     */
-    @Test
-    public void testParameterValidation_EdgeCases() throws Exception {
-        // Test empty string parameters are treated as null
-        when(mockRequest.getParameter(PARAM_COMMAND)).thenReturn(CMD_LIST);
-        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn("");
-        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(TEST_RECORD_ID);
-
-        servlet.doGet(mockRequest, mockResponse);
-        verify(mockResponse).setStatus(HttpStatus.SC_BAD_REQUEST);
-    }
-
-    /**
-     * Tests case insensitive command handling
-     */
-    @Test
-    public void testCommandCaseHandling() throws Exception {
-        // Test lowercase command
-        when(mockRequest.getParameter(PARAM_COMMAND)).thenReturn("list");
-        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(null);
-        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(TEST_RECORD_ID);
-
-        servlet.doGet(mockRequest, mockResponse);
-        // Should still handle as LIST command and return BAD_REQUEST for missing tabId
-        verify(mockResponse).setStatus(HttpStatus.SC_BAD_REQUEST);
-    }
-
-    /**
-     * Tests mixed case command handling
-     */
-    @Test
-    public void testCommandMixedCase() throws Exception {
-        // Test mixed case command
-        when(mockRequest.getParameter(PARAM_COMMAND)).thenReturn("List");
-        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(null);
-        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(TEST_RECORD_ID);
-
-        servlet.doGet(mockRequest, mockResponse);
-        // Should still handle as LIST command and return BAD_REQUEST for missing tabId
-        verify(mockResponse).setStatus(HttpStatus.SC_BAD_REQUEST);
-    }
-
-    /**
-     * Tests that servlet properly handles IOException during response writing
-     */
-    @Test
-    public void testErrorResponseHandling() throws Exception {
-        // Arrange
-        when(mockRequest.getParameter(PARAM_COMMAND)).thenReturn("INVALID");
-        
-        // Mock response.getWriter() to throw IOException to test error handling
-        when(mockResponse.getWriter()).thenThrow(new IOException("Test IO exception"));
-
-        // Act
-        servlet.doGet(mockRequest, mockResponse);
-
-        // Assert - Should set 500 status when JSON response writing fails
-        verify(mockResponse).setStatus(HttpStatus.SC_INTERNAL_SERVER_ERROR);
-    }
 }

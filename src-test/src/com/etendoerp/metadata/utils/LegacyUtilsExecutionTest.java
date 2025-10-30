@@ -53,9 +53,7 @@ class LegacyUtilsExecutionTest {
      */
     @Test
     void isLegacyProcessWithNullInputThrowsNPE() {
-        assertThrows(NullPointerException.class, () -> {
-            LegacyUtils.isLegacyProcess(null);
-        });
+        assertThrows(NullPointerException.class, () -> LegacyUtils.isLegacyProcess(null));
     }
 
     /**
