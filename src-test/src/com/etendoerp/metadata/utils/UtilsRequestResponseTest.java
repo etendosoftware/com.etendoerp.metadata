@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.nio.charset.StandardCharsets;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -38,6 +39,7 @@ import static org.mockito.Mockito.*;
  */
 @ExtendWith(MockitoExtension.class)
 class UtilsRequestResponseTest {
+  private static final String UTF_8 = "UTF-8";
 
   /**
    * @throws Exception if request processing fails
@@ -51,7 +53,7 @@ class UtilsRequestResponseTest {
     when(mockReader.readLine()).thenReturn("invalid json {");
     when(mockReader.readLine()).thenReturn(null);
     
-    String result = Utils.getRequestData(mockRequest);
+    String result = String.valueOf(Utils.getRequestData(mockRequest));
     
     assertEquals("{}", result);
   }
@@ -65,7 +67,7 @@ class UtilsRequestResponseTest {
     
     when(mockRequest.getReader()).thenThrow(new IOException("Test IO Exception"));
     
-    String result = Utils.getRequestData(mockRequest);
+    String result = String.valueOf(Utils.getRequestData(mockRequest));
     
     assertEquals("{}", result);
   }
@@ -135,7 +137,7 @@ class UtilsRequestResponseTest {
     
     verify(mockResponse).setStatus(400);
     verify(mockResponse).setContentType("application/json");
-    verify(mockResponse).setCharacterEncoding("UTF-8");
+    verify(mockResponse).setCharacterEncoding(UTF_8);
     
     String output = stringWriter.toString();
     assertTrue(output.contains("Test error message"));
@@ -157,7 +159,7 @@ class UtilsRequestResponseTest {
     
     verify(mockResponse).setStatus(500);
     verify(mockResponse).setContentType("application/json");
-    verify(mockResponse).setCharacterEncoding("UTF-8");
+    verify(mockResponse).setCharacterEncoding(UTF_8);
     verify(mockWriter).write(anyString());
   }
 
@@ -208,7 +210,7 @@ class UtilsRequestResponseTest {
     HttpServletRequest mockRequest = mock(HttpServletRequest.class);
     String testContent = "Contenido con acentos: áéíóú";
     BufferedReader mockReader = new BufferedReader(new InputStreamReader(
-        new ByteArrayInputStream(testContent.getBytes("UTF-8")), "UTF-8"));
+        new ByteArrayInputStream(testContent.getBytes(StandardCharsets.UTF_8)), StandardCharsets.UTF_8));
     
     when(mockRequest.getReader()).thenReturn(mockReader);
     

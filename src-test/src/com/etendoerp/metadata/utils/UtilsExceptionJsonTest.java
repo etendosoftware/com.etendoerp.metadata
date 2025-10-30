@@ -22,8 +22,9 @@ import org.codehaus.jettison.json.JSONObject;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.openbravo.authentication.AuthenticationException;
 import org.openbravo.base.exception.OBException;
-import org.openbravo.base.secureApp.HttpSecureAppServlet.AuthenticationException;
+
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -34,6 +35,8 @@ import static org.junit.jupiter.api.Assertions.*;
 class UtilsExceptionJsonTest {
 
   private static final String TEST_ERROR_MESSAGE = "Test error message";
+  private static final String MESSAGE = "message";
+  private static final String SUCCESS = "success";
 
   /**
    * Tests the getHttpStatusFor method with different exception types.
@@ -57,8 +60,8 @@ class UtilsExceptionJsonTest {
     JSONObject result = Utils.convertToJson(exception);
     
     assertNotNull(result);
-    assertEquals(false, result.optBoolean("success"));
-    assertEquals(errorMessage, result.optString("message"));
+    assertEquals(false, result.optBoolean(SUCCESS));
+    assertEquals(errorMessage, result.optString(MESSAGE));
     assertEquals("RuntimeException", result.optString("type"));
   }
 
@@ -74,8 +77,8 @@ class UtilsExceptionJsonTest {
     JSONObject result = Utils.convertToJson(exception);
     
     assertNotNull(result);
-    assertEquals(false, result.optBoolean("success"));
-    assertEquals(causeMessage, result.optString("message"));
+    assertEquals(false, result.optBoolean(SUCCESS));
+    assertEquals(causeMessage, result.optString(MESSAGE));
     assertEquals("IllegalArgumentException", result.optString("type"));
   }
 
@@ -96,7 +99,7 @@ class UtilsExceptionJsonTest {
     try {
       JSONObject result = Utils.convertToJson(null);
       assertNotNull(result);
-      assertEquals(false, result.optBoolean("success"));
+      assertEquals(false, result.optBoolean(SUCCESS));
     } catch (Exception e) {
       // If it throws an exception, that's also acceptable behavior
       assertNotNull(e);
@@ -114,8 +117,8 @@ class UtilsExceptionJsonTest {
     JSONObject result = Utils.convertToJson(exception);
     
     assertNotNull(result);
-    assertEquals(false, result.optBoolean("success"));
-    assertEquals(longMessage, result.optString("message"));
+    assertEquals(false, result.optBoolean(SUCCESS));
+    assertEquals(longMessage, result.optString(MESSAGE));
   }
 
   /**
@@ -130,9 +133,9 @@ class UtilsExceptionJsonTest {
     JSONObject result = Utils.convertToJson(level1);
     
     assertNotNull(result);
-    assertEquals(false, result.optBoolean("success"));
+    assertEquals(false, result.optBoolean(SUCCESS));
     // Should get the deepest cause message
-    assertEquals("Level 3", result.optString("message"));
+    assertEquals("Level 3", result.optString(MESSAGE));
   }
 
   /**
@@ -145,8 +148,8 @@ class UtilsExceptionJsonTest {
     JSONObject result = Utils.convertToJson(exception);
     
     assertNotNull(result);
-    assertEquals(false, result.optBoolean("success"));
+    assertEquals(false, result.optBoolean(SUCCESS));
     // Should handle empty message gracefully
-    assertNotNull(result.optString("message"));
+    assertNotNull(result.optString(MESSAGE));
   }
 }
