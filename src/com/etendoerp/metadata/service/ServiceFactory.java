@@ -48,9 +48,14 @@ public class ServiceFactory {
             public void process() {
                 try {
                     if (LegacyPaths.USED_BY_LINK.equals(path)) {
+                        String mutableSessionAttribute = "143|C_ORDER_ID";
                         String recordId = req.getParameter("recordId");
                         HttpSession session = req.getSession(true);
-                        session.setAttribute("143|C_ORDER_ID", recordId);
+                        if (LegacyUtils.isMutableSessionAttribute(mutableSessionAttribute)) {
+                            session.setAttribute(mutableSessionAttribute, recordId);
+                        } else {
+                            throw new InternalServerException("Attempt to set forbidden session key: " + mutableSessionAttribute);
+                        }
                     }
 
                     RequestDispatcher dispatcher = req.getServletContext().getRequestDispatcher(path);
