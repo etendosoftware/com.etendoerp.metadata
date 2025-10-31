@@ -38,6 +38,22 @@ public class LegacyUtils {
             "4248"
     );
 
+    /** Set of legacy paths used in the system. */
+    private static final Set<String> LEGACY_PATHS = Set.of(
+            "/utility/UsedByLink.html"
+    );
+
+
+    /**
+     * Checks if the provided path is considered a legacy path.
+     *
+     * @param path The request path to check
+     * @return true if the path is part of the legacy paths; false otherwise
+     */
+    public static boolean isLegacyPath(String path) {
+        return LEGACY_PATHS.contains(path);
+    }
+
     /**
      * Checks if the provided process ID belongs to the list of legacy-defined processes.
      *

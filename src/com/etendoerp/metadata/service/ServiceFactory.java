@@ -17,10 +17,21 @@
 
 package com.etendoerp.metadata.service;
 
+import javax.servlet.RequestDispatcher;
+import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
 
+import com.etendoerp.metadata.exceptions.InternalServerException;
 import com.etendoerp.metadata.exceptions.NotFoundException;
+import com.etendoerp.metadata.utils.LegacyUtils;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import java.io.IOException;
+import java.util.List;
+import java.util.Map;
 
 import static com.etendoerp.metadata.utils.Constants.*;
 
@@ -28,6 +39,46 @@ import static com.etendoerp.metadata.utils.Constants.*;
  * @author luuchorocha
  */
 public class ServiceFactory {
+
+    private static MetadataService buildLegacyForwardService(HttpServletRequest req, HttpServletResponse res, String path) {
+        return new MetadataService(req, res) {
+
+            @Override
+            public void process() {
+                try {
+                    String recordsParam = req.getParameter("sessionParams");
+                    if (recordsParam != null && !recordsParam.isEmpty()) {
+                        ObjectMapper mapper = new ObjectMapper();
+
+                        List<Map<String, String>> records = mapper.readValue(
+                                recordsParam,
+                                new TypeReference<List<Map<String, String>>>() {}
+                        );
+
+                        HttpSession session = req.getSession(true);
+
+                        for (Map<String, String> record : records) {
+                            for (Map.Entry<String, String> entry : record.entrySet()) {
+                                session.setAttribute(entry.getKey(), entry.getValue());
+                            }
+                        }
+                    }
+
+                    RequestDispatcher dispatcher = req.getServletContext().getRequestDispatcher(path);
+
+                    if (dispatcher == null) {
+                        throw new ServletException("No dispatcher found for path: " + path);
+                    }
+
+                    dispatcher.forward(req, res);
+                } catch (IOException e) {
+                    throw new InternalServerException("Failed to parse 'records' JSON: " + e.getMessage());
+                } catch (Exception e) {
+                    throw new InternalServerException("Failed to forward legacy request: " + e.getMessage());
+                }
+            }
+        };
+    }
 
     public static MetadataService getService(final HttpServletRequest req, final HttpServletResponse res) {
         final String path = req.getPathInfo() != null ? req.getPathInfo().replace("/com.etendoerp.metadata.meta/", "/") : "";
@@ -52,6 +103,8 @@ public class ServiceFactory {
             return new ToolbarService(req, res);
         } else if (path.startsWith(LEGACY_PATH)) {
             return new LegacyService(req, res);
+        } else if (LegacyUtils.isLegacyPath(path)) {
+            return buildLegacyForwardService(req, res, path);
         } else {
             throw new NotFoundException();
         }

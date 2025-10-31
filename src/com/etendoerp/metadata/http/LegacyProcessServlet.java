@@ -8,12 +8,12 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.openbravo.base.exception.OBException;
-import org.openbravo.base.provider.OBConfigFileProvider;
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
 import org.openbravo.base.session.OBPropertiesProvider;
 import org.openbravo.client.kernel.RequestContext;
 import org.openbravo.dal.core.OBContext;
 
+import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
@@ -83,6 +83,11 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
                         isProduction ? "Secure" : ""
                 )
         );
+    }
+
+    @Override
+    public void init(ServletConfig config) {
+        super.init(config);
     }
 
     @Override
