@@ -9,8 +9,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import javax.servlet.*;
-import javax.servlet.http.*;
+import javax.servlet.RequestDispatcher;
+import javax.servlet.ServletContext;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
 
 import java.io.IOException;
 
@@ -19,6 +22,8 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class ServiceFactoryTest {
+
+  private final String EXAMPLE_MUTABLE_SESSION_ATTRIBUTTE  = "143|C_ORDER_ID";
 
   @Test
   void getServiceReturnsSessionService() {
@@ -84,7 +89,7 @@ class ServiceFactoryTest {
     when(context.getRequestDispatcher(LegacyPaths.USED_BY_LINK)).thenReturn(dispatcher);
 
     try (MockedStatic<LegacyUtils> legacy = mockStatic(LegacyUtils.class)) {
-      legacy.when(() -> LegacyUtils.isMutableSessionAttribute("143|C_ORDER_ID")).thenReturn(true);
+      legacy.when(() -> LegacyUtils.isMutableSessionAttribute(EXAMPLE_MUTABLE_SESSION_ATTRIBUTTE)).thenReturn(true);
 
       MetadataService service = invokeBuildLegacyForwardService(req, res, LegacyPaths.USED_BY_LINK);
       assertNotNull(service);
@@ -92,7 +97,7 @@ class ServiceFactoryTest {
       // execute process() method
       service.process();
 
-      verify(session).setAttribute("143|C_ORDER_ID", "A123");
+      verify(session).setAttribute(EXAMPLE_MUTABLE_SESSION_ATTRIBUTTE, "A123");
       verify(dispatcher).forward(req, res);
     }
   }
@@ -107,7 +112,7 @@ class ServiceFactoryTest {
     when(req.getParameter("recordId")).thenReturn("A123");
 
     try (MockedStatic<LegacyUtils> legacy = mockStatic(LegacyUtils.class)) {
-      legacy.when(() -> LegacyUtils.isMutableSessionAttribute("143|C_ORDER_ID")).thenReturn(false);
+      legacy.when(() -> LegacyUtils.isMutableSessionAttribute(EXAMPLE_MUTABLE_SESSION_ATTRIBUTTE)).thenReturn(false);
 
       MetadataService service = invokeBuildLegacyForwardService(req, res, LegacyPaths.USED_BY_LINK);
       assertThrows(InternalServerException.class, service::process);
@@ -126,7 +131,7 @@ class ServiceFactoryTest {
     when(req.getSession(true)).thenReturn(session);
 
     try (MockedStatic<LegacyUtils> legacy = mockStatic(LegacyUtils.class)) {
-      legacy.when(() -> LegacyUtils.isMutableSessionAttribute("143|C_ORDER_ID")).thenReturn(true);
+      legacy.when(() -> LegacyUtils.isMutableSessionAttribute(EXAMPLE_MUTABLE_SESSION_ATTRIBUTTE)).thenReturn(true);
 
       MetadataService service = invokeBuildLegacyForwardService(req, res, LegacyPaths.USED_BY_LINK);
       assertThrows(InternalServerException.class, service::process);
@@ -148,7 +153,7 @@ class ServiceFactoryTest {
     doThrow(new IOException("fail")).when(dispatcher).forward(req, res);
 
     try (MockedStatic<LegacyUtils> legacy = mockStatic(LegacyUtils.class)) {
-      legacy.when(() -> LegacyUtils.isMutableSessionAttribute("143|C_ORDER_ID")).thenReturn(true);
+      legacy.when(() -> LegacyUtils.isMutableSessionAttribute(EXAMPLE_MUTABLE_SESSION_ATTRIBUTTE)).thenReturn(true);
 
       MetadataService service = invokeBuildLegacyForwardService(req, res, LegacyPaths.USED_BY_LINK);
       assertThrows(InternalServerException.class, service::process);
@@ -163,7 +168,7 @@ class ServiceFactoryTest {
       method.setAccessible(true);
       return (MetadataService) method.invoke(null, req, res, path);
     } catch (Exception e) {
-      throw new RuntimeException(e);
+      throw new InternalServerException("Failed to forward legacy request: " + e.getMessage());
     }
   }
 
