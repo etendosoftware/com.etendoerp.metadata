@@ -53,7 +53,6 @@ public class AttachmentsServletValidationTest extends OBBaseTest {
     private static final String CMD_UPLOAD = "UPLOAD";
     private static final String CMD_DOWNLOAD_ALL = "DOWNLOAD_ALL";
     private static final String CMD_EDIT = "EDIT";
-    private static final String CMD_DELETE = "DELETE";
 
     private static final String ERROR_MSG_REQUIRED_PARAMS = "Error message should mention required parameters";
     private static final String ERROR_MSG_TAB_RECORD_REQUIRED = "tabId and recordId are required";
