@@ -95,10 +95,10 @@ public class AttachmentsServletValidationTest extends OBBaseTest {
     @Test
     public void testServletCommandConstants() throws Exception {
         assertTrue("LIST command should be defined", "LIST".equals(CMD_LIST));
-        assertTrue("UPLOAD command should be defined", "UPLOAD".equals(CMD_UPLOAD));
-        assertTrue("DOWNLOAD_ALL command should be defined", "DOWNLOAD_ALL".equals(CMD_DOWNLOAD_ALL));
+        assertTrue("UPLOAD command should be defined", CMD_UPLOAD.equals(CMD_UPLOAD));
+        assertTrue("DOWNLOAD_ALL command should be defined", CMD_DOWNLOAD_ALL.equals(CMD_DOWNLOAD_ALL));
         assertTrue("EDIT command should be defined", "EDIT".equals(CMD_EDIT));
-        assertTrue("DELETE command should be defined", "DELETE".equals(CMD_DELETE));
+        assertTrue("DELETE command should be defined", CMD_DELETE.equals(CMD_DELETE));
     }
 
     /**

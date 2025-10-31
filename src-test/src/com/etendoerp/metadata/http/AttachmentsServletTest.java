@@ -74,7 +74,6 @@ public class AttachmentsServletTest extends OBBaseTest {
     private static final String CMD_LIST = "LIST";
     private static final String CMD_UPLOAD = "UPLOAD";
     private static final String CMD_DOWNLOAD = "DOWNLOAD";
-    private static final String CMD_DOWNLOAD_ALL = "DOWNLOAD_ALL";
     private static final String CMD_EDIT = "EDIT";
     private static final String CMD_DELETE = "DELETE";
     private static final String CMD_DELETE_ALL = "DELETE_ALL";
@@ -376,8 +375,8 @@ public class AttachmentsServletTest extends OBBaseTest {
             verify(mockResponse).setStatus(HttpStatus.SC_OK);
             verify(mockAttachManager).update(any(Map.class), eq(TEST_ATTACHMENT_ID), eq(TEST_TAB_ID));
             String responseContent = stringWriter.toString();
-            assertTrue("Response should indicate success",
-                    responseContent.contains("\"success\":true"));
+            assertTrue(RESPONSE_SUCCESS_INDICATOR,
+                    responseContent.contains(RESPONSE_SUCCESS_JSON));
             assertTrue(RESPONSE_SUCCESS_MESSAGE,
                     responseContent.contains("Attachment updated successfully"));
         }
@@ -399,7 +398,7 @@ public class AttachmentsServletTest extends OBBaseTest {
         // Assert
         verify(mockResponse).setStatus(HttpStatus.SC_BAD_REQUEST);
         String responseContent = stringWriter.toString();
-        assertTrue("Error message should mention required parameters",
+        assertTrue(ERROR_MSG_REQUIRED_PARAMS,
                 responseContent.contains("attachmentId and tabId are required"));
     }
 
@@ -741,7 +740,7 @@ public class AttachmentsServletTest extends OBBaseTest {
             String responseContent = stringWriter.toString();
             assertTrue("Response should indicate success",
                     responseContent.contains("\"success\":true"));
-            assertTrue("Response should contain success message",
+            assertTrue(RESPONSE_SUCCESS_MESSAGE,
                     responseContent.contains("Attachment deleted successfully"));
         }
     }
