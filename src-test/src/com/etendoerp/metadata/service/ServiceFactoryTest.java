@@ -23,7 +23,7 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class ServiceFactoryTest {
 
-  private final String EXAMPLE_MUTABLE_SESSION_ATTRIBUTTE  = "143|C_ORDER_ID";
+  private static final String EXAMPLE_MUTABLE_SESSION_ATTRIBUTTE  = "143|C_ORDER_ID";
 
   @Test
   void getServiceReturnsSessionService() {
