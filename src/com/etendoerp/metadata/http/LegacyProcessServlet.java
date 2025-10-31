@@ -86,11 +86,6 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
     }
 
     @Override
-    public void init(ServletConfig config) {
-        super.init(config);
-    }
-
-    @Override
     public void service(HttpServletRequest req, HttpServletResponse res)
             throws IOException, ServletException {
         try {

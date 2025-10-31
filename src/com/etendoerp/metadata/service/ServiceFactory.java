@@ -25,6 +25,7 @@ import javax.servlet.http.HttpSession;
 
 import com.etendoerp.metadata.exceptions.InternalServerException;
 import com.etendoerp.metadata.exceptions.NotFoundException;
+import com.etendoerp.metadata.utils.LegacyPaths;
 import com.etendoerp.metadata.utils.LegacyUtils;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -46,22 +47,10 @@ public class ServiceFactory {
             @Override
             public void process() {
                 try {
-                    String recordsParam = req.getParameter("sessionParams");
-                    if (recordsParam != null && !recordsParam.isEmpty()) {
-                        ObjectMapper mapper = new ObjectMapper();
-
-                        List<Map<String, String>> records = mapper.readValue(
-                                recordsParam,
-                                new TypeReference<List<Map<String, String>>>() {}
-                        );
-
+                    if (LegacyPaths.USED_BY_LINK.equals(path)) {
+                        String recordId = req.getParameter("recordId");
                         HttpSession session = req.getSession(true);
-
-                        for (Map<String, String> record : records) {
-                            for (Map.Entry<String, String> entry : record.entrySet()) {
-                                session.setAttribute(entry.getKey(), entry.getValue());
-                            }
-                        }
+                        session.setAttribute("143|C_ORDER_ID", recordId);
                     }
 
                     RequestDispatcher dispatcher = req.getServletContext().getRequestDispatcher(path);
@@ -71,8 +60,6 @@ public class ServiceFactory {
                     }
 
                     dispatcher.forward(req, res);
-                } catch (IOException e) {
-                    throw new InternalServerException("Failed to parse 'records' JSON: " + e.getMessage());
                 } catch (Exception e) {
                     throw new InternalServerException("Failed to forward legacy request: " + e.getMessage());
                 }

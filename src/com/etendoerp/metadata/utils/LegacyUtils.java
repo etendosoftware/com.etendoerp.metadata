@@ -40,7 +40,7 @@ public class LegacyUtils {
 
     /** Set of legacy paths used in the system. */
     private static final Set<String> LEGACY_PATHS = Set.of(
-            "/utility/UsedByLink.html"
+            LegacyPaths.USED_BY_LINK
     );
 
 
