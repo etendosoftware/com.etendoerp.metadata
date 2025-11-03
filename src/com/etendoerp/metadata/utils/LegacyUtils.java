@@ -55,6 +55,9 @@ public class LegacyUtils {
      * @return true if the ID is part of the legacy process definitions; false otherwise
      */
     public static boolean isLegacyProcess(String processId) {
+        if (processId == null) {
+            return false;
+        }
         return LEGACY_PROCESS_IDS.contains(processId);
     }
 
