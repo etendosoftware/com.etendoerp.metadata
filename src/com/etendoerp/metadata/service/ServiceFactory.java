@@ -45,7 +45,7 @@ public class ServiceFactory {
         return new MetadataService(req, res) {
 
             @Override
-            public void process() {
+            public void process() throws ServletException, IOException {
                 try {
                     if (LegacyPaths.USED_BY_LINK.equals(path)) {
                         String mutableSessionAttribute = "143|C_ORDER_ID";
@@ -66,6 +66,8 @@ public class ServiceFactory {
 
                     dispatcher.forward(req, res);
                 } catch (Exception e) {
+                    if (e instanceof ServletException) throw (ServletException) e;
+                    if (e instanceof IOException) throw (IOException) e;
                     throw new InternalServerException("Failed to forward legacy request: " + e.getMessage());
                 }
             }

@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 
+import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
@@ -69,5 +70,5 @@ public abstract class MetadataService {
         }
     }
 
-    public abstract void process() throws IOException;
+    public abstract void process() throws IOException, ServletException;
 }
