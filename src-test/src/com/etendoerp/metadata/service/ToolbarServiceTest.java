@@ -101,7 +101,7 @@ public class ToolbarServiceTest {
      * 
      * @throws IOException if an I/O error occurs during processing
      */
-    @Test
+    @Test(expected = IOException.class)
     public void testProcessIOException() throws IOException {
         when(mockResponse.getWriter()).thenThrow(new IOException("Test IO Exception"));
         
