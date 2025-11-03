@@ -19,6 +19,8 @@ import org.openbravo.model.ad.ui.Process;
 @ExtendWith(MockitoExtension.class)
 class LegacyUtilsTest {
 
+  private static final String LEGACY_PROCESS_NAME = "Legacy Process Placeholder";
+
   /**
    * Tests the isLegacyProcess method for a process ID that exists in the legacy list.
    */
@@ -65,7 +67,7 @@ class LegacyUtilsTest {
 
       assertNotNull(result);
       verify(mockProcess).setId(processId);
-      verify(mockProcess).setName("Legacy Process Placeholder");
+      verify(mockProcess).setName(LEGACY_PROCESS_NAME);
       verify(mockProcess).setActive(true);
     }
   }
@@ -84,7 +86,7 @@ class LegacyUtilsTest {
 
       assertNotNull(result, "Legacy process should not be null");
       verify(mockProcess).setId(testProcessId);
-      verify(mockProcess).setName("Legacy Process Placeholder");
+      verify(mockProcess).setName(LEGACY_PROCESS_NAME);
       verify(mockProcess).setActive(true);
     }
   }
@@ -109,8 +111,8 @@ class LegacyUtilsTest {
 
       verify(mockProcess1).setId("ID1");
       verify(mockProcess2).setId("ID2");
-      verify(mockProcess1).setName("Legacy Process Placeholder");
-      verify(mockProcess2).setName("Legacy Process Placeholder");
+      verify(mockProcess1).setName(LEGACY_PROCESS_NAME);
+      verify(mockProcess2).setName(LEGACY_PROCESS_NAME);
     }
   }
 

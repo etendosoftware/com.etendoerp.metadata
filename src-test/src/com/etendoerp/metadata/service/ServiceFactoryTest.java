@@ -242,7 +242,7 @@ class ServiceFactoryTest {
       method.setAccessible(true);
       return (MetadataService) method.invoke(null, req, res, path);
     } catch (Exception e) {
-      throw new RuntimeException("Failed to invoke buildLegacyForwardService", e);
+      throw new InternalServerException("Failed to invoke buildLegacyForwardService" + e.getMessage());
     }
   }
 }
