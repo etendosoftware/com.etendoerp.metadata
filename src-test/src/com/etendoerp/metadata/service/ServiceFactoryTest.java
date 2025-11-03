@@ -12,6 +12,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import javax.servlet.RequestDispatcher;
 import javax.servlet.ServletContext;
+import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
@@ -200,7 +201,7 @@ class ServiceFactoryTest {
       legacy.when(() -> LegacyUtils.isMutableSessionAttribute(EXAMPLE_MUTABLE_SESSION_ATTRIBUTE)).thenReturn(true);
 
       MetadataService service = invokeBuildLegacyForwardService(req, res, LegacyPaths.USED_BY_LINK);
-      assertThrows(InternalServerException.class, service::process);
+      assertThrows(ServletException.class, service::process);
     }
   }
 
@@ -221,7 +222,7 @@ class ServiceFactoryTest {
       legacy.when(() -> LegacyUtils.isMutableSessionAttribute(EXAMPLE_MUTABLE_SESSION_ATTRIBUTE)).thenReturn(true);
 
       MetadataService service = invokeBuildLegacyForwardService(req, res, LegacyPaths.USED_BY_LINK);
-      assertThrows(InternalServerException.class, service::process);
+      assertThrows(IOException.class, service::process);
     }
   }
 
