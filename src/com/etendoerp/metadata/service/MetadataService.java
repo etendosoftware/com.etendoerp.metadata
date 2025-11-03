@@ -70,5 +70,11 @@ public abstract class MetadataService {
         }
     }
 
+    /**
+     * Main processing method to be implemented by subclasses.
+     *
+     * @throws IOException      if an I/O error occurs
+     * @throws ServletException if a servlet-specific error occurs
+     */
     public abstract void process() throws IOException, ServletException;
 }

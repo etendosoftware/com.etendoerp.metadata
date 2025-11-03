@@ -47,29 +47,44 @@ public class ServiceFactory {
             @Override
             public void process() throws ServletException, IOException {
                 try {
-                    if (LegacyPaths.USED_BY_LINK.equals(path)) {
-                        String mutableSessionAttribute = "143|C_ORDER_ID";
-                        String recordId = req.getParameter("recordId");
-                        HttpSession session = req.getSession(true);
-                        if (LegacyUtils.isMutableSessionAttribute(mutableSessionAttribute)) {
-                            session.setAttribute(mutableSessionAttribute, recordId);
-                        } else {
-                            throw new InternalServerException("Attempt to set forbidden session key: " + mutableSessionAttribute);
-                        }
-                    }
-
-                    RequestDispatcher dispatcher = req.getServletContext().getRequestDispatcher(path);
-
-                    if (dispatcher == null) {
-                        throw new ServletException("No dispatcher found for path: " + path);
-                    }
-
-                    dispatcher.forward(req, res);
+                    handleLegacySession(req, path);
+                    forwardRequest(req, res, path);
                 } catch (Exception e) {
-                    if (e instanceof ServletException) throw (ServletException) e;
-                    if (e instanceof IOException) throw (IOException) e;
-                    throw new InternalServerException("Failed to forward legacy request: " + e.getMessage());
+                    handleException(e);
                 }
+            }
+
+            private void handleLegacySession(HttpServletRequest req, String path) {
+                if (LegacyPaths.USED_BY_LINK.equals(path)) {
+                    String mutableSessionAttribute = "143|C_ORDER_ID";
+                    String recordId = req.getParameter("recordId");
+                    HttpSession session = req.getSession(true);
+
+                    if (!LegacyUtils.isMutableSessionAttribute(mutableSessionAttribute)) {
+                        throw new InternalServerException(
+                                "Attempt to set forbidden session key: " + mutableSessionAttribute);
+                    }
+
+                    session.setAttribute(mutableSessionAttribute, recordId);
+                }
+            }
+
+            private void forwardRequest(HttpServletRequest req, HttpServletResponse res, String path)
+                    throws ServletException, IOException {
+
+                RequestDispatcher dispatcher = req.getServletContext().getRequestDispatcher(path);
+
+                if (dispatcher == null) {
+                    throw new ServletException("No dispatcher found for path: " + path);
+                }
+
+                dispatcher.forward(req, res);
+            }
+
+            private void handleException(Exception e) throws ServletException, IOException {
+                if (e instanceof ServletException) throw (ServletException) e;
+                if (e instanceof IOException) throw (IOException) e;
+                throw new InternalServerException("Failed to forward legacy request: " + e.getMessage());
             }
         };
     }
