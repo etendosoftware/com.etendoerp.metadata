@@ -38,6 +38,16 @@ public class LegacyUtils {
             "4248"
     );
 
+    /** Set of legacy paths used in the system. */
+    private static final Set<String> LEGACY_PATHS = Set.of(
+            LegacyPaths.USED_BY_LINK
+    );
+
+    private static final Set<String> MUTABLE_SESSION_ATTRIBUTES = Set.of(
+            "143|C_ORDER_ID"
+    );
+
+
     /**
      * Checks if the provided process ID belongs to the list of legacy-defined processes.
      *
@@ -45,6 +55,9 @@ public class LegacyUtils {
      * @return true if the ID is part of the legacy process definitions; false otherwise
      */
     public static boolean isLegacyProcess(String processId) {
+        if (processId == null) {
+            return false;
+        }
         return LEGACY_PROCESS_IDS.contains(processId);
     }
 
@@ -62,5 +75,25 @@ public class LegacyUtils {
         legacyProcess.setActive(true);
 
         return legacyProcess;
+    }
+
+    /**
+     * Checks if the provided path is considered a legacy path.
+     *
+     * @param path The request path to check
+     * @return true if the path is part of the legacy paths; false otherwise
+     */
+    public static boolean isLegacyPath(String path) {
+        return LEGACY_PATHS.contains(path);
+    }
+
+    /**
+     * Checks if the provided session attribute is mutable in legacy processes.
+     *
+     * @param attribute The session attribute to check
+     * @return true if the attribute is mutable; false otherwise
+     */
+    public static boolean isMutableSessionAttribute(String attribute) {
+        return MUTABLE_SESSION_ATTRIBUTES.contains(attribute);
     }
 }

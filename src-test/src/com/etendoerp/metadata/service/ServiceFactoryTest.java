@@ -1,224 +1,249 @@
-/*
- *************************************************************************
- * The contents of this file are subject to the Etendo License
- * (the "License"), you may not use this file except in compliance with
- * the License.
- * You may obtain a copy of the License at
- * https://github.com/etendosoftware/etendo_core/blob/main/legal/Etendo_license.txt
- * Software distributed under the License is distributed on an
- * "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
- * implied. See the License for the specific language governing rights
- * and limitations under the License.
- * All portions are Copyright © 2021–2025 FUTIT SERVICES, S.L
- * All Rights Reserved.
- * Contributor(s): Futit Services S.L.
- *************************************************************************
- */
-
 package com.etendoerp.metadata.service;
 
+import com.etendoerp.metadata.exceptions.InternalServerException;
 import com.etendoerp.metadata.exceptions.NotFoundException;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import com.etendoerp.metadata.utils.LegacyPaths;
+import com.etendoerp.metadata.utils.LegacyUtils;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.MockedStatic;
+import org.mockito.junit.jupiter.MockitoExtension;
 
+import javax.servlet.RequestDispatcher;
+import javax.servlet.ServletContext;
+import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
+import java.io.IOException;
 
-import static org.junit.Assert.*;
-import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 /**
- * Test class for ServiceFactory.
- * Tests the factory pattern implementation for creating appropriate service instances.
+ * Unit tests for {@link ServiceFactory}.
+ * Tests that the correct MetadataService implementation is returned for each path,
+ * and validates behavior of legacy forward handling.
  */
-@RunWith(MockitoJUnitRunner.class)
-public class ServiceFactoryTest {
-    private static final String SERVICE_NOT_NULL = "Service should not be null";
+@ExtendWith(MockitoExtension.class)
+class ServiceFactoryTest {
 
-    @Mock
-    private HttpServletRequest mockRequest;
+  private static final String EXAMPLE_MUTABLE_SESSION_ATTRIBUTE = "143|C_ORDER_ID";
+  private static final String SERVICE_NOT_NULL = "Service should not be null";
 
-    @Mock
-    private HttpServletResponse mockResponse;
+  @Mock
+  private HttpServletRequest mockRequest;
 
-    /**
-     * Sets up test fixtures before each test method.
-     */
-    @Before
-    public void setUp() {
-        // Common setup if needed
+  @Mock
+  private HttpServletResponse mockResponse;
+
+  @Test
+  void getServiceReturnsSessionService() {
+    MetadataService service = ServiceFactory.getService(mockRequestWithPath("/com.etendoerp.metadata.meta/session"), mockResponse);
+    assertNotNull(service, SERVICE_NOT_NULL);
+    assertInstanceOf(SessionService.class, service);
+  }
+
+  @Test
+  void getServiceReturnsMenuService() {
+    MetadataService service = ServiceFactory.getService(mockRequestWithPath("/com.etendoerp.metadata.meta/menu"), mockResponse);
+    assertNotNull(service, SERVICE_NOT_NULL);
+    assertInstanceOf(MenuService.class, service);
+  }
+
+  @Test
+  void getServiceReturnsWindowService() {
+    MetadataService service = ServiceFactory.getService(mockRequestWithPath("/com.etendoerp.metadata.meta/window/123"), mockResponse);
+    assertNotNull(service, SERVICE_NOT_NULL);
+    assertInstanceOf(WindowService.class, service);
+  }
+
+  @Test
+  void getServiceReturnsTabService() {
+    MetadataService service = ServiceFactory.getService(mockRequestWithPath("/com.etendoerp.metadata.meta/tab/456"), mockResponse);
+    assertNotNull(service, SERVICE_NOT_NULL);
+    assertInstanceOf(TabService.class, service);
+  }
+
+  @Test
+  void getServiceReturnsLanguageService() {
+    MetadataService service = ServiceFactory.getService(mockRequestWithPath("/com.etendoerp.metadata.meta/language/en_US"), mockResponse);
+    assertNotNull(service, SERVICE_NOT_NULL);
+    assertInstanceOf(LanguageService.class, service);
+  }
+
+  @Test
+  void getServiceReturnsMessageService() {
+    MetadataService service = ServiceFactory.getService(mockRequestWithPath("/com.etendoerp.metadata.meta/message"), mockResponse);
+    assertNotNull(service, SERVICE_NOT_NULL);
+    assertInstanceOf(MessageService.class, service);
+  }
+
+  @Test
+  void getServiceReturnsLabelsService() {
+    MetadataService service = ServiceFactory.getService(mockRequestWithPath("/com.etendoerp.metadata.meta/labels"), mockResponse);
+    assertNotNull(service, SERVICE_NOT_NULL);
+    assertInstanceOf(LabelsService.class, service);
+  }
+
+  @Test
+  void getServiceReturnsLocationMetadataService() {
+    MetadataService service = ServiceFactory.getService(mockRequestWithPath("/com.etendoerp.metadata.meta/location/test"), mockResponse);
+    assertNotNull(service, SERVICE_NOT_NULL);
+    assertInstanceOf(LocationMetadataService.class, service);
+  }
+
+  @Test
+  void getServiceReturnsToolbarService() {
+    MetadataService service = ServiceFactory.getService(mockRequestWithPath("/com.etendoerp.metadata.meta/toolbar"), mockResponse);
+    assertNotNull(service, SERVICE_NOT_NULL);
+    assertInstanceOf(ToolbarService.class, service);
+  }
+
+  @Test
+  void getServiceReturnsLegacyService() {
+    MetadataService service = ServiceFactory.getService(mockRequestWithPath("/com.etendoerp.metadata.meta/legacy/test"), mockResponse);
+    assertNotNull(service, SERVICE_NOT_NULL);
+    assertInstanceOf(LegacyService.class, service);
+  }
+
+  @Test
+  void getServiceReturnsForwardServiceWhenLegacyUtilsMatches() {
+    HttpServletRequest req = mockRequestWithPath(LegacyPaths.USED_BY_LINK);
+    HttpServletResponse res = mock(HttpServletResponse.class);
+
+    try (MockedStatic<LegacyUtils> legacy = mockStatic(LegacyUtils.class)) {
+      legacy.when(() -> LegacyUtils.isLegacyPath(LegacyPaths.USED_BY_LINK)).thenReturn(true);
+      MetadataService service = ServiceFactory.getService(req, res);
+      assertNotNull(service);
+      assertEquals(MetadataService.class, service.getClass().getSuperclass());
     }
+  }
 
-    /**
-     * Tests that ServiceFactory returns SessionService for session path.
-     */
-    @Test
-    public void testGetSessionService() {
-        when(mockRequest.getPathInfo()).thenReturn("/com.etendoerp.metadata.meta/session");
-        
-        MetadataService service = ServiceFactory.getService(mockRequest, mockResponse);
-        
-        assertNotNull(SERVICE_NOT_NULL, service);
-        assertTrue("Should return SessionService", service instanceof SessionService);
-    }
+  @Test
+  void getServiceThrowsNotFoundForUnknownPath() {
+    assertThrows(NotFoundException.class, () ->
+            ServiceFactory.getService(mockRequestWithPath("/com.etendoerp.metadata.meta/unknown"), mockResponse)
+    );
+  }
 
-    /**
-     * Tests that ServiceFactory returns MenuService for menu path.
-     */
-    @Test
-    public void testGetMenuService() {
-        when(mockRequest.getPathInfo()).thenReturn("/com.etendoerp.metadata.meta/menu");
-        
-        MetadataService service = ServiceFactory.getService(mockRequest, mockResponse);
-        
-        assertNotNull(SERVICE_NOT_NULL, service);
-        assertTrue("Should return MenuService", service instanceof MenuService);
-    }
+  @Test
+  void getServiceThrowsNotFoundForNullOrEmptyPath() {
+    assertThrows(NotFoundException.class, () ->
+            ServiceFactory.getService(mockRequestWithPath(null), mockResponse)
+    );
+    assertThrows(NotFoundException.class, () ->
+            ServiceFactory.getService(mockRequestWithPath(""), mockResponse)
+    );
+    assertThrows(NotFoundException.class, () ->
+            ServiceFactory.getService(mockRequestWithPath("/"), mockResponse)
+    );
+  }
 
-    /**
-     * Tests that ServiceFactory returns WindowService for window path.
-     */
-    @Test
-    public void testGetWindowService() {
-        when(mockRequest.getPathInfo()).thenReturn("/com.etendoerp.metadata.meta/window/123");
-        
-        MetadataService service = ServiceFactory.getService(mockRequest, mockResponse);
-        
-        assertNotNull(SERVICE_NOT_NULL, service);
-        assertTrue("Should return WindowService", service instanceof WindowService);
-    }
+  // -------- Tests for buildLegacyForwardService --------
 
-    /**
-     * Tests that ServiceFactory returns TabService for tab path.
-     */
-    @Test
-    public void testGetTabService() {
-        when(mockRequest.getPathInfo()).thenReturn("/com.etendoerp.metadata.meta/tab/456");
-        
-        MetadataService service = ServiceFactory.getService(mockRequest, mockResponse);
-        
-        assertNotNull(SERVICE_NOT_NULL, service);
-        assertTrue("Should return TabService", service instanceof TabService);
-    }
+  @Test
+  void buildLegacyForwardServiceForwardsSuccessfully() throws Exception {
+    HttpServletRequest req = mock(HttpServletRequest.class);
+    HttpServletResponse res = mock(HttpServletResponse.class);
+    HttpSession session = mock(HttpSession.class);
+    RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+    ServletContext context = mock(ServletContext.class);
 
-    /**
-     * Tests that ServiceFactory returns LanguageService for language path.
-     */
-    @Test
-    public void testGetLanguageService() {
-        when(mockRequest.getPathInfo()).thenReturn("/com.etendoerp.metadata.meta/language/en_US");
-        
-        MetadataService service = ServiceFactory.getService(mockRequest, mockResponse);
-        
-        assertNotNull(SERVICE_NOT_NULL, service);
-        assertTrue("Should return LanguageService", service instanceof LanguageService);
-    }
+    when(req.getServletContext()).thenReturn(context);
+    when(req.getSession(true)).thenReturn(session);
+    when(req.getParameter("recordId")).thenReturn("A123");
+    when(context.getRequestDispatcher(LegacyPaths.USED_BY_LINK)).thenReturn(dispatcher);
 
-    /**
-     * Tests that ServiceFactory returns MessageService for message path.
-     */
-    @Test
-    public void testGetMessageService() {
-        when(mockRequest.getPathInfo()).thenReturn("/com.etendoerp.metadata.meta/message");
-        
-        MetadataService service = ServiceFactory.getService(mockRequest, mockResponse);
-        
-        assertNotNull(SERVICE_NOT_NULL, service);
-        assertTrue("Should return MessageService", service instanceof MessageService);
-    }
+    try (MockedStatic<LegacyUtils> legacy = mockStatic(LegacyUtils.class)) {
+      legacy.when(() -> LegacyUtils.isMutableSessionAttribute(EXAMPLE_MUTABLE_SESSION_ATTRIBUTE)).thenReturn(true);
 
-    /**
-     * Tests that ServiceFactory returns LabelsService for labels path.
-     */
-    @Test
-    public void testGetLabelsService() {
-        when(mockRequest.getPathInfo()).thenReturn("/com.etendoerp.metadata.meta/labels");
-        
-        MetadataService service = ServiceFactory.getService(mockRequest, mockResponse);
-        
-        assertNotNull(SERVICE_NOT_NULL, service);
-        assertTrue("Should return LabelsService", service instanceof LabelsService);
-    }
+      MetadataService service = invokeBuildLegacyForwardService(req, res, LegacyPaths.USED_BY_LINK);
+      assertNotNull(service);
 
-    /**
-     * Tests that ServiceFactory returns LocationMetadataService for location path.
-     */
-    @Test
-    public void testGetLocationMetadataService() {
-        when(mockRequest.getPathInfo()).thenReturn("/com.etendoerp.metadata.meta/location/test");
-        
-        MetadataService service = ServiceFactory.getService(mockRequest, mockResponse);
-        
-        assertNotNull(SERVICE_NOT_NULL, service);
-        assertTrue("Should return LocationMetadataService", service instanceof LocationMetadataService);
-    }
+      service.process();
 
-    /**
-     * Tests that ServiceFactory returns ToolbarService for toolbar path.
-     */
-    @Test
-    public void testGetToolbarService() {
-        when(mockRequest.getPathInfo()).thenReturn("/com.etendoerp.metadata.meta/toolbar");
-        
-        MetadataService service = ServiceFactory.getService(mockRequest, mockResponse);
-        
-        assertNotNull(SERVICE_NOT_NULL, service);
-        assertTrue("Should return ToolbarService", service instanceof ToolbarService);
+      verify(session).setAttribute(EXAMPLE_MUTABLE_SESSION_ATTRIBUTE, "A123");
+      verify(dispatcher).forward(req, res);
     }
+  }
 
-    /**
-     * Tests that ServiceFactory returns LegacyService for legacy path.
-     */
-    @Test
-    public void testGetLegacyService() {
-        when(mockRequest.getPathInfo()).thenReturn("/com.etendoerp.metadata.meta/legacy/test");
-        
-        MetadataService service = ServiceFactory.getService(mockRequest, mockResponse);
-        
-        assertNotNull(SERVICE_NOT_NULL, service);
-        assertTrue("Should return LegacyService", service instanceof LegacyService);
-    }
+  @Test
+  void buildLegacyForwardServiceThrowsWhenAttributeNotAllowed() {
+    HttpServletRequest req = mock(HttpServletRequest.class);
+    HttpServletResponse res = mock(HttpServletResponse.class);
+    HttpSession session = mock(HttpSession.class);
 
-    /**
-     * Tests that ServiceFactory throws NotFoundException for unknown paths.
-     */
-    @Test(expected = NotFoundException.class)
-    public void testGetServiceUnknownPath() {
-        when(mockRequest.getPathInfo()).thenReturn("/com.etendoerp.metadata.meta/unknown");
-        
-        ServiceFactory.getService(mockRequest, mockResponse);
-    }
+    when(req.getSession(true)).thenReturn(session);
+    when(req.getParameter("recordId")).thenReturn("A123");
 
-    /**
-     * Tests that ServiceFactory throws NotFoundException for null path.
-     */
-    @Test(expected = NotFoundException.class)
-    public void testGetServiceNullPath() {
-        when(mockRequest.getPathInfo()).thenReturn(null);
-        
-        ServiceFactory.getService(mockRequest, mockResponse);
-    }
+    try (MockedStatic<LegacyUtils> legacy = mockStatic(LegacyUtils.class)) {
+      legacy.when(() -> LegacyUtils.isMutableSessionAttribute(EXAMPLE_MUTABLE_SESSION_ATTRIBUTE)).thenReturn(false);
 
-    /**
-     * Tests that ServiceFactory throws NotFoundException for empty path.
-     */
-    @Test(expected = NotFoundException.class)
-    public void testGetServiceEmptyPath() {
-        when(mockRequest.getPathInfo()).thenReturn("");
-        
-        ServiceFactory.getService(mockRequest, mockResponse);
+      MetadataService service = invokeBuildLegacyForwardService(req, res, LegacyPaths.USED_BY_LINK);
+      assertThrows(InternalServerException.class, service::process);
     }
+  }
 
-    /**
-     * Tests that ServiceFactory throws NotFoundException for root path.
-     */
-    @Test(expected = NotFoundException.class)
-    public void testGetServiceRootPath() {
-        when(mockRequest.getPathInfo()).thenReturn("/");
-        
-        ServiceFactory.getService(mockRequest, mockResponse);
+  @Test
+  void buildLegacyForwardServiceThrowsWhenDispatcherIsNull() {
+    HttpServletRequest req = mock(HttpServletRequest.class);
+    HttpServletResponse res = mock(HttpServletResponse.class);
+    HttpSession session = mock(HttpSession.class);
+    ServletContext context = mock(ServletContext.class);
+
+    when(req.getServletContext()).thenReturn(context);
+    when(context.getRequestDispatcher(LegacyPaths.USED_BY_LINK)).thenReturn(null);
+    when(req.getSession(true)).thenReturn(session);
+
+    try (MockedStatic<LegacyUtils> legacy = mockStatic(LegacyUtils.class)) {
+      legacy.when(() -> LegacyUtils.isMutableSessionAttribute(EXAMPLE_MUTABLE_SESSION_ATTRIBUTE)).thenReturn(true);
+
+      MetadataService service = invokeBuildLegacyForwardService(req, res, LegacyPaths.USED_BY_LINK);
+      assertThrows(ServletException.class, service::process);
     }
+  }
+
+  @Test
+  void buildLegacyForwardServiceCatchesExceptionFromDispatcher() throws Exception {
+    HttpServletRequest req = mock(HttpServletRequest.class);
+    HttpServletResponse res = mock(HttpServletResponse.class);
+    HttpSession session = mock(HttpSession.class);
+    ServletContext context = mock(ServletContext.class);
+    RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+
+    when(req.getServletContext()).thenReturn(context);
+    when(context.getRequestDispatcher(LegacyPaths.USED_BY_LINK)).thenReturn(dispatcher);
+    when(req.getSession(true)).thenReturn(session);
+    doThrow(new IOException("fail")).when(dispatcher).forward(req, res);
+
+    try (MockedStatic<LegacyUtils> legacy = mockStatic(LegacyUtils.class)) {
+      legacy.when(() -> LegacyUtils.isMutableSessionAttribute(EXAMPLE_MUTABLE_SESSION_ATTRIBUTE)).thenReturn(true);
+
+      MetadataService service = invokeBuildLegacyForwardService(req, res, LegacyPaths.USED_BY_LINK);
+      assertThrows(IOException.class, service::process);
+    }
+  }
+
+
+  /** Helper to create a mock HttpServletRequest with the specified path info. */
+  private HttpServletRequest mockRequestWithPath(String path) {
+    HttpServletRequest req = mock(HttpServletRequest.class);
+    when(req.getPathInfo()).thenReturn(path);
+    return req;
+  }
+
+  /**
+   * Invokes the private static method buildLegacyForwardService using reflection.
+   */
+  private MetadataService invokeBuildLegacyForwardService(HttpServletRequest req, HttpServletResponse res, String path) {
+    try {
+      var method = ServiceFactory.class.getDeclaredMethod("buildLegacyForwardService", HttpServletRequest.class, HttpServletResponse.class, String.class);
+      method.setAccessible(true);
+      return (MetadataService) method.invoke(null, req, res, path);
+    } catch (Exception e) {
+      throw new InternalServerException("Failed to invoke buildLegacyForwardService" + e.getMessage());
+    }
+  }
 }

@@ -24,6 +24,10 @@ public class InternalServerException extends RuntimeException {
         super(message.isEmpty() ? DEFAULT_MESSAGE : message);
     }
 
+    public InternalServerException(String message, Throwable cause) {
+        super(message, cause);
+    }
+
     public InternalServerException() {
         super(DEFAULT_MESSAGE);
     }

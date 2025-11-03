@@ -101,20 +101,12 @@ public class ToolbarServiceTest {
      * 
      * @throws IOException if an I/O error occurs during processing
      */
-    @Test
+
+    @Test(expected = IOException.class)
     public void testProcessIOException() throws IOException {
         when(mockResponse.getWriter()).thenThrow(new IOException("Test IO Exception"));
-        
+
         ToolbarService service = new ToolbarService(mockRequest, mockResponse);
-        
-        try {
-            service.process();
-            fail("Should have thrown an exception");
-        } catch (IOException e) {
-            assertEquals("Should propagate IOException", "Test IO Exception", e.getMessage());
-        } catch (Exception e) {
-            // Other exceptions might occur first due to OBContext issues in test environment
-            assertNotNull("Exception should not be null", e);
-        }
+        service.process();
     }
 }
