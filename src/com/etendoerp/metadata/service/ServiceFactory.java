@@ -84,7 +84,7 @@ public class ServiceFactory {
             private void handleException(Exception e) throws ServletException, IOException {
                 if (e instanceof ServletException) throw (ServletException) e;
                 if (e instanceof IOException) throw (IOException) e;
-                throw new InternalServerException("Failed to forward legacy request: " + e.getMessage());
+                throw new InternalServerException("Failed to forward legacy request: " + e.getMessage(), e);
             }
         };
     }
