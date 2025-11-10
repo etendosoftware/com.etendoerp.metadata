@@ -406,17 +406,31 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
     }
 
     private String getInjectedContent(String path, String responseString) {
+        String publicHost = OBPropertiesProvider.getInstance()
+                .getOpenbravoProperties()
+                .getProperty("next.public.etendo.classic.host");
+
+        if (StringUtils.isEmpty(publicHost)) {
+            publicHost = OBPropertiesProvider.getInstance()
+                    .getOpenbravoProperties()
+                    .getProperty("CLASSIC_URL", "");
+        }
+
+        String webResourceUrl = publicHost + "/web/";
+
         responseString = responseString
                 .replace(META_LEGACY_PATH, META_LEGACY_PATH + path)
-                .replace("src=\"../web/", "src=\"../../../web/")
-                .replace("href=\"../web/", "href=\"../../../web/");
+                .replace("src=\"../web/", "src=\"" + webResourceUrl)
+                .replace("href=\"../web/", "href=\"" + webResourceUrl);
+
         if (responseString.contains(FRAMESET_CLOSE_TAG)) {
             return responseString.replace(HEAD_CLOSE_TAG, RECEIVE_AND_POST_MESSAGE_SCRIPT.concat(HEAD_CLOSE_TAG));
         }
+
         if (responseString.contains(FORM_CLOSE_TAG)) {
             String resWithNewScript = responseString.replace(FORM_CLOSE_TAG, FORM_CLOSE_TAG.concat(POST_MESSAGE_SCRIPT));
-            resWithNewScript = resWithNewScript.replace("src=\"../web/", "src=\"../../../web/");
-            resWithNewScript = resWithNewScript.replace("href=\"../web/", "href=\"../../../web/");
+            resWithNewScript = resWithNewScript.replace("src=\"../web/", "src=\"" + webResourceUrl);
+            resWithNewScript = resWithNewScript.replace("href=\"../web/", "href=\"" + webResourceUrl);
             return injectCodeAfterFunctionCall(
                     injectCodeAfterFunctionCall(resWithNewScript, "submitThisPage\\(([^)]+)\\);", "sendMessage('processOrder');", true),
                     "closeThisPage();",
