@@ -407,9 +407,8 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
     }
 
     private String getInjectedContent(String path, String responseString) {
-        // Obtener el contexto actual del servlet request
         HttpServletRequest req = RequestContext.get().getRequest();
-        String contextPath = req.getContextPath(); // Esto devuelve "/etendo1" por ejemplo
+        String contextPath = req.getContextPath();
 
         log4j.info("===== Context path from request: {}", contextPath);
 
@@ -418,12 +417,10 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
                 .replace("src=\"../web/", "src=\"" + contextPath + WEB_PATH)
                 .replace("href=\"../web/", "href=\"" + contextPath + WEB_PATH);
 
-        // Si hay framesets
         if (responseString.contains(FRAMESET_CLOSE_TAG)) {
             return responseString.replace(HEAD_CLOSE_TAG, RECEIVE_AND_POST_MESSAGE_SCRIPT.concat(HEAD_CLOSE_TAG));
         }
 
-        // Si hay forms
         if (responseString.contains(FORM_CLOSE_TAG)) {
             String resWithNewScript = responseString.replace(FORM_CLOSE_TAG, FORM_CLOSE_TAG.concat(POST_MESSAGE_SCRIPT));
             resWithNewScript = resWithNewScript.replace("src=\"../web/", "src=\"" + contextPath + WEB_PATH);
