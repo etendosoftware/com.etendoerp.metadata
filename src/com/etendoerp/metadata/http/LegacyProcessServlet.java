@@ -406,31 +406,28 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
     }
 
     private String getInjectedContent(String path, String responseString) {
-        String publicHost = OBPropertiesProvider.getInstance()
-                .getOpenbravoProperties()
-                .getProperty("next.public.etendo.classic.host");
+        // Obtener el contexto actual del servlet request
+        HttpServletRequest req = RequestContext.get().getRequest();
+        String contextPath = req.getContextPath(); // Esto devuelve "/etendo1" por ejemplo
 
-        if (StringUtils.isEmpty(publicHost)) {
-            publicHost = OBPropertiesProvider.getInstance()
-                    .getOpenbravoProperties()
-                    .getProperty("CLASSIC_URL", "");
-        }
-
-        String webResourceUrl = publicHost + "/web/";
+        log4j.info("===== Context path from request: {}", contextPath);
 
         responseString = responseString
                 .replace(META_LEGACY_PATH, META_LEGACY_PATH + path)
-                .replace("src=\"../web/", "src=\"" + webResourceUrl)
-                .replace("href=\"../web/", "href=\"" + webResourceUrl);
+                .replace("src=\"../web/", "src=\"" + contextPath + "/web/")
+                .replace("href=\"../web/", "href=\"" + contextPath + "/web/");
 
+        // Si hay framesets
         if (responseString.contains(FRAMESET_CLOSE_TAG)) {
             return responseString.replace(HEAD_CLOSE_TAG, RECEIVE_AND_POST_MESSAGE_SCRIPT.concat(HEAD_CLOSE_TAG));
         }
 
+        // Si hay forms
         if (responseString.contains(FORM_CLOSE_TAG)) {
             String resWithNewScript = responseString.replace(FORM_CLOSE_TAG, FORM_CLOSE_TAG.concat(POST_MESSAGE_SCRIPT));
-            resWithNewScript = resWithNewScript.replace("src=\"../web/", "src=\"" + webResourceUrl);
-            resWithNewScript = resWithNewScript.replace("href=\"../web/", "href=\"" + webResourceUrl);
+            resWithNewScript = resWithNewScript.replace("src=\"../web/", "src=\"" + contextPath + "/web/");
+            resWithNewScript = resWithNewScript.replace("href=\"../web/", "href=\"" + contextPath + "/web/");
+
             return injectCodeAfterFunctionCall(
                     injectCodeAfterFunctionCall(resWithNewScript, "submitThisPage\\(([^)]+)\\);", "sendMessage('processOrder');", true),
                     "closeThisPage();",
@@ -438,6 +435,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
                     false
             );
         }
+
         return responseString;
     }
 
