@@ -43,6 +43,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
     private static final String BEARER_PREFIX = "Bearer ";
     private static final String META_LEGACY_PATH = "/meta/legacy";
     private static final String BASE_PATH = "/etendo";
+    private static final String WEB_PATH = "/web/";
 
     private static final String RECEIVE_AND_POST_MESSAGE_SCRIPT =
             "<script>window.addEventListener(\"message\", (event) => {" +
@@ -406,17 +407,25 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
     }
 
     private String getInjectedContent(String path, String responseString) {
+        HttpServletRequest req = RequestContext.get().getRequest();
+        String contextPath = req.getContextPath();
+
+        log4j.info("===== Context path from request: {}", contextPath);
+
         responseString = responseString
                 .replace(META_LEGACY_PATH, META_LEGACY_PATH + path)
-                .replace("src=\"../web/", "src=\"../../../web/")
-                .replace("href=\"../web/", "href=\"../../../web/");
+                .replace("src=\"../web/", "src=\"" + contextPath + WEB_PATH)
+                .replace("href=\"../web/", "href=\"" + contextPath + WEB_PATH);
+
         if (responseString.contains(FRAMESET_CLOSE_TAG)) {
             return responseString.replace(HEAD_CLOSE_TAG, RECEIVE_AND_POST_MESSAGE_SCRIPT.concat(HEAD_CLOSE_TAG));
         }
+
         if (responseString.contains(FORM_CLOSE_TAG)) {
             String resWithNewScript = responseString.replace(FORM_CLOSE_TAG, FORM_CLOSE_TAG.concat(POST_MESSAGE_SCRIPT));
-            resWithNewScript = resWithNewScript.replace("src=\"../web/", "src=\"../../../web/");
-            resWithNewScript = resWithNewScript.replace("href=\"../web/", "href=\"../../../web/");
+            resWithNewScript = resWithNewScript.replace("src=\"../web/", "src=\"" + contextPath + WEB_PATH);
+            resWithNewScript = resWithNewScript.replace("href=\"../web/", "href=\"" + contextPath + WEB_PATH);
+
             return injectCodeAfterFunctionCall(
                     injectCodeAfterFunctionCall(resWithNewScript, "submitThisPage\\(([^)]+)\\);", "sendMessage('processOrder');", true),
                     "closeThisPage();",
@@ -424,6 +433,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
                     false
             );
         }
+
         return responseString;
     }
 
