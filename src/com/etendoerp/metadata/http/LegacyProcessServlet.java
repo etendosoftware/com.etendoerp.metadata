@@ -43,6 +43,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
     private static final String BEARER_PREFIX = "Bearer ";
     private static final String META_LEGACY_PATH = "/meta/legacy";
     private static final String BASE_PATH = "/etendo";
+    private static final String WEB_PATH = "/web/";
 
     private static final String RECEIVE_AND_POST_MESSAGE_SCRIPT =
             "<script>window.addEventListener(\"message\", (event) => {" +
@@ -414,8 +415,8 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
 
         responseString = responseString
                 .replace(META_LEGACY_PATH, META_LEGACY_PATH + path)
-                .replace("src=\"../web/", "src=\"" + contextPath + "/web/")
-                .replace("href=\"../web/", "href=\"" + contextPath + "/web/");
+                .replace("src=\"../web/", "src=\"" + contextPath + WEB_PATH)
+                .replace("href=\"../web/", "href=\"" + contextPath + WEB_PATH);
 
         // Si hay framesets
         if (responseString.contains(FRAMESET_CLOSE_TAG)) {
@@ -425,8 +426,8 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         // Si hay forms
         if (responseString.contains(FORM_CLOSE_TAG)) {
             String resWithNewScript = responseString.replace(FORM_CLOSE_TAG, FORM_CLOSE_TAG.concat(POST_MESSAGE_SCRIPT));
-            resWithNewScript = resWithNewScript.replace("src=\"../web/", "src=\"" + contextPath + "/web/");
-            resWithNewScript = resWithNewScript.replace("href=\"../web/", "href=\"" + contextPath + "/web/");
+            resWithNewScript = resWithNewScript.replace("src=\"../web/", "src=\"" + contextPath + WEB_PATH);
+            resWithNewScript = resWithNewScript.replace("href=\"../web/", "href=\"" + contextPath + WEB_PATH);
 
             return injectCodeAfterFunctionCall(
                     injectCodeAfterFunctionCall(resWithNewScript, "submitThisPage\\(([^)]+)\\);", "sendMessage('processOrder');", true),
