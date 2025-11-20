@@ -213,7 +213,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         String output = wrapper.getCapturedOutputAsString();
 
         if (wrapper.isRedirected()) {
-            writeRedirect(res, wrapper, output);
+            writeRedirect(res, wrapper);
             return;
         }
 
@@ -223,8 +223,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
     }
 
     private void writeRedirect(HttpServletResponse res,
-                               HttpServletResponseLegacyWrapper wrapper,
-                               String output) throws IOException {
+                               HttpServletResponseLegacyWrapper wrapper) throws IOException {
 
         String location = wrapper.getRedirectLocation();
         String html = getHtmlRedirect(location);
