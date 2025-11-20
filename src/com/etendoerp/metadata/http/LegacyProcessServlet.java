@@ -29,6 +29,7 @@ import java.util.regex.Pattern;
 import static com.etendoerp.metadata.utils.Constants.FORM_CLOSE_TAG;
 import static com.etendoerp.metadata.utils.Constants.FRAMESET_CLOSE_TAG;
 import static com.etendoerp.metadata.utils.Constants.HEAD_CLOSE_TAG;
+import static com.etendoerp.metadata.utils.LegacyPaths.ABOUT_MODAL;
 
 /**
  * Legacy servlet that uses existing HttpServletRequestWrapper infrastructure
@@ -195,6 +196,13 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
                 return;
             }
             output = getInjectedContent(path, output);
+
+            if (ABOUT_MODAL.equals(path)) {
+                res.setContentType("text/html; charset=UTF-8");
+                res.setCharacterEncoding("UTF-8");
+            } else {
+                res.setContentType(responseWrapper.getContentType());
+            }
 
             res.setContentType(responseWrapper.getContentType());
             res.setStatus(responseWrapper.getStatus());
@@ -411,8 +419,6 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         String contextPath = req.getContextPath();
 
         log4j.info("===== Context path from request: {}", contextPath);
-
-        if (path.equals("/ad_forms/about.html")) return responseString;
 
         responseString = responseString
                 .replace(META_LEGACY_PATH, META_LEGACY_PATH + path)
