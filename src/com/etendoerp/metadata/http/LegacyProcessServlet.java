@@ -412,6 +412,8 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
 
         log4j.info("===== Context path from request: {}", contextPath);
 
+        if (path.equals("/ad_forms/about.html")) return responseString;
+
         responseString = responseString
                 .replace(META_LEGACY_PATH, META_LEGACY_PATH + path)
                 .replace("src=\"../web/", "src=\"" + contextPath + WEB_PATH)
