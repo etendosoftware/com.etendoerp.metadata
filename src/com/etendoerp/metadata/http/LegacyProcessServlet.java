@@ -29,6 +29,7 @@ import java.util.regex.Pattern;
 import static com.etendoerp.metadata.utils.Constants.FORM_CLOSE_TAG;
 import static com.etendoerp.metadata.utils.Constants.FRAMESET_CLOSE_TAG;
 import static com.etendoerp.metadata.utils.Constants.HEAD_CLOSE_TAG;
+import static com.etendoerp.metadata.utils.LegacyPaths.ABOUT_MODAL;
 
 /**
  * Legacy servlet that uses existing HttpServletRequestWrapper infrastructure
@@ -118,19 +119,52 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         return command != null && command.startsWith("BUTTON");
     }
 
-    private void processLegacyRequest(HttpServletRequest req, HttpServletResponse res, String path)
-            throws IOException {
-        String token = req.getParameter(TOKEN_PARAM);
-        req.getSession(true);
-        if (token != null) {
-            req.getSession().setAttribute("LEGACY_TOKEN", token);
+    private void processLegacyRequest(HttpServletRequest req, HttpServletResponse res, String path) throws IOException {
+
+        try {
+            HttpServletRequestWrapper wrappedRequest = buildWrappedRequest(req, path);
+            HttpServletResponseLegacyWrapper responseWrapper = new HttpServletResponseLegacyWrapper(res);
+
+            prepareSessionAttributes(req, path);
+            preprocessRequest(req, wrappedRequest);
+
+            wrappedRequest.getRequestDispatcher(path).include(wrappedRequest, responseWrapper);
+
+            handleResponse(res, responseWrapper, path);
+
+        } catch (Exception e) {
+            log4j.error("Error processing legacy request {}: {}", path, e.getMessage(), e);
+            res.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                    "Error processing legacy request: " + e.getMessage());
         }
-        if (path != null && path.contains("/")) {
-            String servletDir = path.substring(0, path.lastIndexOf("/"));
-            req.getSession().setAttribute("LEGACY_SERVLET_DIR", servletDir);
+    }
+
+    private void prepareSessionAttributes(HttpServletRequest req, String path) {
+        String token = req.getParameter(TOKEN_PARAM);
+
+        HttpSession session = req.getSession(true);
+        if (token != null) {
+            session.setAttribute("LEGACY_TOKEN", token);
         }
 
-        HttpServletRequestWrapper wrappedRequest = new HttpServletRequestWrapper(req) {
+        if (path != null && path.contains("/")) {
+            String dir = path.substring(0, path.lastIndexOf("/"));
+            session.setAttribute("LEGACY_SERVLET_DIR", dir);
+        }
+    }
+
+    private void preprocessRequest(HttpServletRequest req, HttpServletRequestWrapper wrapped) {
+        handleTokenConsistency(req, wrapped);
+        handleRecordIdentifier(wrapped);
+        handleRequestContext(null, wrapped);
+        maybeValidateLegacyClass(wrapped.getPathInfo());
+    }
+
+    private HttpServletRequestWrapper buildWrappedRequest(HttpServletRequest req, String path) {
+        String token = req.getParameter(TOKEN_PARAM);
+
+        return new HttpServletRequestWrapper(req) {
+
             @Override
             public String getPathInfo() {
                 return path;
@@ -155,9 +189,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             @Override
             public Enumeration<String> getHeaders(String name) {
                 if (AUTHORIZATION_HEADER.equalsIgnoreCase(name) && token != null) {
-                    return Collections.enumeration(
-                            Arrays.asList(BEARER_PREFIX + token)
-                    );
+                    return Collections.enumeration(Collections.singletonList(BEARER_PREFIX + token));
                 }
                 return super.getHeaders(name);
             }
@@ -172,40 +204,54 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
                 return req.getSession(create);
             }
         };
-
-        var responseWrapper = new HttpServletResponseLegacyWrapper(res);
-
-        try {
-            handleTokenConsistency(req, wrappedRequest);
-            handleRecordIdentifier(wrappedRequest);
-            handleRequestContext(res, wrappedRequest);
-            maybeValidateLegacyClass(wrappedRequest.getPathInfo());
-
-            wrappedRequest.getRequestDispatcher(path).include(wrappedRequest, responseWrapper);
-
-            String output = responseWrapper.getCapturedOutputAsString();
-            if (responseWrapper.isRedirected()) {
-                String redirectLocation = responseWrapper.getRedirectLocation();
-                String htmlRedirect = getHtmlRedirect(redirectLocation);
-
-                res.setContentType(responseWrapper.getContentType());
-                res.setStatus(responseWrapper.getStatus());
-                res.getWriter().write(htmlRedirect);
-                res.getWriter().flush();
-                return;
-            }
-            output = getInjectedContent(path, output);
-
-            res.setContentType(responseWrapper.getContentType());
-            res.setStatus(responseWrapper.getStatus());
-            res.getWriter().write(output);
-            res.getWriter().flush();
-
-        } catch (Exception e) {
-            log4j.error("Error processing legacy request {}: {}", path, e.getMessage(), e);
-            res.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Error processing legacy request: " + e.getMessage());
-        }
     }
+
+    private void handleResponse(HttpServletResponse res,
+                                HttpServletResponseLegacyWrapper wrapper,
+                                String path) throws IOException {
+
+        String output = wrapper.getCapturedOutputAsString();
+
+        if (wrapper.isRedirected()) {
+            writeRedirect(res, wrapper);
+            return;
+        }
+
+        output = getInjectedContent(path, output);
+
+        writeFinalResponse(res, wrapper, path, output);
+    }
+
+    private void writeRedirect(HttpServletResponse res,
+                               HttpServletResponseLegacyWrapper wrapper) throws IOException {
+
+        String location = wrapper.getRedirectLocation();
+        String html = getHtmlRedirect(location);
+
+        res.setContentType(wrapper.getContentType());
+        res.setStatus(wrapper.getStatus());
+        res.getWriter().write(html);
+        res.getWriter().flush();
+    }
+
+    private void writeFinalResponse(HttpServletResponse res,
+                                    HttpServletResponseLegacyWrapper wrapper,
+                                    String path,
+                                    String output) throws IOException {
+
+        if (ABOUT_MODAL.equals(path)) {
+            res.setContentType("text/html; charset=UTF-8");
+            res.setCharacterEncoding("UTF-8");
+        } else {
+            res.setContentType(wrapper.getContentType());
+        }
+
+        res.setStatus(wrapper.getStatus());
+        res.getWriter().write(output);
+        res.getWriter().flush();
+    }
+
+
 
     private void processLegacyFollowupRequest(HttpServletRequest req, HttpServletResponse res)
             throws IOException {
