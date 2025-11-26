@@ -22,6 +22,7 @@ import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import org.codehaus.jettison.json.JSONArray;
@@ -467,6 +468,117 @@ class FieldBuilderWithColumnTest {
       fieldBuilder = new FieldBuilderWithColumn(field, fieldAccess);
 
       assertTrue(fieldBuilder.getColumnUpdatable());
+    }
+  }
+
+  /**
+   * Test para campo con referencia de tipo lista pero sin valores
+   */
+  @Test
+  void testToJSONWithReferenceListEmpty() throws JSONException {
+    when(reference.getId()).thenReturn(Constants.LIST_REFERENCE_ID);
+    when(reference.getADListList()).thenReturn(Collections.emptyList());
+
+    try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
+         MockedStatic<KernelUtils> mockedKernelUtils = mockStatic(KernelUtils.class);
+         MockedStatic<FieldBuilder> mockedFieldBuilder = mockStatic(FieldBuilder.class);
+         MockedStatic<DataSourceUtils> mockedDataSourceUtils = mockStatic(DataSourceUtils.class);
+         MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class,
+                 (mock, context) -> {
+                   JSONObject baseJson = new JSONObject();
+                   baseJson.put("id", FIELD_ID);
+                   when(mock.toJsonObject(any(Field.class), eq(DataResolvingMode.FULL_TRANSLATABLE)))
+                           .thenReturn(baseJson);
+                   when(mock.toJsonObject(any(Column.class), eq(DataResolvingMode.FULL_TRANSLATABLE)))
+                           .thenReturn(new JSONObject().put("id", COLUMN_ID));
+                 })) {
+
+      mockedOBContext.when(OBContext::getOBContext).thenReturn(obContext);
+      mockedKernelUtils.when(() -> KernelUtils.getProperty(field)).thenReturn(fieldProperty);
+      mockedDataSourceUtils.when(() -> DataSourceUtils.getHQLColumnName(true, TEST_TABLE_NAME, TEST_COLUMN_NAME))
+              .thenReturn(new String[]{TEST_FIELD});
+      mockedFieldBuilder.when(() -> FieldBuilder.getListInfo(reference, language))
+              .thenReturn(new JSONArray());
+
+      when(obContext.getLanguage()).thenReturn(language);
+
+      fieldBuilder = new FieldBuilderWithColumn(field, fieldAccess);
+      JSONObject result = fieldBuilder.toJSON();
+
+      assertNotNull(result);
+      assertTrue(result.has(REF_LIST));
+      assertEquals(0, result.getJSONArray(REF_LIST).length());
+    }
+  }
+
+  /**
+   * Test para campo con display logic complejo
+   */
+  @Test
+  void testToJSONWithComplexDisplayLogic() throws JSONException {
+    String complexLogic = "@Product@='Y' & @Customer@!='null'";
+    when(field.getDisplayLogic()).thenReturn(complexLogic);
+
+    try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
+         MockedStatic<KernelUtils> mockedKernelUtils = mockStatic(KernelUtils.class);
+         MockedStatic<DataSourceUtils> mockedDataSourceUtils = mockStatic(DataSourceUtils.class);
+         MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class,
+                 (mock, context) -> {
+                   JSONObject baseJson = new JSONObject();
+                   baseJson.put("id", FIELD_ID);
+                   when(mock.toJsonObject(any(Field.class), eq(DataResolvingMode.FULL_TRANSLATABLE)))
+                           .thenReturn(baseJson);
+                   when(mock.toJsonObject(any(Column.class), eq(DataResolvingMode.FULL_TRANSLATABLE)))
+                           .thenReturn(new JSONObject().put("id", COLUMN_ID));
+                 });
+         MockedConstruction<DynamicExpressionParser> ignored2 = mockConstruction(DynamicExpressionParser.class,
+                 (mock, context) -> when(mock.getJSExpression()).thenReturn("context.Product=='Y' && context.Customer!=null"))) {
+
+      mockedOBContext.when(OBContext::getOBContext).thenReturn(obContext);
+      mockedKernelUtils.when(() -> KernelUtils.getProperty(field)).thenReturn(fieldProperty);
+      mockedDataSourceUtils.when(() -> DataSourceUtils.getHQLColumnName(true, TEST_TABLE_NAME, TEST_COLUMN_NAME))
+              .thenReturn(new String[]{TEST_FIELD});
+
+      when(obContext.getLanguage()).thenReturn(language);
+
+      fieldBuilder = new FieldBuilderWithColumn(field, fieldAccess);
+      JSONObject result = fieldBuilder.toJSON();
+
+      assertNotNull(result);
+    }
+  }
+
+  /**
+   * Test para campo con columna mandatory
+   */
+  @Test
+  void testToJSONWithMandatoryColumn() throws JSONException {
+    when(column.isMandatory()).thenReturn(true);
+
+    try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
+         MockedStatic<KernelUtils> mockedKernelUtils = mockStatic(KernelUtils.class);
+         MockedStatic<DataSourceUtils> mockedDataSourceUtils = mockStatic(DataSourceUtils.class);
+         MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class,
+                 (mock, context) -> {
+                   JSONObject baseJson = new JSONObject();
+                   baseJson.put("id", FIELD_ID);
+                   when(mock.toJsonObject(any(Field.class), eq(DataResolvingMode.FULL_TRANSLATABLE)))
+                           .thenReturn(baseJson);
+                   when(mock.toJsonObject(any(Column.class), eq(DataResolvingMode.FULL_TRANSLATABLE)))
+                           .thenReturn(new JSONObject().put("id", COLUMN_ID));
+                 })) {
+
+      mockedOBContext.when(OBContext::getOBContext).thenReturn(obContext);
+      mockedKernelUtils.when(() -> KernelUtils.getProperty(field)).thenReturn(fieldProperty);
+      mockedDataSourceUtils.when(() -> DataSourceUtils.getHQLColumnName(true, TEST_TABLE_NAME, TEST_COLUMN_NAME))
+              .thenReturn(new String[]{TEST_FIELD});
+
+      when(obContext.getLanguage()).thenReturn(language);
+
+      fieldBuilder = new FieldBuilderWithColumn(field, fieldAccess);
+      JSONObject result = fieldBuilder.toJSON();
+
+      assertNotNull(result);
     }
   }
 }
