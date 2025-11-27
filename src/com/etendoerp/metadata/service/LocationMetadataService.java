@@ -60,8 +60,12 @@ public class LocationMetadataService extends MetadataService {
     public void process() throws IOException {
         try {
             String pathInfo = getRequest().getPathInfo();
+            // Clean the path like ServiceFactory does
+            if (pathInfo != null) {
+                pathInfo = pathInfo.replace("/com.etendoerp.metadata.meta/", "/");
+            }
 
-            if (pathInfo.startsWith(LOCATION_PATH + "create")) {
+            if (pathInfo != null && pathInfo.startsWith(LOCATION_PATH + "create")) {
                 handleCreateLocation();
             } else {
                 throw new NotFoundException("Location endpoint not found");
