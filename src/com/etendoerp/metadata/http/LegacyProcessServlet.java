@@ -460,6 +460,8 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
 
         responseString = responseString
                 .replace(META_LEGACY_PATH, META_LEGACY_PATH + path)
+                // Custom JS file that need custom export
+                .replace("src=\"../utility/DynamicJS.js", "src=\"" + contextPath + "/utility/DynamicJS.js")
                 .replace("src=\"../web/", "src=\"" + contextPath + WEB_PATH)
                 .replace("href=\"../web/", "href=\"" + contextPath + WEB_PATH);
 
