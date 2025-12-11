@@ -158,7 +158,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             }
 
             String jsContent = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
-            String processedContent = transformJavaScriptContent(req, path, jsContent);
+            String processedContent = transformJavaScriptContent(jsContent);
 
             res.setContentType("application/javascript; charset=UTF-8");
             res.setCharacterEncoding("UTF-8");
@@ -182,7 +182,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
      * @param content the original JavaScript content
      * @return the transformed JavaScript content
      */
-    private String transformJavaScriptContent(HttpServletRequest req, String path, String content) {
+    private String transformJavaScriptContent(String content) {
         return content;
     }
 
