@@ -45,6 +45,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
     private static final String META_LEGACY_PATH = "/meta/legacy";
     private static final String BASE_PATH = "/etendo";
     private static final String WEB_PATH = "/web/";
+    private static final String SRC_REPLACE_STRING = "src=\"";
 
     private static final String RECEIVE_AND_POST_MESSAGE_SCRIPT =
             "<script>window.addEventListener(\"message\", (event) => {" +
@@ -460,7 +461,9 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
 
         responseString = responseString
                 .replace(META_LEGACY_PATH, META_LEGACY_PATH + path)
-                .replace("src=\"../web/", "src=\"" + contextPath + WEB_PATH)
+                // Custom JS file that need custom export
+                .replace(SRC_REPLACE_STRING + "../utility/DynamicJS.js", SRC_REPLACE_STRING + contextPath + "/utility/DynamicJS.js")
+                .replace(SRC_REPLACE_STRING + "../web/",  SRC_REPLACE_STRING+ contextPath + WEB_PATH)
                 .replace("href=\"../web/", "href=\"" + contextPath + WEB_PATH);
 
         if (responseString.contains(FRAMESET_CLOSE_TAG)) {
@@ -469,7 +472,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
 
         if (responseString.contains(FORM_CLOSE_TAG)) {
             String resWithNewScript = responseString.replace(FORM_CLOSE_TAG, FORM_CLOSE_TAG.concat(POST_MESSAGE_SCRIPT));
-            resWithNewScript = resWithNewScript.replace("src=\"../web/", "src=\"" + contextPath + WEB_PATH);
+            resWithNewScript = resWithNewScript.replace(SRC_REPLACE_STRING + "../web/", SRC_REPLACE_STRING + contextPath + WEB_PATH);
             resWithNewScript = resWithNewScript.replace("href=\"../web/", "href=\"" + contextPath + WEB_PATH);
 
             return injectCodeAfterFunctionCall(
