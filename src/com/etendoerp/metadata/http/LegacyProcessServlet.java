@@ -30,6 +30,7 @@ import static com.etendoerp.metadata.utils.Constants.FORM_CLOSE_TAG;
 import static com.etendoerp.metadata.utils.Constants.FRAMESET_CLOSE_TAG;
 import static com.etendoerp.metadata.utils.Constants.HEAD_CLOSE_TAG;
 import static com.etendoerp.metadata.utils.LegacyPaths.ABOUT_MODAL;
+import static com.etendoerp.metadata.utils.LegacyPaths.MANUAL_PROCESS;
 
 /**
  * Legacy servlet that uses existing HttpServletRequestWrapper infrastructure
@@ -240,7 +241,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
                                     String path,
                                     String output) throws IOException {
 
-        if (ABOUT_MODAL.equals(path)) {
+        if (ABOUT_MODAL.equals(path) || MANUAL_PROCESS.equals(path)) {
             res.setContentType("text/html; charset=UTF-8");
             res.setCharacterEncoding("UTF-8");
         } else {
