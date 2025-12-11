@@ -13,14 +13,14 @@ import org.openbravo.base.session.OBPropertiesProvider;
 import org.openbravo.client.kernel.RequestContext;
 import org.openbravo.dal.core.OBContext;
 
-import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 import java.io.IOException;
-import java.util.Arrays;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.regex.Matcher;
@@ -40,6 +40,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
     private static final Logger log4j = LogManager.getLogger(LegacyProcessServlet.class);
     private static final String JWT_TOKEN = "#JWT_TOKEN";
     private static final String HTML_EXTENSION = ".html";
+    private static final String JS_EXTENSION = ".js";
     private static final String TOKEN_PARAM = "token";
     private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String BEARER_PREFIX = "Bearer ";
@@ -100,6 +101,8 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
 
             if (isLegacyRequest(path)) {
                 processLegacyRequest(req, res, path);
+            } else if (isJavaScriptRequest(path)) {
+                processJavaScriptRequest(req, res, path);
             } else if (isLegacyFollowupRequest(req)) {
                 processLegacyFollowupRequest(req, res);
             } else {
@@ -114,6 +117,10 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
 
     private boolean isLegacyRequest(String path) {
         return path != null && path.toLowerCase().endsWith(HTML_EXTENSION);
+    }
+
+    private boolean isJavaScriptRequest(String path) {
+        return path != null && path.toLowerCase().endsWith(JS_EXTENSION);
     }
 
     private boolean isLegacyFollowupRequest(HttpServletRequest req) {
@@ -139,6 +146,44 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             res.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
                     "Error processing legacy request: " + e.getMessage());
         }
+    }
+    
+    private void processJavaScriptRequest(HttpServletRequest req, HttpServletResponse res, String path)
+            throws IOException {
+        try (InputStream inputStream = req.getServletContext().getResourceAsStream(path)) {
+            if (inputStream == null) {
+                log4j.warn("JavaScript file not found: {}", path);
+                res.sendError(HttpServletResponse.SC_NOT_FOUND, "JavaScript file not found: " + path);
+                return;
+            }
+
+            String jsContent = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+            String processedContent = transformJavaScriptContent(req, path, jsContent);
+
+            res.setContentType("application/javascript; charset=UTF-8");
+            res.setCharacterEncoding("UTF-8");
+            res.setStatus(HttpServletResponse.SC_OK);
+            res.getWriter().write(processedContent);
+            res.getWriter().flush();
+
+        } catch (Exception e) {
+            log4j.error("Error processing JavaScript request {}: {}", path, e.getMessage(), e);
+            res.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                    "Error processing JavaScript request: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Transform JavaScript content based on the file path.
+     * Applies path-specific transformations similar to getInjectedContent.
+     *
+     * @param req the HTTP request to obtain context path
+     * @param path the path of the JavaScript file
+     * @param content the original JavaScript content
+     * @return the transformed JavaScript content
+     */
+    private String transformJavaScriptContent(HttpServletRequest req, String path, String content) {
+        return content;
     }
 
     private void prepareSessionAttributes(HttpServletRequest req, String path) {
@@ -462,8 +507,9 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
 
         responseString = responseString
                 .replace(META_LEGACY_PATH, META_LEGACY_PATH + path)
-                // Custom JS file that need custom export
+                // Custom JS files that need custom export
                 .replace(SRC_REPLACE_STRING + "../utility/DynamicJS.js", SRC_REPLACE_STRING + contextPath + "/utility/DynamicJS.js")
+                .replace(SRC_REPLACE_STRING + "../org.openbravo.client.kernel/",  SRC_REPLACE_STRING + contextPath + "/org.openbravo.client.kernel/")
                 .replace(SRC_REPLACE_STRING + "../web/",  SRC_REPLACE_STRING+ contextPath + WEB_PATH)
                 .replace("href=\"../web/", "href=\"" + contextPath + WEB_PATH);
 
