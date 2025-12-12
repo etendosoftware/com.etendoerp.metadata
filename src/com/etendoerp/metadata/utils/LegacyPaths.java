@@ -11,5 +11,6 @@ public final class LegacyPaths {
   }
 
   public static final String USED_BY_LINK = "/utility/UsedByLink.html";
-  public static final String ABOUT_MODAL= "/ad_forms/about.html";
+  public static final String ABOUT_MODAL = "/ad_forms/about.html";
+  public static final String MANUAL_PROCESS = "/ad_actionButton/ActionButton_Responser.html";
 }
