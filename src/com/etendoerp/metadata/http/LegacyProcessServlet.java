@@ -29,6 +29,7 @@ import java.util.regex.Pattern;
 import static com.etendoerp.metadata.utils.Constants.FORM_CLOSE_TAG;
 import static com.etendoerp.metadata.utils.Constants.FRAMESET_CLOSE_TAG;
 import static com.etendoerp.metadata.utils.Constants.HEAD_CLOSE_TAG;
+import static com.etendoerp.metadata.utils.Constants.PUBLIC_JS_PATH;
 import static com.etendoerp.metadata.utils.LegacyPaths.ABOUT_MODAL;
 import static com.etendoerp.metadata.utils.LegacyPaths.MANUAL_PROCESS;
 
@@ -48,7 +49,6 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
     private static final String BASE_PATH = "/etendo";
     private static final String WEB_PATH = "/web/";
     private static final String SRC_REPLACE_STRING = "src=\"";
-    private static final String PUBLIC_JS_PATH = "/web/js/";
 
     private static final String RECEIVE_AND_POST_MESSAGE_SCRIPT =
             "<script>window.addEventListener(\"message\", (event) => {" +
