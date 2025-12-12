@@ -36,6 +36,10 @@ public class LegacyProcessServletTest extends OBBaseTest {
     private static final String PARAM_INP_KEY = "inpKey";
     private static final String PARAM_INP_WINDOW_ID = "inpwindowId";
     private static final String PARAM_INP_KEY_COLUMN_ID = "inpkeyColumnId";
+    private static final String NOT_EXIST_JS_FILE =  "/web/js/nonexistent.js";
+    private static final String TEST_JS_FILE = "/web/js/test-script.js";
+    private static final String CALENDAR_JS_FILE = "/web/js/calendar-lang.js";
+    private static final String TEST_UPPERCASE_JS_FILE = "/web/js/script.JS";
 
     @Mock
     private HttpServletRequest request;
@@ -250,6 +254,33 @@ public class LegacyProcessServletTest extends OBBaseTest {
     }
 
     /**
+     * Sets up mocks for a JavaScript request with the given path and content.
+     *
+     * @param jsPath the path to the JavaScript file
+     * @param jsContent the content to return, or null to simulate file not found
+     */
+    private void mockJavaScriptRequest(String jsPath, String jsContent) {
+        when(request.getPathInfo()).thenReturn(jsPath);
+        when(request.getServletContext()).thenReturn(servletContext);
+
+        InputStream inputStream = jsContent != null
+                ? new ByteArrayInputStream(jsContent.getBytes(StandardCharsets.UTF_8))
+                : null;
+        when(servletContext.getResourceAsStream(jsPath)).thenReturn(inputStream);
+    }
+
+    /**
+     * Invokes the servlet service method, catching expected exceptions.
+     */
+    private void invokeServletSafely() {
+        try {
+            legacyProcessServlet.service(request, response);
+        } catch (Exception e) {
+            // Expected due to framework dependencies
+        }
+    }
+
+    /**
      * Tests that the servlet recognizes JavaScript paths correctly.
      * <p>
      * Verifies that paths ending with .js are detected as JavaScript requests.
@@ -257,15 +288,9 @@ public class LegacyProcessServletTest extends OBBaseTest {
      */
     @Test
     public void servletShouldRecognizeJavaScriptPaths() throws Exception {
-        when(request.getPathInfo()).thenReturn("/web/js/test-script.js");
-        when(request.getServletContext()).thenReturn(servletContext);
-        when(servletContext.getResourceAsStream(anyString())).thenReturn(null);
+        mockJavaScriptRequest(TEST_JS_FILE, null);
 
-        try {
-            legacyProcessServlet.service(request, response);
-        } catch (Exception e) {
-            // Expected due to framework dependencies
-        }
+        invokeServletSafely();
 
         verify(request).getPathInfo();
         verify(request).getServletContext();
@@ -280,18 +305,11 @@ public class LegacyProcessServletTest extends OBBaseTest {
      */
     @Test
     public void servletShouldReturn404WhenJavaScriptFileNotFound() throws Exception {
-        String jsPath = "/web/js/nonexistent.js";
-        when(request.getPathInfo()).thenReturn(jsPath);
-        when(request.getServletContext()).thenReturn(servletContext);
-        when(servletContext.getResourceAsStream(jsPath)).thenReturn(null);
+        mockJavaScriptRequest(NOT_EXIST_JS_FILE, null);
 
-        try {
-            legacyProcessServlet.service(request, response);
-        } catch (Exception e) {
-            // Expected due to framework dependencies
-        }
+        invokeServletSafely();
 
-        verify(servletContext).getResourceAsStream(jsPath);
+        verify(servletContext).getResourceAsStream(NOT_EXIST_JS_FILE);
     }
 
     /**
@@ -303,21 +321,11 @@ public class LegacyProcessServletTest extends OBBaseTest {
      */
     @Test
     public void servletShouldServeJavaScriptContent() throws Exception {
-        String jsPath = "/web/js/test-script.js";
-        String jsContent = "console.log('test');";
-        InputStream jsInputStream = new ByteArrayInputStream(jsContent.getBytes(StandardCharsets.UTF_8));
+        mockJavaScriptRequest(TEST_JS_FILE, "console.log('test');");
 
-        when(request.getPathInfo()).thenReturn(jsPath);
-        when(request.getServletContext()).thenReturn(servletContext);
-        when(servletContext.getResourceAsStream(jsPath)).thenReturn(jsInputStream);
+        invokeServletSafely();
 
-        try {
-            legacyProcessServlet.service(request, response);
-        } catch (Exception e) {
-            // Expected due to framework dependencies
-        }
-
-        verify(servletContext).getResourceAsStream(jsPath);
+        verify(servletContext).getResourceAsStream(TEST_JS_FILE);
         verify(response, atLeastOnce()).setContentType("application/javascript; charset=UTF-8");
     }
 
@@ -329,15 +337,9 @@ public class LegacyProcessServletTest extends OBBaseTest {
      */
     @Test
     public void servletShouldRecognizeUppercaseJavaScriptExtension() throws Exception {
-        when(request.getPathInfo()).thenReturn("/web/js/script.JS");
-        when(request.getServletContext()).thenReturn(servletContext);
-        when(servletContext.getResourceAsStream(anyString())).thenReturn(null);
+        mockJavaScriptRequest(TEST_UPPERCASE_JS_FILE, null);
 
-        try {
-            legacyProcessServlet.service(request, response);
-        } catch (Exception e) {
-            // Expected due to framework dependencies
-        }
+        invokeServletSafely();
 
         verify(request).getServletContext();
     }
@@ -350,21 +352,11 @@ public class LegacyProcessServletTest extends OBBaseTest {
      */
     @Test
     public void servletShouldAccessServletContextForJavaScript() throws Exception {
-        String jsPath = "/web/js/calendar-lang.js";
-        String jsContent = "var x = 1;";
-        InputStream jsInputStream = new ByteArrayInputStream(jsContent.getBytes(StandardCharsets.UTF_8));
+        mockJavaScriptRequest(CALENDAR_JS_FILE, "var x = 1;");
 
-        when(request.getPathInfo()).thenReturn(jsPath);
-        when(request.getServletContext()).thenReturn(servletContext);
-        when(servletContext.getResourceAsStream(jsPath)).thenReturn(jsInputStream);
-
-        try {
-            legacyProcessServlet.service(request, response);
-        } catch (Exception e) {
-            // Expected due to framework dependencies
-        }
+        invokeServletSafely();
 
         verify(request, atLeastOnce()).getServletContext();
-        verify(servletContext).getResourceAsStream(jsPath);
+        verify(servletContext).getResourceAsStream(CALENDAR_JS_FILE);
     }
 }
