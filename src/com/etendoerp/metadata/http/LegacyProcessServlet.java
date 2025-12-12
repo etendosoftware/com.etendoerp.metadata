@@ -48,6 +48,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
     private static final String BASE_PATH = "/etendo";
     private static final String WEB_PATH = "/web/";
     private static final String SRC_REPLACE_STRING = "src=\"";
+    private static final String PUBLIC_JS_PATH = "/web/js/";
 
     private static final String RECEIVE_AND_POST_MESSAGE_SCRIPT =
             "<script>window.addEventListener(\"message\", (event) => {" +
@@ -150,10 +151,16 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
     
     private void processJavaScriptRequest(HttpServletRequest req, HttpServletResponse res, String path)
             throws IOException {
-        try (InputStream inputStream = req.getServletContext().getResourceAsStream(path)) {
+        String validatedPath = java.nio.file.Paths.get(path).normalize().toString();
+        if (!validatedPath.startsWith(PUBLIC_JS_PATH)) {
+            log4j.warn("Attempted access to unauthorized path: {}", validatedPath);
+            res.sendError(HttpServletResponse.SC_FORBIDDEN, "Access to this resource is forbidden.");
+            return;
+        }
+        try (InputStream inputStream = req.getServletContext().getResourceAsStream(validatedPath)) {
             if (inputStream == null) {
-                log4j.warn("JavaScript file not found: {}", path);
-                res.sendError(HttpServletResponse.SC_NOT_FOUND, "JavaScript file not found: " + path);
+                log4j.warn("JavaScript file not found: {}", validatedPath);
+                res.sendError(HttpServletResponse.SC_NOT_FOUND, "JavaScript file not found: " + validatedPath);
                 return;
             }
 
@@ -167,7 +174,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             res.getWriter().flush();
 
         } catch (Exception e) {
-            log4j.error("Error processing JavaScript request {}: {}", path, e.getMessage(), e);
+            log4j.error("Error processing JavaScript request {}: {}", validatedPath, e.getMessage(), e);
             res.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
                     "Error processing JavaScript request: " + e.getMessage());
         }
