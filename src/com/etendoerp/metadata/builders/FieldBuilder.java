@@ -168,7 +168,8 @@ public abstract class FieldBuilder extends Builder {
      * Adds list information for a reference's AD List entries.
      * @param ref The reference containing the AD List entries
      * @return JSONArray containing list entries with value and label
-     * @throws JSONException
+     * @throws JSONException if an error occurs while creating or populating the
+     *  *         {@link JSONObject} or {@link JSONArray}
      */
     static JSONArray addADListList(Reference ref) throws JSONException {
         JSONArray selectorInfo = new JSONArray();
