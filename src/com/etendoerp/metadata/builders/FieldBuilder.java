@@ -174,6 +174,7 @@ public abstract class FieldBuilder extends Builder {
         JSONArray selectorInfo = new JSONArray();
         for (org.openbravo.model.ad.domain.List list : ref.getADListList()) {
             JSONObject listElement = new JSONObject();
+            listElement.put("id", list.getId());
             listElement.put("value", list.getSearchKey());
             listElement.put("label", list.get(org.openbravo.model.ad.domain.List.PROPERTY_NAME, OBContext.getOBContext().getLanguage(), list.getId()));
             selectorInfo.put(listElement);
