@@ -581,4 +581,125 @@ class FieldBuilderWithColumnTest {
       assertNotNull(result);
     }
   }
+
+    /**
+     * Tests that button fields with reference list include buttonRefList in JSON.
+     */
+    @Test
+    void testToJSONWithButtonReferenceList() throws JSONException {
+        when(column.getReference().getId()).thenReturn(Constants.BUTTON_REFERENCE_ID);
+        when(column.getReferenceSearchKey()).thenReturn(reference);
+
+        org.openbravo.model.ad.domain.List listItem =
+                mock(org.openbravo.model.ad.domain.List.class);
+        when(listItem.getId()).thenReturn(LIST_ID);
+        when(listItem.getSearchKey()).thenReturn("BTN_KEY");
+        when(listItem.get(anyString(), any(Language.class), anyString()))
+                .thenReturn("Button Label");
+
+        when(reference.getADListList()).thenReturn(List.of(listItem));
+
+        try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
+             MockedStatic<KernelUtils> mockedKernelUtils = mockStatic(KernelUtils.class);
+             MockedStatic<DataSourceUtils> mockedDataSourceUtils = mockStatic(DataSourceUtils.class);
+             MockedConstruction<DataToJsonConverter> ignored =
+                     mockConstruction(DataToJsonConverter.class, (mock, context) -> {
+                         JSONObject baseJson = new JSONObject();
+                         baseJson.put("id", FIELD_ID);
+                         when(mock.toJsonObject(any(Field.class), eq(DataResolvingMode.FULL_TRANSLATABLE)))
+                                 .thenReturn(baseJson);
+                         when(mock.toJsonObject(any(Column.class), eq(DataResolvingMode.FULL_TRANSLATABLE)))
+                                 .thenReturn(new JSONObject().put("id", COLUMN_ID));
+                     })) {
+
+            mockedOBContext.when(OBContext::getOBContext).thenReturn(obContext);
+            mockedKernelUtils.when(() -> KernelUtils.getProperty(field)).thenReturn(fieldProperty);
+            mockedDataSourceUtils.when(() ->
+                            DataSourceUtils.getHQLColumnName(true, TEST_TABLE_NAME, TEST_COLUMN_NAME))
+                    .thenReturn(new String[]{TEST_FIELD});
+
+            when(obContext.getLanguage()).thenReturn(language);
+
+            fieldBuilder = new FieldBuilderWithColumn(field, fieldAccess);
+            JSONObject result = fieldBuilder.toJSON();
+
+            assertNotNull(result);
+            assertTrue(result.has("buttonRefList"));
+
+            JSONArray buttonRefList = result.getJSONArray("buttonRefList");
+            assertEquals(1, buttonRefList.length());
+            assertEquals(LIST_ID, buttonRefList.getJSONObject(0).getString("id"));
+        }
+    }
+
+    /**
+     * Tests that non-button fields do not include buttonRefList.
+     */
+    @Test
+    void testToJSONWithoutButtonReference() throws JSONException {
+        when(column.getReference().getId()).thenReturn("NON_BUTTON_REF");
+
+        try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
+             MockedStatic<KernelUtils> mockedKernelUtils = mockStatic(KernelUtils.class);
+             MockedStatic<DataSourceUtils> mockedDataSourceUtils = mockStatic(DataSourceUtils.class);
+             MockedConstruction<DataToJsonConverter> ignored =
+                     mockConstruction(DataToJsonConverter.class, (mock, context) -> {
+                         JSONObject baseJson = new JSONObject();
+                         baseJson.put("id", FIELD_ID);
+                         when(mock.toJsonObject(any(Field.class), eq(DataResolvingMode.FULL_TRANSLATABLE)))
+                                 .thenReturn(baseJson);
+                         when(mock.toJsonObject(any(Column.class), eq(DataResolvingMode.FULL_TRANSLATABLE)))
+                                 .thenReturn(new JSONObject().put("id", COLUMN_ID));
+                     })) {
+
+            mockedOBContext.when(OBContext::getOBContext).thenReturn(obContext);
+            mockedKernelUtils.when(() -> KernelUtils.getProperty(field)).thenReturn(fieldProperty);
+            mockedDataSourceUtils.when(() ->
+                            DataSourceUtils.getHQLColumnName(true, TEST_TABLE_NAME, TEST_COLUMN_NAME))
+                    .thenReturn(new String[]{TEST_FIELD});
+            when(obContext.getLanguage()).thenReturn(language);
+
+            fieldBuilder = new FieldBuilderWithColumn(field, fieldAccess);
+            JSONObject result = fieldBuilder.toJSON();
+
+            assertNotNull(result);
+            assertFalse(result.has("buttonRefList"));
+        }
+    }
+
+    /**
+     * Tests button field without referenceSearchKey does not add buttonRefList.
+     */
+    @Test
+    void testToJSONWithButtonWithoutReferenceSearchKey() throws JSONException {
+        when(column.getReference().getId()).thenReturn(Constants.BUTTON_REFERENCE_ID);
+        when(column.getReferenceSearchKey()).thenReturn(null);
+
+        try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
+             MockedStatic<KernelUtils> mockedKernelUtils = mockStatic(KernelUtils.class);
+             MockedStatic<DataSourceUtils> mockedDataSourceUtils = mockStatic(DataSourceUtils.class);
+             MockedConstruction<DataToJsonConverter> ignored =
+                     mockConstruction(DataToJsonConverter.class, (mock, context) -> {
+                         JSONObject baseJson = new JSONObject();
+                         baseJson.put("id", FIELD_ID);
+                         when(mock.toJsonObject(any(Field.class), eq(DataResolvingMode.FULL_TRANSLATABLE)))
+                                 .thenReturn(baseJson);
+                         when(mock.toJsonObject(any(Column.class), eq(DataResolvingMode.FULL_TRANSLATABLE)))
+                                 .thenReturn(new JSONObject().put("id", COLUMN_ID));
+                     })) {
+
+            mockedOBContext.when(OBContext::getOBContext).thenReturn(obContext);
+            mockedKernelUtils.when(() -> KernelUtils.getProperty(field)).thenReturn(fieldProperty);
+            mockedDataSourceUtils.when(() ->
+                            DataSourceUtils.getHQLColumnName(true, TEST_TABLE_NAME, TEST_COLUMN_NAME))
+                    .thenReturn(new String[]{TEST_FIELD});
+            when(obContext.getLanguage()).thenReturn(language);
+
+            fieldBuilder = new FieldBuilderWithColumn(field, fieldAccess);
+            JSONObject result = fieldBuilder.toJSON();
+
+            assertNotNull(result);
+            assertFalse(result.has("buttonRefList"));
+        }
+    }
 }
