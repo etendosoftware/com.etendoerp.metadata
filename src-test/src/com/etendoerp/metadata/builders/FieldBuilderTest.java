@@ -92,8 +92,10 @@ class FieldBuilderTest {
   private DataSource dataSource;
   @Mock
   private ModelProvider modelProvider;
+  private static final String LIST_ID_STRING = "list-id";
 
-  /**
+
+    /**
    * Sets up the necessary mocks and their behaviors before each test.
    */
   @BeforeEach
@@ -243,7 +245,7 @@ class FieldBuilderTest {
   @Test
   void testGetListInfo() throws JSONException {
     org.openbravo.model.ad.domain.List listItem = mock(org.openbravo.model.ad.domain.List.class);
-    when(listItem.getId()).thenReturn("list-id");
+    when(listItem.getId()).thenReturn(LIST_ID_STRING);
     when(listItem.getSearchKey()).thenReturn("searchKey");
     when(listItem.get(anyString(), any(Language.class), anyString())).thenReturn("List Name");
 
@@ -255,7 +257,7 @@ class FieldBuilderTest {
     assertNotNull(result);
     assertEquals(1, result.length());
     JSONObject listJson = result.getJSONObject(0);
-    assertEquals("list-id", listJson.getString("id"));
+    assertEquals(LIST_ID_STRING, listJson.getString("id"));
     assertEquals("searchKey", listJson.getString("value"));
     assertEquals("List Name", listJson.getString("label"));
   }
@@ -527,12 +529,12 @@ class FieldBuilderTest {
             org.openbravo.model.ad.domain.List listItem =
                     mock(org.openbravo.model.ad.domain.List.class);
 
-            when(listItem.getId()).thenReturn("list-id");
+            when(listItem.getId()).thenReturn(LIST_ID_STRING);
             when(listItem.getSearchKey()).thenReturn("SEARCH_KEY");
             when(listItem.get(
                     org.openbravo.model.ad.domain.List.PROPERTY_NAME,
                     mockLanguage,
-                    "list-id"
+                    LIST_ID_STRING
             )).thenReturn("List Label");
 
             when(reference.getADListList()).thenReturn(List.of(listItem));
@@ -545,7 +547,7 @@ class FieldBuilderTest {
             assertEquals(1, result.length());
 
             JSONObject json = result.getJSONObject(0);
-            assertEquals("list-id", json.getString("id"));
+            assertEquals(LIST_ID_STRING, json.getString("id"));
             assertEquals("SEARCH_KEY", json.getString("value"));
             assertEquals("List Label", json.getString("label"));
         }
