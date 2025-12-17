@@ -81,7 +81,7 @@ public class FieldBuilderWithColumn extends FieldBuilder {
         addProcessInfo(field);
         addSelectorReferenceList(field);
         addComboSelectInfo(field);
-        addButtonRerenceValues(field);
+        addButtonReferenceValues(field);
 
         return json;
     }
@@ -253,7 +253,7 @@ public class FieldBuilderWithColumn extends FieldBuilder {
      * @param field The field that may be a button with reference list functionality
      * @throws JSONException if there's an error updating the JSON structure
      */
-    private void addButtonRerenceValues(Field field) throws JSONException {
+    private void addButtonReferenceValues(Field field) throws JSONException {
         if (isButtonField(field) && field.getColumn().getReferenceSearchKey() != null) {
             json.put("buttonRefList", addADListList(field.getColumn().getReferenceSearchKey()));
         }
