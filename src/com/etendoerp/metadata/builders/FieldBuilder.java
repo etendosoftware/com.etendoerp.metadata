@@ -165,6 +165,25 @@ public abstract class FieldBuilder extends Builder {
     }
 
     /**
+     * Adds list information for a reference's AD List entries.
+     * @param ref The reference containing the AD List entries
+     * @return JSONArray containing list entries with value and label
+     * @throws JSONException if an error occurs while creating or populating the
+     *  *         {@link JSONObject} or {@link JSONArray}
+     */
+    static JSONArray addADListList(Reference ref) throws JSONException {
+        JSONArray selectorInfo = new JSONArray();
+        for (org.openbravo.model.ad.domain.List list : ref.getADListList()) {
+            JSONObject listElement = new JSONObject();
+            listElement.put("id", list.getId());
+            listElement.put("value", list.getSearchKey());
+            listElement.put("label", list.get(org.openbravo.model.ad.domain.List.PROPERTY_NAME, OBContext.getOBContext().getLanguage(), list.getId()));
+            selectorInfo.put(listElement);
+        }
+        return selectorInfo;
+    }
+
+    /**
      * Creates selector information for a tree-based selector.
      * Configures tree datasource with display and value fields from the tree definition.
      *
