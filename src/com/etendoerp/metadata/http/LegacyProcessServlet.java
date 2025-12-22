@@ -205,6 +205,51 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             String dir = path.substring(0, path.lastIndexOf("/"));
             session.setAttribute("LEGACY_SERVLET_DIR", dir);
         }
+
+        // Map parameters to session for AttributeSetInstance
+        String[] paramsToMap = {
+                "inpmAttributesetId", "ATTRIBUTESETINSTANCE.ATTRIBUTE",
+                "inpAttribute", "ATTRIBUTESETINSTANCE.ATTRIBUTE",
+                "inpInstance", "ATTRIBUTESETINSTANCE.INSTANCE",
+                "inpKeyValue", "ATTRIBUTESETINSTANCE.INSTANCE",
+                "inpProduct", "ATTRIBUTESETINSTANCE.PRODUCT",
+                "inpwindowId", "ATTRIBUTESETINSTANCE.WINDOWID",
+                "inpTabId", "ATTRIBUTESETINSTANCE.TABID",
+                "inpLocatorId", "ATTRIBUTESETINSTANCE.LOCATORID",
+                "isSOTrx", "ATTRIBUTESETINSTANCE.ISOTRX",
+                "strIsSOTrx", "ATTRIBUTESETINSTANCE.ISOTRX"
+        };
+
+        for (int i = 0; i < paramsToMap.length; i += 2) {
+            String paramValue = req.getParameter(paramsToMap[i]);
+            if (StringUtils.isNotEmpty(paramValue)) {
+                session.setAttribute(paramsToMap[i + 1].toUpperCase(), paramValue);
+            }
+        }
+
+        // Map any other inp* parameters directly
+        Enumeration<String> paramNames = req.getParameterNames();
+        while (paramNames.hasMoreElements()) {
+            String name = paramNames.nextElement();
+            if (name.startsWith("inp")) {
+                String value = req.getParameter(name);
+                session.setAttribute(name, value);
+            }
+        }
+
+        if (StringUtils.isNotEmpty(req.getParameter("Command"))) {
+            session.setAttribute("Command", req.getParameter("Command"));
+        }
+        if (StringUtils.isNotEmpty(req.getParameter("IsPopUpCall"))) {
+            session.setAttribute("IsPopUpCall", req.getParameter("IsPopUpCall"));
+        }
+
+        // Map isSOTrx to session context (windowId|isSOTrx)
+        String isSOTrx = req.getParameter("isSOTrx");
+        String windowId = req.getParameter("inpwindowId");
+        if (StringUtils.isNotEmpty(isSOTrx) && StringUtils.isNotEmpty(windowId)) {
+            session.setAttribute(windowId + "|isSOTrx", isSOTrx);
+        }
     }
 
     private void preprocessRequest(HttpServletRequest req, HttpServletRequestWrapper wrapped) {
