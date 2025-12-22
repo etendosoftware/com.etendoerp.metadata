@@ -52,15 +52,15 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
 
     private static final String RECEIVE_AND_POST_MESSAGE_SCRIPT =
             "<script>window.addEventListener(\"message\", (event) => {" +
-                    "if (event.data?.type === \"fromForm\" && window.parent) {" +
-                    "window.parent.postMessage({ type: \"fromIframe\", action: event.data.action }, \"*\");" +
-                    "}});</script>";
+            "if (event.data?.type === \"fromForm\" && window.parent) {" +
+            "window.parent.postMessage({ type: \"fromIframe\", action: event.data.action }, \"*\");" +
+            "}});</script>";
 
     private static final String POST_MESSAGE_SCRIPT =
             "<script>const sendMessage = (action) => {" +
-                    "if (window.parent) {" +
-                    "window.parent.postMessage({ type: \"fromForm\", action: action, }, \"*\");" +
-                    "}}</script>";
+            "if (window.parent) {" +
+            "window.parent.postMessage({ type: \"fromForm\", action: action, }, \"*\");" +
+            "}}</script>";
 
     private void setSessionCookie(HttpServletResponse res, String sessionId) {
         String host = OBPropertiesProvider.getInstance()
@@ -148,7 +148,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
                     "Error processing legacy request: " + e.getMessage());
         }
     }
-    
+
     private void processJavaScriptRequest(HttpServletRequest req, HttpServletResponse res, String path)
             throws IOException {
         String validatedPath = java.nio.file.Paths.get(path).normalize().toString();
@@ -204,6 +204,51 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         if (path != null && path.contains("/")) {
             String dir = path.substring(0, path.lastIndexOf("/"));
             session.setAttribute("LEGACY_SERVLET_DIR", dir);
+        }
+
+        // Map parameters to session for AttributeSetInstance
+        String[] paramsToMap = {
+                "inpmAttributesetId", "ATTRIBUTESETINSTANCE.ATTRIBUTE",
+                "inpAttribute", "ATTRIBUTESETINSTANCE.ATTRIBUTE",
+                "inpInstance", "ATTRIBUTESETINSTANCE.INSTANCE",
+                "inpKeyValue", "ATTRIBUTESETINSTANCE.INSTANCE",
+                "inpProduct", "ATTRIBUTESETINSTANCE.PRODUCT",
+                "inpwindowId", "ATTRIBUTESETINSTANCE.WINDOWID",
+                "inpTabId", "ATTRIBUTESETINSTANCE.TABID",
+                "inpLocatorId", "ATTRIBUTESETINSTANCE.LOCATORID",
+                "isSOTrx", "ATTRIBUTESETINSTANCE.ISOTRX",
+                "strIsSOTrx", "ATTRIBUTESETINSTANCE.ISOTRX"
+        };
+
+        for (int i = 0; i < paramsToMap.length; i += 2) {
+            String paramValue = req.getParameter(paramsToMap[i]);
+            if (StringUtils.isNotEmpty(paramValue)) {
+                session.setAttribute(paramsToMap[i + 1].toUpperCase(), paramValue);
+            }
+        }
+
+        // Map any other inp* parameters directly
+        Enumeration<String> paramNames = req.getParameterNames();
+        while (paramNames.hasMoreElements()) {
+            String name = paramNames.nextElement();
+            if (name.startsWith("inp")) {
+                String value = req.getParameter(name);
+                session.setAttribute(name, value);
+            }
+        }
+
+        if (StringUtils.isNotEmpty(req.getParameter("Command"))) {
+            session.setAttribute("Command", req.getParameter("Command"));
+        }
+        if (StringUtils.isNotEmpty(req.getParameter("IsPopUpCall"))) {
+            session.setAttribute("IsPopUpCall", req.getParameter("IsPopUpCall"));
+        }
+
+        // Map isSOTrx to session context (windowId|isSOTrx)
+        String isSOTrx = req.getParameter("isSOTrx");
+        String windowId = req.getParameter("inpwindowId");
+        if (StringUtils.isNotEmpty(isSOTrx) && StringUtils.isNotEmpty(windowId)) {
+            session.setAttribute(windowId + "|isSOTrx", isSOTrx);
         }
     }
 
@@ -261,8 +306,8 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
     }
 
     private void handleResponse(HttpServletResponse res,
-                                HttpServletResponseLegacyWrapper wrapper,
-                                String path) throws IOException {
+            HttpServletResponseLegacyWrapper wrapper,
+            String path) throws IOException {
 
         String output = wrapper.getCapturedOutputAsString();
 
@@ -277,7 +322,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
     }
 
     private void writeRedirect(HttpServletResponse res,
-                               HttpServletResponseLegacyWrapper wrapper) throws IOException {
+            HttpServletResponseLegacyWrapper wrapper) throws IOException {
 
         String location = wrapper.getRedirectLocation();
         String html = getHtmlRedirect(location);
@@ -289,9 +334,9 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
     }
 
     private void writeFinalResponse(HttpServletResponse res,
-                                    HttpServletResponseLegacyWrapper wrapper,
-                                    String path,
-                                    String output) throws IOException {
+            HttpServletResponseLegacyWrapper wrapper,
+            String path,
+            String output) throws IOException {
 
         if (ABOUT_MODAL.equals(path) || MANUAL_PROCESS.equals(path)) {
             res.setContentType("text/html; charset=UTF-8");
