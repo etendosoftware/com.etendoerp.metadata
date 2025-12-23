@@ -38,6 +38,8 @@ import static org.mockito.Mockito.*;
 @MockitoSettings(strictness = Strictness.LENIENT)
 public class ProcessMetadataServiceTest {
 
+    private static final String EXCEPTION_NOT_NULL_MESSAGE = "Exception should not be null";
+
     @Mock
     private HttpServletRequest mockRequest;
 
@@ -73,7 +75,7 @@ public class ProcessMetadataServiceTest {
             assertTrue("Process method executed without throwing exception", true);
         } catch (Exception e) {
             // Expected in test environment due to missing database
-            assertNotNull("Exception should not be null", e);
+            assertNotNull(EXCEPTION_NOT_NULL_MESSAGE, e);
         }
     }
 
@@ -93,7 +95,7 @@ public class ProcessMetadataServiceTest {
             fail("Should throw exception for invalid path");
         } catch (Exception e) {
             // Expected exception for invalid path
-            assertNotNull("Exception should not be null", e);
+            assertNotNull(EXCEPTION_NOT_NULL_MESSAGE, e);
         }
     }
 
@@ -113,7 +115,7 @@ public class ProcessMetadataServiceTest {
             fail("Should throw exception for null path");
         } catch (Exception e) {
             // Expected exception for null path
-            assertNotNull("Exception should not be null", e);
+            assertNotNull(EXCEPTION_NOT_NULL_MESSAGE, e);
         }
     }
 
@@ -133,7 +135,7 @@ public class ProcessMetadataServiceTest {
             fail("Should throw exception for empty path");
         } catch (Exception e) {
             // Expected exception for empty path
-            assertNotNull("Exception should not be null", e);
+            assertNotNull(EXCEPTION_NOT_NULL_MESSAGE, e);
         }
     }
 
@@ -153,7 +155,7 @@ public class ProcessMetadataServiceTest {
             fail("Should throw exception for missing process ID");
         } catch (Exception e) {
             // Expected exception for missing process ID
-            assertNotNull("Exception should not be null", e);
+            assertNotNull(EXCEPTION_NOT_NULL_MESSAGE, e);
         }
     }
 }

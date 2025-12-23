@@ -37,6 +37,12 @@ import com.etendoerp.metadata.exceptions.NotFoundException;
  * with all the process metadata needed to display the parameter form in the UI.
  */
 public class ProcessMetadataService extends MetadataService {
+    /**
+     * Constructs a new ProcessMetadataService with the specified HTTP request and response objects.
+     *
+     * @param request the HTTP servlet request
+     * @param response the HTTP servlet response
+     */
     public ProcessMetadataService(HttpServletRequest request, HttpServletResponse response) {
         super(request, response);
     }
@@ -83,8 +89,7 @@ public class ProcessMetadataService extends MetadataService {
 
         // Remove leading slash and "com.etendoerp.metadata.meta/" prefix if present
         String cleanPath = pathInfo.replace("/com.etendoerp.metadata.meta/", "/");
-
-        // Expected format: /process/{processId}
+        
         String[] parts = cleanPath.split("/");
 
         if (parts.length < 3 || !"process".equals(parts[1])) {
