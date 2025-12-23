@@ -110,6 +110,8 @@ public class ServiceFactory {
             return new LocationMetadataService(req, res);
         } else if (path.startsWith(TOOLBAR_PATH)) {
             return new ToolbarService(req, res);
+        } else if (path.startsWith(REPORT_AND_PROCESS_PATH)) {
+            return new ReportAndProcessService(req, res);
         } else if (path.startsWith(LEGACY_PATH)) {
             return new LegacyService(req, res);
         } else if (LegacyUtils.isLegacyPath(path)) {
