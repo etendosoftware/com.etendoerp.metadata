@@ -52,6 +52,7 @@ public class Constants {
     public static final int SERVLET_PATH_LENGTH = SERVLET_PATH.length();
     public static final String INPUT_NAME_PREFIX = "inp";
     private static final String SELECTOR_REFERENCE_ID = "95E2A8B50A254B2AAE6774B8C2F28120";
+    public static final String BUTTON_REFERENCE_ID = "28";
     private static final String SEARCH_REFERENCE_ID = "30";
     private static final String TABLE_DIR_REFERENCE_ID = "19";
     private static final String TABLE_REFERENCE_ID = "18";
@@ -72,4 +73,5 @@ public class Constants {
     public static final String TOOLBAR_PATH = "/toolbar";
     public static final String LOCALE_KEY = "Locale";
     public static final String DEFAULT_LOCALE = "en_US";
+    public static final String PUBLIC_JS_PATH = "/web/js/";
 }

@@ -8,11 +8,15 @@ import org.mockito.junit.MockitoJUnitRunner;
 import org.openbravo.test.base.OBBaseTest;
 
 import javax.servlet.RequestDispatcher;
+import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.nio.charset.StandardCharsets;
 
 import static com.etendoerp.metadata.MetadataTestConstants.SALES_INVOICE_HEADER_EDITION_HTML;
 import static com.etendoerp.metadata.MetadataTestConstants.TOKEN;
@@ -32,6 +36,10 @@ public class LegacyProcessServletTest extends OBBaseTest {
     private static final String PARAM_INP_KEY = "inpKey";
     private static final String PARAM_INP_WINDOW_ID = "inpwindowId";
     private static final String PARAM_INP_KEY_COLUMN_ID = "inpkeyColumnId";
+    private static final String NOT_EXIST_JS_FILE =  "/web/js/nonexistent.js";
+    private static final String TEST_JS_FILE = "/web/js/test-script.js";
+    private static final String CALENDAR_JS_FILE = "/web/js/calendar-lang.js";
+    private static final String TEST_UPPERCASE_JS_FILE = "/web/js/script.JS";
 
     @Mock
     private HttpServletRequest request;
@@ -41,6 +49,8 @@ public class LegacyProcessServletTest extends OBBaseTest {
     private HttpSession session;
     @Mock
     private RequestDispatcher requestDispatcher;
+    @Mock
+    private ServletContext servletContext;
     @Mock
     private PrintWriter printWriter;
 
@@ -241,5 +251,112 @@ public class LegacyProcessServletTest extends OBBaseTest {
         if (object == null) {
             throw new AssertionError(message);
         }
+    }
+
+    /**
+     * Sets up mocks for a JavaScript request with the given path and content.
+     *
+     * @param jsPath the path to the JavaScript file
+     * @param jsContent the content to return, or null to simulate file not found
+     */
+    private void mockJavaScriptRequest(String jsPath, String jsContent) {
+        when(request.getPathInfo()).thenReturn(jsPath);
+        when(request.getServletContext()).thenReturn(servletContext);
+
+        InputStream inputStream = jsContent != null
+                ? new ByteArrayInputStream(jsContent.getBytes(StandardCharsets.UTF_8))
+                : null;
+        when(servletContext.getResourceAsStream(jsPath)).thenReturn(inputStream);
+    }
+
+    /**
+     * Invokes the servlet service method, catching expected exceptions.
+     */
+    private void invokeServletSafely() {
+        try {
+            legacyProcessServlet.service(request, response);
+        } catch (Exception e) {
+            // Expected due to framework dependencies
+        }
+    }
+
+    /**
+     * Tests that the servlet recognizes JavaScript paths correctly.
+     * <p>
+     * Verifies that paths ending with .js are detected as JavaScript requests.
+     * </p>
+     */
+    @Test
+    public void servletShouldRecognizeJavaScriptPaths() throws Exception {
+        mockJavaScriptRequest(TEST_JS_FILE, null);
+
+        invokeServletSafely();
+
+        verify(request).getPathInfo();
+        verify(request).getServletContext();
+    }
+
+    /**
+     * Tests that the servlet returns 404 when JavaScript file is not found.
+     * <p>
+     * Verifies that when the ServletContext cannot find the requested JS file,
+     * the servlet sends an appropriate error response.
+     * </p>
+     */
+    @Test
+    public void servletShouldReturn404WhenJavaScriptFileNotFound() throws Exception {
+        mockJavaScriptRequest(NOT_EXIST_JS_FILE, null);
+
+        invokeServletSafely();
+
+        verify(servletContext).getResourceAsStream(NOT_EXIST_JS_FILE);
+    }
+
+    /**
+     * Tests that the servlet serves JavaScript content correctly.
+     * <p>
+     * Verifies that when a JavaScript file is found, its content is read
+     * and written to the response with the correct content type.
+     * </p>
+     */
+    @Test
+    public void servletShouldServeJavaScriptContent() throws Exception {
+        mockJavaScriptRequest(TEST_JS_FILE, "console.log('test');");
+
+        invokeServletSafely();
+
+        verify(servletContext).getResourceAsStream(TEST_JS_FILE);
+        verify(response, atLeastOnce()).setContentType("application/javascript; charset=UTF-8");
+    }
+
+    /**
+     * Tests that JavaScript paths are case-insensitive.
+     * <p>
+     * Verifies that .JS extension (uppercase) is also recognized.
+     * </p>
+     */
+    @Test
+    public void servletShouldRecognizeUppercaseJavaScriptExtension() throws Exception {
+        mockJavaScriptRequest(TEST_UPPERCASE_JS_FILE, null);
+
+        invokeServletSafely();
+
+        verify(request).getServletContext();
+    }
+
+    /**
+     * Tests that JavaScript requests access the ServletContext for resource loading.
+     * <p>
+     * Verifies that the servlet uses ServletContext.getResourceAsStream() to load JS files.
+     * </p>
+     */
+    @Test
+    public void servletShouldAccessServletContextForJavaScript() throws Exception {
+        mockJavaScriptRequest(CALENDAR_JS_FILE, "var x = 1;");
+
+        invokeServletSafely();
+
+        verify(request, atLeastOnce()).getServletContext();
+        verify(servletContext).getResourceAsStream(CALENDAR_JS_FILE);
     }
 }

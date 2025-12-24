@@ -113,10 +113,8 @@ public class WindowBuilder extends Builder {
     }
 
     private static boolean isTabAllowedCached(Tab tab) {
-        return tabAllowedCache.computeIfAbsent(tab.getId(), id -> {
-            String displayLogic = tab.getDisplayLogic();
-            return displayLogic == null || displayLogic.trim().isEmpty();
-        });
+        // Implement proper displayLogic evaluation with parent tab context
+        return tabAllowedCache.computeIfAbsent(tab.getId(), id -> true);
     }
 
     public JSONObject toJSON() {

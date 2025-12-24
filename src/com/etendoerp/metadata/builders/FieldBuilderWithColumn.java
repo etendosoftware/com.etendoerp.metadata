@@ -81,6 +81,7 @@ public class FieldBuilderWithColumn extends FieldBuilder {
         addProcessInfo(field);
         addSelectorReferenceList(field);
         addComboSelectInfo(field);
+        addButtonReferenceValues(field);
 
         return json;
     }
@@ -247,6 +248,18 @@ public class FieldBuilderWithColumn extends FieldBuilder {
     }
 
     /**
+     * Adds button reference values for fields that are buttons with reference lists.
+     * Provides dropdown options for button fields configured with reference lists.
+     * @param field The field that may be a button with reference list functionality
+     * @throws JSONException if there's an error updating the JSON structure
+     */
+    private void addButtonReferenceValues(Field field) throws JSONException {
+        if (isButtonField(field) && field.getColumn().getReferenceSearchKey() != null) {
+            json.put("buttonRefList", addADListList(field.getColumn().getReferenceSearchKey()));
+        }
+    }
+
+    /**
      * Adds process information for fields that trigger processes or actions.
      * Handles both legacy processes and new process definitions.
      * Includes process action buttons and process definition metadata.
@@ -318,5 +331,18 @@ public class FieldBuilderWithColumn extends FieldBuilder {
         Column column = field.getColumn();
 
         return column != null && Constants.SELECTOR_REFERENCES.contains(column.getReference().getId());
+    }
+
+    /**
+     * Determines if a field is a process field.
+     * Checks if the field's column reference is of process type.
+     *
+     * @param field The field to check for process functionality
+     * @return true if the field is a process field, false otherwise
+     */
+    private boolean isButtonField(Field field) {
+        Column column = field.getColumn();
+
+        return column != null && Constants.BUTTON_REFERENCE_ID.equals(column.getReference().getId());
     }
 }
