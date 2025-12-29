@@ -36,11 +36,17 @@ import org.openbravo.model.ad.ui.Menu;
 import org.openbravo.model.ad.ui.Window;
 
 /**
+ * Builder class for generating Menu metadata in JSON format.
+ *
  * @author luuchorocha
  */
 public class MenuBuilder extends Builder {
     private static final ThreadLocal<MenuManager> manager = ThreadLocal.withInitial(MenuManager::new);
 
+    /**
+     * Constructor for MenuBuilder.
+     * Initializes the MenuManager and sets global menu options if necessary.
+     */
     public MenuBuilder() {
         try {
             manager.get().getMenu();
@@ -49,6 +55,115 @@ public class MenuBuilder extends Builder {
         }
     }
 
+    /**
+     * Removes the MenuManager from the current thread.
+     */
+    public void unload() {
+        manager.remove(); // Compliant
+    }
+
+    /**
+     * Adds process-related information to the provided JSON object.
+     *
+     * @param json    The JSONObject to populate.
+     * @param process The process associated with the menu entry.
+     * @param menu    The menu entry.
+     * @throws JSONException If an error occurs while adding data to the JSON object.
+     */
+    private void addProcessInfo(JSONObject json, org.openbravo.model.ad.ui.Process process, Menu menu) throws JSONException {
+        json.put("processId", process.getId());
+        String url = null;
+        MenuManager.MenuEntryType type = null;
+        boolean modal = false;
+        boolean report = false;
+
+        if (process.isActive()) {
+            ModelImplementationMapping defaultMapping = getDefaultMapping(process);
+            if (defaultMapping != null) {
+                url = defaultMapping.getMappingName();
+                if ("Standard".equals(process.getUIPattern())) {
+                    type = MenuManager.MenuEntryType.Process;
+                    modal = Utility.isModalProcess(process.getId());
+                } else if (process.isReport() || process.isJasperReport()) {
+                    type = MenuManager.MenuEntryType.Report;
+                    report = true;
+                } else {
+                    type = MenuManager.MenuEntryType.ProcessManual;
+                }
+            } else if ("P".equals(menu.getAction())) {
+                type = MenuManager.MenuEntryType.Process;
+                modal = Utility.isModalProcess(process.getId());
+                url = getProcessUrl(process);
+            }
+        }
+
+        json.put("processUrl", url);
+        if (null != type) {
+            json.put("processType", type.name());
+        }
+        json.put("isModalProcess", modal);
+        json.put("isReport", report);
+    }
+
+    /**
+     * Retrieves the default model implementation mapping for a given process.
+     *
+     * @param process The process to search for mappings.
+     * @return The default ModelImplementationMapping, or null if none is found.
+     */
+    private ModelImplementationMapping getDefaultMapping(org.openbravo.model.ad.ui.Process process) {
+        for (ModelImplementation mi : process.getADModelImplementationList()) {
+            for (ModelImplementationMapping mim : mi.getADModelImplementationMappingList()) {
+                if (mim.isDefault()) {
+                    return mim;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Determines the URL for a given process based on its configuration.
+     *
+     * @param process The process to determine the URL for.
+     * @return The URL string for the process.
+     */
+    private String getProcessUrl(org.openbravo.model.ad.ui.Process process) {
+        if (Boolean.TRUE.equals(process.isExternalService()) && "PS".equals(process.getServiceType())) {
+            return "/utility/OpenPentaho.html?inpadProcessId=" + process.getId();
+        } else if ("S".equals(process.getUIPattern()) && !process.isJasperReport() && process.getProcedure() == null) {
+            return "/ad_actionButton/ActionButtonJava_Responser.html";
+        } else {
+            return "/ad_actionButton/ActionButton_Responser.html";
+        }
+    }
+
+    /**
+     * Adds basic menu information to the provided JSON object.
+     *
+     * @param json     The JSONObject to populate.
+     * @param entry    The MenuOption entry.
+     * @param menu     The Menu object.
+     * @param language The current language.
+     * @param id       The ID of the menu entry.
+     * @throws JSONException If an error occurs while adding data to the JSON object.
+     */
+    private void addBasicMenuInfo(JSONObject json, MenuOption entry, Menu menu, Language language, String id) throws JSONException {
+        json.put("id", id);
+        json.put("type", entry.getType());
+        json.put("icon", menu.get(Menu.PROPERTY_ETMETAICON, language, id));
+        json.put("name", menu.get(Menu.PROPERTY_NAME, language, id));
+        json.put("description", menu.get(Menu.PROPERTY_DESCRIPTION, language, id));
+        json.put("url", menu.getURL());
+        json.put("action", menu.getAction());
+    }
+
+    /**
+     * Converts a MenuOption entry to its JSON representation.
+     *
+     * @param entry The MenuOption entry to convert.
+     * @return A JSONObject representing the menu entry.
+     */
     private JSONObject toJSON(MenuOption entry) {
         JSONObject json = new JSONObject();
 
@@ -56,73 +171,30 @@ public class MenuBuilder extends Builder {
             Language language = OBContext.getOBContext().getLanguage();
             Menu menu = entry.getMenu();
             String id = menu.getId();
+
+            addBasicMenuInfo(json, entry, menu, language, id);
+
             Window window = menu.getWindow();
-            List<MenuOption> children = entry.getChildren();
-            Form form = menu.getSpecialForm();
-            Process processDefinition = menu.getOBUIAPPProcessDefinition();
-            org.openbravo.model.ad.ui.Process process = menu.getProcess();
-
-            json.put("id", id);
-            json.put("type", entry.getType());
-            json.put("icon", menu.get(Menu.PROPERTY_ETMETAICON, language, id));
-            json.put("name", menu.get(Menu.PROPERTY_NAME, language, id));
-            json.put("description", menu.get(Menu.PROPERTY_DESCRIPTION, language, id));
-            json.put("url", menu.getURL());
-            json.put("action", menu.getAction());
-
-            if (null != window) json.put("windowId", window.getId());
-            if (null != process) {
-                json.put("processId", process.getId());
-                String url = null;
-                MenuManager.MenuEntryType type = null;
-                boolean modal = false;
-                boolean report = false;
-                if (menu.getProcess() != null && menu.getProcess().isActive()) {
-                    boolean found = false;
-
-                    for (ModelImplementation mi : process.getADModelImplementationList()) {
-                        if (found) {
-                            break;
-                        }
-                        for (ModelImplementationMapping mim : mi.getADModelImplementationMappingList()) {
-                            if (mim.isDefault()) {
-                                found = true;
-                                url = mim.getMappingName();
-                                if (process.getUIPattern().equals("Standard")) {
-                                    type = MenuManager.MenuEntryType.Process;
-                                    modal = Utility.isModalProcess(process.getId());
-                                } else if (process.isReport() || process.isJasperReport()) {
-                                    type = MenuManager.MenuEntryType.Report;
-                                    report = true;
-                                } else {
-                                    type = MenuManager.MenuEntryType.ProcessManual;
-                                }
-                                break;
-                            }
-                        }
-                    }
-                    if (!found && "P".equals(menu.getAction())) {
-                        type = MenuManager.MenuEntryType.Process;
-                        modal = Utility.isModalProcess(process.getId());
-                        if (process.isExternalService() != null && process.isExternalService()
-                            && "PS".equals(process.getServiceType())) {
-                            url = "/utility/OpenPentaho.html?inpadProcessId=" + process.getId();
-                        } else if ("S".equals(process.getUIPattern()) && !process.isJasperReport()
-                            && process.getProcedure() == null) {
-                            url = "/ad_actionButton/ActionButtonJava_Responser.html";
-                        } else {
-                            url = "/ad_actionButton/ActionButton_Responser.html";
-                        }
-                    }
-                }
-                json.put("processUrl", url);
-                if (null != type) json.put("processType", type.name());
-                json.put("isModalProcess", modal);
-                json.put("isReport", report);
+            if (null != window) {
+                json.put("windowId", window.getId());
             }
-            if (null != processDefinition) json.put("processDefinitionId", processDefinition.getId());
-            if (null != form) json.put("formId", form.getId());
 
+            org.openbravo.model.ad.ui.Process process = menu.getProcess();
+            if (null != process) {
+                addProcessInfo(json, process, menu);
+            }
+
+            Process processDefinition = menu.getOBUIAPPProcessDefinition();
+            if (null != processDefinition) {
+                json.put("processDefinitionId", processDefinition.getId());
+            }
+
+            Form form = menu.getSpecialForm();
+            if (null != form) {
+                json.put("formId", form.getId());
+            }
+
+            List<MenuOption> children = entry.getChildren();
             if (!children.isEmpty()) {
                 json.put("children", children.stream().map(this::toJSON).collect(Collectors.toList()));
             }
@@ -134,6 +206,12 @@ public class MenuBuilder extends Builder {
         return json;
     }
 
+    /**
+     * Generates the complete menu metadata in JSON format.
+     *
+     * @return A JSONObject containing the menu metadata.
+     * @throws JSONException If an error occurs while generating the JSON.
+     */
     @Override
     public JSONObject toJSON() throws JSONException {
         JSONObject result = new JSONObject();

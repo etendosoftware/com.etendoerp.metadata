@@ -34,7 +34,7 @@ public class MenuServiceTest extends BaseMetadataServiceTest {
     }
 
     @Before
-    public void setUpMenuService() throws Exception {
+    public void setUpMenuService() {
         menuService = new MenuService(mockRequest, mockResponse);
     }
 
@@ -71,9 +71,11 @@ public class MenuServiceTest extends BaseMetadataServiceTest {
         try {
             JSONObject jsonResponse = new JSONObject(responseContent);
             assertNotNull("JSON response should be parseable", jsonResponse);
+            assertTrue("JSON response should contain 'menu' key", jsonResponse.has("menu"));
+            assertNotNull("'menu' should not be null", jsonResponse.get("menu"));
 
         } catch (Exception e) {
-            assertTrue("Process should complete without throwing exceptions", true);
+            fail("JSON response should be valid and contain 'menu' key: " + e.getMessage());
         }
     }
 
