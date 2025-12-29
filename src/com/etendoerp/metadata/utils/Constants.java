@@ -73,7 +73,7 @@ public class Constants {
     public static final String LOCATION_PATH = "/location/";
     public static final String TOOLBAR_PATH = "/toolbar";
     public static final String REPORT_AND_PROCESS_PATH = "/report-and-process/";
-    public static final String PROCESS_PATH = "/process/";
+    public static final String PROCESS_PATH = "/process";
     public static final String LOCALE_KEY = "Locale";
     public static final String DEFAULT_LOCALE = "en_US";
     public static final String PUBLIC_JS_PATH = "/web/js/";

@@ -59,6 +59,8 @@ import org.openbravo.service.datasource.DataSource;
 import org.openbravo.service.datasource.DatasourceField;
 import org.openbravo.service.db.DalConnectionProvider;
 import org.openbravo.service.json.JsonConstants;
+
+import com.etendoerp.metadata.utils.Constants;
 import org.openbravo.userinterface.selector.Selector;
 import org.openbravo.userinterface.selector.SelectorField;
 
@@ -659,7 +661,7 @@ class FieldBuilderTest {
 
       assertNotNull(result);
       assertEquals(Constants.TABLE_DATASOURCE, result.getString(Constants.DATASOURCE_PROPERTY));
-      JSONArray responseValues = result.getJSONArray(JsonConstants.RESPONSE_VALUES);
+      JSONArray responseValues = result.getJSONArray(Constants.RESPONSE_VALUES);
       assertEquals(1, responseValues.length());
       JSONObject entry = responseValues.getJSONObject(0);
       assertEquals(RECORD_ID, entry.getString("id"));
