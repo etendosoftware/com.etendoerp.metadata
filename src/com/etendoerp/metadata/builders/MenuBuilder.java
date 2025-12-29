@@ -98,9 +98,6 @@ public class MenuBuilder extends Builder {
         }
 
         json.put("processUrl", url);
-        if (null != type) {
-            json.put("processType", type.name());
-        }
         json.put("isModalProcess", modal);
         json.put("isReport", report);
     }
