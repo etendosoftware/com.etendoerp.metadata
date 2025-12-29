@@ -201,7 +201,7 @@ public abstract class FieldBuilder extends Builder {
         selectorInfo.put(Constants.VALUE_FIELD_PROPERTY, JsonConstants.ID);
         selectorInfo.put(JsonConstants.SELECTEDPROPERTIES_PARAMETER, JsonConstants.ID);
         selectorInfo.put(JsonConstants.ADDITIONAL_PROPERTIES_PARAMETER, JsonConstants.ID + ",");
-        selectorInfo.put(JsonConstants.RESPONSE_VALUES, comboData);
+        selectorInfo.put(Constants.RESPONSE_VALUES, comboData);
 
         return selectorInfo;
     }
