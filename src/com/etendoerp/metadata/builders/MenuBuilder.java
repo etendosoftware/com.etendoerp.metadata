@@ -27,6 +27,9 @@ import org.openbravo.client.application.MenuManager;
 import org.openbravo.client.application.MenuManager.MenuOption;
 import org.openbravo.client.application.Process;
 import org.openbravo.dal.core.OBContext;
+import org.openbravo.erpCommon.utility.Utility;
+import org.openbravo.model.ad.domain.ModelImplementation;
+import org.openbravo.model.ad.domain.ModelImplementationMapping;
 import org.openbravo.model.ad.system.Language;
 import org.openbravo.model.ad.ui.Form;
 import org.openbravo.model.ad.ui.Menu;
@@ -68,7 +71,55 @@ public class MenuBuilder extends Builder {
             json.put("action", menu.getAction());
 
             if (null != window) json.put("windowId", window.getId());
-            if (null != process) json.put("processId", process.getId());
+            if (null != process) {
+                json.put("processId", process.getId());
+                String url = null;
+                MenuManager.MenuEntryType type = null;
+                boolean modal = false;
+                boolean report = false;
+                if (menu.getProcess() != null && menu.getProcess().isActive()) {
+                    boolean found = false;
+
+                    for (ModelImplementation mi : process.getADModelImplementationList()) {
+                        if (found) {
+                            break;
+                        }
+                        for (ModelImplementationMapping mim : mi.getADModelImplementationMappingList()) {
+                            if (mim.isDefault()) {
+                                found = true;
+                                url = mim.getMappingName();
+                                if (process.getUIPattern().equals("Standard")) {
+                                    type = MenuManager.MenuEntryType.Process;
+                                    modal = Utility.isModalProcess(process.getId());
+                                } else if (process.isReport() || process.isJasperReport()) {
+                                    type = MenuManager.MenuEntryType.Report;
+                                    report = true;
+                                } else {
+                                    type = MenuManager.MenuEntryType.ProcessManual;
+                                }
+                                break;
+                            }
+                        }
+                    }
+                    if (!found && "P".equals(menu.getAction())) {
+                        type = MenuManager.MenuEntryType.Process;
+                        modal = Utility.isModalProcess(process.getId());
+                        if (process.isExternalService() != null && process.isExternalService()
+                            && "PS".equals(process.getServiceType())) {
+                            url = "/utility/OpenPentaho.html?inpadProcessId=" + process.getId();
+                        } else if ("S".equals(process.getUIPattern()) && !process.isJasperReport()
+                            && process.getProcedure() == null) {
+                            url = "/ad_actionButton/ActionButtonJava_Responser.html";
+                        } else {
+                            url = "/ad_actionButton/ActionButton_Responser.html";
+                        }
+                    }
+                }
+                json.put("processUrl", url);
+                if (null != type) json.put("processType", type.name());
+                json.put("isModalProcess", modal);
+                json.put("isReport", report);
+            }
             if (null != processDefinition) json.put("processDefinitionId", processDefinition.getId());
             if (null != form) json.put("formId", form.getId());
 
