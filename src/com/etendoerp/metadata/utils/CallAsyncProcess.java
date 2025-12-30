@@ -206,7 +206,7 @@ public class CallAsyncProcess extends CallProcess {
         this.roleId = context.getRole().getId();
         this.clientId = context.getCurrentClient().getId();
         this.orgId = context.getCurrentOrganization().getId();
-        this.languageId = context.getLanguage().getId();
+        this.languageId = context.getLanguage().getLanguage();
         if (context.getWarehouse() != null) {
           this.warehouseId = context.getWarehouse().getId();
         }
