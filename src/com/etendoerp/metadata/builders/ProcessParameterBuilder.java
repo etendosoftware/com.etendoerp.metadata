@@ -12,6 +12,7 @@ import static com.etendoerp.metadata.utils.Constants.*;
 
 /**
  * Builder for legacy Report and Process parameters (AD_Process_Para)
+ * @author Futit Services S.L.
  */
 public class ProcessParameterBuilder extends Builder {
 
@@ -35,29 +36,30 @@ public class ProcessParameterBuilder extends Builder {
 
     @Override
     public JSONObject toJSON() throws JSONException {
-        JSONObject json = converter.toJsonObject(parameter, DataResolvingMode.FULL_TRANSLATABLE);
+        ProcessParameter currentParameter = this.parameter;
+        JSONObject json = converter.toJsonObject(currentParameter, DataResolvingMode.FULL_TRANSLATABLE);
 
         // Selector (Table / Search reference)
-        if (isSelectorParameter(parameter)) {
+        if (isSelectorParameter(currentParameter)) {
             json.put(
                     "selector",
-                    getSelectorInfo(parameter.getId(), parameter.getReferenceSearchKey())
+                    getSelectorInfo(currentParameter.getId(), currentParameter.getReferenceSearchKey())
             );
         }
 
         // List reference
-        if (isListParameter(parameter)) {
+        if (isListParameter(currentParameter)) {
             json.put(
                     "refList",
-                    getListInfo(parameter.getReferenceSearchKey(), language)
+                    getListInfo(currentParameter.getReferenceSearchKey(), language)
             );
         }
 
         // Explicit legacy flags
-        json.put("isRange", parameter.isRange());
-        json.put("valueFormat", parameter.getValueFormat());
-        json.put("minValue", parameter.getMinValue());
-        json.put("maxValue", parameter.getMaxValue());
+        json.put("isRange", currentParameter.isRange());
+        json.put("valueFormat", currentParameter.getValueFormat());
+        json.put("minValue", currentParameter.getMinValue());
+        json.put("maxValue", currentParameter.getMaxValue());
 
         return json;
     }

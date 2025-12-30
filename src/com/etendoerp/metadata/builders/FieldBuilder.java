@@ -166,6 +166,10 @@ public abstract class FieldBuilder extends Builder {
             return new JSONObject();
         }
 
+        if (field.getProcess() == null || field.getReference() == null) {
+            return new JSONObject();
+        }
+
         JSONArray comboData = new JSONArray();
         try {
             ConnectionProvider connProvider = DalConnectionProvider.getReadOnlyConnectionProvider();
@@ -188,6 +192,7 @@ public abstract class FieldBuilder extends Builder {
                 comboData.put(entry);
             }
         } catch (Exception e) {
+            logger.error("Error filling combo data for field {}", fieldId, e);
             throw new OBException(e);
         }
 

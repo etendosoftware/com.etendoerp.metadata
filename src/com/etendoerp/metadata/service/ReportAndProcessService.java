@@ -25,7 +25,6 @@ import javax.servlet.http.HttpServletResponse;
 import com.etendoerp.metadata.utils.ProcessUtils;
 import org.codehaus.jettison.json.JSONException;
 import org.openbravo.model.ad.ui.Process;
-import org.openbravo.client.application.DataPoolReport;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
 
@@ -37,6 +36,7 @@ import com.etendoerp.metadata.exceptions.NotFoundException;
  * Service to return report and process metadata including parameters and configuration.
  * This service handles requests to /meta/report-and-process/{processId} and returns a JSON response
  * with all the process metadata needed to display the parameter form in the UI.
+ * @author Futit Services S.L.
  */
 public class ReportAndProcessService extends MetadataService {
     public ReportAndProcessService(HttpServletRequest request, HttpServletResponse response) {
