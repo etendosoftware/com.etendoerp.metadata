@@ -23,10 +23,22 @@ import org.openbravo.model.ad.ui.Process;
 import org.openbravo.model.ad.ui.ProcessParameter;
 import org.openbravo.service.json.DataResolvingMode;
 
+/**
+ * Builder for legacy Report and Process entities (AD_Process).
+ * Converts Process entities and their parameters to JSON format for API consumption.
+ *
+ * @author Futit Services S.L.
+ */
 public class ReportAndProcessBuilder extends Builder {
 
     private final Process process;
 
+    /**
+     * Constructs a ReportAndProcessBuilder with the specified process.
+     * Initializes the builder to convert the given process and its parameters to JSON format.
+     *
+     * @param process The process entity to build JSON representation for
+     */
     public ReportAndProcessBuilder(Process process) {
         this.process = process;
     }

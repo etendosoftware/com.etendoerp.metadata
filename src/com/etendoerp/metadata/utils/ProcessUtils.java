@@ -17,15 +17,33 @@
 package com.etendoerp.metadata.utils;
 
 import com.etendoerp.metadata.exceptions.NotFoundException;
-import java.util.Objects;
 
+/**
+ * Utility class for processing and extracting information from request paths.
+ * Provides methods to parse URL path information and extract entity/process IDs
+ * from RESTful API endpoints.
+ *
+ * @author Futit Services S.L.
+ */
 public final class ProcessUtils {
+
+    /**
+     * Path delimiter used in URL paths.
+     */
+    private static final String PATH_DELIMITER = "/";
 
     /**
      * Prefix added by the servlet container that must be removed
      * before processing the logical path.
      */
     private static final String METADATA_PREFIX = "/com.etendoerp.metadata.meta/";
+
+    /**
+     * Private constructor to prevent instantiation of this utility class.
+     */
+    private ProcessUtils() {
+        // Utility class - do not instantiate
+    }
 
     /**
      * Extracts an entity ID from a request path.
@@ -46,7 +64,7 @@ public final class ProcessUtils {
         validateInputs(pathInfo, resourceName);
 
         String normalizedPath = normalizePath(pathInfo);
-        String[] parts = normalizedPath.split("/");
+        String[] parts = normalizedPath.split(PATH_DELIMITER);
 
         // Expected: ["", resourceName, entityId]
         if (parts.length < 3 || !resourceName.equals(parts[1])) {
@@ -59,7 +77,13 @@ public final class ProcessUtils {
     }
 
     /**
-     * Convenience method for process extraction.
+     * Convenience method for extracting a process ID from the request path.
+     * Delegates to {@link #extractEntityId(String, String)} for the actual extraction.
+     *
+     * @param pathInfo            the request path info containing the process ID
+     * @param processResourceName the name of the process resource in the path (e.g., "report-and-process")
+     * @return the extracted process ID from the path
+     * @throws NotFoundException if the path format is invalid or the process ID cannot be extracted
      */
     public static String extractProcessId(String pathInfo, String processResourceName) {
         return extractEntityId(pathInfo, processResourceName);
@@ -81,13 +105,13 @@ public final class ProcessUtils {
             cleanPath = cleanPath.substring(METADATA_PREFIX.length() - 1);
         }
 
-        // Ensure it starts with '/'
-        if (!cleanPath.startsWith("/")) {
-            cleanPath = "/" + cleanPath;
+        // Ensure it starts with path delimiter
+        if (!cleanPath.startsWith(PATH_DELIMITER)) {
+            cleanPath = PATH_DELIMITER + cleanPath;
         }
 
-        // Remove trailing slash
-        if (cleanPath.endsWith("/")) {
+        // Remove trailing path delimiter
+        if (cleanPath.endsWith(PATH_DELIMITER)) {
             cleanPath = cleanPath.substring(0, cleanPath.length() - 1);
         }
 

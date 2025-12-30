@@ -73,9 +73,10 @@ public class CallAsyncProcess extends CallProcess {
 
       if (parameters != null) {
         int index = 0;
-        for (String key : parameters.keySet()) {
+        for (Map.Entry<String, ?> entry : parameters.entrySet()) {
           index++;
-          final Object value = parameters.get(key);
+          final String key = entry.getKey();
+          final Object value = entry.getValue();
           final Parameter parameter = OBProvider.getInstance().get(Parameter.class);
           parameter.setSequenceNumber(index + "");
           parameter.setParameterName(key);
@@ -104,9 +105,9 @@ public class CallAsyncProcess extends CallProcess {
       final ContextValues contextValues = new ContextValues(OBContext.getOBContext());
 
       // 2. ASYNC PHASE: Submit to Executor
-      executorService.submit(() -> {
-        runInBackground(pInstanceId, processId, contextValues, doCommit);
-      });
+      executorService.submit(() -> 
+        runInBackground(pInstanceId, processId, contextValues, doCommit)
+      );
 
       return pInstance;
     } finally {

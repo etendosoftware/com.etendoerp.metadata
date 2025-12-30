@@ -39,6 +39,13 @@ import com.etendoerp.metadata.exceptions.NotFoundException;
  * @author Futit Services S.L.
  */
 public class ReportAndProcessService extends MetadataService {
+
+    /**
+     * Constructs a ReportAndProcessService with the specified HTTP request and response.
+     *
+     * @param request The HTTP servlet request containing the process ID in the path
+     * @param response The HTTP servlet response for writing the process metadata JSON
+     */
     public ReportAndProcessService(HttpServletRequest request, HttpServletResponse response) {
         super(request, response);
     }

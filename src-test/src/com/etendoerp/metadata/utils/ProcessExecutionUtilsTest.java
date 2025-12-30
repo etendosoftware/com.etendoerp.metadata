@@ -22,6 +22,7 @@ import org.openbravo.test.base.OBBaseTest;
  * Unit tests for {@link ProcessExecutionUtils}.
  */
 public class ProcessExecutionUtilsTest extends OBBaseTest {
+    private static final String RECORD_STRING = "record";
 
     /**
      * Verifies that synchronous process execution delegates to {@link CallProcess}.
@@ -35,12 +36,12 @@ public class ProcessExecutionUtilsTest extends OBBaseTest {
         try (MockedStatic<CallProcess> mockedCallProcess = mockStatic(CallProcess.class)) {
             CallProcess callProcess = mock(CallProcess.class);
             mockedCallProcess.when(CallProcess::getInstance).thenReturn(callProcess);
-            when(callProcess.call(mockProcess, "record", parameters)).thenReturn(expectedInstance);
+            when(callProcess.call(mockProcess, RECORD_STRING, parameters)).thenReturn(expectedInstance);
 
-            ProcessInstance result = ProcessExecutionUtils.callProcess(mockProcess, "record", parameters);
+            ProcessInstance result = ProcessExecutionUtils.callProcess(mockProcess, RECORD_STRING, parameters);
 
             assertSame("Result should match delegated instance", expectedInstance, result);
-            verify(callProcess).call(mockProcess, "record", parameters);
+            verify(callProcess).call(mockProcess, RECORD_STRING, parameters);
         }
     }
 

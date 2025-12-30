@@ -332,9 +332,12 @@ public abstract class FieldBuilder extends Builder {
             appendWithComma(selectedProperties, displayFieldProperty);
         }
 
+        SelectorPropertiesBuilder propertiesBuilder = new SelectorPropertiesBuilder(
+            selectedProperties, derivedProperties, extraProperties);
+
         for (SelectorField field : fields) {
             processSelectorField(field, displayField, valueField, displayFieldProperty, valueFieldProperty,
-                selectedProperties, derivedProperties, extraProperties);
+                propertiesBuilder);
         }
 
         selectorInfo.put(JsonConstants.SELECTEDPROPERTIES_PARAMETER, selectedProperties.toString());
@@ -349,13 +352,10 @@ public abstract class FieldBuilder extends Builder {
      * @param valueField The configured value field for the selector.
      * @param displayFieldProperty The property name of the display field.
      * @param valueFieldProperty The property name of the value field.
-     * @param selectedProperties StringBuilder for selected properties.
-     * @param derivedProperties StringBuilder for derived properties.
-     * @param extraProperties StringBuilder for extra properties.
+     * @param propertiesBuilder Builder containing the StringBuilders for selected, derived, and extra properties.
      */
     private static void processSelectorField(SelectorField field, SelectorField displayField, SelectorField valueField,
-        String displayFieldProperty, String valueFieldProperty, StringBuilder selectedProperties,
-        StringBuilder derivedProperties, StringBuilder extraProperties) {
+        String displayFieldProperty, String valueFieldProperty, SelectorPropertiesBuilder propertiesBuilder) {
         String fieldName = getPropertyOrDataSourceField(field);
 
         if (JsonConstants.ID.equals(fieldName) || JsonConstants.IDENTIFIER.equals(fieldName)) {
@@ -363,13 +363,13 @@ public abstract class FieldBuilder extends Builder {
         }
 
         if (fieldName.contains(JsonConstants.FIELD_SEPARATOR)) {
-            appendWithComma(derivedProperties, fieldName);
+            appendWithComma(propertiesBuilder.derivedProperties, fieldName);
         } else {
-            appendWithComma(selectedProperties, fieldName);
+            appendWithComma(propertiesBuilder.selectedProperties, fieldName);
         }
 
         if (isExtraProperty(field, displayField, valueField, fieldName, displayFieldProperty, valueFieldProperty)) {
-            appendWithComma(extraProperties, fieldName);
+            appendWithComma(propertiesBuilder.extraProperties, fieldName);
         }
     }
 
@@ -402,6 +402,23 @@ public abstract class FieldBuilder extends Builder {
             sb.append(",");
         }
         sb.append(value);
+    }
+
+    /**
+     * Helper class to group selector property builders.
+     * Encapsulates the StringBuilders used to accumulate selected, derived, and extra properties.
+     */
+    private static class SelectorPropertiesBuilder {
+        final StringBuilder selectedProperties;
+        final StringBuilder derivedProperties;
+        final StringBuilder extraProperties;
+
+        SelectorPropertiesBuilder(StringBuilder selectedProperties, StringBuilder derivedProperties,
+            StringBuilder extraProperties) {
+            this.selectedProperties = selectedProperties;
+            this.derivedProperties = derivedProperties;
+            this.extraProperties = extraProperties;
+        }
     }
 
     /**

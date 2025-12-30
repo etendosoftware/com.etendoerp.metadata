@@ -18,6 +18,12 @@ public class ProcessParameterBuilder extends Builder {
 
     private final ProcessParameter parameter;
 
+    /**
+     * Constructs a ProcessParameterBuilder with the specified process parameter.
+     * Initializes the builder to convert the given parameter to JSON format.
+     *
+     * @param parameter The process parameter entity to build JSON representation for
+     */
     public ProcessParameterBuilder(ProcessParameter parameter) {
         this.parameter = parameter;
     }

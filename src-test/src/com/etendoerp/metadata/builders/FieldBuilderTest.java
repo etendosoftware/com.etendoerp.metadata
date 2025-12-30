@@ -231,9 +231,7 @@ class FieldBuilderTest {
          MockedStatic<RequestContext> requestContextStatic = mockStatic(RequestContext.class);
          MockedStatic<Utility> utilityStatic = mockStatic(Utility.class);
          MockedConstruction<ComboTableData> comboTableDataMockedConstruction = mockConstruction(ComboTableData.class,
-             (mock, context) -> {
-               when(mock.select(false)).thenReturn(new FieldProvider[0]);
-             })) {
+             (mock, context) -> when(mock.select(false)).thenReturn(new FieldProvider[0]))) {
 
       OBDal obDal = mock(OBDal.class);
       obDalStatic.when(OBDal::getInstance).thenReturn(obDal);
@@ -632,9 +630,7 @@ class FieldBuilderTest {
          MockedStatic<RequestContext> requestContextStatic = mockStatic(RequestContext.class);
          MockedStatic<Utility> utilityStatic = mockStatic(Utility.class);
          MockedConstruction<ComboTableData> comboTableDataMockedConstruction = mockConstruction(ComboTableData.class,
-             (mock, context) -> {
-               when(mock.select(false)).thenReturn(new FieldProvider[]{ fieldProvider });
-             })) {
+             (mock, context) -> when(mock.select(false)).thenReturn(new FieldProvider[]{ fieldProvider }))) {
 
       OBDal obDal = mock(OBDal.class);
       obDalStatic.when(OBDal::getInstance).thenReturn(obDal);
@@ -694,6 +690,8 @@ class FieldBuilderTest {
   @Test
   void testAddComboTableSelectorInfoWithException() {
     ProcessParameter processParameter = mock(ProcessParameter.class);
+    Process processMock = mock(Process.class);
+    Reference ref = mock(Reference.class);
 
     try (MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class);
          MockedStatic<DalConnectionProvider> dalConnStatic = mockStatic(DalConnectionProvider.class)) {
@@ -702,12 +700,15 @@ class FieldBuilderTest {
       obDalStatic.when(OBDal::getInstance).thenReturn(obDal);
       when(obDal.get(ProcessParameter.class, TEST_FIELD_ID)).thenReturn(processParameter);
 
+      // Configure processParameter to return non-null values so code reaches try-catch block
+      when(processParameter.getProcess()).thenReturn(processMock);
+      when(processParameter.getReference()).thenReturn(ref);
+
       dalConnStatic.when(DalConnectionProvider::getReadOnlyConnectionProvider).thenThrow(new RuntimeException("DB Error"));
 
-      assertThrows(org.openbravo.base.exception.OBException.class, () -> {
-        FieldBuilder.getSelectorInfo(TEST_FIELD_ID, null);
-      });
+      assertThrows(org.openbravo.base.exception.OBException.class, () -> FieldBuilder.getSelectorInfo(TEST_FIELD_ID, null));
     }
   }
+
 
 }

@@ -49,7 +49,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 public class ProcessExecutionService extends MetadataService {
 
     private static final ObjectMapper mapper = new ObjectMapper();
+    private static final String PARAMETERS_STRING = "parameters";
 
+    /**
+     * Constructs a ProcessExecutionService with the specified HTTP request and response.
+     *
+     * @param request The HTTP servlet request containing process execution parameters
+     * @param response The HTTP servlet response for writing execution results
+     */
     public ProcessExecutionService(HttpServletRequest request, HttpServletResponse response) {
         super(request, response);
     }
@@ -85,10 +92,10 @@ public class ProcessExecutionService extends MetadataService {
             }
 
             Map<String, String> parameters = new HashMap<>();
-            if (root.has("parameters") && root.get("parameters").isObject()) {
-                root.get("parameters").fields().forEachRemaining(entry -> {
-                    parameters.put(entry.getKey(), entry.getValue().asText());
-                });
+            if (root.has(PARAMETERS_STRING) && root.get(PARAMETERS_STRING).isObject()) {
+                root.get(PARAMETERS_STRING).fields().forEachRemaining(entry ->
+                    parameters.put(entry.getKey(), entry.getValue().asText())
+                );
             }
 
             ProcessInstance pInstance = ProcessExecutionUtils.callProcessAsync(process, recordId, parameters);
