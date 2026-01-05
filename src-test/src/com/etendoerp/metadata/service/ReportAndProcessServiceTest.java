@@ -52,8 +52,12 @@ public class ReportAndProcessServiceTest {
 
     private static final String EXCEPTION_NOT_NULL_MESSAGE = "Exception should not be null";
     private static final String VALID_PROCESS_ID = "123";
-    private static final String VALID_PATH = "/com.etendoerp.metadata.meta/report-and-process/" + VALID_PROCESS_ID;
+    private static final String REPORT_AND_PROCESS_PATH_STRING = "/com.etendoerp.metadata.meta/report-and-process/";
+    private static final String VALID_PATH = REPORT_AND_PROCESS_PATH_STRING + VALID_PROCESS_ID;
     private static final String REPORT_AND_PROCESS_PATH = "/report-and-process/";
+    private static final String NOT_FOUND_EXCEPTION_THROWN = "NotFoundException should be thrown";
+    private static final String RESPONSE_NOT_NULL = "Response should not be null";
+    private static final String REQUEST_NOT_NULL = "Request should not be null";
 
     @Mock
     private HttpServletRequest mockRequest;
@@ -69,6 +73,32 @@ public class ReportAndProcessServiceTest {
 
     @Mock
     private OBContext mockOBContext;
+
+    /**
+     * Helper method for testing NotFoundException scenarios.
+     * Encapsulates the common pattern of mocking OBContext and verifying
+     * NotFoundException is thrown.
+     *
+     * @param pathInfo    the path info to set on the mock request
+     * @param failMessage the message to display if the exception is not thrown
+     * @throws IOException if an I/O error occurs during processing
+     */
+    private void assertNotFoundExceptionForPath(String pathInfo, String failMessage) throws IOException {
+        when(mockRequest.getPathInfo()).thenReturn(pathInfo);
+
+        try (MockedStatic<OBContext> obContextMockedStatic = mockStatic(OBContext.class)) {
+            obContextMockedStatic.when(OBContext::getOBContext).thenReturn(mockOBContext);
+
+            ReportAndProcessService service = new ReportAndProcessService(mockRequest, mockResponse);
+
+            try {
+                service.process();
+                fail(failMessage);
+            } catch (NotFoundException e) {
+                assertNotNull(NOT_FOUND_EXCEPTION_THROWN, e);
+            }
+        }
+    }
 
     /**
      * Tests ReportAndProcessService constructor and inheritance.
@@ -88,8 +118,8 @@ public class ReportAndProcessServiceTest {
     public void testGetRequestAndResponse() {
         ReportAndProcessService service = new ReportAndProcessService(mockRequest, mockResponse);
 
-        assertNotNull("Request should not be null", service.getRequest());
-        assertNotNull("Response should not be null", service.getResponse());
+        assertNotNull(REQUEST_NOT_NULL, service.getRequest());
+        assertNotNull(RESPONSE_NOT_NULL, service.getResponse());
         assertEquals("Request should match", mockRequest, service.getRequest());
         assertEquals("Response should match", mockResponse, service.getResponse());
     }
@@ -122,20 +152,7 @@ public class ReportAndProcessServiceTest {
      */
     @Test
     public void testProcessWithNullPathInfo() throws IOException {
-        when(mockRequest.getPathInfo()).thenReturn(null);
-
-        try (MockedStatic<OBContext> obContextMockedStatic = mockStatic(OBContext.class)) {
-            obContextMockedStatic.when(OBContext::getOBContext).thenReturn(mockOBContext);
-
-            ReportAndProcessService service = new ReportAndProcessService(mockRequest, mockResponse);
-
-            try {
-                service.process();
-                fail("Should throw NotFoundException for null path info");
-            } catch (NotFoundException e) {
-                assertNotNull("NotFoundException should be thrown", e);
-            }
-        }
+        assertNotFoundExceptionForPath(null, "Should throw NotFoundException for null path info");
     }
 
     /**
@@ -145,20 +162,9 @@ public class ReportAndProcessServiceTest {
      */
     @Test
     public void testProcessWithEmptyProcessId() throws IOException {
-        when(mockRequest.getPathInfo()).thenReturn("/com.etendoerp.metadata.meta/report-and-process/");
-
-        try (MockedStatic<OBContext> obContextMockedStatic = mockStatic(OBContext.class)) {
-            obContextMockedStatic.when(OBContext::getOBContext).thenReturn(mockOBContext);
-
-            ReportAndProcessService service = new ReportAndProcessService(mockRequest, mockResponse);
-
-            try {
-                service.process();
-                fail("Should throw NotFoundException for empty process ID");
-            } catch (NotFoundException e) {
-                assertNotNull("NotFoundException should be thrown", e);
-            }
-        }
+        assertNotFoundExceptionForPath(
+                REPORT_AND_PROCESS_PATH_STRING,
+                "Should throw NotFoundException for empty process ID");
     }
 
     /**
@@ -168,20 +174,9 @@ public class ReportAndProcessServiceTest {
      */
     @Test
     public void testProcessWithInvalidPath() throws IOException {
-        when(mockRequest.getPathInfo()).thenReturn("/com.etendoerp.metadata.meta/invalid/path");
-
-        try (MockedStatic<OBContext> obContextMockedStatic = mockStatic(OBContext.class)) {
-            obContextMockedStatic.when(OBContext::getOBContext).thenReturn(mockOBContext);
-
-            ReportAndProcessService service = new ReportAndProcessService(mockRequest, mockResponse);
-
-            try {
-                service.process();
-                fail("Should throw NotFoundException for invalid path");
-            } catch (NotFoundException e) {
-                assertNotNull("NotFoundException should be thrown", e);
-            }
-        }
+        assertNotFoundExceptionForPath(
+                "/com.etendoerp.metadata.meta/invalid/path",
+                "Should throw NotFoundException for invalid path");
     }
 
     /**
@@ -378,10 +373,8 @@ public class ReportAndProcessServiceTest {
         try (MockedStatic<OBDal> obDalMockedStatic = mockStatic(OBDal.class);
                 MockedStatic<OBContext> obContextMockedStatic = mockStatic(OBContext.class);
                 MockedConstruction<ReportAndProcessBuilder> builderMockedConstruction = mockConstruction(
-                        ReportAndProcessBuilder.class, (mock, context) -> {
-                            when(mock.toJSON()).thenThrow(
-                                    new org.codehaus.jettison.json.JSONException("JSON error"));
-                        })) {
+                        ReportAndProcessBuilder.class, (mock, context) -> when(mock.toJSON()).thenThrow(
+                                new org.codehaus.jettison.json.JSONException("JSON error")))) {
 
             obDalMockedStatic.when(OBDal::getInstance).thenReturn(mockOBDal);
             when(mockOBDal.get(Process.class, VALID_PROCESS_ID)).thenReturn(mockProcess);
@@ -411,7 +404,7 @@ public class ReportAndProcessServiceTest {
 
         for (String processId : processIds) {
             when(mockRequest.getPathInfo())
-                    .thenReturn("/com.etendoerp.metadata.meta/report-and-process/" + processId);
+                    .thenReturn(REPORT_AND_PROCESS_PATH_STRING + processId);
 
             ReportAndProcessService service = new ReportAndProcessService(mockRequest, mockResponse);
 

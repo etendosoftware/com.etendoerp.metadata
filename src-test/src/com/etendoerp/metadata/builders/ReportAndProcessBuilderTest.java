@@ -58,6 +58,8 @@ class ReportAndProcessBuilderTest {
     @Mock
     private OBContext obContext;
 
+    private static final String SPECIFIC_PROCESS_ID_STRING = "specific-process-id";
+
     @BeforeEach
     void setUp() {
         when(process.getId()).thenReturn(PROCESS_ID);
@@ -209,10 +211,10 @@ class ReportAndProcessBuilderTest {
     void testInheritanceFromBuilder() throws JSONException {
         try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
                 MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class,
-                        (mock, context) -> {
+                        (mock, context) ->
                             when(mock.toJsonObject(any(Process.class), eq(DataResolvingMode.FULL_TRANSLATABLE)))
-                                    .thenReturn(new JSONObject().put("id", PROCESS_ID));
-                        })) {
+                                    .thenReturn(new JSONObject().put("id", PROCESS_ID))
+                        )) {
 
             mockedOBContext.when(OBContext::getOBContext).thenReturn(obContext);
             when(obContext.getLanguage()).thenReturn(language);
@@ -231,17 +233,17 @@ class ReportAndProcessBuilderTest {
     @Test
     void testConstructorStoresProcess() throws JSONException {
         Process specificProcess = mock(Process.class);
-        when(specificProcess.getId()).thenReturn("specific-process-id");
+        when(specificProcess.getId()).thenReturn(SPECIFIC_PROCESS_ID_STRING);
         when(specificProcess.getADProcessParameterList()).thenReturn(Collections.emptyList());
 
         try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
                 MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class,
-                        (mock, context) -> {
+                        (mock, context) ->
                             when(mock.toJsonObject(eq(specificProcess), eq(DataResolvingMode.FULL_TRANSLATABLE)))
                                     .thenReturn(new JSONObject()
-                                            .put("id", "specific-process-id")
-                                            .put("name", "Specific Process"));
-                        })) {
+                                            .put("id", SPECIFIC_PROCESS_ID_STRING)
+                                            .put("name", "Specific Process"))
+                        )) {
 
             mockedOBContext.when(OBContext::getOBContext).thenReturn(obContext);
             when(obContext.getLanguage()).thenReturn(language);
@@ -250,7 +252,7 @@ class ReportAndProcessBuilderTest {
             JSONObject result = builder.toJSON();
 
             assertNotNull(result);
-            assertEquals("specific-process-id", result.getString("id"));
+            assertEquals(SPECIFIC_PROCESS_ID_STRING, result.getString("id"));
             assertEquals("Specific Process", result.getString("name"));
         }
     }

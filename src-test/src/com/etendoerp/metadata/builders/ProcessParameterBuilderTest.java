@@ -58,6 +58,12 @@ class ProcessParameterBuilderTest {
 
     private static final String SELECTOR_REFERENCE_ID = "95E2A8B50A254B2AAE6774B8C2F28120"; // Table reference
     private static final String LIST_REFERENCE_ID = "17";
+    private static final String IS_RANGE_STRING = "isRange";
+    private static final String VALUE_FORMAT_STRING = "valueFormat";
+    private static final String MIN_VALUE_STRING = "minValue";
+    private static final String MAX_VALUE_STRING = "maxValue";
+    private static final String REF_LIST_STRING = "refList";
+    private static final String SPECIFIC_PARAM_ID_STRING = "specific-param-id";
 
     @BeforeEach
     void setUp() {
@@ -109,8 +115,8 @@ class ProcessParameterBuilderTest {
 
         assertNotNull(result);
         assertTrue(result.has("id"), "Result should contain id");
-        assertTrue(result.has("isRange"), "Result should contain isRange");
-        assertFalse(result.getBoolean("isRange"));
+        assertTrue(result.has(IS_RANGE_STRING), "Result should contain isRange");
+        assertFalse(result.getBoolean(IS_RANGE_STRING));
     }
 
     /**
@@ -125,7 +131,7 @@ class ProcessParameterBuilderTest {
         JSONObject result = executeToJSON(null);
 
         assertNotNull(result);
-        assertTrue(result.getBoolean("isRange"), "isRange should be true");
+        assertTrue(result.getBoolean(IS_RANGE_STRING), "isRange should be true");
     }
 
     /**
@@ -140,8 +146,8 @@ class ProcessParameterBuilderTest {
         JSONObject result = executeToJSON(null);
 
         assertNotNull(result);
-        assertTrue(result.has("valueFormat"), "Result should contain valueFormat");
-        assertEquals("@A@.##", result.getString("valueFormat"));
+        assertTrue(result.has(VALUE_FORMAT_STRING), "Result should contain valueFormat");
+        assertEquals("@A@.##", result.getString(VALUE_FORMAT_STRING));
     }
 
     /**
@@ -157,10 +163,10 @@ class ProcessParameterBuilderTest {
         JSONObject result = executeToJSON(null);
 
         assertNotNull(result);
-        assertTrue(result.has("minValue"), "Result should contain minValue");
-        assertTrue(result.has("maxValue"), "Result should contain maxValue");
-        assertEquals("0", result.getString("minValue"));
-        assertEquals("100", result.getString("maxValue"));
+        assertTrue(result.has(MIN_VALUE_STRING), "Result should contain minValue");
+        assertTrue(result.has(MAX_VALUE_STRING), "Result should contain maxValue");
+        assertEquals("0", result.getString(MIN_VALUE_STRING));
+        assertEquals("100", result.getString(MAX_VALUE_STRING));
     }
 
     /**
@@ -175,7 +181,7 @@ class ProcessParameterBuilderTest {
         JSONObject result = executeToJSON(null);
 
         assertNotNull(result);
-        assertTrue(result.has("refList"), "Result should contain refList for list reference");
+        assertTrue(result.has(REF_LIST_STRING), "Result should contain refList for list reference");
     }
 
     /**
@@ -194,8 +200,8 @@ class ProcessParameterBuilderTest {
         JSONObject result = executeToJSON(null);
 
         assertNotNull(result);
-        assertTrue(result.has("refList"));
-        JSONArray refList = result.getJSONArray("refList");
+        assertTrue(result.has(REF_LIST_STRING));
+        JSONArray refList = result.getJSONArray(REF_LIST_STRING);
         assertEquals(1, refList.length());
 
         JSONObject listJson = refList.getJSONObject(0);
@@ -236,7 +242,7 @@ class ProcessParameterBuilderTest {
 
         assertNotNull(result);
         assertFalse(result.has("selector"), "Should not have selector with null reference");
-        assertFalse(result.has("refList"), "Should not have refList with null reference");
+        assertFalse(result.has(REF_LIST_STRING), "Should not have refList with null reference");
     }
 
     /**
@@ -253,10 +259,10 @@ class ProcessParameterBuilderTest {
 
         JSONObject result = executeToJSON(null);
 
-        assertTrue(result.has("isRange"), "Should contain isRange flag");
-        assertTrue(result.has("valueFormat"), "Should contain valueFormat flag");
-        assertTrue(result.has("minValue"), "Should contain minValue flag");
-        assertTrue(result.has("maxValue"), "Should contain maxValue flag");
+        assertTrue(result.has(IS_RANGE_STRING), "Should contain isRange flag");
+        assertTrue(result.has(VALUE_FORMAT_STRING), "Should contain valueFormat flag");
+        assertTrue(result.has(MIN_VALUE_STRING), "Should contain minValue flag");
+        assertTrue(result.has(MAX_VALUE_STRING), "Should contain maxValue flag");
     }
 
     /**
@@ -266,11 +272,11 @@ class ProcessParameterBuilderTest {
     void testInheritanceFromBuilder() throws JSONException {
         try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
                 MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class,
-                        (mock, context) -> {
+                        (mock, context) ->
                             when(mock.toJsonObject(any(ProcessParameter.class),
                                     eq(DataResolvingMode.FULL_TRANSLATABLE)))
-                                    .thenReturn(new JSONObject().put("id", PARAMETER_ID));
-                        })) {
+                                    .thenReturn(new JSONObject().put("id", PARAMETER_ID))
+                        )) {
 
             mockedOBContext.when(OBContext::getOBContext).thenReturn(obContext);
             when(obContext.getLanguage()).thenReturn(language);
@@ -290,21 +296,21 @@ class ProcessParameterBuilderTest {
     @Test
     void testConstructorStoresParameter() throws JSONException {
         ProcessParameter specificParam = mock(ProcessParameter.class);
-        when(specificParam.getId()).thenReturn("specific-param-id");
+        when(specificParam.getId()).thenReturn(SPECIFIC_PARAM_ID_STRING);
         when(specificParam.getReference()).thenReturn(reference);
         when(specificParam.getReferenceSearchKey()).thenReturn(referenceSearchKey);
         when(specificParam.isRange()).thenReturn(true);
-        when(specificParam.getValueFormat()).thenReturn("specific-format");
+        when(specificParam.getValueFormat()).thenReturn(SPECIFIC_PARAM_ID_STRING);
         when(specificParam.getMinValue()).thenReturn("10");
         when(specificParam.getMaxValue()).thenReturn("50");
         when(reference.getId()).thenReturn("10");
 
         try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
                 MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class,
-                        (mock, context) -> {
+                        (mock, context) ->
                             when(mock.toJsonObject(eq(specificParam), eq(DataResolvingMode.FULL_TRANSLATABLE)))
-                                    .thenReturn(new JSONObject().put("id", "specific-param-id"));
-                        })) {
+                                    .thenReturn(new JSONObject().put("id", SPECIFIC_PARAM_ID_STRING))
+                        )) {
 
             mockedOBContext.when(OBContext::getOBContext).thenReturn(obContext);
             when(obContext.getLanguage()).thenReturn(language);
@@ -313,9 +319,9 @@ class ProcessParameterBuilderTest {
             JSONObject result = builder.toJSON();
 
             assertNotNull(result);
-            assertEquals("specific-param-id", result.getString("id"));
-            assertTrue(result.getBoolean("isRange"));
-            assertEquals("specific-format", result.getString("valueFormat"));
+            assertEquals(SPECIFIC_PARAM_ID_STRING, result.getString("id"));
+            assertTrue(result.getBoolean(IS_RANGE_STRING));
+            assertEquals("specific-format", result.getString(VALUE_FORMAT_STRING));
         }
     }
 }

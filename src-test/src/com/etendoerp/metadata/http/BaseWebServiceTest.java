@@ -42,6 +42,12 @@ import org.openbravo.service.web.WebService;
 public class BaseWebServiceTest {
 
     private static final String TEST_PATH = "/test/path";
+    private static final String REQUEST_PASSED_TO_PROCESS = "Request should be passed to process";
+    private static final String RESPONSE_PASSED_TO_PROCESS = "Response should be passed to process";
+    private static final String PROCESS_CALLED_REGARDLESS_OF_PATH = "Process should be called regardless of path";
+    private static final String EXCEPTION_SHOULD_BE_PROPAGATED = "Exception should be propagated";
+    private static final String SHOULD_THROW_EXCEPTION = "Should throw exception";
+    private static final String TEST_EXCEPTION_MESSAGE = "Test exception";
 
     @Mock
     private HttpServletRequest mockRequest;
@@ -84,6 +90,14 @@ public class BaseWebServiceTest {
         }
     }
 
+    /**
+     * Sets up the test environment before each test method execution.
+     * <p>
+     * Initializes a fresh TestableWebService instance and resets all tracking
+     * variables (processWasCalled, capturedRequest, capturedResponse) to ensure
+     * test isolation between test methods.
+     * </p>
+     */
     @Before
     public void setUp() {
         webService = new TestableWebService();
@@ -111,8 +125,8 @@ public class BaseWebServiceTest {
         webService.doGet(TEST_PATH, mockRequest, mockResponse);
 
         assertTrue("doGet should call process method", processWasCalled);
-        assertEquals("Request should be passed to process", mockRequest, capturedRequest);
-        assertEquals("Response should be passed to process", mockResponse, capturedResponse);
+        assertEquals(REQUEST_PASSED_TO_PROCESS, mockRequest, capturedRequest);
+        assertEquals(RESPONSE_PASSED_TO_PROCESS, mockResponse, capturedResponse);
     }
 
     /**
@@ -125,8 +139,8 @@ public class BaseWebServiceTest {
         webService.doPost(TEST_PATH, mockRequest, mockResponse);
 
         assertTrue("doPost should call process method", processWasCalled);
-        assertEquals("Request should be passed to process", mockRequest, capturedRequest);
-        assertEquals("Response should be passed to process", mockResponse, capturedResponse);
+        assertEquals(REQUEST_PASSED_TO_PROCESS, mockRequest, capturedRequest);
+        assertEquals(RESPONSE_PASSED_TO_PROCESS, mockResponse, capturedResponse);
     }
 
     /**
@@ -139,8 +153,8 @@ public class BaseWebServiceTest {
         webService.doPut(TEST_PATH, mockRequest, mockResponse);
 
         assertTrue("doPut should call process method", processWasCalled);
-        assertEquals("Request should be passed to process", mockRequest, capturedRequest);
-        assertEquals("Response should be passed to process", mockResponse, capturedResponse);
+        assertEquals(REQUEST_PASSED_TO_PROCESS, mockRequest, capturedRequest);
+        assertEquals(RESPONSE_PASSED_TO_PROCESS, mockResponse, capturedResponse);
     }
 
     /**
@@ -153,8 +167,8 @@ public class BaseWebServiceTest {
         webService.doDelete(TEST_PATH, mockRequest, mockResponse);
 
         assertTrue("doDelete should call process method", processWasCalled);
-        assertEquals("Request should be passed to process", mockRequest, capturedRequest);
-        assertEquals("Response should be passed to process", mockResponse, capturedResponse);
+        assertEquals(REQUEST_PASSED_TO_PROCESS, mockRequest, capturedRequest);
+        assertEquals(RESPONSE_PASSED_TO_PROCESS, mockResponse, capturedResponse);
     }
 
     /**
@@ -166,7 +180,7 @@ public class BaseWebServiceTest {
     public void testDoGetIgnoresPathParameter() throws Exception {
         webService.doGet("/different/path", mockRequest, mockResponse);
 
-        assertTrue("Process should be called regardless of path", processWasCalled);
+        assertTrue(PROCESS_CALLED_REGARDLESS_OF_PATH, processWasCalled);
     }
 
     /**
@@ -178,7 +192,7 @@ public class BaseWebServiceTest {
     public void testDoPostIgnoresPathParameter() throws Exception {
         webService.doPost("/another/path", mockRequest, mockResponse);
 
-        assertTrue("Process should be called regardless of path", processWasCalled);
+        assertTrue(PROCESS_CALLED_REGARDLESS_OF_PATH, processWasCalled);
     }
 
     /**
@@ -190,7 +204,7 @@ public class BaseWebServiceTest {
     public void testDoPutIgnoresPathParameter() throws Exception {
         webService.doPut("/yet/another/path", mockRequest, mockResponse);
 
-        assertTrue("Process should be called regardless of path", processWasCalled);
+        assertTrue(PROCESS_CALLED_REGARDLESS_OF_PATH, processWasCalled);
     }
 
     /**
@@ -202,7 +216,7 @@ public class BaseWebServiceTest {
     public void testDoDeleteIgnoresPathParameter() throws Exception {
         webService.doDelete("/final/path", mockRequest, mockResponse);
 
-        assertTrue("Process should be called regardless of path", processWasCalled);
+        assertTrue(PROCESS_CALLED_REGARDLESS_OF_PATH, processWasCalled);
     }
 
     /**
@@ -236,14 +250,14 @@ public class BaseWebServiceTest {
      */
     @Test
     public void testDoGetPropagatesException() throws Exception {
-        Exception expectedException = new RuntimeException("Test exception");
+        Exception expectedException = new RuntimeException(TEST_EXCEPTION_MESSAGE);
         ExceptionThrowingWebService exceptionService = new ExceptionThrowingWebService(expectedException);
 
         try {
             exceptionService.doGet(TEST_PATH, mockRequest, mockResponse);
-            fail("Should throw exception");
+            fail(SHOULD_THROW_EXCEPTION);
         } catch (Exception e) {
-            assertEquals("Exception should be propagated", expectedException, e);
+            assertEquals(EXCEPTION_SHOULD_BE_PROPAGATED, expectedException, e);
         }
     }
 
@@ -254,14 +268,14 @@ public class BaseWebServiceTest {
      */
     @Test
     public void testDoPostPropagatesException() throws Exception {
-        Exception expectedException = new RuntimeException("Test exception");
+        Exception expectedException = new RuntimeException(TEST_EXCEPTION_MESSAGE);
         ExceptionThrowingWebService exceptionService = new ExceptionThrowingWebService(expectedException);
 
         try {
             exceptionService.doPost(TEST_PATH, mockRequest, mockResponse);
-            fail("Should throw exception");
+            fail(SHOULD_THROW_EXCEPTION);
         } catch (Exception e) {
-            assertEquals("Exception should be propagated", expectedException, e);
+            assertEquals(EXCEPTION_SHOULD_BE_PROPAGATED, expectedException, e);
         }
     }
 
@@ -272,14 +286,14 @@ public class BaseWebServiceTest {
      */
     @Test
     public void testDoPutPropagatesException() throws Exception {
-        Exception expectedException = new RuntimeException("Test exception");
+        Exception expectedException = new RuntimeException(TEST_EXCEPTION_MESSAGE);
         ExceptionThrowingWebService exceptionService = new ExceptionThrowingWebService(expectedException);
 
         try {
             exceptionService.doPut(TEST_PATH, mockRequest, mockResponse);
-            fail("Should throw exception");
+            fail(SHOULD_THROW_EXCEPTION);
         } catch (Exception e) {
-            assertEquals("Exception should be propagated", expectedException, e);
+            assertEquals(EXCEPTION_SHOULD_BE_PROPAGATED, expectedException, e);
         }
     }
 
@@ -290,14 +304,14 @@ public class BaseWebServiceTest {
      */
     @Test
     public void testDoDeletePropagatesException() throws Exception {
-        Exception expectedException = new RuntimeException("Test exception");
+        Exception expectedException = new RuntimeException(TEST_EXCEPTION_MESSAGE);
         ExceptionThrowingWebService exceptionService = new ExceptionThrowingWebService(expectedException);
 
         try {
             exceptionService.doDelete(TEST_PATH, mockRequest, mockResponse);
-            fail("Should throw exception");
+            fail(SHOULD_THROW_EXCEPTION);
         } catch (Exception e) {
-            assertEquals("Exception should be propagated", expectedException, e);
+            assertEquals(EXCEPTION_SHOULD_BE_PROPAGATED, expectedException, e);
         }
     }
 
@@ -308,8 +322,6 @@ public class BaseWebServiceTest {
      */
     @Test
     public void testAllMethodsCanBeCalledSequentially() throws Exception {
-        int callCount = 0;
-
         // Create a service that counts calls
         BaseWebService countingService = new BaseWebService() {
             private int calls = 0;
@@ -381,7 +393,7 @@ public class BaseWebServiceTest {
             exceptionService.doGet(TEST_PATH, mockRequest, mockResponse);
             fail("Should throw checked exception");
         } catch (Exception e) {
-            assertEquals("Checked exception should be propagated", checkedException, e);
+            assertEquals(EXCEPTION_SHOULD_BE_PROPAGATED, checkedException, e);
         }
     }
 }

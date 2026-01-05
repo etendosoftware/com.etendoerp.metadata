@@ -45,6 +45,64 @@ class LabelsBuilderTest {
     @Mock
     private I18NComponent.Label label2;
 
+    private static final String SINGLE_LABEL_STRING = "SINGLE_LABEL";
+    private static final String EMPTY_LABEL_STRING = "EMPTY_VALUE_LABEL";
+
+    /**
+     * Functional interface for test assertions that may throw JSONException.
+     */
+    @FunctionalInterface
+    private interface JSONAssertions {
+        void assertResult(JSONObject result) throws JSONException;
+    }
+
+    /**
+     * Helper method to execute toJSON with a list of labels and common mock setup.
+     * Encapsulates the repeated pattern of mocking OBContext and WeldUtils.
+     *
+     * @param labels     the list of labels to use
+     * @param assertions the assertions to perform on the result
+     * @throws JSONException if JSON processing fails
+     */
+    private void executeToJSONWithLabels(List<I18NComponent.Label> labels, JSONAssertions assertions)
+            throws JSONException {
+        try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
+                MockedStatic<WeldUtils> mockedWeldUtils = mockStatic(WeldUtils.class)) {
+
+            mockedOBContext.when(OBContext::getOBContext).thenReturn(obContext);
+            when(obContext.getLanguage()).thenReturn(language);
+
+            mockedWeldUtils.when(() -> WeldUtils.getInstanceFromStaticBeanManager(I18NComponent.class))
+                    .thenReturn(i18nComponent);
+            when(i18nComponent.getLabels()).thenReturn(labels);
+
+            LabelsBuilder builder = new LabelsBuilder();
+            JSONObject result = builder.toJSON();
+
+            assertions.assertResult(result);
+        }
+    }
+
+    /**
+     * Helper method for single label tests.
+     * Sets up label1 with the given key/value and verifies the result.
+     *
+     * @param labelKey   the key for the label
+     * @param labelValue the value for the label
+     * @param assertions the assertions to perform on the result
+     * @throws JSONException if JSON processing fails
+     */
+    private void executeSingleLabelTest(String labelKey, String labelValue, JSONAssertions assertions)
+            throws JSONException {
+        List<I18NComponent.Label> labels = new ArrayList<>();
+        labels.add(label1);
+
+        when(label1.getKey()).thenReturn(labelKey);
+        when(label1.getValue()).thenReturn(labelValue);
+
+        executeToJSONWithLabels(labels, assertions);
+    }
+
     /**
      * Tests toJSON with multiple labels.
      * Verifies that all labels are correctly converted to JSON key-value pairs.
@@ -60,24 +118,12 @@ class LabelsBuilderTest {
         when(label2.getKey()).thenReturn("LABEL_KEY_2");
         when(label2.getValue()).thenReturn("Label Value 2");
 
-        try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
-                MockedStatic<WeldUtils> mockedWeldUtils = mockStatic(WeldUtils.class)) {
-
-            mockedOBContext.when(OBContext::getOBContext).thenReturn(obContext);
-            when(obContext.getLanguage()).thenReturn(language);
-
-            mockedWeldUtils.when(() -> WeldUtils.getInstanceFromStaticBeanManager(I18NComponent.class))
-                    .thenReturn(i18nComponent);
-            when(i18nComponent.getLabels()).thenReturn(labels);
-
-            LabelsBuilder builder = new LabelsBuilder();
-            JSONObject result = builder.toJSON();
-
+        executeToJSONWithLabels(labels, result -> {
             assertNotNull(result, "Result should not be null");
             assertEquals(2, result.length(), "Result should contain 2 labels");
             assertEquals("Label Value 1", result.getString("LABEL_KEY_1"));
             assertEquals("Label Value 2", result.getString("LABEL_KEY_2"));
-        }
+        });
     }
 
     /**
@@ -86,24 +132,10 @@ class LabelsBuilderTest {
      */
     @Test
     void testToJSONWithEmptyLabels() throws JSONException {
-        List<I18NComponent.Label> labels = new ArrayList<>();
-
-        try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
-                MockedStatic<WeldUtils> mockedWeldUtils = mockStatic(WeldUtils.class)) {
-
-            mockedOBContext.when(OBContext::getOBContext).thenReturn(obContext);
-            when(obContext.getLanguage()).thenReturn(language);
-
-            mockedWeldUtils.when(() -> WeldUtils.getInstanceFromStaticBeanManager(I18NComponent.class))
-                    .thenReturn(i18nComponent);
-            when(i18nComponent.getLabels()).thenReturn(labels);
-
-            LabelsBuilder builder = new LabelsBuilder();
-            JSONObject result = builder.toJSON();
-
+        executeToJSONWithLabels(new ArrayList<>(), result -> {
             assertNotNull(result, "Result should not be null even with no labels");
             assertEquals(0, result.length(), "Result should be empty when no labels exist");
-        }
+        });
     }
 
     /**
@@ -112,30 +144,12 @@ class LabelsBuilderTest {
      */
     @Test
     void testToJSONWithSingleLabel() throws JSONException {
-        List<I18NComponent.Label> labels = new ArrayList<>();
-        labels.add(label1);
-
-        when(label1.getKey()).thenReturn("SINGLE_LABEL");
-        when(label1.getValue()).thenReturn("Single Value");
-
-        try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
-                MockedStatic<WeldUtils> mockedWeldUtils = mockStatic(WeldUtils.class)) {
-
-            mockedOBContext.when(OBContext::getOBContext).thenReturn(obContext);
-            when(obContext.getLanguage()).thenReturn(language);
-
-            mockedWeldUtils.when(() -> WeldUtils.getInstanceFromStaticBeanManager(I18NComponent.class))
-                    .thenReturn(i18nComponent);
-            when(i18nComponent.getLabels()).thenReturn(labels);
-
-            LabelsBuilder builder = new LabelsBuilder();
-            JSONObject result = builder.toJSON();
-
+        executeSingleLabelTest(SINGLE_LABEL_STRING, "Single Value", result -> {
             assertNotNull(result);
             assertEquals(1, result.length(), "Result should contain exactly 1 label");
-            assertTrue(result.has("SINGLE_LABEL"), "Result should have the label key");
-            assertEquals("Single Value", result.getString("SINGLE_LABEL"));
-        }
+            assertTrue(result.has(SINGLE_LABEL_STRING), "Result should have the label key");
+            assertEquals("Single Value", result.getString(SINGLE_LABEL_STRING));
+        });
     }
 
     /**
@@ -144,29 +158,12 @@ class LabelsBuilderTest {
      */
     @Test
     void testToJSONWithSpecialCharacters() throws JSONException {
-        List<I18NComponent.Label> labels = new ArrayList<>();
-        labels.add(label1);
+        String expectedValue = "Value with 'quotes' and \"double quotes\"";
 
-        when(label1.getKey()).thenReturn("SPECIAL_LABEL");
-        when(label1.getValue()).thenReturn("Value with 'quotes' and \"double quotes\"");
-
-        try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
-                MockedStatic<WeldUtils> mockedWeldUtils = mockStatic(WeldUtils.class)) {
-
-            mockedOBContext.when(OBContext::getOBContext).thenReturn(obContext);
-            when(obContext.getLanguage()).thenReturn(language);
-
-            mockedWeldUtils.when(() -> WeldUtils.getInstanceFromStaticBeanManager(I18NComponent.class))
-                    .thenReturn(i18nComponent);
-            when(i18nComponent.getLabels()).thenReturn(labels);
-
-            LabelsBuilder builder = new LabelsBuilder();
-            JSONObject result = builder.toJSON();
-
+        executeSingleLabelTest("SPECIAL_LABEL", expectedValue, result -> {
             assertNotNull(result);
-            assertEquals("Value with 'quotes' and \"double quotes\"",
-                    result.getString("SPECIAL_LABEL"));
-        }
+            assertEquals(expectedValue, result.getString("SPECIAL_LABEL"));
+        });
     }
 
     /**
@@ -175,29 +172,12 @@ class LabelsBuilderTest {
      */
     @Test
     void testToJSONWithUnicodeCharacters() throws JSONException {
-        List<I18NComponent.Label> labels = new ArrayList<>();
-        labels.add(label1);
+        String expectedValue = "Etiqueta en español: ñ, á, é, í, ó, ú";
 
-        when(label1.getKey()).thenReturn("UNICODE_LABEL");
-        when(label1.getValue()).thenReturn("Etiqueta en español: ñ, á, é, í, ó, ú");
-
-        try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
-                MockedStatic<WeldUtils> mockedWeldUtils = mockStatic(WeldUtils.class)) {
-
-            mockedOBContext.when(OBContext::getOBContext).thenReturn(obContext);
-            when(obContext.getLanguage()).thenReturn(language);
-
-            mockedWeldUtils.when(() -> WeldUtils.getInstanceFromStaticBeanManager(I18NComponent.class))
-                    .thenReturn(i18nComponent);
-            when(i18nComponent.getLabels()).thenReturn(labels);
-
-            LabelsBuilder builder = new LabelsBuilder();
-            JSONObject result = builder.toJSON();
-
+        executeSingleLabelTest("UNICODE_LABEL", expectedValue, result -> {
             assertNotNull(result);
-            assertEquals("Etiqueta en español: ñ, á, é, í, ó, ú",
-                    result.getString("UNICODE_LABEL"));
-        }
+            assertEquals(expectedValue, result.getString("UNICODE_LABEL"));
+        });
     }
 
     /**
@@ -206,6 +186,12 @@ class LabelsBuilderTest {
      */
     @Test
     void testInheritanceFromBuilder() throws JSONException {
+        executeToJSONWithLabels(new ArrayList<>(), result -> {
+            // We need to access the builder instance, so we test differently
+        });
+
+        // Alternative approach: create builder in separate try block to test
+        // inheritance
         try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
                 MockedStatic<WeldUtils> mockedWeldUtils = mockStatic(WeldUtils.class)) {
 
@@ -218,8 +204,7 @@ class LabelsBuilderTest {
 
             LabelsBuilder builder = new LabelsBuilder();
 
-            assertTrue(builder instanceof Builder,
-                    "LabelsBuilder should extend Builder");
+            assertTrue(builder instanceof Builder, "LabelsBuilder should extend Builder");
         }
     }
 
@@ -252,28 +237,10 @@ class LabelsBuilderTest {
      */
     @Test
     void testToJSONWithEmptyLabelValue() throws JSONException {
-        List<I18NComponent.Label> labels = new ArrayList<>();
-        labels.add(label1);
-
-        when(label1.getKey()).thenReturn("EMPTY_VALUE_LABEL");
-        when(label1.getValue()).thenReturn("");
-
-        try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
-                MockedStatic<WeldUtils> mockedWeldUtils = mockStatic(WeldUtils.class)) {
-
-            mockedOBContext.when(OBContext::getOBContext).thenReturn(obContext);
-            when(obContext.getLanguage()).thenReturn(language);
-
-            mockedWeldUtils.when(() -> WeldUtils.getInstanceFromStaticBeanManager(I18NComponent.class))
-                    .thenReturn(i18nComponent);
-            when(i18nComponent.getLabels()).thenReturn(labels);
-
-            LabelsBuilder builder = new LabelsBuilder();
-            JSONObject result = builder.toJSON();
-
+        executeSingleLabelTest(EMPTY_LABEL_STRING, "", result -> {
             assertNotNull(result);
-            assertTrue(result.has("EMPTY_VALUE_LABEL"));
-            assertEquals("", result.getString("EMPTY_VALUE_LABEL"));
-        }
+            assertTrue(result.has(EMPTY_LABEL_STRING));
+            assertEquals("", result.getString(EMPTY_LABEL_STRING));
+        });
     }
 }

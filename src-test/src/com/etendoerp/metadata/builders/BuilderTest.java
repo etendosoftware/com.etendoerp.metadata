@@ -134,9 +134,6 @@ class BuilderTest {
             mockedOBContext.when(OBContext::getOBContext).thenReturn(obContext);
             when(obContext.getLanguage()).thenReturn(language);
 
-            TestableBuilder builder1 = new TestableBuilder();
-            TestableBuilder builder2 = new TestableBuilder();
-
             // Both instances should reference the same static logger
             assertSame(Builder.logger, Builder.logger,
                     "Logger should be a static field and the same across instances");

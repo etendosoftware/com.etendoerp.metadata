@@ -63,7 +63,7 @@ class FieldBuilderWithoutColumnTest {
     @Mock
     private OBContext obContext;
 
-    private FieldBuilderWithoutColumn fieldBuilder;
+    private static final String DISPLAY_LOGIN_EXPRESSION_STRING = "displayLogicExpression";
 
     @BeforeEach
     void setUp() {
@@ -103,7 +103,7 @@ class FieldBuilderWithoutColumnTest {
                 extraMocks.run();
             }
 
-            fieldBuilder = new FieldBuilderWithoutColumn(field, fieldAccess);
+            FieldBuilderWithoutColumn fieldBuilder = new FieldBuilderWithoutColumn(field, fieldAccess);
             return fieldBuilder.toJSON();
         }
     }
@@ -215,7 +215,7 @@ class FieldBuilderWithoutColumnTest {
             JSONObject result = executeToJSON(null);
 
             assertNotNull(result);
-            assertTrue(result.has("displayLogicExpression"),
+            assertTrue(result.has(DISPLAY_LOGIN_EXPRESSION_STRING),
                     "Result should contain displayLogicExpression when display logic is set");
         }
     }
@@ -230,7 +230,7 @@ class FieldBuilderWithoutColumnTest {
         JSONObject result = executeToJSON(null);
 
         assertNotNull(result);
-        assertFalse(result.has("displayLogicExpression"),
+        assertFalse(result.has(DISPLAY_LOGIN_EXPRESSION_STRING),
                 "Result should not contain displayLogicExpression when not configured");
     }
 
@@ -244,7 +244,7 @@ class FieldBuilderWithoutColumnTest {
         JSONObject result = executeToJSON(null);
 
         assertNotNull(result);
-        assertFalse(result.has("displayLogicExpression"),
+        assertFalse(result.has(DISPLAY_LOGIN_EXPRESSION_STRING),
                 "Result should not contain displayLogicExpression for blank display logic");
     }
 
@@ -282,10 +282,10 @@ class FieldBuilderWithoutColumnTest {
     void testInheritanceFromFieldBuilder() throws JSONException {
         try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
                 MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class,
-                        (mock, context) -> {
+                        (mock, context) ->
                             when(mock.toJsonObject(any(Field.class), eq(DataResolvingMode.FULL_TRANSLATABLE)))
-                                    .thenReturn(new JSONObject().put("id", FIELD_ID));
-                        })) {
+                                    .thenReturn(new JSONObject().put("id", FIELD_ID))
+                        )) {
 
             mockedOBContext.when(OBContext::getOBContext).thenReturn(obContext);
             when(obContext.getLanguage()).thenReturn(language);
