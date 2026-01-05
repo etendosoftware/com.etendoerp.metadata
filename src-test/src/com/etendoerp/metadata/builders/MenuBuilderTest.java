@@ -55,7 +55,9 @@ class MenuBuilderTest {
   @Mock
   private Language language;
 
-  /**
+  private static final String PROCESS_URL_STRING = "processUrl";
+
+    /**
    * Test constructor of MenuBuilder.
    * This test ensures that the MenuBuilder can be constructed successfully
    * when the necessary context and menu manager are available.
@@ -251,7 +253,7 @@ class MenuBuilderTest {
 
       JSONObject processMenu = result.getJSONArray("menu").getJSONObject(0);
       assertEquals("AD_PROCESS_ID", processMenu.getString("processId"));
-      assertEquals("/mapping/url", processMenu.getString("processUrl"));
+      assertEquals("/mapping/url", processMenu.getString(PROCESS_URL_STRING));
       assertEquals("Process", processMenu.getString("processType"));
     }
   }
@@ -296,7 +298,7 @@ class MenuBuilderTest {
       JSONObject result = builder.toJSON();
 
       JSONObject reportMenu = result.getJSONArray("menu").getJSONObject(0);
-      assertEquals("/report/url", reportMenu.getString("processUrl"));
+      assertEquals("/report/url", reportMenu.getString(PROCESS_URL_STRING));
       assertEquals("Report", reportMenu.getString("processType"));
       assertTrue(reportMenu.getBoolean("isReport"));
     }
@@ -338,7 +340,7 @@ class MenuBuilderTest {
       JSONObject result = builder.toJSON();
 
       JSONObject pentahoMenu = result.getJSONArray("menu").getJSONObject(0);
-      assertEquals("/utility/OpenPentaho.html?inpadProcessId=AD_PENTAHO_ID", pentahoMenu.getString("processUrl"));
+      assertEquals("/utility/OpenPentaho.html?inpadProcessId=AD_PENTAHO_ID", pentahoMenu.getString(PROCESS_URL_STRING));
     }
   }
 

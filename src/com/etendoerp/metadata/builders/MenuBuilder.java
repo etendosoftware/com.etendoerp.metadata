@@ -73,7 +73,6 @@ public class MenuBuilder extends Builder {
     private void addProcessInfo(JSONObject json, org.openbravo.model.ad.ui.Process process, Menu menu) throws JSONException {
         json.put("processId", process.getId());
         String url = null;
-        MenuManager.MenuEntryType type = null;
         boolean modal = false;
         boolean report = false;
 
@@ -82,16 +81,11 @@ public class MenuBuilder extends Builder {
             if (defaultMapping != null) {
                 url = defaultMapping.getMappingName();
                 if ("Standard".equals(process.getUIPattern())) {
-                    type = MenuManager.MenuEntryType.Process;
                     modal = Utility.isModalProcess(process.getId());
                 } else if (process.isReport() || process.isJasperReport()) {
-                    type = MenuManager.MenuEntryType.Report;
                     report = true;
-                } else {
-                    type = MenuManager.MenuEntryType.ProcessManual;
                 }
             } else if ("P".equals(menu.getAction())) {
-                type = MenuManager.MenuEntryType.Process;
                 modal = Utility.isModalProcess(process.getId());
                 url = getProcessUrl(process);
             }
