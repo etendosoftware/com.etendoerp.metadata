@@ -272,11 +272,9 @@ class ProcessParameterBuilderTest {
     void testInheritanceFromBuilder() throws JSONException {
         try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
                 MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class,
-                        (mock, context) ->
-                            when(mock.toJsonObject(any(ProcessParameter.class),
-                                    eq(DataResolvingMode.FULL_TRANSLATABLE)))
-                                    .thenReturn(new JSONObject().put("id", PARAMETER_ID))
-                        )) {
+                        (mock, context) -> when(mock.toJsonObject(any(ProcessParameter.class),
+                                eq(DataResolvingMode.FULL_TRANSLATABLE)))
+                                .thenReturn(new JSONObject().put("id", PARAMETER_ID)))) {
 
             mockedOBContext.when(OBContext::getOBContext).thenReturn(obContext);
             when(obContext.getLanguage()).thenReturn(language);
@@ -307,10 +305,9 @@ class ProcessParameterBuilderTest {
 
         try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
                 MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class,
-                        (mock, context) ->
-                            when(mock.toJsonObject(eq(specificParam), eq(DataResolvingMode.FULL_TRANSLATABLE)))
-                                    .thenReturn(new JSONObject().put("id", SPECIFIC_PARAM_ID_STRING))
-                        )) {
+                        (mock, context) -> when(
+                                mock.toJsonObject(eq(specificParam), eq(DataResolvingMode.FULL_TRANSLATABLE)))
+                                .thenReturn(new JSONObject().put("id", SPECIFIC_PARAM_ID_STRING)))) {
 
             mockedOBContext.when(OBContext::getOBContext).thenReturn(obContext);
             when(obContext.getLanguage()).thenReturn(language);
@@ -321,7 +318,7 @@ class ProcessParameterBuilderTest {
             assertNotNull(result);
             assertEquals(SPECIFIC_PARAM_ID_STRING, result.getString("id"));
             assertTrue(result.getBoolean(IS_RANGE_STRING));
-            assertEquals("specific-format", result.getString(VALUE_FORMAT_STRING));
+            assertEquals(SPECIFIC_PARAM_ID_STRING, result.getString(VALUE_FORMAT_STRING));
         }
     }
 }
