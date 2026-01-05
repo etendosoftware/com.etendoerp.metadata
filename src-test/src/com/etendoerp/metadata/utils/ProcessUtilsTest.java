@@ -29,9 +29,10 @@ import com.etendoerp.metadata.exceptions.NotFoundException;
  */
 public class ProcessUtilsTest {
 
+    private static final String PATH_DELIMITER = "/";
     private static final String RESOURCE_NAME = "report-and-process";
     private static final String ENTITY_ID = "123";
-    private static final String VALID_PATH = "/" + RESOURCE_NAME + "/" + ENTITY_ID;
+    private static final String VALID_PATH = PATH_DELIMITER + RESOURCE_NAME + PATH_DELIMITER + ENTITY_ID;
     private static final String METADATA_PREFIX = "/com.etendoerp.metadata.meta/";
     private static final String PATH_INFO_REQUIRED = "Path info is required";
     private static final String RESOURCE_NAME_REQUIRED = "Resource name is required";
@@ -57,7 +58,7 @@ public class ProcessUtilsTest {
      */
     @Test
     public void testExtractEntityIdWithMetadataPrefix() {
-        String pathWithPrefix = METADATA_PREFIX + RESOURCE_NAME + "/" + ENTITY_ID;
+        String pathWithPrefix = METADATA_PREFIX + RESOURCE_NAME + PATH_DELIMITER + ENTITY_ID;
         String result = ProcessUtils.extractEntityId(pathWithPrefix, RESOURCE_NAME);
         assertEquals("Entity ID should be extracted from prefixed path", ENTITY_ID, result);
     }
@@ -67,7 +68,7 @@ public class ProcessUtilsTest {
      */
     @Test
     public void testExtractEntityIdWithoutLeadingSlash() {
-        String pathWithoutSlash = RESOURCE_NAME + "/" + ENTITY_ID;
+        String pathWithoutSlash = RESOURCE_NAME + PATH_DELIMITER + ENTITY_ID;
         String result = ProcessUtils.extractEntityId(pathWithoutSlash, RESOURCE_NAME);
         assertEquals("Entity ID should be extracted from path without leading slash", ENTITY_ID, result);
     }
@@ -77,7 +78,7 @@ public class ProcessUtilsTest {
      */
     @Test
     public void testExtractEntityIdWithTrailingSlash() {
-        String pathWithTrailing = VALID_PATH + "/";
+        String pathWithTrailing = VALID_PATH + PATH_DELIMITER;
         String result = ProcessUtils.extractEntityId(pathWithTrailing, RESOURCE_NAME);
         assertEquals("Entity ID should be extracted from path with trailing slash", ENTITY_ID, result);
     }
@@ -169,7 +170,7 @@ public class ProcessUtilsTest {
     @Test
     public void testExtractEntityIdInvalidPathFormat() {
         try {
-            ProcessUtils.extractEntityId("/invalid/path", RESOURCE_NAME);
+            ProcessUtils.extractEntityId(PATH_DELIMITER + "invalid" + PATH_DELIMITER + "path", RESOURCE_NAME);
             fail("Should throw NotFoundException for invalid path format");
         } catch (NotFoundException e) {
             assertTrue(ERROR_INVALID_PATH,
@@ -183,7 +184,7 @@ public class ProcessUtilsTest {
     @Test
     public void testExtractEntityIdWrongResourceName() {
         try {
-            ProcessUtils.extractEntityId("/wrong-resource/123", RESOURCE_NAME);
+            ProcessUtils.extractEntityId(PATH_DELIMITER + "wrong-resource" + PATH_DELIMITER + "123", RESOURCE_NAME);
             fail("Should throw NotFoundException for wrong resource name");
         } catch (NotFoundException e) {
             assertTrue("Error message should mention expected path format",
@@ -197,7 +198,7 @@ public class ProcessUtilsTest {
     @Test
     public void testExtractEntityIdNoEntityId() {
         try {
-            ProcessUtils.extractEntityId("/" + RESOURCE_NAME, RESOURCE_NAME);
+            ProcessUtils.extractEntityId(PATH_DELIMITER + RESOURCE_NAME, RESOURCE_NAME);
             fail("Should throw NotFoundException when entity ID is missing");
         } catch (NotFoundException e) {
             assertTrue(ERROR_INVALID_PATH,
@@ -221,7 +222,7 @@ public class ProcessUtilsTest {
      */
     @Test
     public void testExtractProcessIdWithMetadataPrefix() {
-        String pathWithPrefix = METADATA_PREFIX + RESOURCE_NAME + "/" + ENTITY_ID;
+        String pathWithPrefix = METADATA_PREFIX + RESOURCE_NAME + PATH_DELIMITER + ENTITY_ID;
         String result = ProcessUtils.extractProcessId(pathWithPrefix, RESOURCE_NAME);
         assertEquals("Process ID should be extracted correctly", ENTITY_ID, result);
     }
@@ -247,7 +248,7 @@ public class ProcessUtilsTest {
     @Test
     public void testExtractEntityIdWithUuid() {
         String uuid = "550e8400-e29b-41d4-a716-446655440000";
-        String path = "/" + RESOURCE_NAME + "/" + uuid;
+        String path = PATH_DELIMITER + RESOURCE_NAME + PATH_DELIMITER + uuid;
         String result = ProcessUtils.extractEntityId(path, RESOURCE_NAME);
         assertEquals("UUID entity ID should be extracted correctly", uuid, result);
     }
@@ -258,7 +259,7 @@ public class ProcessUtilsTest {
     @Test
     public void testExtractEntityIdWithAlphanumericId() {
         String alphanumericId = "ABC123XYZ";
-        String path = "/" + RESOURCE_NAME + "/" + alphanumericId;
+        String path = PATH_DELIMITER + RESOURCE_NAME + PATH_DELIMITER + alphanumericId;
         String result = ProcessUtils.extractEntityId(path, RESOURCE_NAME);
         assertEquals("Alphanumeric entity ID should be extracted correctly", alphanumericId, result);
     }
@@ -269,7 +270,7 @@ public class ProcessUtilsTest {
     @Test
     public void testExtractEntityIdWithDifferentResourceName() {
         String resourceName = "window";
-        String path = "/" + resourceName + "/" + ENTITY_ID;
+        String path = PATH_DELIMITER + resourceName + PATH_DELIMITER + ENTITY_ID;
         String result = ProcessUtils.extractEntityId(path, resourceName);
         assertEquals("Entity ID should be extracted for different resource names", ENTITY_ID, result);
     }
@@ -279,7 +280,8 @@ public class ProcessUtilsTest {
      */
     @Test
     public void testExtractEntityIdWithExtraSegments() {
-        String path = "/" + RESOURCE_NAME + "/" + ENTITY_ID + "/extra/segments";
+        String path = PATH_DELIMITER + RESOURCE_NAME + PATH_DELIMITER + ENTITY_ID + PATH_DELIMITER + "extra"
+                + PATH_DELIMITER + "segments";
         String result = ProcessUtils.extractEntityId(path, RESOURCE_NAME);
         assertEquals("Entity ID should be extracted even with extra segments", ENTITY_ID, result);
     }
@@ -290,7 +292,7 @@ public class ProcessUtilsTest {
     @Test
     public void testExtractEntityIdOnlySlash() {
         try {
-            ProcessUtils.extractEntityId("/", RESOURCE_NAME);
+            ProcessUtils.extractEntityId(PATH_DELIMITER, RESOURCE_NAME);
             fail("Should throw NotFoundException for path with only slash");
         } catch (NotFoundException e) {
             assertTrue(ERROR_INVALID_PATH,
@@ -303,7 +305,7 @@ public class ProcessUtilsTest {
      */
     @Test
     public void testExtractEntityIdWithDoubleSlashes() {
-        String path = "//" + RESOURCE_NAME + "//" + ENTITY_ID;
+        String path = PATH_DELIMITER + PATH_DELIMITER + RESOURCE_NAME + PATH_DELIMITER + PATH_DELIMITER + ENTITY_ID;
         // The result depends on how split handles empty strings
         try {
             ProcessUtils.extractEntityId(path, RESOURCE_NAME);

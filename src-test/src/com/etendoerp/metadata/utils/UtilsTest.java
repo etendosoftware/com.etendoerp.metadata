@@ -144,6 +144,8 @@ public class UtilsTest {
 
     /**
      * Tests converting an exception to JSON.
+     *
+     * @throws JSONException if an error occurs during JSON processing
      */
     @Test
     public void testConvertToJsonWithMessage() throws JSONException {
@@ -157,6 +159,8 @@ public class UtilsTest {
 
     /**
      * Tests converting an exception with a cause to JSON.
+     *
+     * @throws JSONException if an error occurs during JSON processing
      */
     @Test
     public void testConvertToJsonWithCause() throws JSONException {
@@ -173,6 +177,8 @@ public class UtilsTest {
      * Tests converting an exception with null message.
      * Note: JSONObject may not include keys with null values, so we just verify
      * that the method returns a valid JSON object without throwing exceptions.
+     *
+     * @throws JSONException if an error occurs during JSON processing
      */
     @Test
     public void testConvertToJsonWithNullMessage() throws JSONException {
@@ -217,6 +223,8 @@ public class UtilsTest {
 
     /**
      * Tests getting request data from valid JSON body.
+     *
+     * @throws Exception if an error occurs during test execution
      */
     @Test
     public void testGetRequestDataWithValidJson() throws Exception {
@@ -231,6 +239,8 @@ public class UtilsTest {
 
     /**
      * Tests getting request data from empty body.
+     *
+     * @throws Exception if an error occurs during test execution
      */
     @Test
     public void testGetRequestDataWithEmptyBody() throws Exception {
@@ -244,6 +254,8 @@ public class UtilsTest {
 
     /**
      * Tests getting request data when reader throws exception.
+     *
+     * @throws Exception if an error occurs during test execution
      */
     @Test
     public void testGetRequestDataWithException() throws Exception {
@@ -257,6 +269,8 @@ public class UtilsTest {
 
     /**
      * Tests getting request data from invalid JSON.
+     *
+     * @throws Exception if an error occurs during test execution
      */
     @Test
     public void testGetRequestDataWithInvalidJson() throws Exception {
@@ -272,6 +286,8 @@ public class UtilsTest {
 
     /**
      * Tests reading request body.
+     *
+     * @throws Exception if an error occurs during test execution
      */
     @Test
     public void testReadRequestBody() throws Exception {
@@ -285,6 +301,8 @@ public class UtilsTest {
 
     /**
      * Tests reading multiline request body.
+     *
+     * @throws Exception if an error occurs during test execution
      */
     @Test
     public void testReadRequestBodyMultiline() throws Exception {
@@ -298,6 +316,8 @@ public class UtilsTest {
 
     /**
      * Tests reading empty request body.
+     *
+     * @throws Exception if an error occurs during test execution
      */
     @Test
     public void testReadRequestBodyEmpty() throws Exception {
@@ -312,6 +332,8 @@ public class UtilsTest {
 
     /**
      * Tests writing JSON response.
+     *
+     * @throws Exception if an error occurs during test execution
      */
     @Test
     public void testWriteJsonResponse() throws Exception {
@@ -332,6 +354,8 @@ public class UtilsTest {
 
     /**
      * Tests writing JSON response with error status.
+     *
+     * @throws Exception if an error occurs during test execution
      */
     @Test
     public void testWriteJsonResponseWithErrorStatus() throws Exception {
@@ -350,6 +374,8 @@ public class UtilsTest {
 
     /**
      * Tests writing JSON error response.
+     *
+     * @throws Exception if an error occurs during test execution
      */
     @Test
     public void testWriteJsonErrorResponse() throws Exception {
@@ -373,6 +399,8 @@ public class UtilsTest {
 
     /**
      * Tests writing JSON error response with special characters.
+     *
+     * @throws Exception if an error occurs during test execution
      */
     @Test
     public void testWriteJsonErrorResponseWithSpecialCharacters() throws Exception {
