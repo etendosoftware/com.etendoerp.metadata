@@ -66,11 +66,12 @@ public class MenuBuilder extends Builder {
      * Adds process-related information to the provided JSON object.
      *
      * @param json    The JSONObject to populate.
+     * @param entry   The MenuOption entry.
      * @param process The process associated with the menu entry.
      * @param menu    The menu entry.
      * @throws JSONException If an error occurs while adding data to the JSON object.
      */
-    private void addProcessInfo(JSONObject json, org.openbravo.model.ad.ui.Process process, Menu menu) throws JSONException {
+    private void addProcessInfo(JSONObject json, MenuOption entry, org.openbravo.model.ad.ui.Process process, Menu menu) throws JSONException {
         json.put("processId", process.getId());
         String url = null;
         boolean modal = false;
@@ -84,6 +85,9 @@ public class MenuBuilder extends Builder {
                     modal = Utility.isModalProcess(process.getId());
                 } else if (process.isReport() || process.isJasperReport()) {
                     report = true;
+                } else if (entry.getType() == MenuManager.MenuEntryType.ProcessManual) {
+                    // NOTE: ProcessManual always open in a modal
+                    modal = true;
                 }
             } else if ("P".equals(menu.getAction())) {
                 modal = Utility.isModalProcess(process.getId());
@@ -172,7 +176,7 @@ public class MenuBuilder extends Builder {
 
             org.openbravo.model.ad.ui.Process process = menu.getProcess();
             if (null != process) {
-                addProcessInfo(json, process, menu);
+                addProcessInfo(json, entry, process, menu);
             }
 
             Process processDefinition = menu.getOBUIAPPProcessDefinition();
