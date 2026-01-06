@@ -22,9 +22,9 @@ class MetadataComponentProviderTest {
     @Test
     void testGetComponent() {
         MetadataComponentProvider provider = new MetadataComponentProvider();
-        assertThrows(IllegalArgumentException.class, () -> {
-            provider.getComponent("anyId", Collections.emptyMap());
-        });
+        assertThrows(IllegalArgumentException.class, () ->
+            provider.getComponent("anyId", Collections.emptyMap())
+        );
     }
 
     /**
