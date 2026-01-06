@@ -114,6 +114,8 @@ public class ServiceFactory {
             return new ReportAndProcessService(req, res);
         } else if (path.startsWith(PROCESS_PATH)) {
             return new ProcessMetadataService(req, res);
+        } else if (path.startsWith(PROCESS_EXECUTION_PATH)) {
+            return new ProcessExecutionService(req, res);
         } else if (path.startsWith(LEGACY_PATH)) {
             return new LegacyService(req, res);
         } else if (LegacyUtils.isLegacyPath(path)) {
