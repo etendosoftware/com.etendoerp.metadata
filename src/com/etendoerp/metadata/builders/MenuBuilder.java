@@ -89,7 +89,7 @@ public class MenuBuilder extends Builder {
                     // NOTE: ProcessManual always open in a modal
                     modal = true;
                 }
-            } else if ("P".equals(menu.getAction())) {
+            } else if ("P".equals(menu.getAction()) || "R".equals(menu.getAction())) {
                 modal = Utility.isModalProcess(process.getId());
                 url = getProcessUrl(process);
             }
