@@ -118,6 +118,9 @@ class FieldBuilderTest {
   private static final String RECORD_NAME = "record-name";
   private static final String DATASOURCE_FIELD = "datasource.field";
   private static final String DATASOURCE_FIELD_DOLLAR = "datasource$field";
+  private static final String VALUE_PROPERTY = "valueProperty";
+  private static final String DISPLAY_PROPERTY = "displayProperty";
+  private static final String SEARCH_FIELD = "searchField";
 
   /**
    * Sets up the necessary mocks and their behaviors before each test.
@@ -463,11 +466,11 @@ class FieldBuilderTest {
 
     try (MockedStatic<FieldBuilder> mockedStatic = mockStatic(FieldBuilder.class, CALLS_REAL_METHODS)) {
       mockedStatic.when(() -> FieldBuilder.getPropertyOrDataSourceField(selectorField))
-          .thenReturn("valueProperty");
+          .thenReturn(VALUE_PROPERTY);
 
       String result = FieldBuilder.getValueField(selector);
 
-      assertEquals("valueProperty", result);
+      assertEquals(VALUE_PROPERTY, result);
     }
   }
 
@@ -743,25 +746,25 @@ class FieldBuilderTest {
     when(selector.getSuggestiontextmatchstyle()).thenReturn("startsWith");
     when(selector.getOBUISELSelectorFieldList()).thenReturn(Collections.emptyList());
 
-    when(displayField.getProperty()).thenReturn("displayProperty");
+    when(displayField.getProperty()).thenReturn(DISPLAY_PROPERTY);
     when(displayField.getDisplayColumnAlias()).thenReturn("displayAlias");
     when(displayField.getObuiselSelector()).thenReturn(selector);
 
-    when(valueField.getProperty()).thenReturn("valueProperty");
+    when(valueField.getProperty()).thenReturn(VALUE_PROPERTY);
     when(valueField.getObuiselSelector()).thenReturn(selector);
 
     try (MockedStatic<FieldBuilder> mockedStatic = mockStatic(FieldBuilder.class, CALLS_REAL_METHODS)) {
-      mockedStatic.when(() -> FieldBuilder.getDisplayField(selector)).thenReturn("displayProperty");
-      mockedStatic.when(() -> FieldBuilder.getValueField(selector)).thenReturn("valueProperty");
+      mockedStatic.when(() -> FieldBuilder.getDisplayField(selector)).thenReturn(DISPLAY_PROPERTY);
+      mockedStatic.when(() -> FieldBuilder.getValueField(selector)).thenReturn(VALUE_PROPERTY);
       mockedStatic.when(() -> FieldBuilder.getExtraSearchFields(selector)).thenReturn("");
-      mockedStatic.when(() -> FieldBuilder.getPropertyOrDataSourceField(displayField)).thenReturn("displayProperty");
-      mockedStatic.when(() -> FieldBuilder.getPropertyOrDataSourceField(valueField)).thenReturn("valueProperty");
+      mockedStatic.when(() -> FieldBuilder.getPropertyOrDataSourceField(displayField)).thenReturn(DISPLAY_PROPERTY);
+      mockedStatic.when(() -> FieldBuilder.getPropertyOrDataSourceField(valueField)).thenReturn(VALUE_PROPERTY);
 
       JSONObject result = FieldBuilder.addSelectorInfo(FIELD_ID, selector);
 
       assertEquals("TestTable", result.getString(Constants.DATASOURCE_PROPERTY));
-      assertEquals("displayProperty", result.getString(Constants.DISPLAY_FIELD_PROPERTY));
-      assertEquals("valueProperty", result.getString(Constants.VALUE_FIELD_PROPERTY));
+      assertEquals(DISPLAY_PROPERTY, result.getString(Constants.DISPLAY_FIELD_PROPERTY));
+      assertEquals(VALUE_PROPERTY, result.getString(Constants.VALUE_FIELD_PROPERTY));
       assertEquals("startsWith", result.getString(JsonConstants.TEXTMATCH_PARAMETER));
     }
   }
@@ -779,7 +782,7 @@ class FieldBuilderTest {
 
     when(activeField.isActive()).thenReturn(true);
     when(activeField.isSearchinsuggestionbox()).thenReturn(true);
-    when(activeField.getProperty()).thenReturn("searchField");
+    when(activeField.getProperty()).thenReturn(SEARCH_FIELD);
     when(activeField.getObuiselSelector()).thenReturn(selector);
     when(selector.getTable()).thenReturn(table);
 
@@ -788,11 +791,11 @@ class FieldBuilderTest {
 
     try (MockedStatic<FieldBuilder> mockedStatic = mockStatic(FieldBuilder.class, CALLS_REAL_METHODS)) {
       mockedStatic.when(() -> FieldBuilder.getDisplayField(selector)).thenReturn("display");
-      mockedStatic.when(() -> FieldBuilder.getPropertyOrDataSourceField(activeField)).thenReturn("searchField");
+      mockedStatic.when(() -> FieldBuilder.getPropertyOrDataSourceField(activeField)).thenReturn(SEARCH_FIELD);
 
       String result = FieldBuilder.getExtraSearchFields(selector);
 
-      assertEquals("searchField", result);
+      assertEquals(SEARCH_FIELD, result);
     }
   }
 

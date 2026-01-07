@@ -27,12 +27,11 @@ import com.etendoerp.metadata.exceptions.InternalServerException;
 import com.etendoerp.metadata.exceptions.NotFoundException;
 import com.etendoerp.metadata.utils.LegacyPaths;
 import com.etendoerp.metadata.utils.LegacyUtils;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
-import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.function.BiFunction;
 
 import static com.etendoerp.metadata.utils.Constants.*;
 
@@ -41,7 +40,30 @@ import static com.etendoerp.metadata.utils.Constants.*;
  */
 public class ServiceFactory {
 
-    private static MetadataService buildLegacyForwardService(HttpServletRequest req, HttpServletResponse res, String path) {
+    private static final Map<String, BiFunction<HttpServletRequest, HttpServletResponse, MetadataService>> EXACT_MATCH_SERVICES = new LinkedHashMap<>();
+    private static final Map<String, BiFunction<HttpServletRequest, HttpServletResponse, MetadataService>> PREFIX_MATCH_SERVICES = new LinkedHashMap<>();
+
+    static {
+        // Exact match services
+        EXACT_MATCH_SERVICES.put(SESSION_PATH, SessionService::new);
+        EXACT_MATCH_SERVICES.put(MENU_PATH, MenuService::new);
+        EXACT_MATCH_SERVICES.put(MESSAGE_PATH, MessageService::new);
+        EXACT_MATCH_SERVICES.put(LABELS_PATH, LabelsService::new);
+
+        // Prefix match services (order matters for overlapping prefixes)
+        PREFIX_MATCH_SERVICES.put(WINDOW_PATH, WindowService::new);
+        PREFIX_MATCH_SERVICES.put(TAB_PATH, TabService::new);
+        PREFIX_MATCH_SERVICES.put(LANGUAGE_PATH, LanguageService::new);
+        PREFIX_MATCH_SERVICES.put(LOCATION_PATH, LocationMetadataService::new);
+        PREFIX_MATCH_SERVICES.put(TOOLBAR_PATH, ToolbarService::new);
+        PREFIX_MATCH_SERVICES.put(REPORT_AND_PROCESS_PATH, ReportAndProcessService::new);
+        PREFIX_MATCH_SERVICES.put(PROCESS_EXECUTION_PATH, ProcessExecutionService::new);
+        PREFIX_MATCH_SERVICES.put(PROCESS_PATH, ProcessMetadataService::new);
+        PREFIX_MATCH_SERVICES.put(LEGACY_PATH, LegacyService::new);
+    }
+
+    private static MetadataService buildLegacyForwardService(HttpServletRequest req, HttpServletResponse res,
+            String path) {
         return new MetadataService(req, res) {
 
             @Override
@@ -82,46 +104,38 @@ public class ServiceFactory {
             }
 
             private void handleException(Exception e) throws ServletException, IOException {
-                if (e instanceof ServletException) throw (ServletException) e;
-                if (e instanceof IOException) throw (IOException) e;
+                if (e instanceof ServletException)
+                    throw (ServletException) e;
+                if (e instanceof IOException)
+                    throw (IOException) e;
                 throw new InternalServerException("Failed to forward legacy request: " + e.getMessage(), e);
             }
         };
     }
 
     public static MetadataService getService(final HttpServletRequest req, final HttpServletResponse res) {
-        final String path = req.getPathInfo() != null ? req.getPathInfo().replace("/com.etendoerp.metadata.meta/", "/") : "";
+        final String path = req.getPathInfo() != null
+                ? req.getPathInfo().replace("/com.etendoerp.metadata.meta/", "/")
+                : "";
 
-        if (path.equals(SESSION_PATH)) {
-            return new SessionService(req, res);
-        } else if (path.equals(MENU_PATH)) {
-            return new MenuService(req, res);
-        } else if (path.startsWith(WINDOW_PATH)) {
-            return new WindowService(req, res);
-        } else if (path.startsWith(TAB_PATH)) {
-            return new TabService(req, res);
-        } else if (path.startsWith(LANGUAGE_PATH)) {
-            return new LanguageService(req, res);
-        } else if (path.equals(MESSAGE_PATH)) {
-            return new MessageService(req, res);
-        } else if (path.equals(LABELS_PATH)) {
-            return new LabelsService(req, res);
-        } else if (path.startsWith(LOCATION_PATH)) {
-            return new LocationMetadataService(req, res);
-        } else if (path.startsWith(TOOLBAR_PATH)) {
-            return new ToolbarService(req, res);
-        } else if (path.startsWith(REPORT_AND_PROCESS_PATH)) {
-            return new ReportAndProcessService(req, res);
-        } else if (path.startsWith(PROCESS_PATH)) {
-            return new ProcessMetadataService(req, res);
-        } else if (path.startsWith(PROCESS_EXECUTION_PATH)) {
-            return new ProcessExecutionService(req, res);
-        } else if (path.startsWith(LEGACY_PATH)) {
-            return new LegacyService(req, res);
-        } else if (LegacyUtils.isLegacyPath(path)) {
-            return buildLegacyForwardService(req, res, path);
-        } else {
-            throw new NotFoundException();
+        // Check exact matches first
+        if (EXACT_MATCH_SERVICES.containsKey(path)) {
+            return EXACT_MATCH_SERVICES.get(path).apply(req, res);
         }
+
+        // Check prefix matches
+        for (Map.Entry<String, BiFunction<HttpServletRequest, HttpServletResponse, MetadataService>> entry : PREFIX_MATCH_SERVICES
+                .entrySet()) {
+            if (path.startsWith(entry.getKey())) {
+                return entry.getValue().apply(req, res);
+            }
+        }
+
+        // Check legacy paths
+        if (LegacyUtils.isLegacyPath(path)) {
+            return buildLegacyForwardService(req, res, path);
+        }
+
+        throw new NotFoundException();
     }
 }

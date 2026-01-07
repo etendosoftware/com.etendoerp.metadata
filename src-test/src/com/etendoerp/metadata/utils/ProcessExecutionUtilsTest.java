@@ -29,6 +29,8 @@ public class ProcessExecutionUtilsTest extends OBBaseTest {
     private static final String ASYNC_KEY = "async";
     private static final String TRUE_VALUE = "true";
     private static final String REC_ID = "rec";
+    private static final String RESULT_MATCH_MSG = "Result should match delegated instance";
+    private static final String ASYNC_RESULT_MSG = "Async call should return delegated instance";
 
     /**
      * Verifies that synchronous process execution delegates to {@link CallProcess}.
@@ -46,7 +48,7 @@ public class ProcessExecutionUtilsTest extends OBBaseTest {
 
             ProcessInstance result = ProcessExecutionUtils.callProcess(mockProcess, RECORD_STRING, parameters);
 
-            assertSame("Result should match delegated instance", expectedInstance, result);
+            assertSame(RESULT_MATCH_MSG, expectedInstance, result);
             verify(callProcess).call(mockProcess, RECORD_STRING, parameters);
         }
     }
@@ -63,7 +65,7 @@ public class ProcessExecutionUtilsTest extends OBBaseTest {
 
             ProcessInstance result = ProcessExecutionUtils.callProcess(PROCESS_NAME, RECORD_STRING, parameters);
 
-            assertSame("Result should match delegated instance", expectedInstance, result);
+            assertSame(RESULT_MATCH_MSG, expectedInstance, result);
             verify(callProcess).call(PROCESS_NAME, RECORD_STRING, parameters);
         }
     }
@@ -82,7 +84,7 @@ public class ProcessExecutionUtilsTest extends OBBaseTest {
             ProcessInstance result = ProcessExecutionUtils.callProcess(PROCESS_NAME, RECORD_STRING, parameters,
                     doCommit);
 
-            assertSame("Result should match delegated instance", expectedInstance, result);
+            assertSame(RESULT_MATCH_MSG, expectedInstance, result);
             verify(callProcess).call(PROCESS_NAME, RECORD_STRING, parameters, doCommit);
         }
     }
@@ -102,7 +104,7 @@ public class ProcessExecutionUtilsTest extends OBBaseTest {
             ProcessInstance result = ProcessExecutionUtils.callProcess(mockProcess, RECORD_STRING, parameters,
                     doCommit);
 
-            assertSame("Result should match delegated instance", expectedInstance, result);
+            assertSame(RESULT_MATCH_MSG, expectedInstance, result);
             verify(callProcess).call(mockProcess, RECORD_STRING, parameters, doCommit);
         }
     }
@@ -123,7 +125,7 @@ public class ProcessExecutionUtilsTest extends OBBaseTest {
 
             ProcessInstance result = ProcessExecutionUtils.callProcessAsync(mockProcess, REC_ID, parameters);
 
-            assertSame("Async call should return delegated instance", expectedInstance, result);
+            assertSame(ASYNC_RESULT_MSG, expectedInstance, result);
             verify(asyncProcess).call(mockProcess, REC_ID, parameters);
         }
     }
@@ -140,7 +142,7 @@ public class ProcessExecutionUtilsTest extends OBBaseTest {
 
             ProcessInstance result = ProcessExecutionUtils.callProcessAsync(PROCESS_NAME, REC_ID, parameters);
 
-            assertSame("Async call should return delegated instance", expectedInstance, result);
+            assertSame(ASYNC_RESULT_MSG, expectedInstance, result);
             verify(asyncProcess).call(PROCESS_NAME, REC_ID, parameters);
         }
     }
@@ -159,7 +161,7 @@ public class ProcessExecutionUtilsTest extends OBBaseTest {
 
             ProcessInstance result = ProcessExecutionUtils.callProcessAsync(PROCESS_NAME, REC_ID, parameters, doCommit);
 
-            assertSame("Async call should return delegated instance", expectedInstance, result);
+            assertSame(ASYNC_RESULT_MSG, expectedInstance, result);
             verify(asyncProcess).call(PROCESS_NAME, REC_ID, parameters, doCommit);
         }
     }
@@ -179,7 +181,7 @@ public class ProcessExecutionUtilsTest extends OBBaseTest {
 
             ProcessInstance result = ProcessExecutionUtils.callProcessAsync(mockProcess, REC_ID, parameters, doCommit);
 
-            assertSame("Async call should return delegated instance", expectedInstance, result);
+            assertSame(ASYNC_RESULT_MSG, expectedInstance, result);
             verify(asyncProcess).call(mockProcess, REC_ID, parameters, doCommit);
         }
     }
