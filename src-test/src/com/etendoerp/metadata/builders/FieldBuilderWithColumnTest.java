@@ -122,18 +122,23 @@ class FieldBuilderWithColumnTest {
         try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
                 MockedStatic<KernelUtils> mockedKernelUtils = mockStatic(KernelUtils.class);
                 MockedStatic<DataSourceUtils> mockedDataSourceUtils = mockStatic(DataSourceUtils.class);
-                MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class,
+                MockedConstruction<DataToJsonConverter> ignored = mockConstruction(
+                        DataToJsonConverter.class,
                         (mock, context) -> {
                             JSONObject base = new JSONObject().put("id", FIELD_ID);
-                            when(mock.toJsonObject(any(Field.class), eq(DataResolvingMode.FULL_TRANSLATABLE)))
+                            when(mock.toJsonObject(any(Field.class),
+                                    eq(DataResolvingMode.FULL_TRANSLATABLE)))
                                     .thenReturn(base);
-                            when(mock.toJsonObject(any(Column.class), eq(DataResolvingMode.FULL_TRANSLATABLE)))
-                                    .thenReturn(new JSONObject().put("id", COLUMN_ID));
+                            when(mock.toJsonObject(any(Column.class),
+                                    eq(DataResolvingMode.FULL_TRANSLATABLE)))
+                                    .thenReturn(new JSONObject().put("id",
+                                            COLUMN_ID));
                         })) {
 
             mockedOBContext.when(OBContext::getOBContext).thenReturn(obContext);
             mockedKernelUtils.when(() -> KernelUtils.getProperty(field)).thenReturn(fieldProperty);
-            mockedDataSourceUtils.when(() -> DataSourceUtils.getHQLColumnName(true, TEST_TABLE_NAME, TEST_COLUMN_NAME))
+            mockedDataSourceUtils.when(
+                    () -> DataSourceUtils.getHQLColumnName(true, TEST_TABLE_NAME, TEST_COLUMN_NAME))
                     .thenReturn(new String[] { TEST_FIELD });
 
             when(obContext.getLanguage()).thenReturn(language);
@@ -151,7 +156,8 @@ class FieldBuilderWithColumnTest {
             String jsExpression,
             Runnable extraMocks) throws JSONException {
 
-        try (MockedConstruction<DynamicExpressionParser> ignored = mockConstruction(DynamicExpressionParser.class,
+        try (MockedConstruction<DynamicExpressionParser> ignored = mockConstruction(
+                DynamicExpressionParser.class,
                 (mock, context) -> when(mock.getJSExpression()).thenReturn(jsExpression))) {
             return executeToJSON(extraMocks);
         }
@@ -279,17 +285,34 @@ class FieldBuilderWithColumnTest {
                 MockedStatic<DataSourceUtils> mockedDataSourceUtils = mockStatic(DataSourceUtils.class);
                 MockedStatic<org.openbravo.base.model.ModelProvider> mockedModelProvider = mockStatic(
                         org.openbravo.base.model.ModelProvider.class);
-                MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class,
+                MockedStatic<OBDal> mockedOBDal = mockStatic(OBDal.class);
+                MockedStatic<Utils> mockedUtils = mockStatic(Utils.class);
+                MockedConstruction<DataToJsonConverter> ignored = mockConstruction(
+                        DataToJsonConverter.class,
                         (mock, context) -> {
                             JSONObject base = new JSONObject().put("id", FIELD_ID);
-                            when(mock.toJsonObject(any(Field.class), eq(DataResolvingMode.FULL_TRANSLATABLE)))
+                            when(mock.toJsonObject(any(Field.class),
+                                    eq(DataResolvingMode.FULL_TRANSLATABLE)))
                                     .thenReturn(base);
-                            when(mock.toJsonObject(any(Column.class), eq(DataResolvingMode.FULL_TRANSLATABLE)))
-                                    .thenReturn(new JSONObject().put("id", COLUMN_ID));
+                            when(mock.toJsonObject(any(Column.class),
+                                    eq(DataResolvingMode.FULL_TRANSLATABLE)))
+                                    .thenReturn(new JSONObject().put("id",
+                                            COLUMN_ID));
                         })) {
 
             mockedOBContext.when(OBContext::getOBContext).thenReturn(obContext);
             when(obContext.getLanguage()).thenReturn(language);
+
+            // Mock OBDal to avoid EntityAccessChecker null issue
+            mockedOBDal.when(OBDal::getInstance).thenReturn(obDal);
+            when(obDal.get(eq(Table.class), anyString())).thenReturn(table);
+            when(obDal.createCriteria(Tab.class)).thenReturn(criteria);
+            when(criteria.add(any(Criterion.class))).thenReturn(criteria);
+            when(criteria.setMaxResults(anyInt())).thenReturn(criteria);
+            when(criteria.uniqueResult()).thenReturn(null);
+
+            // Mock Utils.getReferencedTab to avoid internal OBDal call
+            mockedUtils.when(() -> Utils.getReferencedTab(any(Property.class))).thenReturn(null);
 
             KernelUtils kernelUtilsInstance = mock(KernelUtils.class);
             mockedKernelUtils.when(KernelUtils::getInstance).thenReturn(kernelUtilsInstance);
@@ -302,7 +325,8 @@ class FieldBuilderWithColumnTest {
                     .thenReturn(modelProviderInstance);
             when(modelProviderInstance.getEntityByTableName(TEST_TABLE_NAME)).thenReturn(parentEntity);
 
-            mockedDataSourceUtils.when(() -> DataSourceUtils.getHQLColumnName(true, TEST_TABLE_NAME, TEST_COLUMN_NAME))
+            mockedDataSourceUtils.when(
+                    () -> DataSourceUtils.getHQLColumnName(true, TEST_TABLE_NAME, TEST_COLUMN_NAME))
                     .thenReturn(new String[] { TEST_FIELD });
 
             fieldBuilder = new FieldBuilderWithColumn(field, fieldAccess);
@@ -318,13 +342,17 @@ class FieldBuilderWithColumnTest {
         try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
                 MockedStatic<KernelUtils> mockedKernelUtils = mockStatic(KernelUtils.class);
                 MockedStatic<DataSourceUtils> mockedDataSourceUtils = mockStatic(DataSourceUtils.class);
-                MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class,
+                MockedConstruction<DataToJsonConverter> ignored = mockConstruction(
+                        DataToJsonConverter.class,
                         (mock, context) -> {
                             JSONObject base = new JSONObject().put("id", FIELD_ID);
-                            when(mock.toJsonObject(any(Field.class), eq(DataResolvingMode.FULL_TRANSLATABLE)))
+                            when(mock.toJsonObject(any(Field.class),
+                                    eq(DataResolvingMode.FULL_TRANSLATABLE)))
                                     .thenReturn(base);
-                            when(mock.toJsonObject(any(Column.class), eq(DataResolvingMode.FULL_TRANSLATABLE)))
-                                    .thenReturn(new JSONObject().put("id", COLUMN_ID));
+                            when(mock.toJsonObject(any(Column.class),
+                                    eq(DataResolvingMode.FULL_TRANSLATABLE)))
+                                    .thenReturn(new JSONObject().put("id",
+                                            COLUMN_ID));
                         })) {
 
             mockedOBContext.when(OBContext::getOBContext).thenReturn(obContext);
@@ -333,7 +361,8 @@ class FieldBuilderWithColumnTest {
             mockedKernelUtils.when(() -> KernelUtils.getProperty(field))
                     .thenThrow(new RuntimeException("Test exception"));
 
-            mockedDataSourceUtils.when(() -> DataSourceUtils.getHQLColumnName(true, TEST_TABLE_NAME, TEST_COLUMN_NAME))
+            mockedDataSourceUtils.when(
+                    () -> DataSourceUtils.getHQLColumnName(true, TEST_TABLE_NAME, TEST_COLUMN_NAME))
                     .thenReturn(new String[] { TEST_FIELD });
 
             fieldBuilder = new FieldBuilderWithColumn(field, fieldAccess);
@@ -352,10 +381,12 @@ class FieldBuilderWithColumnTest {
         try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
                 MockedStatic<KernelUtils> mockedKernelUtils = mockStatic(KernelUtils.class);
                 MockedStatic<DataSourceUtils> mockedDataSourceUtils = mockStatic(DataSourceUtils.class);
-                MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class,
+                MockedConstruction<DataToJsonConverter> ignored = mockConstruction(
+                        DataToJsonConverter.class,
                         (mock, context) -> {
                             JSONObject base = new JSONObject().put("id", FIELD_ID);
-                            when(mock.toJsonObject(any(Field.class), eq(DataResolvingMode.FULL_TRANSLATABLE)))
+                            when(mock.toJsonObject(any(Field.class),
+                                    eq(DataResolvingMode.FULL_TRANSLATABLE)))
                                     .thenReturn(base);
                         })) {
 
@@ -364,7 +395,8 @@ class FieldBuilderWithColumnTest {
 
             mockedKernelUtils.when(() -> KernelUtils.getProperty(field)).thenReturn(fieldProperty);
 
-            mockedDataSourceUtils.when(() -> DataSourceUtils.getHQLColumnName(anyBoolean(), anyString(), anyString()))
+            mockedDataSourceUtils.when(
+                    () -> DataSourceUtils.getHQLColumnName(anyBoolean(), anyString(), anyString()))
                     .thenReturn(new String[] { TEST_FIELD });
 
             // FieldBuilderWithColumn cannot be instantiated with null column

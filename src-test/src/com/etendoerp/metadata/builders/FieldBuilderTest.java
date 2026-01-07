@@ -12,6 +12,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Answers.CALLS_REAL_METHODS;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.mockStatic;
@@ -33,11 +35,14 @@ import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.openbravo.base.model.Entity;
 import org.openbravo.base.model.ModelProvider;
+import org.openbravo.base.model.Property;
 import org.openbravo.base.model.domaintype.DomainType;
 import org.openbravo.base.model.domaintype.PrimitiveDomainType;
 import org.openbravo.base.secureApp.VariablesSecureApp;
 import org.openbravo.client.kernel.RequestContext;
+import org.openbravo.dal.core.DalUtil;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.data.FieldProvider;
@@ -785,13 +790,27 @@ class FieldBuilderTest {
     when(activeField.getProperty()).thenReturn(SEARCH_FIELD);
     when(activeField.getObuiselSelector()).thenReturn(selector);
     when(selector.getTable()).thenReturn(table);
+    when(table.getName()).thenReturn("TestTable");
 
     when(displayField.getProperty()).thenReturn("display");
     when(displayField.getObuiselSelector()).thenReturn(selector);
 
-    try (MockedStatic<FieldBuilder> mockedStatic = mockStatic(FieldBuilder.class, CALLS_REAL_METHODS)) {
+    try (MockedStatic<FieldBuilder> mockedStatic = mockStatic(FieldBuilder.class, CALLS_REAL_METHODS);
+        MockedStatic<ModelProvider> mockedModelProvider = mockStatic(ModelProvider.class);
+        MockedStatic<DalUtil> mockedDalUtil = mockStatic(DalUtil.class)) {
       mockedStatic.when(() -> FieldBuilder.getDisplayField(selector)).thenReturn("display");
       mockedStatic.when(() -> FieldBuilder.getPropertyOrDataSourceField(activeField)).thenReturn(SEARCH_FIELD);
+
+      Entity mockEntity = mock(Entity.class);
+      Property mockProperty = mock(Property.class);
+      PrimitiveDomainType mockDomainType = mock(PrimitiveDomainType.class);
+
+      mockedModelProvider.when(ModelProvider::getInstance).thenReturn(modelProvider);
+      when(modelProvider.getEntity("TestTable")).thenReturn(mockEntity);
+      mockedDalUtil.when(() -> DalUtil.getPropertyFromPath(any(Entity.class), eq(SEARCH_FIELD)))
+          .thenReturn(mockProperty);
+      when(mockProperty.getDomainType()).thenReturn(mockDomainType);
+      doReturn(String.class).when(mockDomainType).getPrimitiveType();
 
       String result = FieldBuilder.getExtraSearchFields(selector);
 
