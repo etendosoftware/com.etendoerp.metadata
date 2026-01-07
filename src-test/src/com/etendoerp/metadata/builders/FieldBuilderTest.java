@@ -126,6 +126,7 @@ class FieldBuilderTest {
   private static final String VALUE_PROPERTY = "valueProperty";
   private static final String DISPLAY_PROPERTY = "displayProperty";
   private static final String SEARCH_FIELD = "searchField";
+  private static final String TEST_TABLE = "TestTable";
 
   /**
    * Sets up the necessary mocks and their behaviors before each test.
@@ -744,7 +745,7 @@ class FieldBuilderTest {
     when(selector.getObserdsDatasource()).thenReturn(null);
     when(selector.isCustomQuery()).thenReturn(false);
     when(selector.getTable()).thenReturn(table);
-    when(table.getName()).thenReturn("TestTable");
+    when(table.getName()).thenReturn(TEST_TABLE);
     when(selector.getId()).thenReturn("selector-id");
     when(selector.getDisplayfield()).thenReturn(displayField);
     when(selector.getValuefield()).thenReturn(valueField);
@@ -767,7 +768,7 @@ class FieldBuilderTest {
 
       JSONObject result = FieldBuilder.addSelectorInfo(FIELD_ID, selector);
 
-      assertEquals("TestTable", result.getString(Constants.DATASOURCE_PROPERTY));
+      assertEquals(TEST_TABLE, result.getString(Constants.DATASOURCE_PROPERTY));
       assertEquals(DISPLAY_PROPERTY, result.getString(Constants.DISPLAY_FIELD_PROPERTY));
       assertEquals(VALUE_PROPERTY, result.getString(Constants.VALUE_FIELD_PROPERTY));
       assertEquals("startsWith", result.getString(JsonConstants.TEXTMATCH_PARAMETER));
@@ -790,7 +791,7 @@ class FieldBuilderTest {
     when(activeField.getProperty()).thenReturn(SEARCH_FIELD);
     when(activeField.getObuiselSelector()).thenReturn(selector);
     when(selector.getTable()).thenReturn(table);
-    when(table.getName()).thenReturn("TestTable");
+    when(table.getName()).thenReturn(TEST_TABLE);
 
     when(displayField.getProperty()).thenReturn("display");
     when(displayField.getObuiselSelector()).thenReturn(selector);
@@ -806,7 +807,7 @@ class FieldBuilderTest {
       PrimitiveDomainType mockDomainType = mock(PrimitiveDomainType.class);
 
       mockedModelProvider.when(ModelProvider::getInstance).thenReturn(modelProvider);
-      when(modelProvider.getEntity("TestTable")).thenReturn(mockEntity);
+      when(modelProvider.getEntity(TEST_TABLE)).thenReturn(mockEntity);
       mockedDalUtil.when(() -> DalUtil.getPropertyFromPath(any(Entity.class), eq(SEARCH_FIELD)))
           .thenReturn(mockProperty);
       when(mockProperty.getDomainType()).thenReturn(mockDomainType);
