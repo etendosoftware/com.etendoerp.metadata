@@ -55,7 +55,7 @@ public class ProcessDefinitionBuilder extends Builder {
 
         if (reportDef != null) {
             JSONObject reportDefJSON = new JSONObject();
-            reportDefJSON.put("pdfTemplate", reportDef.getPDFTemplate());
+            reportDefJSON.put("id", reportDef.getId());
             reportDefJSON.put("xlsTemplate", reportDef.getXLSTemplate());
             reportDefJSON.put("htmlTemplate", reportDef.getHTMLTemplate());
             reportDefJSON.put("usePdfAsXlsTemplate", reportDef.isUsePDFAsXLSTemplate());
