@@ -69,7 +69,8 @@ import com.etendoerp.metadata.data.ReferenceSelectors;
 import com.etendoerp.metadata.utils.Constants;
 
 /**
- * Test class for FieldBuilder, which contains methods to build and manipulate field-related data.
+ * Test class for FieldBuilder, which contains methods to build and manipulate
+ * field-related data.
  * This class uses Mockito for mocking dependencies and JUnit 5 for testing.
  */
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -118,8 +119,7 @@ class FieldBuilderTest {
   private static final String DATASOURCE_FIELD = "datasource.field";
   private static final String DATASOURCE_FIELD_DOLLAR = "datasource$field";
 
-
-    /**
+  /**
    * Sets up the necessary mocks and their behaviors before each test.
    */
   @BeforeEach
@@ -158,7 +158,8 @@ class FieldBuilderTest {
   }
 
   /**
-   * Tests if the field is not a process field when both process and process definition are null.
+   * Tests if the field is not a process field when both process and process
+   * definition are null.
    */
   @Test
   void testIsProcessFieldWithoutProcess() {
@@ -226,12 +227,12 @@ class FieldBuilderTest {
     Process processMock = mock(Process.class);
 
     try (MockedStatic<FieldBuilder> mockedStatic = mockStatic(FieldBuilder.class, CALLS_REAL_METHODS);
-         MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class);
-         MockedStatic<DalConnectionProvider> dalConnStatic = mockStatic(DalConnectionProvider.class);
-         MockedStatic<RequestContext> requestContextStatic = mockStatic(RequestContext.class);
-         MockedStatic<Utility> utilityStatic = mockStatic(Utility.class);
-         MockedConstruction<ComboTableData> comboTableDataMockedConstruction = mockConstruction(ComboTableData.class,
-             (mock, context) -> when(mock.select(false)).thenReturn(new FieldProvider[0]))) {
+        MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class);
+        MockedStatic<DalConnectionProvider> dalConnStatic = mockStatic(DalConnectionProvider.class);
+        MockedStatic<RequestContext> requestContextStatic = mockStatic(RequestContext.class);
+        MockedStatic<Utility> utilityStatic = mockStatic(Utility.class);
+        MockedConstruction<ComboTableData> comboTableDataMockedConstruction = mockConstruction(ComboTableData.class,
+            (mock, context) -> when(mock.select(false)).thenReturn(new FieldProvider[0]))) {
 
       OBDal obDal = mock(OBDal.class);
       obDalStatic.when(OBDal::getInstance).thenReturn(obDal);
@@ -245,7 +246,8 @@ class FieldBuilderTest {
       when(processParameter.getProcess()).thenReturn(processMock);
       when(processMock.getId()).thenReturn(PROC_ID);
 
-      dalConnStatic.when(DalConnectionProvider::getReadOnlyConnectionProvider).thenReturn(mock(DalConnectionProvider.class));
+      dalConnStatic.when(DalConnectionProvider::getReadOnlyConnectionProvider)
+          .thenReturn(mock(DalConnectionProvider.class));
       RequestContext requestContext = mock(RequestContext.class);
       requestContextStatic.when(RequestContext::get).thenReturn(requestContext);
       when(requestContext.getVariablesSecureApp()).thenReturn(mock(VariablesSecureApp.class));
@@ -264,7 +266,8 @@ class FieldBuilderTest {
   }
 
   /**
-   * Tests if the method returns the correct JSON object with tree selector information.
+   * Tests if the method returns the correct JSON object with tree selector
+   * information.
    * It mocks the necessary methods to return a valid tree selector.
    *
    * @throws JSONException if there is an error creating the JSON object
@@ -291,10 +294,12 @@ class FieldBuilderTest {
   }
 
   /**
-   * Tests the getListInfo method to ensure it returns a JSONArray with the correct list information.
+   * Tests the getListInfo method to ensure it returns a JSONArray with the
+   * correct list information.
    * Mocks a list item and verifies the resulting JSON structure and values.
    *
-   * @throws JSONException if there is an error creating or accessing the JSON object
+   * @throws JSONException if there is an error creating or accessing the JSON
+   *                       object
    */
   @Test
   void testGetListInfo() throws JSONException {
@@ -350,7 +355,8 @@ class FieldBuilderTest {
   }
 
   /**
-   * Tests if the method returns "_identifier" when no display field is set and no data source is available.
+   * Tests if the method returns "_identifier" when no display field is set and no
+   * data source is available.
    */
   @Test
   void testGetPropertyOrDataSourceFieldWithProperty() {
@@ -375,7 +381,8 @@ class FieldBuilderTest {
   }
 
   /**
-   * Tests if the method returns the data source field name when no property or display column alias is set.
+   * Tests if the method returns the data source field name when no property or
+   * display column alias is set.
    */
   @Test
   void testGetPropertyOrDataSourceFieldWithDatasourceField() {
@@ -465,7 +472,8 @@ class FieldBuilderTest {
   }
 
   /**
-   * Tests if the method returns "_identifier" when no value field is set and a data source is available.
+   * Tests if the method returns "_identifier" when no value field is set and a
+   * data source is available.
    */
   @Test
   void testGetDisplayFieldWithDataSourceWithTable() {
@@ -479,7 +487,8 @@ class FieldBuilderTest {
   }
 
   /**
-   * Tests if the method returns "id" when no value field is set and a data source with a table is available.
+   * Tests if the method returns "id" when no value field is set and a data source
+   * with a table is available.
    */
   @Test
   void testGetValueFieldWithDataSourceWithTable() {
@@ -494,7 +503,8 @@ class FieldBuilderTest {
 
   /**
    * Tests the addSelectorInfo method with a custom query selector.
-   * Verifies that the correct data source and text match style are set in the resulting JSON object.
+   * Verifies that the correct data source and text match style are set in the
+   * resulting JSON object.
    *
    * @throws Exception if any error occurs during the test
    */
@@ -521,7 +531,8 @@ class FieldBuilderTest {
   }
 
   /**
-   * Tests the private getHqlName method when an exception is thrown by field.getColumn().
+   * Tests the private getHqlName method when an exception is thrown by
+   * field.getColumn().
    * Verifies that the method returns the field name as a fallback.
    *
    * @throws Exception if reflection fails or method invocation fails
@@ -535,7 +546,7 @@ class FieldBuilderTest {
 
     try (MockedStatic<DataSourceUtils> mockedDataSourceUtils = mockStatic(DataSourceUtils.class)) {
       mockedDataSourceUtils.when(() -> DataSourceUtils.getHQLColumnName(true, "test_table", "test_column"))
-          .thenReturn(new String[]{ "hqlColumnName" });
+          .thenReturn(new String[] { "hqlColumnName" });
 
       Method method = FieldBuilder.class.getDeclaredMethod("getHqlName", Field.class);
       method.setAccessible(true);
@@ -546,7 +557,8 @@ class FieldBuilderTest {
   }
 
   /**
-   * Tests the private getHqlName method when an exception is thrown by field.getColumn().
+   * Tests the private getHqlName method when an exception is thrown by
+   * field.getColumn().
    * Verifies that the method returns the field name as a fallback.
    *
    * @throws Exception if reflection fails or method invocation fails
@@ -580,16 +592,14 @@ class FieldBuilderTest {
       when(mockContext.getLanguage()).thenReturn(mockLanguage);
 
       // Mock AD List entry
-      org.openbravo.model.ad.domain.List listItem =
-          mock(org.openbravo.model.ad.domain.List.class);
+      org.openbravo.model.ad.domain.List listItem = mock(org.openbravo.model.ad.domain.List.class);
 
       when(listItem.getId()).thenReturn(LIST_ID_STRING);
       when(listItem.getSearchKey()).thenReturn("SEARCH_KEY");
       when(listItem.get(
           org.openbravo.model.ad.domain.List.PROPERTY_NAME,
           mockLanguage,
-          LIST_ID_STRING
-      )).thenReturn("List Label");
+          LIST_ID_STRING)).thenReturn("List Label");
 
       when(reference.getADListList()).thenReturn(List.of(listItem));
 
@@ -609,7 +619,8 @@ class FieldBuilderTest {
 
   /**
    * Tests the addComboTableSelectorInfo method.
-   * This test ensures that the method can correctly generate combo table selector information
+   * This test ensures that the method can correctly generate combo table selector
+   * information
    * by mocking all necessary Openbravo infrastructure and dependencies.
    *
    * @throws JSONException if there is an error during JSON construction
@@ -626,11 +637,11 @@ class FieldBuilderTest {
     FieldProvider fieldProvider = mock(FieldProvider.class);
 
     try (MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class);
-         MockedStatic<DalConnectionProvider> dalConnStatic = mockStatic(DalConnectionProvider.class);
-         MockedStatic<RequestContext> requestContextStatic = mockStatic(RequestContext.class);
-         MockedStatic<Utility> utilityStatic = mockStatic(Utility.class);
-         MockedConstruction<ComboTableData> comboTableDataMockedConstruction = mockConstruction(ComboTableData.class,
-             (mock, context) -> when(mock.select(false)).thenReturn(new FieldProvider[]{ fieldProvider }))) {
+        MockedStatic<DalConnectionProvider> dalConnStatic = mockStatic(DalConnectionProvider.class);
+        MockedStatic<RequestContext> requestContextStatic = mockStatic(RequestContext.class);
+        MockedStatic<Utility> utilityStatic = mockStatic(Utility.class);
+        MockedConstruction<ComboTableData> comboTableDataMockedConstruction = mockConstruction(ComboTableData.class,
+            (mock, context) -> when(mock.select(false)).thenReturn(new FieldProvider[] { fieldProvider }))) {
 
       OBDal obDal = mock(OBDal.class);
       obDalStatic.when(OBDal::getInstance).thenReturn(obDal);
@@ -694,21 +705,122 @@ class FieldBuilderTest {
     Reference ref = mock(Reference.class);
 
     try (MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class);
-         MockedStatic<DalConnectionProvider> dalConnStatic = mockStatic(DalConnectionProvider.class)) {
+        MockedStatic<DalConnectionProvider> dalConnStatic = mockStatic(DalConnectionProvider.class)) {
 
       OBDal obDal = mock(OBDal.class);
       obDalStatic.when(OBDal::getInstance).thenReturn(obDal);
       when(obDal.get(ProcessParameter.class, TEST_FIELD_ID)).thenReturn(processParameter);
 
-      // Configure processParameter to return non-null values so code reaches try-catch block
+      // Configure processParameter to return non-null values so code reaches
+      // try-catch block
       when(processParameter.getProcess()).thenReturn(processMock);
       when(processParameter.getReference()).thenReturn(ref);
 
-      dalConnStatic.when(DalConnectionProvider::getReadOnlyConnectionProvider).thenThrow(new RuntimeException("DB Error"));
+      dalConnStatic.when(DalConnectionProvider::getReadOnlyConnectionProvider)
+          .thenThrow(new RuntimeException("DB Error"));
 
-      assertThrows(org.openbravo.base.exception.OBException.class, () -> FieldBuilder.getSelectorInfo(TEST_FIELD_ID, null));
+      assertThrows(org.openbravo.base.exception.OBException.class,
+          () -> FieldBuilder.getSelectorInfo(TEST_FIELD_ID, null));
     }
   }
 
+  /**
+   * Tests that addSelectorInfo correctly generates selector properties with
+   * display and value fields.
+   */
+  @Test
+  void testAddSelectorInfoWithDisplayAndValueFields() throws JSONException {
+    SelectorField displayField = mock(SelectorField.class);
+    SelectorField valueField = mock(SelectorField.class);
+
+    when(selector.getObserdsDatasource()).thenReturn(null);
+    when(selector.isCustomQuery()).thenReturn(false);
+    when(selector.getTable()).thenReturn(table);
+    when(table.getName()).thenReturn("TestTable");
+    when(selector.getId()).thenReturn("selector-id");
+    when(selector.getDisplayfield()).thenReturn(displayField);
+    when(selector.getValuefield()).thenReturn(valueField);
+    when(selector.getSuggestiontextmatchstyle()).thenReturn("startsWith");
+    when(selector.getOBUISELSelectorFieldList()).thenReturn(Collections.emptyList());
+
+    when(displayField.getProperty()).thenReturn("displayProperty");
+    when(displayField.getDisplayColumnAlias()).thenReturn("displayAlias");
+    when(displayField.getObuiselSelector()).thenReturn(selector);
+
+    when(valueField.getProperty()).thenReturn("valueProperty");
+    when(valueField.getObuiselSelector()).thenReturn(selector);
+
+    try (MockedStatic<FieldBuilder> mockedStatic = mockStatic(FieldBuilder.class, CALLS_REAL_METHODS)) {
+      mockedStatic.when(() -> FieldBuilder.getDisplayField(selector)).thenReturn("displayProperty");
+      mockedStatic.when(() -> FieldBuilder.getValueField(selector)).thenReturn("valueProperty");
+      mockedStatic.when(() -> FieldBuilder.getExtraSearchFields(selector)).thenReturn("");
+      mockedStatic.when(() -> FieldBuilder.getPropertyOrDataSourceField(displayField)).thenReturn("displayProperty");
+      mockedStatic.when(() -> FieldBuilder.getPropertyOrDataSourceField(valueField)).thenReturn("valueProperty");
+
+      JSONObject result = FieldBuilder.addSelectorInfo(FIELD_ID, selector);
+
+      assertEquals("TestTable", result.getString(Constants.DATASOURCE_PROPERTY));
+      assertEquals("displayProperty", result.getString(Constants.DISPLAY_FIELD_PROPERTY));
+      assertEquals("valueProperty", result.getString(Constants.VALUE_FIELD_PROPERTY));
+      assertEquals("startsWith", result.getString(JsonConstants.TEXTMATCH_PARAMETER));
+    }
+  }
+
+  /**
+   * Tests getExtraSearchFields with active selector fields.
+   */
+  @Test
+  void testGetExtraSearchFieldsWithActiveFields() {
+    SelectorField activeField = mock(SelectorField.class);
+    SelectorField displayField = mock(SelectorField.class);
+
+    when(selector.getDisplayfield()).thenReturn(displayField);
+    when(selector.getOBUISELSelectorFieldList()).thenReturn(List.of(activeField));
+
+    when(activeField.isActive()).thenReturn(true);
+    when(activeField.isSearchinsuggestionbox()).thenReturn(true);
+    when(activeField.getProperty()).thenReturn("searchField");
+    when(activeField.getObuiselSelector()).thenReturn(selector);
+    when(selector.getTable()).thenReturn(table);
+
+    when(displayField.getProperty()).thenReturn("display");
+    when(displayField.getObuiselSelector()).thenReturn(selector);
+
+    try (MockedStatic<FieldBuilder> mockedStatic = mockStatic(FieldBuilder.class, CALLS_REAL_METHODS)) {
+      mockedStatic.when(() -> FieldBuilder.getDisplayField(selector)).thenReturn("display");
+      mockedStatic.when(() -> FieldBuilder.getPropertyOrDataSourceField(activeField)).thenReturn("searchField");
+
+      String result = FieldBuilder.getExtraSearchFields(selector);
+
+      assertEquals("searchField", result);
+    }
+  }
+
+  /**
+   * Tests getListInfo with active and inactive items.
+   */
+  @Test
+  void testGetListInfoWithActiveStatus() throws JSONException {
+    org.openbravo.model.ad.domain.List activeItem = mock(org.openbravo.model.ad.domain.List.class);
+    org.openbravo.model.ad.domain.List inactiveItem = mock(org.openbravo.model.ad.domain.List.class);
+
+    when(activeItem.getId()).thenReturn("active-id");
+    when(activeItem.getSearchKey()).thenReturn("ACTIVE");
+    when(activeItem.get(anyString(), any(Language.class), anyString())).thenReturn("Active");
+    when(activeItem.isActive()).thenReturn(true);
+
+    when(inactiveItem.getId()).thenReturn("inactive-id");
+    when(inactiveItem.getSearchKey()).thenReturn("INACTIVE");
+    when(inactiveItem.get(anyString(), any(Language.class), anyString())).thenReturn("Inactive");
+    when(inactiveItem.isActive()).thenReturn(false);
+
+    when(reference.getADListList()).thenReturn(List.of(activeItem, inactiveItem));
+
+    JSONArray result = FieldBuilder.getListInfo(reference, language);
+
+    assertEquals(2, result.length());
+    assertTrue(result.getJSONObject(0).getBoolean("active"));
+    assertFalse(result.getJSONObject(1).getBoolean("active"));
+  }
 
 }

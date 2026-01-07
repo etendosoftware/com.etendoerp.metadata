@@ -22,6 +22,8 @@ import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.process.ProcessInstance;
 import org.openbravo.model.ad.ui.Process;
 
+import com.etendoerp.metadata.exceptions.InternalServerException;
+import com.etendoerp.metadata.exceptions.NotFoundException;
 import com.etendoerp.metadata.utils.Constants;
 import com.etendoerp.metadata.utils.ProcessExecutionUtils;
 
@@ -29,6 +31,15 @@ import com.etendoerp.metadata.utils.ProcessExecutionUtils;
  * Unit tests for {@link ProcessExecutionService}.
  */
 public class ProcessExecutionServiceTest extends BaseMetadataServiceTest {
+
+    private static final String POST_METHOD = "POST";
+    private static final String GET_METHOD = "GET";
+    private static final String PROCESS_ID = "123";
+    private static final String RECORD_ID = "REC";
+    private static final String PINSTANCE_ID = "PI1";
+    private static final String PINSTANCE_ID_KEY = "\"pInstanceId\":\"";
+    private static final String STATUS_STARTED = "\"status\":\"STARTED\"";
+    private static final String IS_PROCESSING_FALSE = "\"isProcessing\":false";
 
     @Override
     protected String getServicePath() {
@@ -40,31 +51,33 @@ public class ProcessExecutionServiceTest extends BaseMetadataServiceTest {
      */
     @Test
     public void testExecuteAction() throws Exception {
-        when(mockRequest.getMethod()).thenReturn("POST");
-        String body = "{\"processId\":\"123\",\"recordId\":\"REC\",\"parameters\":{\"foo\":\"bar\"}}";
+        when(mockRequest.getMethod()).thenReturn(POST_METHOD);
+        String body = "{\"processId\":\"" + PROCESS_ID + "\",\"recordId\":\"" + RECORD_ID
+                + "\",\"parameters\":{\"foo\":\"bar\"}}";
         when(mockRequest.getInputStream()).thenReturn(new MockServletInputStream(body));
 
         try (MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class);
-             MockedStatic<ProcessExecutionUtils> utilsStatic = mockStatic(ProcessExecutionUtils.class)) {
+                MockedStatic<ProcessExecutionUtils> utilsStatic = mockStatic(ProcessExecutionUtils.class)) {
 
             OBDal obDal = mock(OBDal.class);
             obDalStatic.when(OBDal::getInstance).thenReturn(obDal);
 
             Process process = mock(Process.class);
-            when(obDal.get(Process.class, "123")).thenReturn(process);
+            when(obDal.get(Process.class, PROCESS_ID)).thenReturn(process);
 
             ProcessInstance instance = mock(ProcessInstance.class);
-            when(instance.getId()).thenReturn("PI1");
+            when(instance.getId()).thenReturn(PINSTANCE_ID);
 
-            utilsStatic.when(() -> ProcessExecutionUtils.callProcessAsync(eq(process), eq("REC"), any(Map.class)))
-                .thenReturn(instance);
+            utilsStatic.when(() -> ProcessExecutionUtils.callProcessAsync(eq(process), eq(RECORD_ID), any(Map.class)))
+                    .thenReturn(instance);
 
             ProcessExecutionService service = new ProcessExecutionService(mockRequest, mockResponse);
             service.process();
 
             String response = responseWriter.toString();
-            assertTrue("Response should contain pInstanceId", response.contains("\"pInstanceId\":\"PI1\""));
-            assertTrue("Response should indicate STARTED", response.contains("\"status\":\"STARTED\""));
+            assertTrue("Response should contain pInstanceId",
+                    response.contains(PINSTANCE_ID_KEY + PINSTANCE_ID + "\""));
+            assertTrue("Response should indicate STARTED", response.contains(STATUS_STARTED));
         }
     }
 
@@ -73,19 +86,18 @@ public class ProcessExecutionServiceTest extends BaseMetadataServiceTest {
      */
     @Test
     public void testStatusAction() throws Exception {
-        String piId = "PI1";
-        when(mockRequest.getMethod()).thenReturn("GET");
-        when(mockRequest.getPathInfo()).thenReturn(Constants.PROCESS_PATH + "/status/" + piId);
+        when(mockRequest.getMethod()).thenReturn(GET_METHOD);
+        when(mockRequest.getPathInfo()).thenReturn(Constants.PROCESS_PATH + "/status/" + PINSTANCE_ID);
 
         try (MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class)) {
             OBDal obDal = mock(OBDal.class);
             obDalStatic.when(OBDal::getInstance).thenReturn(obDal);
 
             ProcessInstance instance = mock(ProcessInstance.class);
-            when(instance.getId()).thenReturn(piId);
+            when(instance.getId()).thenReturn(PINSTANCE_ID);
             when(instance.getResult()).thenReturn(1L);
             when(instance.getErrorMsg()).thenReturn(null);
-            when(obDal.get(ProcessInstance.class, piId)).thenReturn(instance);
+            when(obDal.get(ProcessInstance.class, PINSTANCE_ID)).thenReturn(instance);
 
             Session session = mock(Session.class);
             when(obDal.getSession()).thenReturn(session);
@@ -94,8 +106,72 @@ public class ProcessExecutionServiceTest extends BaseMetadataServiceTest {
             service.process();
 
             String response = responseWriter.toString();
-            assertTrue("Response should contain pInstanceId", response.contains(piId));
-            assertTrue("Response should indicate not processing", response.contains("\"isProcessing\":false"));
+            assertTrue("Response should contain pInstanceId", response.contains(PINSTANCE_ID));
+            assertTrue("Response should indicate not processing", response.contains(IS_PROCESSING_FALSE));
+        }
+    }
+
+    /**
+     * Tests that execute action throws InternalServerException when processId is
+     * missing.
+     */
+    @Test(expected = InternalServerException.class)
+    public void testExecuteActionWithMissingProcessId() throws Exception {
+        when(mockRequest.getMethod()).thenReturn(POST_METHOD);
+        String body = "{\"recordId\":\"" + RECORD_ID + "\"}";
+        when(mockRequest.getInputStream()).thenReturn(new MockServletInputStream(body));
+
+        ProcessExecutionService service = new ProcessExecutionService(mockRequest, mockResponse);
+        service.process();
+    }
+
+    /**
+     * Tests that execute action throws NotFoundException when process is not found.
+     */
+    @Test(expected = NotFoundException.class)
+    public void testExecuteActionWithNonExistentProcess() throws Exception {
+        when(mockRequest.getMethod()).thenReturn(POST_METHOD);
+        String body = "{\"processId\":\"nonexistent\",\"recordId\":\"" + RECORD_ID + "\"}";
+        when(mockRequest.getInputStream()).thenReturn(new MockServletInputStream(body));
+
+        try (MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class)) {
+            OBDal obDal = mock(OBDal.class);
+            obDalStatic.when(OBDal::getInstance).thenReturn(obDal);
+            when(obDal.get(Process.class, "nonexistent")).thenReturn(null);
+
+            ProcessExecutionService service = new ProcessExecutionService(mockRequest, mockResponse);
+            service.process();
+        }
+    }
+
+    /**
+     * Tests that status action throws NotFoundException when path is invalid.
+     */
+    @Test(expected = NotFoundException.class)
+    public void testStatusActionWithInvalidPath() throws Exception {
+        when(mockRequest.getMethod()).thenReturn(GET_METHOD);
+        when(mockRequest.getPathInfo()).thenReturn("/invalid/path");
+
+        ProcessExecutionService service = new ProcessExecutionService(mockRequest, mockResponse);
+        service.process();
+    }
+
+    /**
+     * Tests that status action throws NotFoundException when process instance is
+     * not found.
+     */
+    @Test(expected = NotFoundException.class)
+    public void testStatusActionWithNonExistentProcessInstance() throws Exception {
+        when(mockRequest.getMethod()).thenReturn(GET_METHOD);
+        when(mockRequest.getPathInfo()).thenReturn(Constants.PROCESS_PATH + "/status/nonexistent");
+
+        try (MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class)) {
+            OBDal obDal = mock(OBDal.class);
+            obDalStatic.when(OBDal::getInstance).thenReturn(obDal);
+            when(obDal.get(ProcessInstance.class, "nonexistent")).thenReturn(null);
+
+            ProcessExecutionService service = new ProcessExecutionService(mockRequest, mockResponse);
+            service.process();
         }
     }
 
