@@ -85,8 +85,10 @@ public class MenuBuilder extends Builder {
                     modal = Utility.isModalProcess(process.getId());
                 } else if (process.isReport() || process.isJasperReport()) {
                     report = true;
+                    // NOTE: Reports always open in a js modal
+                    modal = true;
                 } else if (entry.getType() == MenuManager.MenuEntryType.ProcessManual) {
-                    // NOTE: ProcessManual always open in a modal
+                    // NOTE: ProcessManual always open in a js modal
                     modal = true;
                 }
             } else if ("P".equals(menu.getAction()) || "R".equals(menu.getAction())) {
