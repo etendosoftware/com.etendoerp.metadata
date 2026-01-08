@@ -17,6 +17,7 @@ import java.io.InputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 
 import static com.etendoerp.metadata.MetadataTestConstants.SALES_INVOICE_HEADER_EDITION_HTML;
 import static com.etendoerp.metadata.MetadataTestConstants.TOKEN;
@@ -31,15 +32,17 @@ import static org.mockito.Mockito.*;
  * deep integration with complex framework components.
  * </p>
  */
-@RunWith(MockitoJUnitRunner.class)
+@RunWith(MockitoJUnitRunner.Silent.class)
 public class LegacyProcessServletTest extends OBBaseTest {
     private static final String PARAM_INP_KEY = "inpKey";
     private static final String PARAM_INP_WINDOW_ID = "inpwindowId";
     private static final String PARAM_INP_KEY_COLUMN_ID = "inpkeyColumnId";
-    private static final String NOT_EXIST_JS_FILE =  "/web/js/nonexistent.js";
+    private static final String NOT_EXIST_JS_FILE = "/web/js/nonexistent.js";
     private static final String TEST_JS_FILE = "/web/js/test-script.js";
     private static final String CALENDAR_JS_FILE = "/web/js/calendar-lang.js";
     private static final String TEST_UPPERCASE_JS_FILE = "/web/js/script.JS";
+    public static final String REDIRECT = "/redirect";
+    public static final String LOCATION = "location";
 
     @Mock
     private HttpServletRequest request;
@@ -69,7 +72,14 @@ public class LegacyProcessServletTest extends OBBaseTest {
         when(response.getWriter()).thenReturn(printWriter);
         when(request.getSession()).thenReturn(session);
         when(request.getSession(true)).thenReturn(session);
+        when(request.getSession(false)).thenReturn(session);
         when(request.getRequestDispatcher(anyString())).thenReturn(requestDispatcher);
+        when(request.getHeaderNames()).thenReturn(Collections.emptyEnumeration());
+        when(request.getHeaders(anyString())).thenReturn(Collections.emptyEnumeration());
+        when(request.getParameterNames()).thenReturn(Collections.emptyEnumeration());
+        when(request.getLocales()).thenReturn(Collections.emptyEnumeration());
+        when(request.getAttributeNames()).thenReturn(Collections.emptyEnumeration());
+        when(session.getAttributeNames()).thenReturn(Collections.emptyEnumeration());
     }
 
     /**
@@ -128,6 +138,98 @@ public class LegacyProcessServletTest extends OBBaseTest {
         } catch (Exception e) {
             verify(request, atLeastOnce()).getSession();
         }
+    }
+
+    /**
+     * Tests that the servlet validates redirect locations.
+     * <p>
+     * Verifies that external URLs are rejected to prevent open redirect
+     * vulnerabilities.
+     * </p>
+     */
+    @Test
+    public void servletShouldRejectExternalRedirectLocation() throws Exception {
+        when(request.getPathInfo()).thenReturn(REDIRECT);
+        when(request.getParameter(LOCATION)).thenReturn("https://malicious.com");
+
+        try {
+            legacyProcessServlet.service(request, response);
+        } catch (Exception e) {
+            // Error handling might throw framework exceptions
+        }
+
+        verify(response).sendError(eq(HttpServletResponse.SC_BAD_REQUEST), anyString());
+    }
+
+    /**
+     * Tests that the servlet rejects null redirect location.
+     */
+    @Test
+    public void servletShouldRejectNullRedirectLocation() throws Exception {
+        when(request.getPathInfo()).thenReturn(REDIRECT);
+        when(request.getParameter(LOCATION)).thenReturn(null);
+
+        try {
+            legacyProcessServlet.service(request, response);
+        } catch (Exception ignored) {
+            // Expected due to framework dependencies
+        }
+
+        verify(response).sendError(eq(HttpServletResponse.SC_BAD_REQUEST), anyString());
+    }
+
+    /**
+     * Tests that the servlet handles redirect to internal location.
+     */
+    @Test
+    public void servletShouldAllowInternalRedirectLocation() throws Exception {
+        when(request.getPathInfo()).thenReturn(REDIRECT);
+        when(request.getParameter(LOCATION)).thenReturn("/etendo/internal/path");
+        when(response.getWriter()).thenReturn(printWriter);
+
+        try {
+            legacyProcessServlet.service(request, response);
+        } catch (Exception ignored) {
+            // Expected due to framework dependencies
+        }
+
+        verify(response).setContentType("text/html; charset=UTF-8");
+        verify(response).setStatus(HttpServletResponse.SC_OK);
+    }
+
+    /**
+     * Tests that the servlet correctly identifies legacy requests.
+     */
+    @Test
+    public void servletShouldIdentifyLegacyFollowupRequest() throws Exception {
+        when(request.getParameter("Command")).thenReturn("BUTTON_TEST");
+        when(request.getSession(false)).thenReturn(session);
+        when(session.getAttribute("LEGACY_TOKEN")).thenReturn("test-token");
+        when(session.getAttribute("LEGACY_SERVLET_DIR")).thenReturn("/dir");
+
+        try {
+            legacyProcessServlet.service(request, response);
+        } catch (Exception ignored) {
+            // Expected due to framework dependencies
+        }
+
+        verify(request, atLeastOnce()).getParameter("Command");
+    }
+
+    /**
+     * Tests JS security path validation.
+     */
+    @Test
+    public void servletShouldRejectUnauthorizedJsPath() throws Exception {
+        when(request.getPathInfo()).thenReturn("/unauthorized/path.js");
+
+        try {
+            legacyProcessServlet.service(request, response);
+        } catch (Exception ignored) {
+            // Expected due to security check failure
+        }
+
+        verify(response).sendError(eq(HttpServletResponse.SC_FORBIDDEN), anyString());
     }
 
     /**
@@ -256,7 +358,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
     /**
      * Sets up mocks for a JavaScript request with the given path and content.
      *
-     * @param jsPath the path to the JavaScript file
+     * @param jsPath    the path to the JavaScript file
      * @param jsContent the content to return, or null to simulate file not found
      */
     private void mockJavaScriptRequest(String jsPath, String jsContent) {
@@ -287,7 +389,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
      * </p>
      */
     @Test
-    public void servletShouldRecognizeJavaScriptPaths() throws Exception {
+    public void servletShouldRecognizeJavaScriptPaths() {
         mockJavaScriptRequest(TEST_JS_FILE, null);
 
         invokeServletSafely();
@@ -304,7 +406,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
      * </p>
      */
     @Test
-    public void servletShouldReturn404WhenJavaScriptFileNotFound() throws Exception {
+    public void servletShouldReturn404WhenJavaScriptFileNotFound() {
         mockJavaScriptRequest(NOT_EXIST_JS_FILE, null);
 
         invokeServletSafely();
@@ -320,7 +422,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
      * </p>
      */
     @Test
-    public void servletShouldServeJavaScriptContent() throws Exception {
+    public void servletShouldServeJavaScriptContent() {
         mockJavaScriptRequest(TEST_JS_FILE, "console.log('test');");
 
         invokeServletSafely();
@@ -336,7 +438,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
      * </p>
      */
     @Test
-    public void servletShouldRecognizeUppercaseJavaScriptExtension() throws Exception {
+    public void servletShouldRecognizeUppercaseJavaScriptExtension() {
         mockJavaScriptRequest(TEST_UPPERCASE_JS_FILE, null);
 
         invokeServletSafely();
@@ -345,13 +447,15 @@ public class LegacyProcessServletTest extends OBBaseTest {
     }
 
     /**
-     * Tests that JavaScript requests access the ServletContext for resource loading.
+     * Tests that JavaScript requests access the ServletContext for resource
+     * loading.
      * <p>
-     * Verifies that the servlet uses ServletContext.getResourceAsStream() to load JS files.
+     * Verifies that the servlet uses ServletContext.getResourceAsStream() to load
+     * JS files.
      * </p>
      */
     @Test
-    public void servletShouldAccessServletContextForJavaScript() throws Exception {
+    public void servletShouldAccessServletContextForJavaScript() {
         mockJavaScriptRequest(CALENDAR_JS_FILE, "var x = 1;");
 
         invokeServletSafely();
