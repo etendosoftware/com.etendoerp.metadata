@@ -32,12 +32,12 @@ import static org.mockito.Mockito.*;
  * deep integration with complex framework components.
  * </p>
  */
-@RunWith(MockitoJUnitRunner.class)
+@RunWith(MockitoJUnitRunner.Silent.class)
 public class LegacyProcessServletTest extends OBBaseTest {
     private static final String PARAM_INP_KEY = "inpKey";
     private static final String PARAM_INP_WINDOW_ID = "inpwindowId";
     private static final String PARAM_INP_KEY_COLUMN_ID = "inpkeyColumnId";
-    private static final String NOT_EXIST_JS_FILE =  "/web/js/nonexistent.js";
+    private static final String NOT_EXIST_JS_FILE = "/web/js/nonexistent.js";
     private static final String TEST_JS_FILE = "/web/js/test-script.js";
     private static final String CALENDAR_JS_FILE = "/web/js/calendar-lang.js";
     private static final String TEST_UPPERCASE_JS_FILE = "/web/js/script.JS";
@@ -143,7 +143,8 @@ public class LegacyProcessServletTest extends OBBaseTest {
     /**
      * Tests that the servlet validates redirect locations.
      * <p>
-     * Verifies that external URLs are rejected to prevent open redirect vulnerabilities.
+     * Verifies that external URLs are rejected to prevent open redirect
+     * vulnerabilities.
      * </p>
      */
     @Test
@@ -230,7 +231,6 @@ public class LegacyProcessServletTest extends OBBaseTest {
 
         verify(response).sendError(eq(HttpServletResponse.SC_FORBIDDEN), anyString());
     }
-
 
     /**
      * Tests that the servlet recognizes HTML paths correctly.
@@ -358,7 +358,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
     /**
      * Sets up mocks for a JavaScript request with the given path and content.
      *
-     * @param jsPath the path to the JavaScript file
+     * @param jsPath    the path to the JavaScript file
      * @param jsContent the content to return, or null to simulate file not found
      */
     private void mockJavaScriptRequest(String jsPath, String jsContent) {
@@ -447,9 +447,11 @@ public class LegacyProcessServletTest extends OBBaseTest {
     }
 
     /**
-     * Tests that JavaScript requests access the ServletContext for resource loading.
+     * Tests that JavaScript requests access the ServletContext for resource
+     * loading.
      * <p>
-     * Verifies that the servlet uses ServletContext.getResourceAsStream() to load JS files.
+     * Verifies that the servlet uses ServletContext.getResourceAsStream() to load
+     * JS files.
      * </p>
      */
     @Test
