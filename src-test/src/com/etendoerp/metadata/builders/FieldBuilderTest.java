@@ -687,6 +687,8 @@ class FieldBuilderTest {
 
   /**
    * Tests the addComboTableSelectorInfo method when the field is not found.
+   * When field is not found, the method still returns the base selector structure
+   * with default properties but without RESPONSE_VALUES.
    */
   @Test
   void testAddComboTableSelectorInfoFieldNotFound() throws JSONException {
@@ -700,7 +702,14 @@ class FieldBuilderTest {
       JSONObject result = FieldBuilder.getSelectorInfo(fieldId, null);
 
       assertNotNull(result);
-      assertEquals(0, result.length());
+      // The method returns the base combo table selector structure with 9 properties
+      assertEquals(9, result.length());
+      assertTrue(result.has(Constants.DATASOURCE_PROPERTY));
+      assertTrue(result.has(Constants.FIELD_ID_PROPERTY));
+      assertTrue(result.has(Constants.DISPLAY_FIELD_PROPERTY));
+      assertTrue(result.has(Constants.VALUE_FIELD_PROPERTY));
+      // RESPONSE_VALUES should NOT be present when field is not found
+      assertFalse(result.has(Constants.RESPONSE_VALUES));
     }
   }
 
