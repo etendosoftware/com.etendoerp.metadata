@@ -51,6 +51,7 @@ public class Constants {
     public static final String SWS_INVALID_CREDENTIALS = "SWS - You must specify a username and password or a valid token";
     public static final int SERVLET_PATH_LENGTH = SERVLET_PATH.length();
     public static final String INPUT_NAME_PREFIX = "inp";
+    public static final String RESPONSE_VALUES = "response";
     private static final String SELECTOR_REFERENCE_ID = "95E2A8B50A254B2AAE6774B8C2F28120";
     public static final String BUTTON_REFERENCE_ID = "28";
     private static final String SEARCH_REFERENCE_ID = "30";
@@ -71,7 +72,9 @@ public class Constants {
     public static final String DELETE = "DELETE";
     public static final String LOCATION_PATH = "/location/";
     public static final String TOOLBAR_PATH = "/toolbar";
+    public static final String REPORT_AND_PROCESS_PATH = "/report-and-process/";
     public static final String PROCESS_PATH = "/process/";
+    public static final String PROCESS_EXECUTION_PATH = "/process-execution";
     public static final String LOCALE_KEY = "Locale";
     public static final String DEFAULT_LOCALE = "en_US";
     public static final String PUBLIC_JS_PATH = "/web/js/";
