@@ -162,38 +162,34 @@ public abstract class FieldBuilder extends Builder {
         JSONObject selectorInfo = new JSONObject();
 
         ProcessParameter field = OBDal.getInstance().get(ProcessParameter.class, fieldId);
-        if (field == null) {
-            return new JSONObject();
-        }
+        JSONArray comboData = null;
 
-        if (field.getProcess() == null || field.getReference() == null) {
-            return new JSONObject();
-        }
-
-        JSONArray comboData = new JSONArray();
-        try {
-            ConnectionProvider connProvider = DalConnectionProvider.getReadOnlyConnectionProvider();
-            var vars = RequestContext.get().getVariablesSecureApp();
-            var comboTableData = new ComboTableData(vars, connProvider,
-                field.getReference().getId(), field.getDBColumnName(), "",
-                field.getValidation() != null ? field.getValidation().getId() : null,
-                Utility.getContext(connProvider, vars, "#AccessibleOrgTree", ""),
-                Utility.getContext(connProvider, vars, "#User_Client", ""), 0);
-            Utility.fillSQLParameters(connProvider, vars, null, comboTableData,
-                field.getProcess().getId(),
-                Utility.getContext(connProvider, vars, "#AD_Org_ID", field.getProcess().getId()));
-            var select = comboTableData.select(false);
-            for (FieldProvider fieldProvider : select) {
-                String id = fieldProvider.getField("ID");
-                String name = fieldProvider.getField("NAME");
-                JSONObject entry = new JSONObject();
-                entry.put("id", id);
-                entry.put("name", name);
-                comboData.put(entry);
+        if (field != null && (field.getProcess() != null || field.getReference() != null)) {
+            comboData = new JSONArray();
+            try {
+                ConnectionProvider connProvider = DalConnectionProvider.getReadOnlyConnectionProvider();
+                var vars = RequestContext.get().getVariablesSecureApp();
+                var comboTableData = new ComboTableData(vars, connProvider,
+                        field.getReference().getId(), field.getDBColumnName(), "",
+                        field.getValidation() != null ? field.getValidation().getId() : null,
+                        Utility.getContext(connProvider, vars, "#AccessibleOrgTree", ""),
+                        Utility.getContext(connProvider, vars, "#User_Client", ""), 0);
+                Utility.fillSQLParameters(connProvider, vars, null, comboTableData,
+                        field.getProcess().getId(),
+                        Utility.getContext(connProvider, vars, "#AD_Org_ID", field.getProcess().getId()));
+                var select = comboTableData.select(false);
+                for (FieldProvider fieldProvider : select) {
+                    String id = fieldProvider.getField("ID");
+                    String name = fieldProvider.getField("NAME");
+                    JSONObject entry = new JSONObject();
+                    entry.put("id", id);
+                    entry.put("name", name);
+                    comboData.put(entry);
+                }
+            } catch (Exception e) {
+                logger.error("Error filling combo data for field {}", fieldId, e);
+                throw new OBException(e);
             }
-        } catch (Exception e) {
-            logger.error("Error filling combo data for field {}", fieldId, e);
-            throw new OBException(e);
         }
 
         selectorInfo.put(Constants.SELECTOR_DEFINITION_PROPERTY, (Object) null);
@@ -206,7 +202,9 @@ public abstract class FieldBuilder extends Builder {
         selectorInfo.put(Constants.VALUE_FIELD_PROPERTY, JsonConstants.ID);
         selectorInfo.put(JsonConstants.SELECTEDPROPERTIES_PARAMETER, JsonConstants.ID);
         selectorInfo.put(JsonConstants.ADDITIONAL_PROPERTIES_PARAMETER, JsonConstants.ID + ",");
-        selectorInfo.put(Constants.RESPONSE_VALUES, comboData);
+        if (comboData != null) {
+            selectorInfo.put(Constants.RESPONSE_VALUES, comboData);
+        }
 
         return selectorInfo;
     }
