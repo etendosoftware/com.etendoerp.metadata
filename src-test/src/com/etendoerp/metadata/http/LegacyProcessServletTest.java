@@ -41,6 +41,8 @@ public class LegacyProcessServletTest extends OBBaseTest {
     private static final String TEST_JS_FILE = "/web/js/test-script.js";
     private static final String CALENDAR_JS_FILE = "/web/js/calendar-lang.js";
     private static final String TEST_UPPERCASE_JS_FILE = "/web/js/script.JS";
+    public static final String REDIRECT = "/redirect";
+    public static final String LOCATION = "location";
 
     @Mock
     private HttpServletRequest request;
@@ -146,8 +148,8 @@ public class LegacyProcessServletTest extends OBBaseTest {
      */
     @Test
     public void servletShouldRejectExternalRedirectLocation() throws Exception {
-        when(request.getPathInfo()).thenReturn("/redirect");
-        when(request.getParameter("location")).thenReturn("https://malicious.com");
+        when(request.getPathInfo()).thenReturn(REDIRECT);
+        when(request.getParameter(LOCATION)).thenReturn("https://malicious.com");
 
         try {
             legacyProcessServlet.service(request, response);
@@ -163,8 +165,8 @@ public class LegacyProcessServletTest extends OBBaseTest {
      */
     @Test
     public void servletShouldRejectNullRedirectLocation() throws Exception {
-        when(request.getPathInfo()).thenReturn("/redirect");
-        when(request.getParameter("location")).thenReturn(null);
+        when(request.getPathInfo()).thenReturn(REDIRECT);
+        when(request.getParameter(LOCATION)).thenReturn(null);
 
         try {
             legacyProcessServlet.service(request, response);
@@ -180,8 +182,8 @@ public class LegacyProcessServletTest extends OBBaseTest {
      */
     @Test
     public void servletShouldAllowInternalRedirectLocation() throws Exception {
-        when(request.getPathInfo()).thenReturn("/redirect");
-        when(request.getParameter("location")).thenReturn("/etendo/internal/path");
+        when(request.getPathInfo()).thenReturn(REDIRECT);
+        when(request.getParameter(LOCATION)).thenReturn("/etendo/internal/path");
         when(response.getWriter()).thenReturn(printWriter);
 
         try {

@@ -45,7 +45,7 @@ import static com.etendoerp.metadata.utils.LegacyPaths.MANUAL_PROCESS;
  * requests and responses to inject necessary scripts and handle authentication.
  */
 public class LegacyProcessServlet extends HttpSecureAppServlet {
-    private static final Logger log = LogManager.getLogger(LegacyProcessServlet.class);
+    private static final Logger log = LogManager.getLogger();
     private static final String JWT_TOKEN = "#JWT_TOKEN";
     private static final String HTML_EXTENSION = ".html";
     private static final String JS_EXTENSION = ".js";
@@ -538,6 +538,10 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         try {
             if (strUserAuth == null && StringUtils.isEmpty(strUser)) {
                 return null;
+            }
+
+            if (req == null) {
+                throw new OBException("Request object is null, cannot create DB session");
             }
 
             String usr = strUserAuth == null ? "0" : strUserAuth;
