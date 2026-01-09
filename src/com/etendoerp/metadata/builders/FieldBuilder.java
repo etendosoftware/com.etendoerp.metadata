@@ -23,6 +23,7 @@ import java.util.stream.Collectors;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
+import org.openbravo.base.exception.OBException;
 import org.openbravo.base.model.Entity;
 import org.openbravo.base.model.ModelProvider;
 import org.openbravo.base.model.Property;
@@ -31,8 +32,14 @@ import org.openbravo.base.model.domaintype.ForeignKeyDomainType;
 import org.openbravo.base.model.domaintype.PrimitiveDomainType;
 import org.openbravo.base.util.Check;
 import org.openbravo.client.application.DynamicExpressionParser;
+import org.openbravo.client.kernel.RequestContext;
 import org.openbravo.dal.core.DalUtil;
 import org.openbravo.dal.core.OBContext;
+import org.openbravo.dal.service.OBDal;
+import org.openbravo.data.FieldProvider;
+import org.openbravo.database.ConnectionProvider;
+import org.openbravo.erpCommon.utility.ComboTableData;
+import org.openbravo.erpCommon.utility.Utility;
 import org.openbravo.model.ad.access.FieldAccess;
 import org.openbravo.model.ad.datamodel.Column;
 import org.openbravo.model.ad.domain.Reference;
@@ -40,8 +47,10 @@ import org.openbravo.model.ad.domain.ReferencedTree;
 import org.openbravo.model.ad.system.Language;
 import org.openbravo.model.ad.ui.Field;
 import org.openbravo.model.ad.ui.Process;
+import org.openbravo.model.ad.ui.ProcessParameter;
 import org.openbravo.service.datasource.DataSource;
 import org.openbravo.service.datasource.DatasourceField;
+import org.openbravo.service.db.DalConnectionProvider;
 import org.openbravo.service.json.DataResolvingMode;
 import org.openbravo.service.json.JsonConstants;
 import org.openbravo.userinterface.selector.Selector;
@@ -50,6 +59,8 @@ import org.openbravo.userinterface.selector.SelectorField;
 import com.etendoerp.etendorx.utils.DataSourceUtils;
 import com.etendoerp.metadata.data.ReferenceSelectors;
 import com.etendoerp.metadata.utils.Constants;
+
+import javax.servlet.ServletException;
 
 /**
  * Abstract base class for building field metadata in JSON format.
@@ -62,7 +73,7 @@ public abstract class FieldBuilder extends Builder {
     protected final Field field;
     protected final FieldAccess fieldAccess;
     protected final JSONObject json;
-    protected final Language language;
+    protected final Language lang;
 
     /**
      * Constructs a FieldBuilder with the specified field and access permissions.
@@ -71,11 +82,11 @@ public abstract class FieldBuilder extends Builder {
      * @param field The UI field entity containing field definition and properties
      * @param fieldAccess The field access permissions (can be null for default permissions)
      */
-    public FieldBuilder(Field field, FieldAccess fieldAccess) {
+    protected FieldBuilder(Field field, FieldAccess fieldAccess) {
         this.field = field;
         this.fieldAccess = fieldAccess;
         this.json = converter.toJsonObject(field, DataResolvingMode.FULL_TRANSLATABLE);
-        this.language = OBContext.getOBContext().getLanguage();
+        this.lang = OBContext.getOBContext().getLanguage();
     }
 
     /**
@@ -150,6 +161,37 @@ public abstract class FieldBuilder extends Builder {
     private static JSONObject addComboTableSelectorInfo(String fieldId) throws JSONException {
         JSONObject selectorInfo = new JSONObject();
 
+        ProcessParameter field = OBDal.getInstance().get(ProcessParameter.class, fieldId);
+        JSONArray comboData = null;
+
+        if (field != null && (field.getProcess() != null || field.getReference() != null)) {
+            comboData = new JSONArray();
+            try {
+                ConnectionProvider connProvider = DalConnectionProvider.getReadOnlyConnectionProvider();
+                var vars = RequestContext.get().getVariablesSecureApp();
+                var comboTableData = new ComboTableData(vars, connProvider,
+                        field.getReference().getId(), field.getDBColumnName(), "",
+                        field.getValidation() != null ? field.getValidation().getId() : null,
+                        Utility.getContext(connProvider, vars, "#AccessibleOrgTree", ""),
+                        Utility.getContext(connProvider, vars, "#User_Client", ""), 0);
+                Utility.fillSQLParameters(connProvider, vars, null, comboTableData,
+                        field.getProcess().getId(),
+                        Utility.getContext(connProvider, vars, "#AD_Org_ID", field.getProcess().getId()));
+                var select = comboTableData.select(false);
+                for (FieldProvider fieldProvider : select) {
+                    String id = fieldProvider.getField("ID");
+                    String name = fieldProvider.getField("NAME");
+                    JSONObject entry = new JSONObject();
+                    entry.put("id", id);
+                    entry.put("name", name);
+                    comboData.put(entry);
+                }
+            } catch (Exception e) {
+                logger.error("Error filling combo data for field {}", fieldId, e);
+                throw new OBException(e);
+            }
+        }
+
         selectorInfo.put(Constants.SELECTOR_DEFINITION_PROPERTY, (Object) null);
         selectorInfo.put(JsonConstants.SORTBY_PARAMETER, JsonConstants.IDENTIFIER);
         selectorInfo.put(JsonConstants.TEXTMATCH_PARAMETER, JsonConstants.TEXTMATCH_SUBSTRING);
@@ -160,6 +202,9 @@ public abstract class FieldBuilder extends Builder {
         selectorInfo.put(Constants.VALUE_FIELD_PROPERTY, JsonConstants.ID);
         selectorInfo.put(JsonConstants.SELECTEDPROPERTIES_PARAMETER, JsonConstants.ID);
         selectorInfo.put(JsonConstants.ADDITIONAL_PROPERTIES_PARAMETER, JsonConstants.ID + ",");
+        if (comboData != null) {
+            selectorInfo.put(Constants.RESPONSE_VALUES, comboData);
+        }
 
         return selectorInfo;
     }
@@ -280,40 +325,98 @@ public abstract class FieldBuilder extends Builder {
         StringBuilder derivedProperties = new StringBuilder();
         StringBuilder extraProperties = new StringBuilder(valueFieldProperty);
 
-        // get extra properties
         if (displayField != null && !JsonConstants.IDENTIFIER.equals(displayFieldProperty)) {
-            extraProperties.append(",").append(displayFieldProperty);
-            selectedProperties.append(",").append(displayFieldProperty);
+            appendWithComma(extraProperties, displayFieldProperty);
+            appendWithComma(selectedProperties, displayFieldProperty);
         }
 
-        // get selected and derived properties
+        SelectorPropertiesBuilder propertiesBuilder = new SelectorPropertiesBuilder(
+            selectedProperties, derivedProperties, extraProperties);
+
         for (SelectorField field : fields) {
-            String fieldName = getPropertyOrDataSourceField(field);
-
-            if (fieldName.equals(JsonConstants.ID) || fieldName.equals(JsonConstants.IDENTIFIER)) {
-                continue;
-            }
-
-            if (fieldName.contains(JsonConstants.FIELD_SEPARATOR)) {
-                if (derivedProperties.length() == 0) {
-                    derivedProperties = new StringBuilder(fieldName);
-                } else {
-                    derivedProperties.append(',').append(fieldName);
-                }
-            } else {
-                selectedProperties.append(",").append(fieldName);
-            }
-
-            if ((!field.isOutfield() || (displayField == null || fieldName.equals(
-                displayFieldProperty))) && (valueField == null || fieldName.equals(valueFieldProperty))) {
-                if (field.isOutfield()) {
-                    extraProperties.append(",").append(fieldName);
-                }
-            }
+            processSelectorField(field, displayField, valueField, displayFieldProperty, valueFieldProperty,
+                propertiesBuilder);
         }
 
         selectorInfo.put(JsonConstants.SELECTEDPROPERTIES_PARAMETER, selectedProperties.toString());
         selectorInfo.put(JsonConstants.ADDITIONAL_PROPERTIES_PARAMETER, extraProperties + "," + derivedProperties);
+    }
+
+    /**
+     * Processes an individual selector field and categorizes it into selected, derived, or extra properties.
+     *
+     * @param field The selector field to process.
+     * @param displayField The configured display field for the selector.
+     * @param valueField The configured value field for the selector.
+     * @param displayFieldProperty The property name of the display field.
+     * @param valueFieldProperty The property name of the value field.
+     * @param propertiesBuilder Builder containing the StringBuilders for selected, derived, and extra properties.
+     */
+    private static void processSelectorField(SelectorField field, SelectorField displayField, SelectorField valueField,
+        String displayFieldProperty, String valueFieldProperty, SelectorPropertiesBuilder propertiesBuilder) {
+        String fieldName = getPropertyOrDataSourceField(field);
+
+        if (JsonConstants.ID.equals(fieldName) || JsonConstants.IDENTIFIER.equals(fieldName)) {
+            return;
+        }
+
+        if (fieldName.contains(JsonConstants.FIELD_SEPARATOR)) {
+            appendWithComma(propertiesBuilder.derivedProperties, fieldName);
+        } else {
+            appendWithComma(propertiesBuilder.selectedProperties, fieldName);
+        }
+
+        if (isExtraProperty(field, displayField, valueField, fieldName, displayFieldProperty, valueFieldProperty)) {
+            appendWithComma(propertiesBuilder.extraProperties, fieldName);
+        }
+    }
+
+    /**
+     * Determines if a selector field should be considered an extra property.
+     *
+     * @param field The selector field to check.
+     * @param displayField The configured display field.
+     * @param valueField The configured value field.
+     * @param fieldName The name of the field being checked.
+     * @param displayFieldProperty The property name of the display field.
+     * @param valueFieldProperty The property name of the value field.
+     * @return true if the field is an extra property, false otherwise.
+     */
+    private static boolean isExtraProperty(SelectorField field, SelectorField displayField, SelectorField valueField,
+        String fieldName, String displayFieldProperty, String valueFieldProperty) {
+        return field.isOutfield() &&
+            (displayField == null || fieldName.equals(displayFieldProperty)) &&
+            (valueField == null || fieldName.equals(valueFieldProperty));
+    }
+
+    /**
+     * Appends a value to a StringBuilder, adding a comma separator if the StringBuilder is not empty.
+     *
+     * @param sb The StringBuilder to append to.
+     * @param value The value to append.
+     */
+    private static void appendWithComma(StringBuilder sb, String value) {
+        if (sb.length() > 0) {
+            sb.append(",");
+        }
+        sb.append(value);
+    }
+
+    /**
+     * Helper class to group selector property builders.
+     * Encapsulates the StringBuilders used to accumulate selected, derived, and extra properties.
+     */
+    private static class SelectorPropertiesBuilder {
+        final StringBuilder selectedProperties;
+        final StringBuilder derivedProperties;
+        final StringBuilder extraProperties;
+
+        SelectorPropertiesBuilder(StringBuilder selectedProperties, StringBuilder derivedProperties,
+            StringBuilder extraProperties) {
+            this.selectedProperties = selectedProperties;
+            this.derivedProperties = derivedProperties;
+            this.extraProperties = extraProperties;
+        }
     }
 
     /**
@@ -369,7 +472,7 @@ public abstract class FieldBuilder extends Builder {
                     fieldName = fieldName + DalUtil.FIELDSEPARATOR + JsonConstants.IDENTIFIER;
                 }
 
-                if (!(sb.length() == 0)) {
+                if (sb.length() != 0) {
                     sb.append(",");
                 }
                 sb.append(fieldName);
