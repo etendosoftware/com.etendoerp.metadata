@@ -7,11 +7,16 @@ import com.smf.securewebservices.utils.SecureWebServicesUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.openbravo.base.HttpBaseUtils;
 import org.openbravo.base.exception.OBException;
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
+import org.openbravo.base.secureApp.VariablesSecureApp;
 import org.openbravo.base.session.OBPropertiesProvider;
 import org.openbravo.client.kernel.RequestContext;
 import org.openbravo.dal.core.OBContext;
+import org.openbravo.dal.service.OBDal;
+import org.openbravo.erpCommon.security.SessionLogin;
+import org.openbravo.model.ad.access.User;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.Cookie;
@@ -36,9 +41,11 @@ import static com.etendoerp.metadata.utils.LegacyPaths.MANUAL_PROCESS;
 /**
  * Legacy servlet that uses existing HttpServletRequestWrapper infrastructure
  * to handle legacy HTML pages and their follow-up requests.
+ * It provides compatibility for WAD-generated windows and processes by wrapping
+ * requests and responses to inject necessary scripts and handle authentication.
  */
 public class LegacyProcessServlet extends HttpSecureAppServlet {
-    private static final Logger log4j = LogManager.getLogger(LegacyProcessServlet.class);
+    private static final Logger log = LogManager.getLogger();
     private static final String JWT_TOKEN = "#JWT_TOKEN";
     private static final String HTML_EXTENSION = ".html";
     private static final String JS_EXTENSION = ".js";
@@ -61,8 +68,23 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
                     "if (window.parent) {" +
                     "window.parent.postMessage({ type: \"fromForm\", action: action, }, \"*\");" +
                     "}}</script>";
+    public static final String SET_COOKIE = "Set-Cookie";
+    public static final String ERROR_SENDING_ERROR_RESPONSE = "Error sending error response: {}";
 
+    /**
+     * Sets the JSESSIONID cookie in the response if it hasn't been set yet.
+     * It ensures that the cookie is configured with proper Path, Domain, HttpOnly, and SameSite attributes.
+     *
+     * @param res the HttpServletResponse where the cookie will be added
+     * @param sessionId the session identifier to be stored in the cookie
+     */
     private void setSessionCookie(HttpServletResponse res, String sessionId) {
+        if (res.getHeaders(SET_COOKIE) != null &&
+                res.getHeaders(SET_COOKIE).stream().anyMatch(h -> h.contains("JSESSIONID"))) {
+            // Session cookie already set
+            log.info("JSESSIONID cookie already set in response headers.");
+            return;
+        }
         String host = OBPropertiesProvider.getInstance()
                 .getOpenbravoProperties()
                 .getProperty("CLASSIC_URL");
@@ -82,7 +104,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         boolean isProduction = !host.equalsIgnoreCase("localhost") && !host.startsWith("127.");
         cookie.setSecure(isProduction);
 
-        res.setHeader("Set-Cookie",
+        res.addHeader(SET_COOKIE,
                 String.format("JSESSIONID=%s; Path=/; Domain=%s; HttpOnly; %s; SameSite=None",
                         sessionId,
                         host,
@@ -91,6 +113,16 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         );
     }
 
+    /**
+     * Handles the entry point for all requests to this servlet.
+     * Routes requests based on whether they are legacy HTML requests, JavaScript requests,
+     * follow-up actions, or redirect requests.
+     *
+     * @param req the HttpServletRequest
+     * @param res the HttpServletResponse
+     * @throws IOException if an input or output error is detected when the servlet handles the request
+     * @throws ServletException if the request could not be handled
+     */
     @Override
     public void service(HttpServletRequest req, HttpServletResponse res)
             throws IOException, ServletException {
@@ -106,15 +138,151 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
                 processJavaScriptRequest(req, res, path);
             } else if (isLegacyFollowupRequest(req)) {
                 processLegacyFollowupRequest(req, res);
+            } else if (isRedirectRequest(path)) {
+                processRedirectRequest(req, res, path);
             } else {
                 super.service(req, res);
             }
         } catch (Exception e) {
-            log4j.error(e.getMessage(), e);
+            log.error(e.getMessage(), e);
             throw new ServletException(e);
         }
     }
 
+
+    /**
+     * Processes a redirect request, validating a JWT token and establishing the session context.
+     * It handles user authentication based on the token and redirects to the specified location.
+     *
+     * @param req the HttpServletRequest
+     * @param res the HttpServletResponse
+     * @param path the request path
+     */
+    private void processRedirectRequest(HttpServletRequest req, HttpServletResponse res,
+                                        String path) {
+        String token = req.getParameter(TOKEN_PARAM);
+        if (token != null) {
+            try {
+                authenticateWithToken(req, token);
+            } catch (Exception e) {
+                log.error("Invalid token provided for redirect request", e);
+                sendErrorResponse(res, HttpServletResponse.SC_UNAUTHORIZED,
+                        "Invalid token provided for redirect request");
+                return;
+            }
+        }
+
+        String location = req.getParameter("location");
+        if (!isValidLocation(location)) {
+            sendErrorResponse(res, HttpServletResponse.SC_BAD_REQUEST,
+                    "Invalid or missing location parameter");
+            return;
+        }
+
+        try {
+            String html = getHtmlRedirect(location, false);
+            sendHtmlResponse(res, html);
+        } catch (IOException e) {
+            log.error("Error processing redirect request {}: {}", path, e.getMessage(), e);
+            sendErrorResponse(res, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                    "Error processing redirect request: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Authenticates the user based on a JWT token and sets up the session context.
+     *
+     * @param req the HttpServletRequest
+     * @param token the JWT token
+     * @throws OBException if token decoding or session creation fails
+     */
+    private void authenticateWithToken(HttpServletRequest req, String token) {
+        try {
+            DecodedJWT decodedJWT = SecureWebServicesUtils.decodeToken(token);
+            String userId = decodedJWT.getClaim("user").asString();
+            String roleId = decodedJWT.getClaim("role").asString();
+            String clientId = decodedJWT.getClaim("client").asString();
+            String orgId = decodedJWT.getClaim("organization").asString();
+            String warehouseId = decodedJWT.getClaim("warehouse") != null ?
+                    decodedJWT.getClaim("warehouse").asString() : null;
+
+            OBContext.setOBContext(userId, roleId, clientId, orgId, null, warehouseId);
+            OBContext.setOBContextInSession(req, OBContext.getOBContext());
+
+            User user = OBDal.getInstance().get(User.class, userId);
+            if (user == null) {
+                throw new OBException("User not found: " + userId);
+            }
+            String sessionId = createDBSession(req, user.getUsername(), userId);
+
+            VariablesSecureApp vars = new VariablesSecureApp(req);
+            vars.setSessionValue("#AD_User_ID", userId);
+            vars.setSessionValue("#AD_SESSION_ID", sessionId);
+            vars.setSessionValue("#LogginIn", "Y");
+            req.getSession(true).setAttribute("#Authenticated_user", userId);
+
+            try {
+                OBContext.setAdminMode(true);
+                SecureWebServicesUtils.fillSessionVariables(req);
+            } finally {
+                OBContext.restorePreviousMode();
+            }
+        } catch (Exception e) {
+            throw new OBException("Error authenticating with token", e);
+        }
+    }
+
+    /**
+     * Validates if the provided redirect location is safe and not null.
+     *
+     * @param location the location string to validate
+     * @return true if the location is valid, false otherwise
+     */
+    private boolean isValidLocation(String location) {
+        if (location == null) {
+            log.error("No location parameter provided for redirect request");
+            return false;
+        }
+        if (location.contains("://") || location.startsWith("//")) {
+            log.error("Invalid location parameter provided for redirect request: {}", location);
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Sends an error response to the client.
+     *
+     * @param res the HttpServletResponse
+     * @param statusCode the HTTP status code
+     * @param message the error message
+     */
+    private void sendErrorResponse(HttpServletResponse res, int statusCode, String message) {
+        try {
+            res.sendError(statusCode, message);
+        } catch (IOException e) {
+            log.error(ERROR_SENDING_ERROR_RESPONSE, e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Sends a successful HTML response to the client.
+     *
+     * @param res the HttpServletResponse
+     * @param html the HTML content to send
+     * @throws IOException if an error occurs while writing the response
+     */
+    private void sendHtmlResponse(HttpServletResponse res, String html) throws IOException {
+        res.setContentType("text/html; charset=UTF-8");
+        res.setStatus(HttpServletResponse.SC_OK);
+        res.getWriter().write(html);
+        res.getWriter().flush();
+    }
+
+
+    private boolean isRedirectRequest(String path) {
+        return path != null && path.toLowerCase().endsWith("/redirect");
+    }
 
     private boolean isLegacyRequest(String path) {
         return path != null && path.toLowerCase().endsWith(HTML_EXTENSION);
@@ -129,6 +297,15 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         return command != null && command.startsWith("BUTTON");
     }
 
+    /**
+     * Processes a request for a legacy HTML page.
+     * Wraps the request and response to capture output and inject necessary compatibility scripts.
+     *
+     * @param req the HttpServletRequest
+     * @param res the HttpServletResponse
+     * @param path the path to the legacy resource
+     * @throws IOException if an error occurs during processing
+     */
     private void processLegacyRequest(HttpServletRequest req, HttpServletResponse res, String path) throws IOException {
 
         try {
@@ -143,23 +320,32 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             handleResponse(res, responseWrapper, path);
 
         } catch (Exception e) {
-            log4j.error("Error processing legacy request {}: {}", path, e.getMessage(), e);
+            log.error("Error processing legacy request {}: {}", path, e.getMessage(), e);
             res.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
                     "Error processing legacy request: " + e.getMessage());
         }
     }
     
+    /**
+     * Processes requests for JavaScript files, ensuring they are from authorized paths
+     * and applying any necessary transformations.
+     *
+     * @param req the HttpServletRequest
+     * @param res the HttpServletResponse
+     * @param path the path to the JavaScript file
+     * @throws IOException if an error occurs during processing
+     */
     private void processJavaScriptRequest(HttpServletRequest req, HttpServletResponse res, String path)
             throws IOException {
         String validatedPath = java.nio.file.Paths.get(path).normalize().toString();
         if (!validatedPath.startsWith(PUBLIC_JS_PATH)) {
-            log4j.warn("Attempted access to unauthorized path: {}", validatedPath);
+            log.warn("Attempted access to unauthorized path: {}", validatedPath);
             res.sendError(HttpServletResponse.SC_FORBIDDEN, "Access to this resource is forbidden.");
             return;
         }
         try (InputStream inputStream = req.getServletContext().getResourceAsStream(validatedPath)) {
             if (inputStream == null) {
-                log4j.warn("JavaScript file not found: {}", validatedPath);
+                log.warn("JavaScript file not found: {}", validatedPath);
                 res.sendError(HttpServletResponse.SC_NOT_FOUND, "JavaScript file not found: " + validatedPath);
                 return;
             }
@@ -174,7 +360,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             res.getWriter().flush();
 
         } catch (Exception e) {
-            log4j.error("Error processing JavaScript request {}: {}", validatedPath, e.getMessage(), e);
+            log.error("Error processing JavaScript request {}: {}", validatedPath, e.getMessage(), e);
             res.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
                     "Error processing JavaScript request: " + e.getMessage());
         }
@@ -193,6 +379,12 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         return content;
     }
 
+    /**
+     * Prepares session attributes such as tokens and directory paths for legacy requests.
+     *
+     * @param req the HttpServletRequest
+     * @param path the resource path
+     */
     private void prepareSessionAttributes(HttpServletRequest req, String path) {
         String token = req.getParameter(TOKEN_PARAM);
 
@@ -207,11 +399,11 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         }
     }
 
-    private void preprocessRequest(HttpServletRequest req, HttpServletRequestWrapper wrapped) {
-        handleTokenConsistency(req, wrapped);
-        handleRecordIdentifier(wrapped);
-        handleRequestContext(null, wrapped);
-        maybeValidateLegacyClass(wrapped.getPathInfo());
+    private void preprocessRequest(HttpServletRequest req, HttpServletRequestWrapper wrappedRequest) {
+        handleTokenConsistency(req, wrappedRequest);
+        handleRecordIdentifier(wrappedRequest);
+        handleRequestContext(null, wrappedRequest);
+        maybeValidateLegacyClass(wrappedRequest.getPathInfo());
     }
 
     private HttpServletRequestWrapper buildWrappedRequest(HttpServletRequest req, String path) {
@@ -260,6 +452,14 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         };
     }
 
+    /**
+     * Handles the captured response by potentially injecting content or performing redirects.
+     *
+     * @param res the HttpServletResponse
+     * @param wrapper the response wrapper containing captured output
+     * @param path the resource path
+     * @throws IOException if an error occurs while writing the response
+     */
     private void handleResponse(HttpServletResponse res,
                                 HttpServletResponseLegacyWrapper wrapper,
                                 String path) throws IOException {
@@ -280,7 +480,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
                                HttpServletResponseLegacyWrapper wrapper) throws IOException {
 
         String location = wrapper.getRedirectLocation();
-        String html = getHtmlRedirect(location);
+        String html = getHtmlRedirect(location, true);
 
         res.setContentType(wrapper.getContentType());
         res.setStatus(wrapper.getStatus());
@@ -305,8 +505,77 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         res.getWriter().flush();
     }
 
+    /**
+     * Creates a new session in the database (AD_Session table).
+     * This method is a duplication of the logic found in
+     * {@link org.openbravo.authentication.AuthenticationManager#createDBSession(HttpServletRequest, String, String, String)}.
+     *
+     * The duplication is necessary because the original method in AuthenticationManager is 'protected'
+     * and cannot be accessed directly from this context, even though we need to manually establish
+     * a session during the JWT-based redirect login flow.
+     *
+     * @param req The current HTTP request.
+     * @param strUser The username for the session.
+     * @param strUserAuth The user ID (AD_User_ID).
+     * @return The ID of the created session.
+     */
+    protected final String createDBSession(HttpServletRequest req, String strUser, String strUserAuth) {
+        return createDBSession(req, strUser, strUserAuth, "S");
+    }
+
+    /**
+     * Internal implementation for creating a database session.
+     * Duplicated from {@link org.openbravo.authentication.AuthenticationManager}.
+     *
+     * @param req The current HTTP request.
+     * @param strUser The username for the session.
+     * @param strUserAuth The user ID (AD_User_ID).
+     * @param successSessionType The status type for the session (e.g., "S" for success).
+     * @return The ID of the created session.
+     */
+    protected final String createDBSession(HttpServletRequest req, String strUser, String strUserAuth,
+                                           String successSessionType) {
+        try {
+            if (strUserAuth == null && StringUtils.isEmpty(strUser)) {
+                return null;
+            }
+
+            if (req == null) {
+                throw new OBException("Request object is null, cannot create DB session");
+            }
+
+            String usr = strUserAuth == null ? "0" : strUserAuth;
+
+            final SessionLogin sl = new SessionLogin(req, "0", "0", usr);
+
+            if (strUserAuth == null) {
+                sl.setStatus("F");
+            } else {
+                sl.setStatus(successSessionType);
+            }
+
+            sl.setUserName(strUser);
+            if (req != null) {
+                sl.setServerUrl(HttpBaseUtils.getLocalAddress(req));
+            }
+            sl.save();
+            return sl.getSessionID();
+        } catch (Exception e) {
+            log.error("Error creating DB session", e);
+            return null;
+        }
+    }
 
 
+
+    /**
+     * Processes follow-up requests triggered by buttons or actions within legacy pages.
+     * Restores authentication context and forwards the request to the appropriate legacy servlet.
+     *
+     * @param req the HttpServletRequest
+     * @param res the HttpServletResponse
+     * @throws IOException if an error occurs during processing
+     */
     private void processLegacyFollowupRequest(HttpServletRequest req, HttpServletResponse res)
             throws IOException {
 
@@ -314,7 +583,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         String servletDir = (String) req.getSession(false).getAttribute("LEGACY_SERVLET_DIR");
 
         if (token == null) {
-            log4j.error("No token found in session for legacy follow-up request");
+            log.error("No token found in session for legacy follow-up request");
             res.sendError(HttpServletResponse.SC_UNAUTHORIZED, "No authentication token for follow-up request");
             return;
         }
@@ -347,16 +616,16 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             String targetPath = extractTargetPath(req, servletDir);
 
             if (targetPath != null) {
-                log4j.debug("Forwarding follow-up request to: {}", targetPath);
+                log.debug("Forwarding follow-up request to: {}", targetPath);
                 wrappedRequest.getRequestDispatcher(targetPath).forward(wrappedRequest, res);
             } else {
-                log4j.error("Could not determine target path for follow-up request. PathInfo: {}, ServletDir: {}",
+                log.error("Could not determine target path for follow-up request. PathInfo: {}, ServletDir: {}",
                         req.getPathInfo(), servletDir);
                 res.sendError(HttpServletResponse.SC_BAD_REQUEST, "Could not determine target servlet");
             }
 
         } catch (Exception e) {
-            log4j.error("Error processing legacy follow-up request: {}", e.getMessage(), e);
+            log.error("Error processing legacy follow-up request: {}", e.getMessage(), e);
             res.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Error processing follow-up request");
         }
     }
@@ -400,25 +669,25 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             }
             return null;
         } catch (Exception e) {
-            log4j.warn("Error extracting target path from referer: {}", referer, e);
+            log.warn("Error extracting target path from referer: {}", referer, e);
             return null;
         }
     }
 
-    private void handleTokenConsistency(HttpServletRequest req, HttpServletRequestWrapper request) {
+    private void handleTokenConsistency(HttpServletRequest req, HttpServletRequestWrapper wrappedRequest) {
         String token = req.getParameter(TOKEN_PARAM);
         if (token != null) {
             req.getSession().setAttribute(JWT_TOKEN, token);
-        } else {
+        } else if (wrappedRequest != null) {
             Object sessionToken = req.getSession().getAttribute(JWT_TOKEN);
             if (sessionToken != null) {
                 try {
                     DecodedJWT decodedJWT = SecureWebServicesUtils.decodeToken(sessionToken.toString());
                     Claim jtiClaim = decodedJWT.getClaims().get("jti");
                     if (jtiClaim != null) {
-                        request.setSessionId(jtiClaim.asString());
+                        wrappedRequest.setSessionId(jtiClaim.asString());
                     } else {
-                        log4j.warn("JWT token in session does not contain 'jti' claim.");
+                        log.warn("JWT token in session does not contain 'jti' claim.");
                     }
                 } catch (Exception e) {
                     throw new OBException("Error decoding token", e);
@@ -455,7 +724,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
                 validateLegacyClassExists(expected);
             }
         } catch (Exception e) {
-            log4j.debug("Legacy class validation failed: {}", e.getMessage());
+            log.debug("Legacy class validation failed: {}", e.getMessage());
         }
     }
 
@@ -492,8 +761,13 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
      * @param redirectLocation the original redirect URL to be modified
      * @return an HTML string containing the redirect page with meta refresh
      */
-    private static String getHtmlRedirect(String redirectLocation) {
-        String forwardedUrl = redirectLocation.replace(BASE_PATH, BASE_PATH + META_LEGACY_PATH);
+    private static String getHtmlRedirect(String redirectLocation, boolean replacePath) {
+        String forwardedUrl;
+        if (replacePath) {
+            forwardedUrl = redirectLocation.replace(BASE_PATH, BASE_PATH + META_LEGACY_PATH);
+        } else {
+            forwardedUrl = redirectLocation;
+        }
         return String.format(
                 "<!DOCTYPE html>\n" +
                         "<html>\n" +
@@ -506,11 +780,20 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         );
     }
 
+    /**
+     * Injects compatibility scripts and adjusts paths in the HTML response content.
+     * This ensures that legacy pages can communicate with the modern frontend
+     * and that all resource links work correctly.
+     *
+     * @param path the resource path
+     * @param responseString the original HTML content
+     * @return the HTML content with injected scripts and adjusted paths
+     */
     private String getInjectedContent(String path, String responseString) {
         HttpServletRequest req = RequestContext.get().getRequest();
         String contextPath = req.getContextPath();
 
-        log4j.info("===== Context path from request: {}", contextPath);
+        log.info("===== Context path from request: {}", contextPath);
 
         responseString = responseString
                 .replace(META_LEGACY_PATH, META_LEGACY_PATH + path)

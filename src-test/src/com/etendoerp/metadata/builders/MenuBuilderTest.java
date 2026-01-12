@@ -16,12 +16,14 @@ import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
 
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -32,12 +34,17 @@ import org.openbravo.client.application.GlobalMenu;
 import org.openbravo.client.application.MenuManager;
 import org.openbravo.client.application.MenuManager.MenuOption;
 import org.openbravo.dal.core.OBContext;
+import org.openbravo.erpCommon.utility.Utility;
+import org.openbravo.model.ad.domain.ModelImplementation;
+import org.openbravo.model.ad.domain.ModelImplementationMapping;
 import org.openbravo.model.ad.system.Language;
 import org.openbravo.model.ad.ui.Menu;
+import org.openbravo.model.ad.ui.Window;
 
 /**
  * Test class for MenuBuilder.
- * This class tests the functionality of the MenuBuilder, ensuring it can construct a menu
+ * This class tests the functionality of the MenuBuilder, ensuring it can
+ * construct a menu
  * and convert it to JSON format correctly, including handling nested children.
  */
 @ExtendWith(MockitoExtension.class)
@@ -52,6 +59,25 @@ class MenuBuilderTest {
   @Mock
   private Language language;
 
+  private static final String PROCESS_URL = "processUrl";
+  private static final String PROCESS_ID = "processId";
+  private static final String IS_REPORT = "isReport";
+  private static final String STANDARD = "Standard";
+  private static final String MAPPING_URL = "/mapping/url";
+  private static final String REPORT_URL = "/report/url";
+  private static final String PENTAHO_URL = "/utility/OpenPentaho.html?inpadProcessId=";
+  private static final String AD_PROCESS_ID = "AD_PROCESS_ID";
+  private static final String AD_REPORT_ID = "AD_REPORT_ID";
+  private static final String AD_PENTAHO_ID = "AD_PENTAHO_ID";
+  private static final String P_ACTION = "P";
+
+  @AfterEach
+  void tearDown() throws NoSuchFieldException, IllegalAccessException {
+    Field managerField = MenuBuilder.class.getDeclaredField("manager");
+    managerField.setAccessible(true);
+    ((ThreadLocal<?>) managerField.get(null)).remove();
+  }
+
   /**
    * Test constructor of MenuBuilder.
    * This test ensures that the MenuBuilder can be constructed successfully
@@ -60,8 +86,8 @@ class MenuBuilderTest {
   @Test
   void testConstructorSuccessful() {
     try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
-         MockedConstruction<MenuManager> ignored = mockConstruction(MenuManager.class,
-             (mock, context) -> when(mock.getMenu()).thenReturn(rootMenuOption))) {
+        MockedConstruction<MenuManager> ignored = mockConstruction(MenuManager.class,
+            (mock, context) -> when(mock.getMenu()).thenReturn(rootMenuOption))) {
 
       obContextStatic.when(OBContext::getOBContext).thenReturn(obContext);
       when(obContext.getLanguage()).thenReturn(language);
@@ -71,18 +97,20 @@ class MenuBuilderTest {
   }
 
   /**
-   * Test constructor of MenuBuilder when MenuManager throws a NullPointerException.
+   * Test constructor of MenuBuilder when MenuManager throws a
+   * NullPointerException.
    * This test ensures that the MenuBuilder can still be constructed even if the
-   * MenuManager throws a NullPointerException, which is a common scenario in real-world applications.
+   * MenuManager throws a NullPointerException, which is a common scenario in
+   * real-world applications.
    */
   @Test
   void testConstructorWithNullPointerException() {
     try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
-         MockedConstruction<MenuManager> ignored = mockConstruction(MenuManager.class,
-             (mock, context) -> {
-               when(mock.getMenu()).thenThrow(new NullPointerException());
-               doNothing().when(mock).setGlobalMenuOptions(any(GlobalMenu.class));
-             })) {
+        MockedConstruction<MenuManager> ignored = mockConstruction(MenuManager.class,
+            (mock, context) -> {
+              when(mock.getMenu()).thenThrow(new NullPointerException());
+              doNothing().when(mock).setGlobalMenuOptions(any(GlobalMenu.class));
+            })) {
 
       obContextStatic.when(OBContext::getOBContext).thenReturn(obContext);
       when(obContext.getLanguage()).thenReturn(language);
@@ -93,11 +121,13 @@ class MenuBuilderTest {
 
   /**
    * Tests the toJSON method of MenuBuilder with nested children.
-   * This test verifies that the JSON output correctly represents a menu structure with nested children.
+   * This test verifies that the JSON output correctly represents a menu structure
+   * with nested children.
    * It also ensures that no JSONException is thrown during the process.
    *
    * @throws JSONException
-   *     if there is an error during JSON construction (should not occur in this test)
+   *                       if there is an error during JSON construction (should
+   *                       not occur in this test)
    */
   @Test
   void testToJSONWithNestedChildren() throws JSONException {
@@ -146,8 +176,8 @@ class MenuBuilderTest {
     when(grandChildMenu.getProcess()).thenReturn(null);
 
     try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
-         MockedConstruction<MenuManager> ignored = mockConstruction(MenuManager.class,
-             (mock, context) -> when(mock.getMenu()).thenReturn(rootMenuOption))) {
+        MockedConstruction<MenuManager> ignored = mockConstruction(MenuManager.class,
+            (mock, context) -> when(mock.getMenu()).thenReturn(rootMenuOption))) {
 
       obContextStatic.when(OBContext::getOBContext).thenReturn(obContext);
       when(obContext.getLanguage()).thenReturn(language);
@@ -175,7 +205,8 @@ class MenuBuilderTest {
 
   /**
    * Test toJSON method of MenuBuilder.
-   * This test ensures that the toJSON method can convert the menu structure into a JSON object
+   * This test ensures that the toJSON method can convert the menu structure into
+   * a JSON object
    * without throwing any exceptions, even when the menu has no children.
    */
   @Test
@@ -187,8 +218,8 @@ class MenuBuilderTest {
     rootChildren.add(freshChildOption);
 
     try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
-         MockedConstruction<MenuManager> ignored = mockConstruction(MenuManager.class,
-             (mock, context) -> when(mock.getMenu()).thenReturn(freshRootOption))) {
+        MockedConstruction<MenuManager> ignored = mockConstruction(MenuManager.class,
+            (mock, context) -> when(mock.getMenu()).thenReturn(freshRootOption))) {
 
       obContextStatic.when(OBContext::getOBContext).thenReturn(obContext);
       when(obContext.getLanguage()).thenReturn(language);
@@ -203,6 +234,192 @@ class MenuBuilderTest {
           fail("JSONException should be handled internally");
         }
       });
+    }
+  }
+
+  /**
+   * Tests the toJSON method with a process that has a default mapping.
+   * This covers addProcessInfo and getDefaultMapping.
+   *
+   * @throws JSONException if there is an error during JSON construction
+   */
+  @Test
+  void testAddProcessInfoWithDefaultMapping() throws JSONException {
+    MenuOption childOption = mock(MenuOption.class);
+    Menu childMenu = mock(Menu.class);
+    org.openbravo.model.ad.ui.Process process = mock(org.openbravo.model.ad.ui.Process.class);
+    ModelImplementation mi = mock(ModelImplementation.class);
+    ModelImplementationMapping mim = mock(ModelImplementationMapping.class);
+
+    List<MenuOption> rootChildren = List.of(childOption);
+    when(rootMenuOption.getChildren()).thenReturn(rootChildren);
+
+    when(childOption.getMenu()).thenReturn(childMenu);
+    when(childOption.getType()).thenReturn(MenuManager.MenuEntryType.Process);
+    when(childMenu.getId()).thenReturn("PROCESS_ID_VAL");
+    when(childMenu.getProcess()).thenReturn(process);
+    when(childMenu.getAction()).thenReturn(P_ACTION);
+
+    when(process.getId()).thenReturn(AD_PROCESS_ID);
+    when(process.isActive()).thenReturn(true);
+    when(process.getUIPattern()).thenReturn(STANDARD);
+    when(process.getADModelImplementationList()).thenReturn(List.of(mi));
+    when(mi.getADModelImplementationMappingList()).thenReturn(List.of(mim));
+    when(mim.isDefault()).thenReturn(true);
+    when(mim.getMappingName()).thenReturn(MAPPING_URL);
+
+    try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
+        MockedStatic<Utility> utilityStatic = mockStatic(Utility.class);
+        MockedConstruction<MenuManager> ignored = mockConstruction(MenuManager.class,
+            (mock, context) -> when(mock.getMenu()).thenReturn(rootMenuOption))) {
+
+      obContextStatic.when(OBContext::getOBContext).thenReturn(obContext);
+      when(obContext.getLanguage()).thenReturn(language);
+
+      MenuBuilder builder = new MenuBuilder();
+      JSONObject result = builder.toJSON();
+
+      JSONObject processMenu = result.getJSONArray("menu").getJSONObject(0);
+      assertEquals(AD_PROCESS_ID, processMenu.getString(PROCESS_ID));
+      assertEquals(MAPPING_URL, processMenu.getString(PROCESS_URL));
+    }
+  }
+
+  /**
+   * Tests the toJSON method with a report process.
+   * This covers addProcessInfo with report logic.
+   *
+   * @throws JSONException if there is an error during JSON construction
+   */
+  @Test
+  void testAddProcessInfoWithReport() throws JSONException {
+    MenuOption childOption = mock(MenuOption.class);
+    Menu childMenu = mock(Menu.class);
+    org.openbravo.model.ad.ui.Process process = mock(org.openbravo.model.ad.ui.Process.class);
+    ModelImplementation mi = mock(ModelImplementation.class);
+    ModelImplementationMapping mim = mock(ModelImplementationMapping.class);
+
+    List<MenuOption> rootChildren = List.of(childOption);
+    when(rootMenuOption.getChildren()).thenReturn(rootChildren);
+
+    when(childOption.getMenu()).thenReturn(childMenu);
+    when(childOption.getType()).thenReturn(MenuManager.MenuEntryType.Report);
+    when(childMenu.getId()).thenReturn("REPORT_ID_VAL");
+    when(childMenu.getProcess()).thenReturn(process);
+
+    when(process.getId()).thenReturn(AD_REPORT_ID);
+    when(process.isActive()).thenReturn(true);
+    when(process.isReport()).thenReturn(true);
+    when(process.getADModelImplementationList()).thenReturn(List.of(mi));
+    when(mi.getADModelImplementationMappingList()).thenReturn(List.of(mim));
+    when(mim.isDefault()).thenReturn(true);
+    when(mim.getMappingName()).thenReturn(REPORT_URL);
+
+    try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
+        MockedStatic<Utility> utilityStatic = mockStatic(Utility.class);
+        MockedConstruction<MenuManager> ignored = mockConstruction(MenuManager.class,
+            (mock, context) -> when(mock.getMenu()).thenReturn(rootMenuOption))) {
+
+      obContextStatic.when(OBContext::getOBContext).thenReturn(obContext);
+      when(obContext.getLanguage()).thenReturn(language);
+
+      MenuBuilder builder = new MenuBuilder();
+      JSONObject result = builder.toJSON();
+
+      JSONObject reportMenu = result.getJSONArray("menu").getJSONObject(0);
+      assertEquals(REPORT_URL, reportMenu.getString(PROCESS_URL));
+      assertTrue(reportMenu.getBoolean(IS_REPORT));
+    }
+  }
+
+  /**
+   * Tests the toJSON method with an external service process (Pentaho).
+   * This covers getProcessUrl.
+   *
+   * @throws JSONException if there is an error during JSON construction
+   */
+  @Test
+  void testAddProcessInfoWithExternalService() throws JSONException {
+    MenuOption childOption = mock(MenuOption.class);
+    Menu childMenu = mock(Menu.class);
+    org.openbravo.model.ad.ui.Process process = mock(org.openbravo.model.ad.ui.Process.class);
+
+    List<MenuOption> rootChildren = List.of(childOption);
+    when(rootMenuOption.getChildren()).thenReturn(rootChildren);
+
+    when(childOption.getMenu()).thenReturn(childMenu);
+    when(childMenu.getId()).thenReturn("PENTAHO_ID_VAL");
+    when(childMenu.getProcess()).thenReturn(process);
+    when(childMenu.getAction()).thenReturn(P_ACTION);
+
+    when(process.getId()).thenReturn(AD_PENTAHO_ID);
+    when(process.isActive()).thenReturn(true);
+    when(process.isExternalService()).thenReturn(true);
+    when(process.getServiceType()).thenReturn("PS");
+    when(process.getADModelImplementationList()).thenReturn(new ArrayList<>());
+
+    try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
+        MockedStatic<Utility> utilityStatic = mockStatic(Utility.class);
+        MockedConstruction<MenuManager> ignored = mockConstruction(MenuManager.class,
+            (mock, context) -> when(mock.getMenu()).thenReturn(rootMenuOption))) {
+
+      obContextStatic.when(OBContext::getOBContext).thenReturn(obContext);
+      when(obContext.getLanguage()).thenReturn(language);
+
+      MenuBuilder builder = new MenuBuilder();
+      JSONObject result = builder.toJSON();
+
+      JSONObject pentahoMenu = result.getJSONArray("menu").getJSONObject(0);
+      assertEquals(PENTAHO_URL + AD_PENTAHO_ID, pentahoMenu.getString(PROCESS_URL));
+    }
+  }
+
+  /**
+   * Tests addBasicMenuInfo via toJSON.
+   *
+   * @throws JSONException if there is an error during JSON construction
+   */
+  @Test
+  void testAddBasicMenuInfo() throws JSONException {
+    MenuOption childOption = mock(MenuOption.class);
+    Menu childMenu = mock(Menu.class);
+    String menuId = "BASIC_MENU_ID";
+    String menuName = "Basic Menu";
+    String menuDesc = "Basic Description";
+    String menuIcon = "basic-icon";
+    String menuUrl = "/basic/url";
+    String menuAction = "X";
+
+    List<MenuOption> rootChildren = List.of(childOption);
+    when(rootMenuOption.getChildren()).thenReturn(rootChildren);
+
+    when(childOption.getMenu()).thenReturn(childMenu);
+    when(childOption.getType()).thenReturn(MenuManager.MenuEntryType.External);
+    when(childMenu.getId()).thenReturn(menuId);
+    when(childMenu.get(Menu.PROPERTY_ETMETAICON, language, menuId)).thenReturn(menuIcon);
+    when(childMenu.get(Menu.PROPERTY_NAME, language, menuId)).thenReturn(menuName);
+    when(childMenu.get(Menu.PROPERTY_DESCRIPTION, language, menuId)).thenReturn(menuDesc);
+    when(childMenu.getURL()).thenReturn(menuUrl);
+    when(childMenu.getAction()).thenReturn(menuAction);
+
+    try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
+        MockedConstruction<MenuManager> ignored = mockConstruction(MenuManager.class,
+            (mock, context) -> when(mock.getMenu()).thenReturn(rootMenuOption))) {
+
+      obContextStatic.when(OBContext::getOBContext).thenReturn(obContext);
+      when(obContext.getLanguage()).thenReturn(language);
+
+      MenuBuilder builder = new MenuBuilder();
+      JSONObject result = builder.toJSON();
+
+      JSONObject basicMenu = result.getJSONArray("menu").getJSONObject(0);
+      assertEquals(menuId, basicMenu.getString("id"));
+      assertEquals("External", basicMenu.getString("type"));
+      assertEquals(menuIcon, basicMenu.getString("icon"));
+      assertEquals(menuName, basicMenu.getString("name"));
+      assertEquals(menuDesc, basicMenu.getString("description"));
+      assertEquals(menuUrl, basicMenu.getString("url"));
+      assertEquals(menuAction, basicMenu.getString("action"));
     }
   }
 

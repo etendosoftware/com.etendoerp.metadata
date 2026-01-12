@@ -270,7 +270,8 @@ class WindowBuilderTest {
     assertNotNull(result);
     assertTrue(result.has("tabs"));
     JSONArray tabs = result.getJSONArray("tabs");
-    assertEquals(3, tabs.length());  }
+    assertEquals(3, tabs.length());
+  }
 
   /**
    * Sets up mock tabs with various display logic configurations.
