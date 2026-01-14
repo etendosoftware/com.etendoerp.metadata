@@ -70,12 +70,9 @@ public class TabBuilder extends Builder {
 
       String displayLogic = tab.getDisplayLogic();
       if (displayLogic != null && !displayLogic.isBlank()) {
-        try {
-          org.openbravo.client.application.DynamicExpressionParser parser = new org.openbravo.client.application.DynamicExpressionParser(
-              displayLogic, tab, (org.openbravo.model.ad.ui.Field) null);
-          json.put("displayLogicExpression", parser.getJSExpression());
-        } catch (Exception e) {
-          logger.warn("Error parsing display logic for tab {}: {}", tab.getId(), e.getMessage());
+        String displayLogicExpression = parseDisplayLogicExpression(displayLogic);
+        if (displayLogicExpression != null) {
+          json.put("displayLogicExpression", displayLogicExpression);
         }
       }
 
@@ -101,6 +98,23 @@ public class TabBuilder extends Builder {
 
   private Tab getParentTab() {
     return KernelUtils.getInstance().getParentTab(tab);
+  }
+
+  /**
+   * Parses the display logic string into a JavaScript expression.
+   *
+   * @param displayLogic the display logic string to parse
+   * @return the parsed JavaScript expression, or null if parsing fails
+   */
+  private String parseDisplayLogicExpression(String displayLogic) {
+    try {
+      org.openbravo.client.application.DynamicExpressionParser parser = new org.openbravo.client.application.DynamicExpressionParser(
+          displayLogic, tab, (org.openbravo.model.ad.ui.Field) null);
+      return parser.getJSExpression();
+    } catch (Exception e) {
+      logger.warn("Error parsing display logic for tab {}: {}", tab.getId(), e.getMessage());
+      return null;
+    }
   }
 
   private JSONArray getParentColumns() {

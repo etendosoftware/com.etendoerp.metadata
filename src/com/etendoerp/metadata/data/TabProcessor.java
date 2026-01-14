@@ -55,6 +55,29 @@ public class TabProcessor {
   private static final CachedConcurrentMap<String, JSONObject> fieldAccessCache = new CachedConcurrentMap<>(
       FIELD_ACCESS_CACHE);
 
+  /**
+   * Encapsulates the functional interfaces needed to process field items.
+   */
+  private static class FieldProcessors<T> {
+    final Function<T, Column> columnExtractor;
+    final Function<T, String> customJsExtractor;
+    final Function<T, String> clientClassExtractor;
+    final Function<T, String> nameExtractor;
+    final BiConsumer<T, String> nameSetter;
+    final BiFunction<T, Boolean, JSONObject> fieldMapper;
+
+    FieldProcessors(Function<T, Column> columnExtractor, Function<T, String> customJsExtractor,
+        Function<T, String> clientClassExtractor, Function<T, String> nameExtractor,
+        BiConsumer<T, String> nameSetter, BiFunction<T, Boolean, JSONObject> fieldMapper) {
+      this.columnExtractor = columnExtractor;
+      this.customJsExtractor = customJsExtractor;
+      this.clientClassExtractor = clientClassExtractor;
+      this.nameExtractor = nameExtractor;
+      this.nameSetter = nameSetter;
+      this.fieldMapper = fieldMapper;
+    }
+  }
+
   private static boolean isFieldAccessible(Field field) {
     return field.isActive() && hasAccessToProcess(field,
         field.getTab().getWindow().getId()) && evaluateDisplayLogicAtServerLevel(field);
@@ -75,35 +98,14 @@ public class TabProcessor {
     JSONObject list = cache.get(cacheKey);
     if (list != null) return list;
 
+    FieldProcessors<T> processors = new FieldProcessors<>(columnExtractor, customJsExtractor,
+        clientClassExtractor, nameExtractor, nameSetter, fieldMapper);
     JSONObject result = new JSONObject();
 
     for (T fieldLike : data) {
       try {
         if (accessPredicate.test(fieldLike)) {
-          Column column = columnExtractor.apply(fieldLike);
-          if (column != null) {
-            String entityColumnName = getEntityColumnName(column);
-            if (entityColumnName != null) {
-              result.put(entityColumnName, fieldMapper.apply(fieldLike, true));
-            } else {
-              logger.warn("Could not determine entity column name for column: {} - skipping field",
-                  column.getDBColumnName());
-            }
-          } else {
-            String customJs = customJsExtractor.apply(fieldLike);
-            String clientClass = clientClassExtractor.apply(fieldLike);
-            String fieldName = nameExtractor.apply(fieldLike);
-            if (customJs != null && clientClass != null && fieldName != null && nameSetter != null) {
-              String fieldKey = fieldName + "_" + clientClass;
-              // Set a new name for the field, appending "Canva" to it
-              // In the future, Canva may become another word if we need it to.
-              String newFieldName = fieldName + " " + "Canva";
-              nameSetter.accept(fieldLike, newFieldName);
-              result.put(fieldKey, fieldMapper.apply(fieldLike, false));
-            } else {
-              logger.warn("Field has null column and null custom javascript - skipping field: {}", fieldLike);
-            }
-          }
+          processFieldItem(fieldLike, processors, result);
         }
       } catch (Exception e) {
         logger.warn("Error processing field: {} - {}", fieldLike, e.getMessage(), e);
@@ -112,6 +114,45 @@ public class TabProcessor {
 
     cache.put(cacheKey, result);
     return result;
+  }
+
+  private static <T> void processFieldItem(T fieldLike, FieldProcessors<T> processors,
+      JSONObject result) throws JSONException {
+    Column column = processors.columnExtractor.apply(fieldLike);
+    if (column != null) {
+      processFieldWithColumn(fieldLike, column, processors.fieldMapper, result);
+    } else {
+      processFieldWithoutColumn(fieldLike, processors, result);
+    }
+  }
+
+  private static <T> void processFieldWithColumn(T fieldLike, Column column,
+      BiFunction<T, Boolean, JSONObject> fieldMapper, JSONObject result) throws JSONException {
+    String entityColumnName = getEntityColumnName(column);
+    if (entityColumnName != null) {
+      result.put(entityColumnName, fieldMapper.apply(fieldLike, true));
+    } else {
+      logger.warn("Could not determine entity column name for column: {} - skipping field",
+          column.getDBColumnName());
+    }
+  }
+
+  private static <T> void processFieldWithoutColumn(T fieldLike, FieldProcessors<T> processors,
+      JSONObject result) throws JSONException {
+    String customJs = processors.customJsExtractor.apply(fieldLike);
+    String clientClass = processors.clientClassExtractor.apply(fieldLike);
+    String fieldName = processors.nameExtractor.apply(fieldLike);
+
+    if (customJs != null && clientClass != null && fieldName != null && processors.nameSetter != null) {
+      String fieldKey = fieldName + "_" + clientClass;
+      // Set a new name for the field, appending "Canva" to it
+      // In the future, Canva may become another word if we need it to.
+      String newFieldName = fieldName + " " + "Canva";
+      processors.nameSetter.accept(fieldLike, newFieldName);
+      result.put(fieldKey, processors.fieldMapper.apply(fieldLike, false));
+    } else {
+      logger.warn("Field has null column and null custom javascript - skipping field: {}", fieldLike);
+    }
   }
 
   public static JSONObject getTabFields(Tab tab) {
