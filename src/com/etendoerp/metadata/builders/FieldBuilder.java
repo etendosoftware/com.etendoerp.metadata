@@ -30,7 +30,6 @@ import org.openbravo.base.model.Property;
 import org.openbravo.base.model.domaintype.DomainType;
 import org.openbravo.base.model.domaintype.ForeignKeyDomainType;
 import org.openbravo.base.model.domaintype.PrimitiveDomainType;
-import org.openbravo.base.util.Check;
 import org.openbravo.client.application.DynamicExpressionParser;
 import org.openbravo.client.kernel.RequestContext;
 import org.openbravo.dal.core.DalUtil;
@@ -294,7 +293,7 @@ public abstract class FieldBuilder extends Builder {
         selectorInfo.put(JsonConstants.TEXTMATCH_PARAMETER, selector.getSuggestiontextmatchstyle());
 
         setSelectorProperties(selector.getOBUISELSelectorFieldList(), selector.getDisplayfield(),
-            selector.getValuefield(), selectorInfo);
+                selector.getValuefield(), selectorInfo);
 
         selectorInfo.put("extraSearchFields", getExtraSearchFields(selector));
         selectorInfo.put(Constants.DISPLAY_FIELD_PROPERTY, getDisplayField(selector));
@@ -315,11 +314,11 @@ public abstract class FieldBuilder extends Builder {
      * @throws JSONException if there's an error updating the JSON structure
      */
     private static void setSelectorProperties(List<SelectorField> fields, SelectorField displayField,
-        SelectorField valueField, JSONObject selectorInfo) throws JSONException {
+            SelectorField valueField, JSONObject selectorInfo) throws JSONException {
         String valueFieldProperty = valueField != null ? getValueField(
-            valueField.getObuiselSelector()) : JsonConstants.IDENTIFIER;
+                valueField.getObuiselSelector()) : JsonConstants.IDENTIFIER;
         String displayFieldProperty = displayField != null ? getDisplayField(
-            displayField.getObuiselSelector()) : JsonConstants.IDENTIFIER;
+                displayField.getObuiselSelector()) : JsonConstants.IDENTIFIER;
 
         StringBuilder selectedProperties = new StringBuilder(JsonConstants.ID);
         StringBuilder derivedProperties = new StringBuilder();
@@ -331,11 +330,11 @@ public abstract class FieldBuilder extends Builder {
         }
 
         SelectorPropertiesBuilder propertiesBuilder = new SelectorPropertiesBuilder(
-            selectedProperties, derivedProperties, extraProperties);
+                selectedProperties, derivedProperties, extraProperties);
 
         for (SelectorField field : fields) {
             processSelectorField(field, displayField, valueField, displayFieldProperty, valueFieldProperty,
-                propertiesBuilder);
+                    propertiesBuilder);
         }
 
         selectorInfo.put(JsonConstants.SELECTEDPROPERTIES_PARAMETER, selectedProperties.toString());
@@ -353,7 +352,7 @@ public abstract class FieldBuilder extends Builder {
      * @param propertiesBuilder Builder containing the StringBuilders for selected, derived, and extra properties.
      */
     private static void processSelectorField(SelectorField field, SelectorField displayField, SelectorField valueField,
-        String displayFieldProperty, String valueFieldProperty, SelectorPropertiesBuilder propertiesBuilder) {
+            String displayFieldProperty, String valueFieldProperty, SelectorPropertiesBuilder propertiesBuilder) {
         String fieldName = getPropertyOrDataSourceField(field);
 
         if (JsonConstants.ID.equals(fieldName) || JsonConstants.IDENTIFIER.equals(fieldName)) {
@@ -383,10 +382,10 @@ public abstract class FieldBuilder extends Builder {
      * @return true if the field is an extra property, false otherwise.
      */
     private static boolean isExtraProperty(SelectorField field, SelectorField displayField, SelectorField valueField,
-        String fieldName, String displayFieldProperty, String valueFieldProperty) {
+            String fieldName, String displayFieldProperty, String valueFieldProperty) {
         return field.isOutfield() &&
-            (displayField == null || fieldName.equals(displayFieldProperty)) &&
-            (valueField == null || fieldName.equals(valueFieldProperty));
+                (displayField == null || fieldName.equals(displayFieldProperty)) &&
+                (valueField == null || fieldName.equals(valueFieldProperty));
     }
 
     /**
@@ -412,7 +411,7 @@ public abstract class FieldBuilder extends Builder {
         final StringBuilder extraProperties;
 
         SelectorPropertiesBuilder(StringBuilder selectedProperties, StringBuilder derivedProperties,
-            StringBuilder extraProperties) {
+                StringBuilder extraProperties) {
             this.selectedProperties = selectedProperties;
             this.derivedProperties = derivedProperties;
             this.extraProperties = extraProperties;
@@ -457,7 +456,7 @@ public abstract class FieldBuilder extends Builder {
         final String displayField = getDisplayField(selector);
         final StringBuilder sb = new StringBuilder();
         for (SelectorField selectorField : selector.getOBUISELSelectorFieldList().stream().filter(
-            SelectorField::isActive).collect(Collectors.toList())) {
+                SelectorField::isActive).collect(Collectors.toList())) {
             String fieldName = getPropertyOrDataSourceField(selectorField);
             if (fieldName.equals(displayField)) {
                 continue;
@@ -564,16 +563,30 @@ public abstract class FieldBuilder extends Builder {
      * @return The domain type of the field, or null if cannot be determined
      */
     private static DomainType getDomainType(SelectorField selectorField) {
-        if (selectorField.getObuiselSelector().getTable() != null && selectorField.getProperty() != null) {
-            final String entityName = selectorField.getObuiselSelector().getTable().getName();
-            final Entity entity = ModelProvider.getInstance().getEntity(entityName);
-            final Property property = DalUtil.getPropertyFromPath(entity, selectorField.getProperty());
-            Check.isNotNull(property, "Property " + selectorField.getProperty() + " not found in Entity " + entity);
-            return property.getDomainType();
-        } else if (selectorField.getObuiselSelector().getTable() != null && selectorField.getObuiselSelector().isCustomQuery() && selectorField.getReference() != null) {
-            return getDomainType(selectorField.getReference().getId());
-        } else if (selectorField.getObserdsDatasourceField().getReference() != null) {
-            return getDomainType(selectorField.getObserdsDatasourceField().getReference().getId());
+        try {
+            if (selectorField.getObuiselSelector().getTable() != null && selectorField.getProperty() != null) {
+                final String entityName = selectorField.getObuiselSelector().getTable().getName();
+                final Entity entity = ModelProvider.getInstance().getEntity(entityName);
+                if (entity == null) {
+                    logger.warn("Entity not found for table: {}", entityName);
+                    return null;
+                }
+                final Property property = DalUtil.getPropertyFromPath(entity, selectorField.getProperty());
+                if (property == null) {
+                    logger.warn("Property {} not found in entity {}", selectorField.getProperty(), entityName);
+                    return null;
+                }
+                return property.getDomainType();
+            } else if (selectorField.getObuiselSelector().getTable() != null
+                    && selectorField.getObuiselSelector().isCustomQuery() && selectorField.getReference() != null) {
+                return getDomainType(selectorField.getReference().getId());
+            } else if (selectorField.getObserdsDatasourceField() != null
+                    && selectorField.getObserdsDatasourceField().getReference() != null) {
+                return getDomainType(selectorField.getObserdsDatasourceField().getReference().getId());
+            }
+        } catch (Exception e) {
+            logger.warn("Error getting domain type for selector field {}: {}",
+                    selectorField.getId(), e.getMessage(), e);
         }
         return null;
     }
@@ -586,14 +599,23 @@ public abstract class FieldBuilder extends Builder {
      * @throws IllegalStateException if no reference is found for the given ID
      */
     public static DomainType getDomainType(String referenceId) {
-        final org.openbravo.base.model.Reference reference = ModelProvider.getInstance().getReference(referenceId);
-        Check.isNotNull(reference, "No reference found for referenceid " + referenceId);
-        return reference.getDomainType();
+        try {
+            final org.openbravo.base.model.Reference reference = ModelProvider.getInstance().getReference(referenceId);
+            if (reference == null) {
+                logger.warn("No reference found for referenceId: {}", referenceId);
+                return null;
+            }
+            return reference.getDomainType();
+        } catch (Exception e) {
+            logger.warn("Error getting domain type for referenceId {}: {}", referenceId, e.getMessage(), e);
+            return null;
+        }
     }
 
     /**
      * Extracts the property name or datasource field name from a selector field.
-     * Handles different types of selector field configurations and normalizes path separators.
+     * Handles different types of selector field configurations and normalizes path
+     * separators.
      *
      * @param selectorField The selector field to extract the name from
      * @return The property or field name with normalized path separators
@@ -609,7 +631,7 @@ public abstract class FieldBuilder extends Builder {
             result = selectorField.getObserdsDatasourceField().getName();
         } else {
             throw new IllegalStateException(
-                "Selector field " + selectorField + " has a null datasource and a null property");
+                    "Selector field " + selectorField + " has a null datasource and a null property");
         }
         return result.replace(DalUtil.DOT, DalUtil.FIELDSEPARATOR);
     }
@@ -660,9 +682,13 @@ public abstract class FieldBuilder extends Builder {
      */
     @Override
     public JSONObject toJSON() throws JSONException {
-        addAccessProperties(fieldAccess);
-        addHqlName(field);
-        addDisplayLogic(field);
+        try {
+            addAccessProperties(fieldAccess);
+            addHqlName(field);
+            addDisplayLogic(field);
+        } catch (Exception e) {
+            logger.warn("Error building basic JSON for field {}: {}", field.getId(), e.getMessage(), e);
+        }
 
         return json;
     }

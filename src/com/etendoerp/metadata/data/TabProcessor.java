@@ -66,11 +66,11 @@ public class TabProcessor {
 
   public static <T> JSONObject getFields(String id, String updated, List<T> data, Predicate<T> accessPredicate,
                                          Function<T, Column> columnExtractor, Function<T,String> customJsExtractor,
-                                          Function<T, String> clientClassExtractor,
-                                         Function<T, String> nameExtractor,
-                                         BiConsumer<T, String> nameSetter,
-                                         BiFunction<T, Boolean, JSONObject> fieldMapper,
-                                         ConcurrentMap<String, JSONObject> cache) {
+      Function<T, String> clientClassExtractor,
+      Function<T, String> nameExtractor,
+      BiConsumer<T, String> nameSetter,
+      BiFunction<T, Boolean, JSONObject> fieldMapper,
+      ConcurrentMap<String, JSONObject> cache) {
     String cacheKey = getCacheKey(id, updated);
     JSONObject list = cache.get(cacheKey);
     if (list != null) return list;
@@ -87,7 +87,7 @@ public class TabProcessor {
               result.put(entityColumnName, fieldMapper.apply(fieldLike, true));
             } else {
               logger.warn("Could not determine entity column name for column: {} - skipping field",
-                      column.getDBColumnName());
+                  column.getDBColumnName());
             }
           } else {
             String customJs = customJsExtractor.apply(fieldLike);
@@ -105,7 +105,7 @@ public class TabProcessor {
             }
           }
         }
-      } catch (JSONException e) {
+      } catch (Exception e) {
         logger.warn("Error processing field: {} - {}", fieldLike, e.getMessage(), e);
       }
     }
@@ -117,7 +117,7 @@ public class TabProcessor {
   public static JSONObject getTabFields(Tab tab) {
     return getFields(tab.getId(), tab.getUpdated().toString(), tab.getADFieldList(), TabProcessor::isFieldAccessible,
         Field::getColumn, Field::getEtmetaCustomjs, Field::getClientclass, Field::getName,
-            Field::setName, TabProcessor::getJSONField, fieldCache);
+        Field::setName, TabProcessor::getJSONField, fieldCache);
   }
 
   public static JSONObject getTabFields(TabAccess tabAccess) {
