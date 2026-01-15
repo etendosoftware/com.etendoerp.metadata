@@ -31,10 +31,14 @@ import static org.mockito.Mockito.when;
 public class MetadataFilterTest extends WeldBaseTest {
 
   private MetadataFilter filter;
+  private HttpServletRequest request;
+  private HttpServletResponse response;
+  private FilterChain chain;
 
   private static final String FORWARD_PATH = "forwardPath";
   private static final String ACCEPT_HEADER = "Accept";
   private static final String APPLICATION_JSON = "application/json";
+  private static final String TEXT_HTML = "text/html";
 
   private static final String META_API_TEST_URI = "/etendo/meta/api/test";
   private static final String META_API_PREFIX = "/etendo/meta/api/";
@@ -44,6 +48,9 @@ public class MetadataFilterTest extends WeldBaseTest {
   public void setUp() throws Exception {
     super.setUp();
     filter = new MetadataFilter();
+    request = mock(HttpServletRequest.class);
+    response = mock(HttpServletResponse.class);
+    chain = mock(FilterChain.class);
   }
 
   @Test
@@ -89,114 +96,85 @@ public class MetadataFilterTest extends WeldBaseTest {
   public void testNonHttpRequestThrowsException() throws Exception {
     ServletRequest req = mock(ServletRequest.class);
     ServletResponse res = mock(ServletResponse.class);
-    FilterChain chain = mock(FilterChain.class);
 
     filter.doFilter(req, res, chain);
   }
 
   @Test
   public void testDoFilterWithNullPathInfo() throws Exception {
-    HttpServletRequest req = mock(HttpServletRequest.class);
-    HttpServletResponse res = mock(HttpServletResponse.class);
-    FilterChain chain = mock(FilterChain.class);
+    when(request.getPathInfo()).thenReturn(null);
 
-    when(req.getPathInfo()).thenReturn(null);
+    filter.doFilter(request, response, chain);
 
-    filter.doFilter(req, res, chain);
-
-    verify(chain).doFilter(req, res);
+    verify(chain).doFilter(request, response);
   }
 
   @Test
   public void testHtmlRequestHandledByLegacyServlet() throws Exception {
-    HttpServletRequest req = mock(HttpServletRequest.class);
-    HttpServletResponse res = mock(HttpServletResponse.class);
-    FilterChain chain = mock(FilterChain.class);
-
-    when(req.getPathInfo()).thenReturn("/SalesOrder/Header.html");
-    when(req.getRequestURI()).thenReturn("/etendo/meta/SalesOrder/Header.html");
-    when(req.getMethod()).thenReturn("GET");
-    when(req.getSession()).thenReturn(mock(javax.servlet.http.HttpSession.class));
-    when(req.getSession(true)).thenReturn(mock(javax.servlet.http.HttpSession.class));
+    setupHtmlRequest("/SalesOrder/Header.html");
 
     try {
-      filter.doFilter(req, res, chain);
+      filter.doFilter(request, response, chain);
     } catch (Exception e) {
       // expected
     }
 
-    verify(chain, never()).doFilter(req, res);
+    verify(chain, never()).doFilter(request, response);
   }
 
   @Test
   public void returnsJsonWhenIscDataFormatJsonOnException() throws Exception {
-    HttpServletRequest req = mockJsonRequest("/etendo/meta/window/foo", "GET");
-    when(req.getParameter("isc_dataFormat")).thenReturn("json");
+    setupJsonRequest("/etendo/meta/window/foo", "GET");
+    when(request.getParameter("isc_dataFormat")).thenReturn("json");
+    setupJsonResponse();
 
-    HttpServletResponse res = mockJsonResponse();
+    FilterChain exceptionChain = createExceptionChain("boom");
 
-    FilterChain chain = (ServletRequest r, ServletResponse s) -> {
-      throw new RuntimeException("boom");
-    };
+    filter.doFilter(request, response, exceptionChain);
 
-    filter.doFilter(req, res, chain);
-
-    verify(res).setContentType(contains(APPLICATION_JSON));
-    verify(res).setStatus(anyInt());
+    verify(response).setContentType(contains(APPLICATION_JSON));
+    verify(response).setStatus(anyInt());
   }
 
   @Test
   public void testHtmlErrorResponseOnException() throws Exception {
-    HttpServletRequest req = mock(HttpServletRequest.class);
-    HttpServletResponse res = mock(HttpServletResponse.class);
-    StringWriter stringWriter = new StringWriter();
+    StringWriter stringWriter = setupHtmlResponse();
+    when(request.getRequestURI()).thenReturn("/etendo/meta/SalesOrder/Header.html");
+    when(request.getMethod()).thenReturn("GET");
+    when(request.getHeader(ACCEPT_HEADER)).thenReturn(TEXT_HTML);
 
-    FilterChain chain = (ServletRequest r, ServletResponse s) -> {
-      throw new RuntimeException("Test exception");
-    };
+    FilterChain exceptionChain = createExceptionChain("Test exception");
 
-    when(req.getRequestURI()).thenReturn("/etendo/meta/SalesOrder/Header.html");
-    when(req.getMethod()).thenReturn("GET");
-    when(req.getHeader(ACCEPT_HEADER)).thenReturn("text/html");
-    when(res.isCommitted()).thenReturn(false);
-    when(res.getWriter()).thenReturn(new PrintWriter(stringWriter));
+    filter.doFilter(request, response, exceptionChain);
 
-    filter.doFilter(req, res, chain);
-
-    verify(res).setContentType("text/html; charset=UTF-8");
-    verify(res).setStatus(anyInt());
+    verify(response).setContentType("text/html; charset=UTF-8");
+    verify(response).setStatus(anyInt());
     assertTrue(stringWriter.toString().contains("Etendo Meta Error"));
   }
 
   @Test
   public void testCommittedResponseNotModifiedOnException() throws Exception {
-    HttpServletRequest req = mockJsonRequest(META_API_TEST_URI, "GET");
-    HttpServletResponse res = mock(HttpServletResponse.class);
+    setupJsonRequest(META_API_TEST_URI, "GET");
+    when(response.isCommitted()).thenReturn(true);
 
-    when(res.isCommitted()).thenReturn(true);
+    FilterChain exceptionChain = createExceptionChain("boom");
 
-    FilterChain chain = (ServletRequest r, ServletResponse s) -> {
-      throw new RuntimeException("boom");
-    };
+    filter.doFilter(request, response, exceptionChain);
 
-    filter.doFilter(req, res, chain);
-
-    verify(res, never()).setStatus(anyInt());
-    verify(res, never()).setContentType(anyString());
+    verify(response, never()).setStatus(anyInt());
+    verify(response, never()).setContentType(anyString());
   }
 
   @Test
   public void testJsonResponseWhenAcceptNotHtml() throws Exception {
-    HttpServletRequest req = mockJsonRequest(META_API_PREFIX + "endpoint", "POST");
-    HttpServletResponse res = mockJsonResponse();
+    setupJsonRequest(META_API_PREFIX + "endpoint", "POST");
+    setupJsonResponse();
 
-    FilterChain chain = (ServletRequest r, ServletResponse s) -> {
-      throw new RuntimeException("Test error");
-    };
+    FilterChain exceptionChain = createExceptionChain("Test error");
 
-    filter.doFilter(req, res, chain);
+    filter.doFilter(request, response, exceptionChain);
 
-    verify(res).setContentType(contains(APPLICATION_JSON));
+    verify(response).setContentType(contains(APPLICATION_JSON));
   }
 
   @Test
@@ -206,76 +184,75 @@ public class MetadataFilterTest extends WeldBaseTest {
 
   @Test
   public void testHtmlExtensionCaseInsensitive() throws Exception {
-    HttpServletRequest req = mock(HttpServletRequest.class);
-    HttpServletResponse res = mock(HttpServletResponse.class);
-    FilterChain chain = mock(FilterChain.class);
-
-    when(req.getPathInfo()).thenReturn("/SalesOrder/Header.HTML");
-    when(req.getRequestURI()).thenReturn("/etendo/meta/SalesOrder/Header.HTML");
-    when(req.getMethod()).thenReturn("GET");
-    when(req.getSession()).thenReturn(mock(javax.servlet.http.HttpSession.class));
-    when(req.getSession(true)).thenReturn(mock(javax.servlet.http.HttpSession.class));
+    setupHtmlRequest("/SalesOrder/Header.HTML");
 
     try {
-      filter.doFilter(req, res, chain);
+      filter.doFilter(request, response, chain);
     } catch (Exception e) {
       // expected
     }
 
-    verify(chain, never()).doFilter(req, res);
+    verify(chain, never()).doFilter(request, response);
   }
 
   @Test
   public void testErrorResponseWithQueryString() throws Exception {
-    HttpServletRequest req = mockJsonRequest(META_API_TEST_URI, "GET");
-    when(req.getQueryString()).thenReturn("param1=value1&param2=value2");
+    setupJsonRequest(META_API_TEST_URI, "GET");
+    when(request.getQueryString()).thenReturn("param1=value1&param2=value2");
+    setupJsonResponse();
 
-    HttpServletResponse res = mockJsonResponse();
+    FilterChain exceptionChain = createExceptionChain("Error with query");
 
-    FilterChain chain = (ServletRequest r, ServletResponse s) -> {
-      throw new RuntimeException("Error with query");
-    };
+    filter.doFilter(request, response, exceptionChain);
 
-    filter.doFilter(req, res, chain);
-
-    verify(res).setStatus(anyInt());
+    verify(response).setStatus(anyInt());
   }
 
   @Test
   public void testHtmlErrorEscapesSpecialCharacters() throws Exception {
-    HttpServletRequest req = mock(HttpServletRequest.class);
-    HttpServletResponse res = mock(HttpServletResponse.class);
-    StringWriter stringWriter = new StringWriter();
+    StringWriter stringWriter = setupHtmlResponse();
+    when(request.getRequestURI()).thenReturn("/etendo/meta/test.html");
+    when(request.getMethod()).thenReturn("GET");
+    when(request.getHeader(ACCEPT_HEADER)).thenReturn(TEXT_HTML);
 
-    FilterChain chain = (ServletRequest r, ServletResponse s) -> {
-      throw new RuntimeException("<script>alert('xss')</script>");
-    };
+    FilterChain exceptionChain = createExceptionChain("<script>alert('xss')</script>");
 
-    when(req.getRequestURI()).thenReturn("/etendo/meta/test.html");
-    when(req.getMethod()).thenReturn("GET");
-    when(req.getHeader(ACCEPT_HEADER)).thenReturn("text/html");
-    when(res.isCommitted()).thenReturn(false);
-    when(res.getWriter()).thenReturn(new PrintWriter(stringWriter));
-
-    filter.doFilter(req, res, chain);
+    filter.doFilter(request, response, exceptionChain);
 
     String output = stringWriter.toString();
     assertFalse(output.contains("<script>"));
     assertTrue(output.contains("&lt;script&gt;"));
   }
 
-  private HttpServletRequest mockJsonRequest(String uri, String method) {
-    HttpServletRequest req = mock(HttpServletRequest.class);
-    when(req.getRequestURI()).thenReturn(uri);
-    when(req.getMethod()).thenReturn(method);
-    when(req.getHeader(ACCEPT_HEADER)).thenReturn(APPLICATION_JSON);
-    return req;
+  private void setupJsonRequest(String uri, String method) {
+    when(request.getRequestURI()).thenReturn(uri);
+    when(request.getMethod()).thenReturn(method);
+    when(request.getHeader(ACCEPT_HEADER)).thenReturn(APPLICATION_JSON);
   }
 
-  private HttpServletResponse mockJsonResponse() throws Exception {
-    HttpServletResponse res = mock(HttpServletResponse.class);
-    when(res.isCommitted()).thenReturn(false);
-    when(res.getWriter()).thenReturn(new PrintWriter(new StringWriter()));
-    return res;
+  private void setupJsonResponse() throws Exception {
+    when(response.isCommitted()).thenReturn(false);
+    when(response.getWriter()).thenReturn(new PrintWriter(new StringWriter()));
+  }
+
+  private StringWriter setupHtmlResponse() throws Exception {
+    StringWriter stringWriter = new StringWriter();
+    when(response.isCommitted()).thenReturn(false);
+    when(response.getWriter()).thenReturn(new PrintWriter(stringWriter));
+    return stringWriter;
+  }
+
+  private void setupHtmlRequest(String path) {
+    when(request.getPathInfo()).thenReturn(path);
+    when(request.getRequestURI()).thenReturn("/etendo/meta" + path);
+    when(request.getMethod()).thenReturn("GET");
+    when(request.getSession()).thenReturn(mock(javax.servlet.http.HttpSession.class));
+    when(request.getSession(true)).thenReturn(mock(javax.servlet.http.HttpSession.class));
+  }
+
+  private FilterChain createExceptionChain(String message) {
+    return (ServletRequest r, ServletResponse s) -> {
+      throw new RuntimeException(message);
+    };
   }
 }
