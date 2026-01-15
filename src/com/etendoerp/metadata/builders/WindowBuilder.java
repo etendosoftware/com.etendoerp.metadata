@@ -56,18 +56,18 @@ public class WindowBuilder extends Builder {
 
         Role role = OBContext.getOBContext().getRole();
         WindowAccess windowAccess = (WindowAccess) dal.createCriteria(WindowAccess.class) //
-            .add(Restrictions.eq(WindowAccess.PROPERTY_ROLE, role)) //
-            .add(Restrictions.eq(WindowAccess.PROPERTY_ACTIVE, true)) //
-            .add(Restrictions.eq(WindowAccess.PROPERTY_WINDOW, adWindow))//
-            .setMaxResults(1) //
-            .uniqueResult();
-
-        if (windowAccess == null) {
-            windowAccess = (WindowAccess) dal.createCriteria(WindowAccess.class) //
+                .add(Restrictions.eq(WindowAccess.PROPERTY_ROLE, role)) //
                 .add(Restrictions.eq(WindowAccess.PROPERTY_ACTIVE, true)) //
                 .add(Restrictions.eq(WindowAccess.PROPERTY_WINDOW, adWindow))//
                 .setMaxResults(1) //
                 .uniqueResult();
+
+        if (windowAccess == null) {
+            windowAccess = (WindowAccess) dal.createCriteria(WindowAccess.class) //
+                    .add(Restrictions.eq(WindowAccess.PROPERTY_ACTIVE, true)) //
+                    .add(Restrictions.eq(WindowAccess.PROPERTY_WINDOW, adWindow))//
+                    .setMaxResults(1) //
+                    .uniqueResult();
         }
 
         if (windowAccess == null) {
@@ -123,6 +123,7 @@ public class WindowBuilder extends Builder {
         JSONObject windowJson = converter.toJsonObject(window, DataResolvingMode.FULL_TRANSLATABLE);
 
         try {
+            windowJson.put("id", window.getId());
             windowJson.put("tabs", createTabsJson(windowAccess.getADTabAccessList(), window.getADTabList()));
         } catch (JSONException e) {
             logger.error("Error creating JSON for window tabs: {}", e.getMessage(), e);

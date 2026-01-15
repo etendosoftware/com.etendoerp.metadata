@@ -45,14 +45,13 @@ public class TabBuilder extends Builder {
   private static final String DB_UPDATED = "Updated";
   private static final String DB_UPDATED_BY = "UpdatedBy";
   private static final String[] AUDIT_FIELDS = {
-          CREATION_DATE, CREATED_BY, UPDATED, UPDATED_BY
+      CREATION_DATE, CREATED_BY, UPDATED, UPDATED_BY
   };
   private static final Map<String, String> AUDIT_DB_COLUMNS = Map.of(
-          CREATION_DATE, DB_CREATED,
-          CREATED_BY, DB_CREATED_BY,
-          UPDATED, DB_UPDATED,
-          UPDATED_BY, DB_UPDATED_BY
-  );
+      CREATION_DATE, DB_CREATED,
+      CREATED_BY, DB_CREATED_BY,
+      UPDATED, DB_UPDATED,
+      UPDATED_BY, DB_UPDATED_BY);
 
   private final Tab tab;
   private final TabAccess tabAccess;
@@ -68,6 +67,15 @@ public class TabBuilder extends Builder {
 
       json.put("filter", tab.getFilterClause());
       json.put("displayLogic", tab.getDisplayLogic());
+
+      String displayLogic = tab.getDisplayLogic();
+      if (displayLogic != null && !displayLogic.isBlank()) {
+        String displayLogicExpression = parseDisplayLogicExpression(displayLogic);
+        if (displayLogicExpression != null) {
+          json.put("displayLogicExpression", displayLogicExpression);
+        }
+      }
+
       json.put("entityName", tab.getTable().getName());
       json.put("parentColumns", getParentColumns());
 
@@ -90,6 +98,23 @@ public class TabBuilder extends Builder {
 
   private Tab getParentTab() {
     return KernelUtils.getInstance().getParentTab(tab);
+  }
+
+  /**
+   * Parses the display logic string into a JavaScript expression.
+   *
+   * @param displayLogic the display logic string to parse
+   * @return the parsed JavaScript expression, or null if parsing fails
+   */
+  private String parseDisplayLogicExpression(String displayLogic) {
+    try {
+      org.openbravo.client.application.DynamicExpressionParser parser = new org.openbravo.client.application.DynamicExpressionParser(
+          displayLogic, tab, (org.openbravo.model.ad.ui.Field) null);
+      return parser.getJSExpression();
+    } catch (Exception e) {
+      logger.warn("Error parsing display logic for tab {}: {}", tab.getId(), e.getMessage());
+      return null;
+    }
   }
 
   private JSONArray getParentColumns() {
@@ -140,7 +165,7 @@ public class TabBuilder extends Builder {
         if (column != null) {
           boolean showInGrid = shouldShowInGrid(auditField);
           JSONObject syntheticField = createAuditField(column, auditField, baseGridPosition + order,
-                  showInGrid);
+              showInGrid);
           fieldsJson.put(auditField, syntheticField);
           order++;
         } else {
@@ -159,9 +184,9 @@ public class TabBuilder extends Builder {
    */
   private Column findColumnByDBName(Table table, String dbColumnName) {
     return table.getADColumnList().stream()
-            .filter(col -> StringUtils.equals(col.getDBColumnName(), dbColumnName))
-            .findFirst()
-            .orElse(null);
+        .filter(col -> StringUtils.equals(col.getDBColumnName(), dbColumnName))
+        .findFirst()
+        .orElse(null);
   }
 
   /**
@@ -187,7 +212,7 @@ public class TabBuilder extends Builder {
    */
   private JSONObject createAuditField(Column column, String hqlName, int gridPosition, boolean
           showInGrid)
-          throws JSONException {
+      throws JSONException {
     if (column == null) {
       throw new IllegalArgumentException("Column cannot be null when creating audit field: " + hqlName);
     }

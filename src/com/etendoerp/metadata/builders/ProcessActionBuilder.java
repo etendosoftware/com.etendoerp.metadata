@@ -57,6 +57,16 @@ public class ProcessActionBuilder extends Builder {
         processJson.put("fieldId", field.getId());
         processJson.put("columnId", field.getColumn().getId());
         processJson.put("displayLogic", field.getDisplayLogic());
+        String displayLogic = field.getDisplayLogic();
+        if (displayLogic != null && !displayLogic.isBlank()) {
+            try {
+                org.openbravo.client.application.DynamicExpressionParser parser = new org.openbravo.client.application.DynamicExpressionParser(
+                        displayLogic, field.getTab(), field);
+                processJson.put("displayLogicExpression", parser.getJSExpression());
+            } catch (Exception e) {
+                // Ignore error and log
+            }
+        }
         processJson.put("buttonText", field.getColumn().getName());
         processJson.put("fieldName", field.getName());
         processJson.put("reference", field.getColumn().getReference().getId());
@@ -73,7 +83,7 @@ public class ProcessActionBuilder extends Builder {
         }
         if (isListParameter(param)) {
             paramJSON.put("refList",
-                getListInfo(param.getReferenceSearchKey(), OBContext.getOBContext().getLanguage()));
+                    getListInfo(param.getReferenceSearchKey(), OBContext.getOBContext().getLanguage()));
         }
 
         return paramJSON;

@@ -70,18 +70,22 @@ public class FieldBuilderWithColumn extends FieldBuilder {
      */
     @Override
     public JSONObject toJSON() throws JSONException {
-        // Call parent method to add basic properties
-        super.toJSON();
+        try {
+            // Call parent method to add basic properties
+            super.toJSON();
 
-        // Add column-specific properties
-        addColumnSpecificProperties(field);
-        addReferencedProperty(field);
-        addReferencedTableInfo(field);
-        addReadOnlyLogic(field);
-        addProcessInfo(field);
-        addSelectorReferenceList(field);
-        addComboSelectInfo(field);
-        addButtonReferenceValues(field);
+            // Add column-specific properties
+            addColumnSpecificProperties(field);
+            addReferencedProperty(field);
+            addReferencedTableInfo(field);
+            addReadOnlyLogic(field);
+            addProcessInfo(field);
+            addSelectorReferenceList(field);
+            addComboSelectInfo(field);
+            addButtonReferenceValues(field);
+        } catch (Exception e) {
+            logger.warn("Error building JSON for field {}: {}", field.getId(), e.getMessage(), e);
+        }
 
         return json;
     }
@@ -179,9 +183,21 @@ public class FieldBuilderWithColumn extends FieldBuilder {
                 parentEntity = ModelProvider.getInstance().getEntityByTableName(parentTab.getTable().getDBTableName());
             }
 
-            Property property = KernelUtils.getProperty(field);
-            Entity referencedEntity = property.getReferencedProperty().getEntity();
-            return referencedEntity.equals(parentEntity);
+            try {
+                Property property = KernelUtils.getProperty(field);
+                Property referencedProperty = property.getReferencedProperty();
+                if (referencedProperty == null) {
+                    return false;
+                }
+                Entity referencedEntity = referencedProperty.getEntity();
+                return referencedEntity.equals(parentEntity);
+            } catch (Exception e) {
+                // If any error occurs while getting the property, return false gracefully
+                String errorMessage = String.format("Error checking parent record property for field %s: %s",
+                        field.getId(), e.getMessage());
+                logger.warn(errorMessage, e);
+                return false;
+            }
         } else {
             return false;
         }
