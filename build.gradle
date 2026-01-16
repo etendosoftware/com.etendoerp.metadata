@@ -1,5 +1,5 @@
 group = "com.etendoerp"
-version = "0.13.1"
+version = "0.13.2"
 description = "A module that provides APIs for the new Etendo UI"
 ext.artifact = "metadata"
 ext.repository = "https://maven.pkg.github.com/etendosoftware/com.etendoerp.platform.extensions"
