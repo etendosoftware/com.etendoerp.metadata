@@ -813,10 +813,15 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             resWithNewScript = resWithNewScript.replace("href=\"../web/", "href=\"" + contextPath + WEB_PATH);
 
             return injectCodeAfterFunctionCall(
-                    injectCodeAfterFunctionCall(resWithNewScript, "submitThisPage\\(([^)]+)\\);", "sendMessage('processOrder');", true),
-                    "closeThisPage();",
+                    injectCodeAfterFunctionCall(
+                            resWithNewScript,
+                            "submitThisPage\\(([^)]+)\\);",
+                            "sendMessage('processOrder');",
+                            true
+                    ),
+                    "close(This)?Page\\(\\);",
                     "sendMessage('closeModal');",
-                    false
+                    true
             );
         }
 
