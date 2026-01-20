@@ -5,6 +5,8 @@ import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.dal.service.OBDal;
+import com.etendoerp.metadata.data.ToolbarWindow;
+import org.openbravo.model.ad.ui.Window;
 
 import java.util.List;
 
@@ -14,8 +16,29 @@ import java.util.List;
  * into JSON format, as well as to generate a JSON representation of the menu structure.
  */
 public class ToolbarBuilder extends Builder {
+    private JSONArray toolbarWindowsToJSON(Toolbar toolbar) throws JSONException {
+        JSONArray windowsArray = new JSONArray();
 
-  /**
+        for (ToolbarWindow tw : toolbar.getEtmetaToolbarWindowList()) {
+            if (!Boolean.TRUE.equals(tw.isActive())) {
+                continue;
+            }
+
+            Window window = tw.getWindow();
+
+            JSONObject windowJson = new JSONObject()
+                    .put("id", window.getId())
+                    .put("name", window.getName());
+
+            windowsArray.put(windowJson);
+        }
+
+        return windowsArray;
+    }
+
+
+
+    /**
    * Constructor that initializes the MenuManager.
    * This ensures that the menu is loaded and ready for processing.
    */
@@ -39,8 +62,8 @@ public class ToolbarBuilder extends Builder {
         .put("action", t.getAction())
         .put("buttonType", t.getButtontype())
         .put("section", t.getSection())
-        .put("module", t.getModule() != null ? t.getModule().getId() : null);
-
+        .put("module", t.getModule() != null ? t.getModule().getId() : null)
+        .put("windows", toolbarWindowsToJSON(t));
   }
 
   /**
