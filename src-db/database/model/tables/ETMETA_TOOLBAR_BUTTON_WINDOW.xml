@@ -41,6 +41,10 @@
         <default><![CDATA[0]]></default>
         <onCreateDefault/>
       </column>
+      <column name="AD_MODULE_ID" primaryKey="false" required="false" type="VARCHAR" size="32" autoIncrement="false">
+        <default/>
+        <onCreateDefault/>
+      </column>
       <foreign-key foreignTable="AD_WINDOW" name="ETMETA_TB_BTN_WIN_ADWIN_FK">
         <reference local="AD_WINDOW_ID" foreign="AD_WINDOW_ID"/>
       </foreign-key>
