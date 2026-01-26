@@ -23,6 +23,7 @@ import java.util.stream.Collectors;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
+import org.hibernate.criterion.Restrictions;
 import org.openbravo.base.exception.OBException;
 import org.openbravo.base.model.Entity;
 import org.openbravo.base.model.ModelProvider;
@@ -40,6 +41,7 @@ import org.openbravo.database.ConnectionProvider;
 import org.openbravo.erpCommon.utility.ComboTableData;
 import org.openbravo.erpCommon.utility.Utility;
 import org.openbravo.model.ad.access.FieldAccess;
+import org.openbravo.model.ad.access.WindowAccess;
 import org.openbravo.model.ad.datamodel.Column;
 import org.openbravo.model.ad.domain.Reference;
 import org.openbravo.model.ad.domain.ReferencedTree;
@@ -58,8 +60,7 @@ import org.openbravo.userinterface.selector.SelectorField;
 import com.etendoerp.etendorx.utils.DataSourceUtils;
 import com.etendoerp.metadata.data.ReferenceSelectors;
 import com.etendoerp.metadata.utils.Constants;
-
-import javax.servlet.ServletException;
+import org.openbravo.model.ad.ui.Window;
 
 /**
  * Abstract base class for building field metadata in JSON format.
@@ -76,10 +77,13 @@ public abstract class FieldBuilder extends Builder {
 
     /**
      * Constructs a FieldBuilder with the specified field and access permissions.
-     * Initializes the JSON object with basic field data and sets up the language context.
+     * Initializes the JSON object with basic field data and sets up the language
+     * context.
      *
-     * @param field The UI field entity containing field definition and properties
-     * @param fieldAccess The field access permissions (can be null for default permissions)
+     * @param field       The UI field entity containing field definition and
+     *                    properties
+     * @param fieldAccess The field access permissions (can be null for default
+     *                    permissions)
      */
     protected FieldBuilder(Field field, FieldAccess fieldAccess) {
         this.field = field;
@@ -93,7 +97,8 @@ public abstract class FieldBuilder extends Builder {
      * Checks both legacy process actions and new process definitions.
      *
      * @param field The field to check for process functionality
-     * @return true if the field has an associated process action or definition, false otherwise
+     * @return true if the field has an associated process action or definition,
+     *         false otherwise
      */
     public static boolean isProcessField(Field field) {
         Process processAction = field.getColumn().getProcess();
@@ -102,14 +107,15 @@ public abstract class FieldBuilder extends Builder {
         return (processAction != null || processDefinition != null);
     }
 
-
     /**
      * Creates selector information JSON for a given field and reference.
-     * Determines the appropriate selector type (custom selector, tree selector, or combo table)
+     * Determines the appropriate selector type (custom selector, tree selector, or
+     * combo table)
      * and delegates to the specific selector info creation method.
      *
      * @param fieldId The unique identifier of the field
-     * @param ref The reference definition that may contain selector configurations
+     * @param ref     The reference definition that may contain selector
+     *                configurations
      * @return JSONObject containing complete selector configuration for the field
      * @throws JSONException if there's an error creating the JSON structure
      */
@@ -130,7 +136,8 @@ public abstract class FieldBuilder extends Builder {
      * Analyzes the reference to find configured selectors and tree selectors.
      *
      * @param ref The reference definition to analyze (can be null)
-     * @return ReferenceSelectors object containing found selector and tree selector instances
+     * @return ReferenceSelectors object containing found selector and tree selector
+     *         instances
      */
     public static ReferenceSelectors getReferenceSelectors(Reference ref) {
         Selector selector = null;
@@ -210,10 +217,11 @@ public abstract class FieldBuilder extends Builder {
 
     /**
      * Adds list information for a reference's AD List entries.
+     * 
      * @param ref The reference containing the AD List entries
      * @return JSONArray containing list entries with value and label
      * @throws JSONException if an error occurs while creating or populating the
-     *  *         {@link JSONObject} or {@link JSONArray}
+     *                       * {@link JSONObject} or {@link JSONArray}
      */
     static JSONArray addADListList(Reference ref) throws JSONException {
         JSONArray selectorInfo = new JSONArray();
@@ -221,7 +229,8 @@ public abstract class FieldBuilder extends Builder {
             JSONObject listElement = new JSONObject();
             listElement.put("id", list.getId());
             listElement.put("value", list.getSearchKey());
-            listElement.put("label", list.get(org.openbravo.model.ad.domain.List.PROPERTY_NAME, OBContext.getOBContext().getLanguage(), list.getId()));
+            listElement.put("label", list.get(org.openbravo.model.ad.domain.List.PROPERTY_NAME,
+                    OBContext.getOBContext().getLanguage(), list.getId()));
             selectorInfo.put(listElement);
         }
         return selectorInfo;
@@ -229,9 +238,10 @@ public abstract class FieldBuilder extends Builder {
 
     /**
      * Creates selector information for a tree-based selector.
-     * Configures tree datasource with display and value fields from the tree definition.
+     * Configures tree datasource with display and value fields from the tree
+     * definition.
      *
-     * @param fieldId The unique identifier of the field
+     * @param fieldId      The unique identifier of the field
      * @param treeSelector The tree selector configuration
      * @return JSONObject with tree selector configuration
      * @throws JSONException if there's an error creating the JSON structure
@@ -260,7 +270,7 @@ public abstract class FieldBuilder extends Builder {
      * Creates comprehensive selector information for a custom selector.
      * Handles datasource determination, field properties, and search configuration.
      *
-     * @param fieldId The unique identifier of the field
+     * @param fieldId  The unique identifier of the field
      * @param selector The custom selector configuration
      * @return JSONObject with complete custom selector configuration
      * @throws JSONException if there's an error creating the JSON structure
@@ -283,7 +293,9 @@ public abstract class FieldBuilder extends Builder {
 
         if (selector.getDisplayfield() != null) {
             selectorInfo.put(JsonConstants.SORTBY_PARAMETER,
-                selector.getDisplayfield().getDisplayColumnAlias() != null ? selector.getDisplayfield().getDisplayColumnAlias() : selector.getDisplayfield().getProperty());
+                    selector.getDisplayfield().getDisplayColumnAlias() != null
+                            ? selector.getDisplayfield().getDisplayColumnAlias()
+                            : selector.getDisplayfield().getProperty());
         } else {
             selectorInfo.put(JsonConstants.SORTBY_PARAMETER, JsonConstants.IDENTIFIER);
         }
@@ -303,13 +315,15 @@ public abstract class FieldBuilder extends Builder {
     }
 
     /**
-     * Configures selector properties including selected, derived, and additional properties.
-     * Analyzes selector fields to determine which properties should be included in queries
+     * Configures selector properties including selected, derived, and additional
+     * properties.
+     * Analyzes selector fields to determine which properties should be included in
+     * queries
      * and which should be available for display and searching.
      *
-     * @param fields List of selector field configurations
+     * @param fields       List of selector field configurations
      * @param displayField The field used for display (can be null)
-     * @param valueField The field used for values (can be null)
+     * @param valueField   The field used for values (can be null)
      * @param selectorInfo The JSON object to populate with property configurations
      * @throws JSONException if there's an error updating the JSON structure
      */
@@ -342,14 +356,16 @@ public abstract class FieldBuilder extends Builder {
     }
 
     /**
-     * Processes an individual selector field and categorizes it into selected, derived, or extra properties.
+     * Processes an individual selector field and categorizes it into selected,
+     * derived, or extra properties.
      *
-     * @param field The selector field to process.
-     * @param displayField The configured display field for the selector.
-     * @param valueField The configured value field for the selector.
+     * @param field                The selector field to process.
+     * @param displayField         The configured display field for the selector.
+     * @param valueField           The configured value field for the selector.
      * @param displayFieldProperty The property name of the display field.
-     * @param valueFieldProperty The property name of the value field.
-     * @param propertiesBuilder Builder containing the StringBuilders for selected, derived, and extra properties.
+     * @param valueFieldProperty   The property name of the value field.
+     * @param propertiesBuilder    Builder containing the StringBuilders for
+     *                             selected, derived, and extra properties.
      */
     private static void processSelectorField(SelectorField field, SelectorField displayField, SelectorField valueField,
             String displayFieldProperty, String valueFieldProperty, SelectorPropertiesBuilder propertiesBuilder) {
@@ -373,12 +389,12 @@ public abstract class FieldBuilder extends Builder {
     /**
      * Determines if a selector field should be considered an extra property.
      *
-     * @param field The selector field to check.
-     * @param displayField The configured display field.
-     * @param valueField The configured value field.
-     * @param fieldName The name of the field being checked.
+     * @param field                The selector field to check.
+     * @param displayField         The configured display field.
+     * @param valueField           The configured value field.
+     * @param fieldName            The name of the field being checked.
      * @param displayFieldProperty The property name of the display field.
-     * @param valueFieldProperty The property name of the value field.
+     * @param valueFieldProperty   The property name of the value field.
      * @return true if the field is an extra property, false otherwise.
      */
     private static boolean isExtraProperty(SelectorField field, SelectorField displayField, SelectorField valueField,
@@ -389,9 +405,10 @@ public abstract class FieldBuilder extends Builder {
     }
 
     /**
-     * Appends a value to a StringBuilder, adding a comma separator if the StringBuilder is not empty.
+     * Appends a value to a StringBuilder, adding a comma separator if the
+     * StringBuilder is not empty.
      *
-     * @param sb The StringBuilder to append to.
+     * @param sb    The StringBuilder to append to.
      * @param value The value to append.
      */
     private static void appendWithComma(StringBuilder sb, String value) {
@@ -403,7 +420,8 @@ public abstract class FieldBuilder extends Builder {
 
     /**
      * Helper class to group selector property builders.
-     * Encapsulates the StringBuilders used to accumulate selected, derived, and extra properties.
+     * Encapsulates the StringBuilders used to accumulate selected, derived, and
+     * extra properties.
      */
     private static class SelectorPropertiesBuilder {
         final StringBuilder selectedProperties;
@@ -422,7 +440,7 @@ public abstract class FieldBuilder extends Builder {
      * Generates list information for reference list fields (dropdown options).
      * Converts reference list entries into JSON format with localized labels.
      *
-     * @param refList The reference containing list definitions
+     * @param refList  The reference containing list definitions
      * @param language The language for label localization
      * @return JSONArray containing list options with id, value, and localized label
      * @throws JSONException if there's an error creating the JSON structure
@@ -436,7 +454,8 @@ public abstract class FieldBuilder extends Builder {
             listJson.put("id", list.getId());
             listJson.put("value", list.getSearchKey());
             listJson.put("label", list.get(org.openbravo.model.ad.domain.List.PROPERTY_NAME, language, list.getId()));
-            listJson.put("color", list.get(org.openbravo.model.ad.domain.List.PROPERTY_ETMETACOLOR, language, list.getId()));
+            listJson.put("color",
+                    list.get(org.openbravo.model.ad.domain.List.PROPERTY_ETMETACOLOR, language, list.getId()));
             listJson.put("active", list.isActive());
 
             result.put(listJson);
@@ -446,7 +465,8 @@ public abstract class FieldBuilder extends Builder {
     }
 
     /**
-     * Determines which fields should be available for text searching in selector suggestions.
+     * Determines which fields should be available for text searching in selector
+     * suggestions.
      * Filters out boolean fields and configures foreign key fields appropriately.
      *
      * @param selector The selector configuration to analyze
@@ -482,7 +502,8 @@ public abstract class FieldBuilder extends Builder {
 
     /**
      * Determines the display field for a selector.
-     * Uses configured display field or falls back to intelligent defaults based on datasource type.
+     * Uses configured display field or falls back to intelligent defaults based on
+     * datasource type.
      *
      * @param selector The selector configuration
      * @return The property name to use for display purposes
@@ -509,7 +530,8 @@ public abstract class FieldBuilder extends Builder {
 
     /**
      * Determines the value field for a selector.
-     * Uses configured value field or falls back to defaults, handling foreign key fields appropriately.
+     * Uses configured value field or falls back to defaults, handling foreign key
+     * fields appropriately.
      *
      * @param selector The selector configuration
      * @return The property name to use for value storage
@@ -541,7 +563,8 @@ public abstract class FieldBuilder extends Builder {
 
     /**
      * Checks if a selector field represents a boolean type.
-     * Boolean fields are excluded from search functionality as they don't work well with text search.
+     * Boolean fields are excluded from search functionality as they don't work well
+     * with text search.
      *
      * @param selectorField The selector field to check
      * @return true if the field is of boolean type, false otherwise
@@ -550,14 +573,16 @@ public abstract class FieldBuilder extends Builder {
         final DomainType domainType = getDomainType(selectorField);
         if (domainType instanceof PrimitiveDomainType) {
             PrimitiveDomainType primitiveDomainType = (PrimitiveDomainType) domainType;
-            return boolean.class == primitiveDomainType.getPrimitiveType() || Boolean.class == primitiveDomainType.getPrimitiveType();
+            return boolean.class == primitiveDomainType.getPrimitiveType()
+                    || Boolean.class == primitiveDomainType.getPrimitiveType();
         }
         return false;
     }
 
     /**
      * Retrieves the domain type for a selector field.
-     * Handles different selector field configurations (table-based, custom query, datasource-based).
+     * Handles different selector field configurations (table-based, custom query,
+     * datasource-based).
      *
      * @param selectorField The selector field to analyze
      * @return The domain type of the field, or null if cannot be determined
@@ -619,7 +644,8 @@ public abstract class FieldBuilder extends Builder {
      *
      * @param selectorField The selector field to extract the name from
      * @return The property or field name with normalized path separators
-     * @throws IllegalStateException if the selector field has no valid property or datasource field
+     * @throws IllegalStateException if the selector field has no valid property or
+     *                               datasource field
      */
     public static String getPropertyOrDataSourceField(SelectorField selectorField) {
         final String result;
@@ -649,11 +675,15 @@ public abstract class FieldBuilder extends Builder {
 
     /**
      * Generates the HQL (Hibernate Query Language) property name for a field.
-     * Attempts to determine the correct HQL name from database table and column information,
-     * falling back to the field name if unable to determine.
+     * Attempts to determine the correct HQL name from database table and column
+     * information.
+     * If matched, returns the HQL property name via DataSourceUtils.
+     * If column lookup fails, matches the field name normalized to camelCase (e.g.
+     * "General Ledger" -> "generalLedger")
+     * to align with HQL alias conventions.
      *
      * @param field The field to generate HQL name for
-     * @return The HQL property name, or field name as fallback
+     * @return The HQL property name, or camelCased field name as fallback
      */
     protected static String getHqlName(Field field) {
         try {
@@ -669,13 +699,15 @@ public abstract class FieldBuilder extends Builder {
             logger.warn(e.getMessage(), e);
         }
 
-        return field.getName();
+        String name = field.getName().replaceAll("\\s+", "");
+        return Character.toLowerCase(name.charAt(0)) + name.substring(1);
     }
 
     /**
      * Builds the complete JSON representation of the field.
      * Template method that calls specific property addition methods in sequence.
-     * Subclasses can override to add additional properties after calling super.toJSON().
+     * Subclasses can override to add additional properties after calling
+     * super.toJSON().
      *
      * @return JSONObject containing the complete field metadata
      * @throws JSONException if there's an error building the JSON structure
@@ -695,7 +727,8 @@ public abstract class FieldBuilder extends Builder {
 
     /**
      * Adds access control properties to the field JSON.
-     * Determines field editability, read-only status, and update permissions based on
+     * Determines field editability, read-only status, and update permissions based
+     * on
      * field access configuration and column properties.
      *
      * @param access The field access permissions (can be null for defaults)
