@@ -169,7 +169,7 @@ public class TabBuilder extends Builder {
           fieldsJson.put(auditField, syntheticField);
           order++;
         } else {
-            logger.debug("Audit column '{}' not found in table '{}'- skipping audit field '{}'", dbColumnName, table.getName(), auditField);
+            logger.info("Audit column '{}' not found in table '{}'- skipping audit field '{}'", dbColumnName, table.getName(), auditField);
         }
       }
     }
@@ -184,7 +184,7 @@ public class TabBuilder extends Builder {
    */
   private Column findColumnByDBName(Table table, String dbColumnName) {
     return table.getADColumnList().stream()
-        .filter(col -> StringUtils.equals(col.getDBColumnName(), dbColumnName))
+        .filter(col -> StringUtils.equalsIgnoreCase(col.getDBColumnName(), dbColumnName))
         .findFirst()
         .orElse(null);
   }
