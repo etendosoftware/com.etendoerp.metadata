@@ -309,10 +309,14 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
     private void processLegacyRequest(HttpServletRequest req, HttpServletResponse res, String path) throws IOException {
 
         try {
+            String token = req.getParameter(TOKEN_PARAM);
             HttpServletRequestWrapper wrappedRequest = buildWrappedRequest(req, path);
             HttpServletResponseLegacyWrapper responseWrapper = new HttpServletResponseLegacyWrapper(res);
 
             prepareSessionAttributes(req, path);
+            if (token != null) {
+                authenticateWithToken(wrappedRequest, token);
+            }
             preprocessRequest(req, wrappedRequest);
 
             wrappedRequest.getRequestDispatcher(path).include(wrappedRequest, responseWrapper);
@@ -370,8 +374,6 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
      * Transform JavaScript content based on the file path.
      * Applies path-specific transformations similar to getInjectedContent.
      *
-     * @param req the HTTP request to obtain context path
-     * @param path the path of the JavaScript file
      * @param content the original JavaScript content
      * @return the transformed JavaScript content
      */
