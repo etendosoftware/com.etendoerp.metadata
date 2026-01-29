@@ -686,11 +686,45 @@ public abstract class FieldBuilder extends Builder {
             addAccessProperties(fieldAccess);
             addHqlName(field);
             addDisplayLogic(field);
+            addIsAuditField(field);
         } catch (Exception e) {
             logger.warn("Error building basic JSON for field {}: {}", field.getId(), e.getMessage(), e);
         }
 
         return json;
+    }
+
+    /**
+     * Checks if the field corresponds to a standard audit field based on its DB
+     * column name.
+     *
+     * @param field The field to check
+     * @return true if the field is an audit field (Created, CreatedBy, Updated,
+     *         UpdatedBy), false otherwise
+     */
+    protected boolean isAuditField(Field field) {
+        if (field.getColumn() == null) {
+            return false;
+        }
+        String dbColumnName = field.getColumn().getDBColumnName();
+        return Constants.DB_CREATED.equalsIgnoreCase(dbColumnName) ||
+                Constants.DB_CREATED_BY.equalsIgnoreCase(dbColumnName) ||
+                Constants.DB_UPDATED.equalsIgnoreCase(dbColumnName) ||
+                Constants.DB_UPDATED_BY.equalsIgnoreCase(dbColumnName);
+    }
+
+    /**
+     * Adds the isAuditField property to the field JSON.
+     * This property helps the frontend identify audit fields regardless of their ID
+     * or configuration.
+     *
+     * @param field The field being processed
+     * @throws JSONException if an error occurs while adding the property
+     */
+    protected void addIsAuditField(Field field) throws JSONException {
+        if (isAuditField(field)) {
+            json.put("isAuditField", true);
+        }
     }
 
     /**
