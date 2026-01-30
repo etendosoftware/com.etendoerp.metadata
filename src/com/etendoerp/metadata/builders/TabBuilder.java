@@ -34,24 +34,17 @@ import org.openbravo.service.json.DataResolvingMode;
 
 import com.etendoerp.metadata.data.TabProcessor;
 import com.etendoerp.metadata.exceptions.InternalServerException;
+import com.etendoerp.metadata.utils.Constants;
 
 public class TabBuilder extends Builder {
-  private static final String CREATION_DATE = "creationDate";
-  private static final String CREATED_BY = "createdBy";
-  private static final String UPDATED = "updated";
-  private static final String UPDATED_BY = "updatedBy";
-  private static final String DB_CREATED = "Created";
-  private static final String DB_CREATED_BY = "CreatedBy";
-  private static final String DB_UPDATED = "Updated";
-  private static final String DB_UPDATED_BY = "UpdatedBy";
   private static final String[] AUDIT_FIELDS = {
-      CREATION_DATE, CREATED_BY, UPDATED, UPDATED_BY
+          Constants.CREATION_DATE, Constants.CREATED_BY, Constants.UPDATED, Constants.UPDATED_BY
   };
   private static final Map<String, String> AUDIT_DB_COLUMNS = Map.of(
-      CREATION_DATE, DB_CREATED,
-      CREATED_BY, DB_CREATED_BY,
-      UPDATED, DB_UPDATED,
-      UPDATED_BY, DB_UPDATED_BY);
+      Constants.CREATION_DATE, Constants.DB_CREATED,
+      Constants.CREATED_BY, Constants.DB_CREATED_BY,
+      Constants.UPDATED, Constants.DB_UPDATED,
+      Constants.UPDATED_BY, Constants.DB_UPDATED_BY);
 
   private final Tab tab;
   private final TabAccess tabAccess;
@@ -169,7 +162,8 @@ public class TabBuilder extends Builder {
           fieldsJson.put(auditField, syntheticField);
           order++;
         } else {
-            logger.debug("Audit column '{}' not found in table '{}'- skipping audit field '{}'", dbColumnName, table.getName(), auditField);
+          logger.info("Audit column '{}' not found in table '{}'- skipping audit field '{}'", dbColumnName,
+              table.getName(), auditField);
         }
       }
     }
@@ -178,13 +172,13 @@ public class TabBuilder extends Builder {
   /**
    * Searches for a column in the table by its database column name.
    *
-   * @param table the table to search in
+   * @param table        the table to search in
    * @param dbColumnName the database column name to search for
    * @return the matching Column object, or null if not found
    */
   private Column findColumnByDBName(Table table, String dbColumnName) {
     return table.getADColumnList().stream()
-        .filter(col -> StringUtils.equals(col.getDBColumnName(), dbColumnName))
+        .filter(col -> StringUtils.equalsIgnoreCase(col.getDBColumnName(), dbColumnName))
         .findFirst()
         .orElse(null);
   }
@@ -197,7 +191,7 @@ public class TabBuilder extends Builder {
    * @return true if the field should be visible in grid, false otherwise
    */
   private boolean shouldShowInGrid(String fieldName) {
-    return StringUtils.equals(fieldName, CREATION_DATE) || StringUtils.equals(fieldName, UPDATED);
+    return StringUtils.equals(fieldName, Constants.CREATION_DATE) || StringUtils.equals(fieldName, Constants.UPDATED);
   }
 
   /**
@@ -258,6 +252,7 @@ public class TabBuilder extends Builder {
     field.put("shownInStatusBar", false);
     field.put("tab", tab.getId());
     field.put("tab$_identifier", tab.getIdentifier());
+    field.put("isAuditField", true);
 
     return field;
   }
@@ -269,6 +264,6 @@ public class TabBuilder extends Builder {
    * @return true if the field is a user reference, false otherwise
    */
   private boolean isUserField(String hqlName) {
-    return StringUtils.equals(hqlName, CREATED_BY) || StringUtils.equals(hqlName, UPDATED_BY);
+    return StringUtils.equals(hqlName, Constants.CREATED_BY) || StringUtils.equals(hqlName, Constants.UPDATED_BY);
   }
 }

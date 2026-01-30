@@ -59,7 +59,7 @@ public class Constants {
     private static final String TABLE_REFERENCE_ID = "18";
     private static final String TREE_REFERENCE_ID = "8C57A4A2E05F4261A1FADF47C30398AD";
     public static final List<String> SELECTOR_REFERENCES = Arrays.asList(TABLE_REFERENCE_ID, TABLE_DIR_REFERENCE_ID,
-        SEARCH_REFERENCE_ID, SELECTOR_REFERENCE_ID, TREE_REFERENCE_ID);
+            SEARCH_REFERENCE_ID, SELECTOR_REFERENCE_ID, TREE_REFERENCE_ID);
     public static final String WINDOW_REFERENCE_ID = "FF80818132D8F0F30132D9BC395D0038";
     public static final String FORM_CLOSE_TAG = "</FORM>";
     public static final String FRAMESET_CLOSE_TAG = "</FRAMESET>";
@@ -78,4 +78,16 @@ public class Constants {
     public static final String LOCALE_KEY = "Locale";
     public static final String DEFAULT_LOCALE = "en_US";
     public static final String PUBLIC_JS_PATH = "/web/js/";
+
+    // Audit Fields
+    public static final String CREATION_DATE = "creationDate";
+    public static final String CREATED_BY = "createdBy";
+    public static final String UPDATED = "updated";
+    public static final String UPDATED_BY = "updatedBy";
+
+    // Audit DB Columns
+    public static final String DB_CREATED = "Created";
+    public static final String DB_CREATED_BY = "CreatedBy";
+    public static final String DB_UPDATED = "Updated";
+    public static final String DB_UPDATED_BY = "UpdatedBy";
 }
