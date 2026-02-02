@@ -20,6 +20,7 @@ package com.etendoerp.metadata.builders;
 import com.etendoerp.metadata.utils.Constants;
 import com.etendoerp.metadata.utils.LegacyUtils;
 import com.etendoerp.metadata.utils.Utils;
+import org.apache.commons.lang3.StringUtils;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.hibernate.criterion.Restrictions;
@@ -40,6 +41,12 @@ import org.openbravo.model.ad.ui.Window;
 import org.openbravo.service.json.DataResolvingMode;
 
 import static com.etendoerp.metadata.utils.Utils.getReferencedTab;
+import org.openbravo.dal.core.OBContext;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import org.openbravo.model.ad.access.WindowAccess;
+import org.openbravo.model.ad.access.Role;
+import org.openbravo.dal.service.OBCriteria;
 
 /**
  * Concrete implementation of FieldBuilder for fields with database columns.
@@ -49,6 +56,7 @@ import static com.etendoerp.metadata.utils.Utils.getReferencedTab;
  * @author Futit Services S.L.
  */
 public class FieldBuilderWithColumn extends FieldBuilder {
+    private static final Map<String, Boolean> windowAccessCache = new ConcurrentHashMap<>();
 
     /**
      * Constructs a FieldBuilderWithColumn for fields that have associated database columns.
@@ -83,6 +91,7 @@ public class FieldBuilderWithColumn extends FieldBuilder {
             addSelectorReferenceList(field);
             addComboSelectInfo(field);
             addButtonReferenceValues(field);
+            addLinkAccessibilityInfo();
         } catch (Exception e) {
             logger.warn("Error building JSON for field {}: {}", field.getId(), e.getMessage(), e);
         }
@@ -240,13 +249,20 @@ public class FieldBuilderWithColumn extends FieldBuilder {
      * Adds selector information for fields that use selector-based references.
      * Configures custom selectors, tree selectors, or combo table selectors
      * based on the field's reference configuration.
+     * * Handles exceptions gracefully to prevent breaking the entire field JSON generation
+     * if the selector configuration is invalid.
      *
      * @param field The field that may have selector functionality
-     * @throws JSONException if there's an error updating the JSON structure
+     * @throws JSONException if there's an error updating the JSON structure (outside the try-catch)
      */
     private void addComboSelectInfo(Field field) throws JSONException {
         if (isSelectorField(field)) {
-            json.put("selector", getSelectorInfo(field.getId(), field.getColumn().getReferenceSearchKey()));
+            try {
+                json.put("selector", getSelectorInfo(field.getId(), field.getColumn().getReferenceSearchKey()));
+            } catch (Exception e) {
+                logger.error("Error retrieving selector info for field: {} ({}). Skipping selector configuration.",
+                        field.getId(), field.getName(), e);
+            }
         }
     }
 
@@ -360,5 +376,83 @@ public class FieldBuilderWithColumn extends FieldBuilder {
         Column column = field.getColumn();
 
         return column != null && Constants.BUTTON_REFERENCE_ID.equals(column.getReference().getId());
+    }
+
+    /**
+     * Injects the 'isReferencedWindowAccessible' property into the JSON object.
+     * It checks if a 'referencedWindowId' is present and verifies if the current user
+     * has access to that window using a cached strategy.
+     *
+     * @throws JSONException if there is an error manipulating the JSON object
+     */
+    private void addLinkAccessibilityInfo() throws JSONException {
+        if (json.has("referencedWindowId")) {
+            String windowId = json.optString("referencedWindowId");
+
+            if (StringUtils.isNotEmpty(windowId) && !StringUtils.equals(windowId, "null")) {
+                boolean isAccessible = isWindowAccessible(windowId);
+                json.put("isReferencedWindowAccessible", isAccessible);
+            } else {
+                json.put("isReferencedWindowAccessible", false);
+            }
+        }
+    }
+
+    /**
+     * Checks if the current user role has access to the specified window.
+     * Uses a static ConcurrentHashMap to cache results and avoid repetitive DB queries.
+     *
+     * @param windowId The ID of the window to check
+     * @return true if the user has access, false otherwise
+     */
+    private boolean isWindowAccessible(String windowId) {
+        try {
+            OBContext context = OBContext.getOBContext();
+            Role role = context.getRole();
+
+            if (role == null) {
+                return false;
+            }
+
+            // "RoleID_WindowID"
+            String cacheKey = role.getId() + "_" + windowId;
+
+            return windowAccessCache.computeIfAbsent(cacheKey, k -> checkAccessInDB(role, windowId));
+
+        } catch (Exception e) {
+            logger.warn("Error checking window access for window {}: {}", windowId, e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Performs the actual database query to check if a role has access to a window.
+     * This method is intended to be called only when the cache misses.
+     *
+     * @param role The role to check
+     * @param windowId The ID of the window
+     * @return true if a record exists in AD_Window_Access, false otherwise
+     */
+    private boolean checkAccessInDB(Role role, String windowId) {
+        try {
+            OBDal dal = OBDal.getReadOnlyInstance();
+            Window window = dal.get(Window.class, windowId);
+
+            if (window == null) {
+                return false;
+            }
+
+            OBCriteria<WindowAccess> criteria = dal.createCriteria(WindowAccess.class);
+            criteria.add(Restrictions.eq(WindowAccess.PROPERTY_ROLE, role));
+            criteria.add(Restrictions.eq(WindowAccess.PROPERTY_WINDOW, window));
+            criteria.add(Restrictions.eq(WindowAccess.PROPERTY_ACTIVE, true));
+
+            criteria.setMaxResults(1);
+
+            return criteria.uniqueResult() != null;
+        } catch (Exception e) {
+            logger.error("DB Error checking access for Role {} and Window {}", role.getId(), windowId, e);
+            return false;
+        }
     }
 }
