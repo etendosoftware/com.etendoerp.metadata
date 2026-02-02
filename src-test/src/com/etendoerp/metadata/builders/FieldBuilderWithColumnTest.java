@@ -92,6 +92,17 @@ class FieldBuilderWithColumnTest {
     private static final String WINDOW_ID_STRING = "window-id";
     private static final String ROLE_ID_STRING = "role-id";
 
+    private static final String METH_CHECK_ACCESS_IN_DB = "checkAccessInDB";
+    private static final String METH_IS_WINDOW_ACCESSIBLE = "isWindowAccessible";
+    private static final String METH_ADD_LINK_ACCESSIBILITY = "addLinkAccessibilityInfo";
+    private static final String METH_ADD_BUTTON_REF_VALUES = "addButtonReferenceValues";
+    private static final String METH_ADD_READ_ONLY_LOGIC = "addReadOnlyLogic";
+
+    private static final String PROP_REFERENCED_WINDOW_ID = "referencedWindowId";
+    private static final String IS_REFERENCE_WINDOW_STRING = "isReferencedWindowAccessible";
+    private static final String NULL_VALUE = "null";
+    private static final String PROP_READ_ONLY_LOGIC = "readOnlyLogicExpression";
+
     private FieldBuilderWithColumn fieldBuilder;
 
     @BeforeEach
@@ -134,6 +145,34 @@ class FieldBuilderWithColumnTest {
     /* ---------------------------------------------------------------------- */
     /* Helpers */
     /* ---------------------------------------------------------------------- */
+
+    private void setupWindowAccessMocks(String windowId, OBCriteria<WindowAccess> criteriaMock,
+            WindowAccess windowAccess) {
+        when(obDal.get(Window.class, windowId)).thenReturn(mock(Window.class));
+        when(obDal.createCriteria(WindowAccess.class)).thenReturn(criteriaMock);
+        when(criteriaMock.add(any())).thenReturn(criteriaMock);
+        when(criteriaMock.setMaxResults(1)).thenReturn(criteriaMock);
+        when(criteriaMock.uniqueResult()).thenReturn(windowAccess);
+    }
+
+    private Object invokePrivate(Object target, String methodName, Class<?>[] parameterTypes, Object... args)
+            throws Exception {
+        Method method = target.getClass().getDeclaredMethod(methodName, parameterTypes);
+        method.setAccessible(true);
+        return method.invoke(target, args);
+    }
+
+    private JSONObject getJson(FieldBuilder builder) throws Exception {
+        java.lang.reflect.Field jsonField = FieldBuilder.class.getDeclaredField("json");
+        jsonField.setAccessible(true);
+        return (JSONObject) jsonField.get(builder);
+    }
+
+    private void setJson(FieldBuilder builder, JSONObject json) throws Exception {
+        java.lang.reflect.Field jsonField = FieldBuilder.class.getDeclaredField("json");
+        jsonField.setAccessible(true);
+        jsonField.set(builder, json);
+    }
 
     private JSONObject executeToJSON(Runnable extraMocks) throws JSONException {
         try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
@@ -432,10 +471,9 @@ class FieldBuilderWithColumnTest {
     }
 
     @Test
-    void testCheckAccessInDB_Accessible() throws Exception {
+    void testCheckAccessInDBAccessible() throws Exception {
         Role role = mock(Role.class);
         String windowId = WINDOW_ID_STRING;
-        Window window = mock(Window.class);
         @SuppressWarnings("unchecked")
         OBCriteria<WindowAccess> criteriaMock = mock(OBCriteria.class);
 
@@ -445,26 +483,19 @@ class FieldBuilderWithColumnTest {
 
             mockedOBContext.when(OBContext::getOBContext).thenReturn(obContext);
             mockedOBDal.when(OBDal::getReadOnlyInstance).thenReturn(obDal);
-            when(obDal.get(Window.class, windowId)).thenReturn(window);
-            when(obDal.createCriteria(WindowAccess.class)).thenReturn(criteriaMock);
-            when(criteriaMock.add(any())).thenReturn(criteriaMock);
-            when(criteriaMock.setMaxResults(1)).thenReturn(criteriaMock);
-            when(criteriaMock.uniqueResult()).thenReturn(mock(WindowAccess.class));
+            setupWindowAccessMocks(windowId, criteriaMock, mock(WindowAccess.class));
 
             fieldBuilder = new FieldBuilderWithColumn(field, fieldAccess);
-            Method method = FieldBuilderWithColumn.class.getDeclaredMethod("checkAccessInDB", Role.class, String.class);
-            method.setAccessible(true);
-
-            boolean result = (boolean) method.invoke(fieldBuilder, role, windowId);
+            boolean result = (boolean) invokePrivate(fieldBuilder, METH_CHECK_ACCESS_IN_DB,
+                    new Class[] { Role.class, String.class }, role, windowId);
             assertTrue(result);
         }
     }
 
     @Test
-    void testCheckAccessInDB_NotAccessible() throws Exception {
+    void testCheckAccessInDBNotAccessible() throws Exception {
         Role role = mock(Role.class);
         String windowId = WINDOW_ID_STRING;
-        Window window = mock(Window.class);
         @SuppressWarnings("unchecked")
         OBCriteria<WindowAccess> criteriaMock = mock(OBCriteria.class);
 
@@ -474,65 +505,51 @@ class FieldBuilderWithColumnTest {
 
             mockedOBContext.when(OBContext::getOBContext).thenReturn(obContext);
             mockedOBDal.when(OBDal::getReadOnlyInstance).thenReturn(obDal);
-            when(obDal.get(Window.class, windowId)).thenReturn(window);
-            when(obDal.createCriteria(WindowAccess.class)).thenReturn(criteriaMock);
-            when(criteriaMock.add(any())).thenReturn(criteriaMock);
-            when(criteriaMock.setMaxResults(1)).thenReturn(criteriaMock);
-            when(criteriaMock.uniqueResult()).thenReturn(null);
+            setupWindowAccessMocks(windowId, criteriaMock, null);
 
             fieldBuilder = new FieldBuilderWithColumn(field, fieldAccess);
-            Method method = FieldBuilderWithColumn.class.getDeclaredMethod("checkAccessInDB", Role.class, String.class);
-            method.setAccessible(true);
-
-            boolean result = (boolean) method.invoke(fieldBuilder, role, windowId);
+            boolean result = (boolean) invokePrivate(fieldBuilder, METH_CHECK_ACCESS_IN_DB,
+                    new Class[] { Role.class, String.class }, role, windowId);
             assertFalse(result);
         }
     }
 
     @Test
-    void testIsWindowAccessible_Cached() throws Exception {
+    void testIsWindowAccessibleCached() throws Exception {
         Role role = mock(Role.class);
         when(role.getId()).thenReturn(ROLE_ID_STRING);
         String windowId = WINDOW_ID_STRING;
-        Window window = mock(Window.class);
         @SuppressWarnings("unchecked")
         OBCriteria<WindowAccess> criteriaMock = mock(OBCriteria.class);
 
-        try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
-                MockedStatic<OBDal> mockedOBDal = mockStatic(OBDal.class);
+        try (MockedStatic<OBDal> mockedOBDal = mockStatic(OBDal.class);
+                MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
                 MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class)) {
             mockedOBContext.when(OBContext::getOBContext).thenReturn(obContext);
             when(obContext.getRole()).thenReturn(role);
             mockedOBDal.when(OBDal::getReadOnlyInstance).thenReturn(obDal);
 
-            when(obDal.get(Window.class, windowId)).thenReturn(window);
-            when(obDal.createCriteria(WindowAccess.class)).thenReturn(criteriaMock);
-            when(criteriaMock.add(any())).thenReturn(criteriaMock);
-            when(criteriaMock.setMaxResults(1)).thenReturn(criteriaMock);
-            when(criteriaMock.uniqueResult()).thenReturn(mock(WindowAccess.class));
+            setupWindowAccessMocks(windowId, criteriaMock, mock(WindowAccess.class));
 
             fieldBuilder = new FieldBuilderWithColumn(field, fieldAccess);
-            Method method = FieldBuilderWithColumn.class.getDeclaredMethod("isWindowAccessible", String.class);
-            method.setAccessible(true);
 
             // First call hits DB
-            method.invoke(fieldBuilder, windowId);
+            invokePrivate(fieldBuilder, METH_IS_WINDOW_ACCESSIBLE, new Class[] { String.class }, windowId);
             // Second call should use cache
-            method.invoke(fieldBuilder, windowId);
+            invokePrivate(fieldBuilder, METH_IS_WINDOW_ACCESSIBLE, new Class[] { String.class }, windowId);
 
             verify(obDal, times(1)).createCriteria(WindowAccess.class);
         }
     }
 
     @Test
-    void testAddLinkAccessibilityInfo_WhenAccessible() throws JSONException {
+    void testAddLinkAccessibilityInfoWhenAccessible() throws JSONException {
         // Prepare JSON with referencedWindowId
         JSONObject json = new JSONObject();
-        json.put("referencedWindowId", WINDOW_ID_STRING);
+        json.put(PROP_REFERENCED_WINDOW_ID, WINDOW_ID_STRING);
 
         Role role = mock(Role.class);
         when(role.getId()).thenReturn(ROLE_ID_STRING);
-        Window window = mock(Window.class);
         @SuppressWarnings("unchecked")
         OBCriteria<WindowAccess> criteriaMock = mock(OBCriteria.class);
 
@@ -544,28 +561,15 @@ class FieldBuilderWithColumnTest {
             when(obContext.getRole()).thenReturn(role);
             mockedOBDal.when(OBDal::getReadOnlyInstance).thenReturn(obDal);
 
-            when(obDal.get(Window.class, WINDOW_ID_STRING)).thenReturn(window);
-            when(obDal.createCriteria(WindowAccess.class)).thenReturn(criteriaMock);
-            when(criteriaMock.add(any())).thenReturn(criteriaMock);
-            when(criteriaMock.setMaxResults(1)).thenReturn(criteriaMock);
-            when(criteriaMock.uniqueResult()).thenReturn(mock(WindowAccess.class));
+            setupWindowAccessMocks(WINDOW_ID_STRING, criteriaMock, mock(WindowAccess.class));
 
             fieldBuilder = new FieldBuilderWithColumn(field, fieldAccess);
-            // Use reflection to set the protected 'json' field if possible,
-            // but since it's defined in Builder/FieldBuilder we need to find where it is.
-            // Actually, we can just call the private method if we can access the 'json'
-            // field.
             try {
-                java.lang.reflect.Field jsonField = FieldBuilder.class.getDeclaredField("json");
-                jsonField.setAccessible(true);
-                jsonField.set(fieldBuilder, json);
+                setJson(fieldBuilder, json);
+                invokePrivate(fieldBuilder, METH_ADD_LINK_ACCESSIBILITY, new Class[] {});
 
-                Method method = FieldBuilderWithColumn.class.getDeclaredMethod("addLinkAccessibilityInfo");
-                method.setAccessible(true);
-                method.invoke(fieldBuilder);
-
-                assertTrue(json.has("isReferencedWindowAccessible"));
-                assertTrue(json.getBoolean("isReferencedWindowAccessible"));
+                assertTrue(json.has(IS_REFERENCE_WINDOW_STRING));
+                assertTrue(json.getBoolean(IS_REFERENCE_WINDOW_STRING));
             } catch (Exception e) {
                 fail("Reflection failed: " + e.getMessage());
             }
