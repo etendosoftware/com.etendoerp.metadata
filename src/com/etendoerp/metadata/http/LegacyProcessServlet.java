@@ -219,6 +219,9 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             vars.setSessionValue("#AD_User_ID", userId);
             vars.setSessionValue("#AD_SESSION_ID", sessionId);
             vars.setSessionValue("#LogginIn", "Y");
+            vars.setSessionValue("#AD_Role_ID", roleId);
+            vars.setSessionValue("#AD_Client_ID", clientId);
+            vars.setSessionValue("#AD_Org_ID", orgId);
             req.getSession(true).setAttribute("#Authenticated_user", userId);
 
             try {
