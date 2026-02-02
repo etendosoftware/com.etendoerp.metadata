@@ -95,13 +95,8 @@ class FieldBuilderWithColumnTest {
     private static final String METH_CHECK_ACCESS_IN_DB = "checkAccessInDB";
     private static final String METH_IS_WINDOW_ACCESSIBLE = "isWindowAccessible";
     private static final String METH_ADD_LINK_ACCESSIBILITY = "addLinkAccessibilityInfo";
-    private static final String METH_ADD_BUTTON_REF_VALUES = "addButtonReferenceValues";
-    private static final String METH_ADD_READ_ONLY_LOGIC = "addReadOnlyLogic";
 
-    private static final String PROP_REFERENCED_WINDOW_ID = "referencedWindowId";
     private static final String IS_REFERENCE_WINDOW_STRING = "isReferencedWindowAccessible";
-    private static final String NULL_VALUE = "null";
-    private static final String PROP_READ_ONLY_LOGIC = "readOnlyLogicExpression";
 
     private FieldBuilderWithColumn fieldBuilder;
 
@@ -160,12 +155,6 @@ class FieldBuilderWithColumnTest {
         Method method = target.getClass().getDeclaredMethod(methodName, parameterTypes);
         method.setAccessible(true);
         return method.invoke(target, args);
-    }
-
-    private JSONObject getJson(FieldBuilder builder) throws Exception {
-        java.lang.reflect.Field jsonField = FieldBuilder.class.getDeclaredField("json");
-        jsonField.setAccessible(true);
-        return (JSONObject) jsonField.get(builder);
     }
 
     private void setJson(FieldBuilder builder, JSONObject json) throws Exception {
