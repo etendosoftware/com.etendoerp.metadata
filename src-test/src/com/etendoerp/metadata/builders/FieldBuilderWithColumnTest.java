@@ -97,6 +97,7 @@ class FieldBuilderWithColumnTest {
     private static final String METH_ADD_LINK_ACCESSIBILITY = "addLinkAccessibilityInfo";
 
     private static final String IS_REFERENCE_WINDOW_STRING = "isReferencedWindowAccessible";
+    private static final String PROP_REFERENCED_WINDOW_ID = "referencedWindowId";
 
     private FieldBuilderWithColumn fieldBuilder;
 
