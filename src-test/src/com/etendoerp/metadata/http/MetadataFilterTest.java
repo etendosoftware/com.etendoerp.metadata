@@ -42,6 +42,7 @@ public class MetadataFilterTest extends WeldBaseTest {
   private static final String ACCEPT_HEADER = "Accept";
   private static final String APPLICATION_JSON = "application/json";
   private static final String TEXT_HTML = "text/html";
+  private static final String TEXT_PLAIN = "text/plain";
 
   private static final String META_API_TEST_URI = "/etendo/meta/api/test";
   private static final String META_API_PREFIX = "/etendo/meta/api/";
@@ -239,12 +240,12 @@ public class MetadataFilterTest extends WeldBaseTest {
 
     // Case 2: Accept header contains text/html
     when(request.getRequestURI()).thenReturn("/test");
-    when(request.getHeader("Accept")).thenReturn("text/html,application/xhtml+xml");
+    when(request.getHeader(ACCEPT_HEADER)).thenReturn("text/html,application/xhtml+xml");
     assertTrue((Boolean) method.invoke(filter, request, response));
 
     // Case 3: None
     when(request.getRequestURI()).thenReturn("/test");
-    when(request.getHeader("Accept")).thenReturn("application/json");
+    when(request.getHeader(ACCEPT_HEADER)).thenReturn(APPLICATION_JSON);
     assertFalse((Boolean) method.invoke(filter, request, response));
 
     // Case 4: Nulls
@@ -272,9 +273,9 @@ public class MetadataFilterTest extends WeldBaseTest {
     when(response.getOutputStream()).thenReturn(mockOutput);
 
     byte[] body = "test content".getBytes();
-    method.invoke(filter, response, body, 200, "text/plain");
+    method.invoke(filter, response, body, 200, TEXT_PLAIN);
 
-    verify(response).setContentType("text/plain");
+    verify(response).setContentType(TEXT_PLAIN);
     verify(response).setStatus(200);
     verify(mockOutput).write(body);
   }
@@ -315,12 +316,12 @@ public class MetadataFilterTest extends WeldBaseTest {
     byte[] body = "content".getBytes();
     when(captureWrapper.getCapturedOutput()).thenReturn(body);
     when(captureWrapper.getStatus()).thenReturn(200);
-    when(captureWrapper.getContentType()).thenReturn("text/plain");
+    when(captureWrapper.getContentType()).thenReturn(TEXT_PLAIN);
     ServletOutputStream mockOutput = mock(ServletOutputStream.class);
     when(response.getOutputStream()).thenReturn(mockOutput);
 
     method.invoke(filter, request, response, captureWrapper);
-    verify(response).setContentType("text/plain");
+    verify(response).setContentType(TEXT_PLAIN);
     verify(mockOutput).write(body);
   }
 
