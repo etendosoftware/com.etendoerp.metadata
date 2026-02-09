@@ -311,6 +311,13 @@ public abstract class FieldBuilder extends Builder {
         selectorInfo.put(Constants.DISPLAY_FIELD_PROPERTY, getDisplayField(selector));
         selectorInfo.put(Constants.VALUE_FIELD_PROPERTY, getValueField(selector));
 
+        if (selector.getTable() != null) {
+            selectorInfo.put("hasTableRelated", true);
+        }
+        if (selector.getProcessDefintion() != null) {
+            selectorInfo.put("hasProcessDefinitionRelated", true);
+        }
+
         return selectorInfo;
     }
 
