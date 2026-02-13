@@ -176,7 +176,8 @@ public abstract class FieldBuilder extends Builder {
                 ConnectionProvider connProvider = DalConnectionProvider.getReadOnlyConnectionProvider();
                 var vars = RequestContext.get().getVariablesSecureApp();
                 var comboTableData = new ComboTableData(vars, connProvider,
-                        field.getReference().getId(), field.getDBColumnName(), "",
+                        field.getReference().getId(), field.getDBColumnName(),
+                        field.getReferenceSearchKey() != null ? field.getReferenceSearchKey().getId() : "",
                         field.getValidation() != null ? field.getValidation().getId() : null,
                         Utility.getContext(connProvider, vars, "#AccessibleOrgTree", ""),
                         Utility.getContext(connProvider, vars, "#User_Client", ""), 0);
