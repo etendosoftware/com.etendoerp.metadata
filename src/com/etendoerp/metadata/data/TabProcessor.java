@@ -46,6 +46,7 @@ import com.etendoerp.metadata.builders.FieldBuilderWithColumn;
 import com.etendoerp.redis.interfaces.CachedConcurrentMap;
 import java.util.function.BiFunction;
 import java.util.function.BiConsumer;
+import org.hibernate.exception.GenericJDBCException;
 
 public class TabProcessor {
   private static final Logger logger = LogManager.getLogger(TabProcessor.class);
@@ -107,6 +108,8 @@ public class TabProcessor {
         if (accessPredicate.test(fieldLike)) {
           processFieldItem(fieldLike, processors, result);
         }
+      } catch (GenericJDBCException e) {
+        throw e;
       } catch (Exception e) {
         logger.warn("Error processing field: {} - {}", fieldLike, e.getMessage(), e);
       }
