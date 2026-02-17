@@ -1,17 +1,24 @@
 package com.etendoerp.metadata.auth;
 
+import static org.junit.Assert.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
 import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.util.Date;
 import java.util.ArrayList;
 import java.util.List;
+
+import com.auth0.jwt.algorithms.Algorithm;
+import com.auth0.jwt.interfaces.DecodedJWT;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -35,7 +42,8 @@ import com.smf.securewebservices.SWSConfig;
 import com.smf.securewebservices.utils.SecureWebServicesUtils;
 
 /**
- * Test class for Utils, specifically focusing on the generateToken method and its interactions with OBContext and SWSConfig.
+ * Test class for Utils, specifically focusing on the generateToken method and
+ * its interactions with OBContext and SWSConfig.
  * This class uses Mockito to mock dependencies and verify behavior.
  */
 @RunWith(MockitoJUnitRunner.class)
@@ -43,60 +51,60 @@ public class UtilsTest extends OBBaseTest {
 
     @Mock
     private AuthData authData;
-    
+
     @Mock
     private User user;
-    
+
     @Mock
     private Role role;
-    
+
     @Mock
     private Role defaultRole;
-    
+
     @Mock
     private Role wsRole;
-    
+
     @Mock
     private Organization organization;
-    
+
     @Mock
     private Organization defaultOrganization;
-    
+
     @Mock
     private Warehouse warehouse;
-    
+
     @Mock
     private Warehouse defaultWarehouse;
-    
+
     @Mock
     private Client client;
-    
+
     @Mock
     private UserRoles userRoles;
-    
+
     @Mock
     private SWSConfig swsConfig;
-    
+
     @Mock
     private OBContext obContext;
-    
+
     private String sessionId;
 
-  @Override
+    @Override
     @Before
     public void setUp() throws Exception {
         super.setUp();
-        
+
         sessionId = "test-session-id";
         List<UserRoles> userRolesList = new ArrayList<>();
         userRolesList.add(userRoles);
-        
+
         // Setup basic mocks
         when(authData.getUser()).thenReturn(user);
         when(authData.getRole()).thenReturn(role);
         when(authData.getOrg()).thenReturn(organization);
         when(authData.getWarehouse()).thenReturn(warehouse);
-        
+
         when(user.getADUserRolesList()).thenReturn(userRolesList);
         when(user.getSmfswsDefaultWsRole()).thenReturn(wsRole);
         when(user.getDefaultRole()).thenReturn(defaultRole);
@@ -107,7 +115,8 @@ public class UtilsTest extends OBBaseTest {
 
     /**
      * Test to ensure that the Utils class cannot be instantiated.
-     * This is to verify that the constructor is private and throws an InstantiationException.
+     * This is to verify that the constructor is private and throws an
+     * InstantiationException.
      */
     @Test
     public void utilsConstructorShouldThrowInstantiationException() {
@@ -123,28 +132,32 @@ public class UtilsTest extends OBBaseTest {
     }
 
     /**
-     * Tests that generateToken sets admin mode and restores it even if an exception is thrown.
+     * Tests that generateToken sets admin mode and restores it even if an exception
+     * is thrown.
      * <p>
-     * Mocks SWSConfig to throw a RuntimeException and verifies that OBContext.setAdminMode(true)
-     * and OBContext.restorePreviousMode() are called, ensuring proper context management.
+     * Mocks SWSConfig to throw a RuntimeException and verifies that
+     * OBContext.setAdminMode(true)
+     * and OBContext.restorePreviousMode() are called, ensuring proper context
+     * management.
      * </p>
+     * 
      * @throws Exception if mocking fails
      */
     @Test
     public void generateTokenShouldSetAdminModeAndRestoreIt() throws Exception {
         try (MockedStatic<OBContext> contextMock = mockStatic(OBContext.class);
-             MockedStatic<SWSConfig> configMock = mockStatic(SWSConfig.class)) {
-            
+                MockedStatic<SWSConfig> configMock = mockStatic(SWSConfig.class)) {
+
             // Setup to throw an exception early so we can verify admin mode handling
             configMock.when(SWSConfig::getInstance).thenThrow(new RuntimeException("Test exception"));
-            
+
             try {
                 Utils.generateToken(authData, sessionId);
                 fail("Expected exception");
             } catch (RuntimeException e) {
                 assertEquals("Test exception", e.getMessage());
             }
-            
+
             // Verify admin mode was set and restored
             contextMock.verify(() -> OBContext.setAdminMode(true));
             contextMock.verify(OBContext::restorePreviousMode);
@@ -152,41 +165,45 @@ public class UtilsTest extends OBBaseTest {
     }
 
     /**
-     * Tests that generateToken correctly generates a token with the expected values.
+     * Tests that generateToken correctly generates a token with the expected
+     * values.
      * <p>
-     * Mocks SWSConfig to return a specific private key and verifies that the generated token
+     * Mocks SWSConfig to return a specific private key and verifies that the
+     * generated token
      * contains the expected values for user, role, organization, and warehouse.
      * </p>
      */
     @Test
     public void generateTokenShouldHandlePreferencesException() {
         try (MockedStatic<OBContext> contextMock = mockStatic(OBContext.class);
-             MockedStatic<SWSConfig> configMock = mockStatic(SWSConfig.class);
-             MockedStatic<SecureWebServicesUtils> swsUtilsMock = mockStatic(SecureWebServicesUtils.class);
-             MockedStatic<Preferences> preferencesMock = mockStatic(Preferences.class)) {
-            
+                MockedStatic<SWSConfig> configMock = mockStatic(SWSConfig.class);
+                MockedStatic<SecureWebServicesUtils> swsUtilsMock = mockStatic(SecureWebServicesUtils.class);
+                MockedStatic<Preferences> preferencesMock = mockStatic(Preferences.class)) {
+
             configMock.when(SWSConfig::getInstance).thenReturn(swsConfig);
             when(swsConfig.getPrivateKey()).thenReturn("new-version-private-key");
-            
+
             swsUtilsMock.when(() -> SecureWebServicesUtils.isNewVersionPrivKey("new-version-private-key"))
-                .thenReturn(true);
-            
+                    .thenReturn(true);
+
             contextMock.when(OBContext::getOBContext).thenReturn(obContext);
             when(obContext.getCurrentClient()).thenReturn(client);
             when(obContext.getCurrentOrganization()).thenReturn(organization);
             when(obContext.getUser()).thenReturn(user);
             when(obContext.getRole()).thenReturn(role);
-            
+
             // Setup preferences to throw exception
-            preferencesMock.when(() -> Preferences.getPreferenceValue(anyString(), anyBoolean(), (Client) any(), any(), any(), any(), any()))
-                .thenThrow(new PropertyException("Preference not found"));
-            
+            preferencesMock
+                    .when(() -> Preferences.getPreferenceValue(anyString(), anyBoolean(), (Client) any(), any(), any(),
+                            any(), any()))
+                    .thenThrow(new PropertyException("Preference not found"));
+
             try {
                 Utils.generateToken(authData, sessionId);
                 fail("Expected PropertyException");
             } catch (Exception e) {
                 assertTrue(e instanceof PropertyException || e.getCause() instanceof PropertyException,
-                    "Should propagate PropertyException");
+                        "Should propagate PropertyException");
             }
 
             contextMock.verify(OBContext::restorePreviousMode);
@@ -197,8 +214,10 @@ public class UtilsTest extends OBBaseTest {
      * Tests that generateToken always restores the previous OBContext mode,
      * even if an exception is thrown during token generation.
      * <p>
-     * This test covers scenarios where SWSConfig or AuthData throw a RuntimeException,
-     * and verifies that OBContext.setAdminMode(true) and OBContext.restorePreviousMode()
+     * This test covers scenarios where SWSConfig or AuthData throw a
+     * RuntimeException,
+     * and verifies that OBContext.setAdminMode(true) and
+     * OBContext.restorePreviousMode()
      * are always called to ensure proper context management.
      * </p>
      *
@@ -210,34 +229,107 @@ public class UtilsTest extends OBBaseTest {
 
             try (MockedStatic<SWSConfig> configMock = mockStatic(SWSConfig.class)) {
                 configMock.when(SWSConfig::getInstance).thenThrow(new RuntimeException("Config error"));
-                
+
                 try {
                     Utils.generateToken(authData, sessionId);
                 } catch (RuntimeException e) {
                     // Expected
                 }
-                
+
                 contextMock.verify(() -> OBContext.setAdminMode(true));
                 contextMock.verify(OBContext::restorePreviousMode);
             }
-            
+
             contextMock.clearInvocations();
-            
+
             when(authData.getUser()).thenThrow(new RuntimeException("User error"));
-            
+
             try (MockedStatic<SWSConfig> configMock = mockStatic(SWSConfig.class)) {
                 configMock.when(SWSConfig::getInstance).thenReturn(swsConfig);
                 when(swsConfig.getPrivateKey()).thenReturn("test-key");
-                
+
                 try {
                     Utils.generateToken(authData, sessionId);
                 } catch (RuntimeException e) {
                     // Expected
                 }
-                
+
                 contextMock.verify(() -> OBContext.setAdminMode(true));
                 contextMock.verify(OBContext::restorePreviousMode);
             }
         }
+    }
+
+    /**
+     * Tests the decodeToken method.
+     * Mocks SecureWebServicesUtils.decodeToken and verifies that it is called and
+     * returns the expected DecodedJWT.
+     */
+    @Test
+    public void testDecodeToken() {
+        try (MockedStatic<SecureWebServicesUtils> swsUtilsMock = mockStatic(SecureWebServicesUtils.class)) {
+            DecodedJWT decodedJWT = mock(DecodedJWT.class);
+            swsUtilsMock.when(() -> SecureWebServicesUtils.decodeToken("test-token")).thenReturn(decodedJWT);
+
+            DecodedJWT result = Utils.decodeToken("test-token");
+            assertEquals(decodedJWT, result);
+        }
+    }
+
+    /**
+     * Tests the cleanPrivateKey method.
+     * Uses reflection to access the private method and mocks
+     * SecureWebServicesUtils.cleanPrivateKey.
+     * 
+     * @throws Exception if reflection or mocking fails
+     */
+    @Test
+    public void testCleanPrivateKey() throws Exception {
+        when(swsConfig.getPrivateKey()).thenReturn("{\"private-key\": \"cleaned-key\"}");
+
+        Method method = Utils.class.getDeclaredMethod("cleanPrivateKey", SWSConfig.class);
+        method.setAccessible(true);
+        String result = (String) method.invoke(null, swsConfig);
+
+        assertEquals("cleaned-key", result);
+    }
+
+    /**
+     * Tests the getEncoderAlgorithm method.
+     * Uses reflection to access the private method and mocks
+     * SecureWebServicesUtils.getEncoderAlgorithm.
+     * 
+     * @throws Exception if reflection or mocking fails
+     */
+    @Test
+    public void testGetEncoderAlgorithm() throws Exception {
+        Method method = Utils.class.getDeclaredMethod("getEncoderAlgorithm", String.class, String.class);
+        method.setAccessible(true);
+        Algorithm result = (Algorithm) method.invoke(null, "test-key", "HS256");
+
+        assertNotNull(result);
+        assertEquals("HS256", result.getName());
+    }
+
+    /**
+     * Tests the getExpirationDate method.
+     * Uses reflection to access the private method and verifies that it calculates
+     * the expiration date correctly based on the SWSConfig.
+     * 
+     * @throws Exception if reflection or mocking fails
+     */
+    @Test
+    public void testGetExpirationDate() throws Exception {
+        when(swsConfig.getExpirationTime()).thenReturn(60L); // 60 minutes
+
+        Method method = Utils.class.getDeclaredMethod("getExpirationDate", SWSConfig.class);
+        method.setAccessible(true);
+        Date result = (Date) method.invoke(null, swsConfig);
+
+        long now = System.currentTimeMillis();
+        long expected = now + (60 * 60000);
+
+        // Allow a small delta for execution time
+        assertTrue(Math.abs(expected - result.getTime()) < 1000);
     }
 }
