@@ -109,7 +109,7 @@ public class TabProcessor {
           processFieldItem(fieldLike, processors, result);
         }
       } catch (GenericJDBCException e) {
-        throw e;
+          throw new GenericJDBCException("Error processing tab fields via JDBC", e.getSQLException());
       } catch (Exception e) {
         logger.warn("Error processing field: {} - {}", fieldLike, e.getMessage(), e);
       }
