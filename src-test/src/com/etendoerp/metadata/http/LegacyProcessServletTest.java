@@ -112,12 +112,10 @@ public class LegacyProcessServletTest extends OBBaseTest {
         when(request.getParameter(PARAM_INP_WINDOW_ID)).thenReturn("test-window");
         when(request.getParameter(PARAM_INP_KEY_COLUMN_ID)).thenReturn("test-column");
 
-        try {
-            legacyProcessServlet.service(request, response);
-        } catch (Exception e) {
-            verify(request, atLeastOnce()).getPathInfo();
-            verify(request, atLeastOnce()).getParameter(anyString());
-        }
+        legacyProcessServlet.service(request, response);
+
+        verify(request, atLeastOnce()).getPathInfo();
+        verify(request, atLeastOnce()).getParameter(anyString());
     }
 
     /**
@@ -135,11 +133,8 @@ public class LegacyProcessServletTest extends OBBaseTest {
         when(request.getParameter(PARAM_INP_WINDOW_ID)).thenReturn("session-window");
         when(request.getParameter(PARAM_INP_KEY_COLUMN_ID)).thenReturn("session-column");
 
-        try {
-            legacyProcessServlet.service(request, response);
-        } catch (Exception e) {
-            verify(request, atLeastOnce()).getSession();
-        }
+        legacyProcessServlet.service(request, response);
+        verify(request, atLeastOnce()).getSession();
     }
 
     /**
@@ -154,11 +149,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
         when(request.getPathInfo()).thenReturn(REDIRECT);
         when(request.getParameter(LOCATION)).thenReturn("https://malicious.com");
 
-        try {
-            legacyProcessServlet.service(request, response);
-        } catch (Exception e) {
-            // Error handling might throw framework exceptions
-        }
+        legacyProcessServlet.service(request, response);
 
         verify(response).sendError(eq(HttpServletResponse.SC_BAD_REQUEST), anyString());
     }
@@ -225,11 +216,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
     public void servletShouldRejectUnauthorizedJsPath() throws Exception {
         when(request.getPathInfo()).thenReturn("/unauthorized/path.js");
 
-        try {
-            legacyProcessServlet.service(request, response);
-        } catch (Exception ignored) {
-            // Expected due to security check failure
-        }
+        legacyProcessServlet.service(request, response);
 
         verify(response).sendError(eq(HttpServletResponse.SC_FORBIDDEN), anyString());
     }
@@ -265,11 +252,8 @@ public class LegacyProcessServletTest extends OBBaseTest {
         when(request.getPathInfo()).thenReturn("/test/dispatcher.html");
         when(request.getParameter(TOKEN)).thenReturn(null);
 
-        try {
-            legacyProcessServlet.service(request, response);
-        } catch (Exception e) {
-            verify(request, atLeastOnce()).getRequestDispatcher(anyString());
-        }
+        legacyProcessServlet.service(request, response);
+        verify(request, atLeastOnce()).getRequestDispatcher(anyString());
     }
 
     /**
@@ -301,11 +285,8 @@ public class LegacyProcessServletTest extends OBBaseTest {
         when(request.getPathInfo()).thenReturn("/empty/params.html");
         when(request.getParameter(anyString())).thenReturn(null);
 
-        try {
-            legacyProcessServlet.service(request, response);
-        } catch (Exception e) {
-            verify(request, atLeastOnce()).getParameter(anyString());
-        }
+        legacyProcessServlet.service(request, response);
+        verify(request, atLeastOnce()).getParameter(anyString());
     }
 
     /**
@@ -320,11 +301,8 @@ public class LegacyProcessServletTest extends OBBaseTest {
         when(request.getPathInfo()).thenReturn("/writer/test.html");
         when(request.getParameter(TOKEN)).thenReturn(null);
 
-        try {
-            legacyProcessServlet.service(request, response);
-        } catch (Exception e) {
-            verify(response, atLeastOnce()).getWriter();
-        }
+        legacyProcessServlet.service(request, response);
+        verify(response, atLeastOnce()).getWriter();
     }
 
     /**
@@ -342,13 +320,11 @@ public class LegacyProcessServletTest extends OBBaseTest {
         when(request.getParameter(PARAM_INP_WINDOW_ID)).thenReturn("complete-window");
         when(request.getParameter(PARAM_INP_KEY_COLUMN_ID)).thenReturn("complete-column");
 
-        try {
-            legacyProcessServlet.service(request, response);
-        } catch (Exception e) {
-            verify(request).getParameter(PARAM_INP_KEY);
-            verify(request).getParameter(PARAM_INP_WINDOW_ID);
-            verify(request).getParameter(PARAM_INP_KEY_COLUMN_ID);
-        }
+        legacyProcessServlet.service(request, response);
+
+        verify(request).getParameter(PARAM_INP_KEY);
+        verify(request).getParameter(PARAM_INP_WINDOW_ID);
+        verify(request).getParameter(PARAM_INP_KEY_COLUMN_ID);
     }
 
     private void assertNotNull(String message, Object object) {
@@ -484,10 +460,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
         PrintWriter writer = new PrintWriter(stringWriter);
         when(response.getWriter()).thenReturn(writer);
 
-        try {
-            legacyProcessServlet.service(request, response);
-        } catch (Exception ignored) {
-        }
+        legacyProcessServlet.service(request, response);
 
         String output = stringWriter.toString();
         assertTrue("Output should contain redirected URL with replaced context path",
