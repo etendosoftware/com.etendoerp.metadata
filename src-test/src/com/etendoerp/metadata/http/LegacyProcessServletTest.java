@@ -21,6 +21,7 @@ import java.util.Collections;
 
 import static com.etendoerp.metadata.MetadataTestConstants.SALES_INVOICE_HEADER_EDITION_HTML;
 import static com.etendoerp.metadata.MetadataTestConstants.TOKEN;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
@@ -80,6 +81,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
         when(request.getLocales()).thenReturn(Collections.emptyEnumeration());
         when(request.getAttributeNames()).thenReturn(Collections.emptyEnumeration());
         when(session.getAttributeNames()).thenReturn(Collections.emptyEnumeration());
+        when(request.getContextPath()).thenReturn("/etendo");
     }
 
     /**
@@ -462,5 +464,39 @@ public class LegacyProcessServletTest extends OBBaseTest {
 
         verify(request, atLeastOnce()).getServletContext();
         verify(servletContext).getResourceAsStream(CALENDAR_JS_FILE);
+    }
+
+    /**
+     * Tests that the servlet correctly replaces the context path in redirects.
+     */
+    @Test
+    public void servletShouldRedirectWithCorrectContextPath() throws Exception {
+        when(request.getPathInfo()).thenReturn("/simple/test.html");
+        when(request.getContextPath()).thenReturn("/etendodev");
+
+        doAnswer(invocation -> {
+            HttpServletResponseLegacyWrapper wrapper = invocation.getArgument(1);
+            wrapper.sendRedirect("/etendodev/web/other.html");
+            return null;
+        }).when(requestDispatcher).include(any(), any());
+
+        StringWriter stringWriter = new StringWriter();
+        PrintWriter writer = new PrintWriter(stringWriter);
+        when(response.getWriter()).thenReturn(writer);
+
+        try {
+            legacyProcessServlet.service(request, response);
+        } catch (Exception ignored) {
+        }
+
+        String output = stringWriter.toString();
+        assertTrue("Output should contain redirected URL with replaced context path",
+                output.contains("url='/etendodev/meta/legacy/web/other.html'"));
+    }
+
+    private void assertTrue(String message, boolean condition) {
+        if (!condition) {
+            throw new AssertionError(message);
+        }
     }
 }

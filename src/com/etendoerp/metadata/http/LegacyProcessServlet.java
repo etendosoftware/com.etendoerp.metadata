@@ -53,7 +53,6 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
     private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String BEARER_PREFIX = "Bearer ";
     private static final String META_LEGACY_PATH = "/meta/legacy";
-    private static final String BASE_PATH = "/etendo";
     private static final String WEB_PATH = "/web/";
     private static final String SRC_REPLACE_STRING = "src=\"";
 
@@ -184,7 +183,8 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         }
 
         try {
-            String html = getHtmlRedirect(location, false);
+            String contextPath = req.getContextPath();
+            String html = getHtmlRedirect(location, false, contextPath);
             sendHtmlResponse(res, html);
         } catch (IOException e) {
             log.error("Error processing redirect request {}: {}", path, e.getMessage(), e);
@@ -317,6 +317,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
 
         try {
             String token = req.getParameter(TOKEN_PARAM);
+            String contextPath = req.getContextPath();
             HttpServletRequestWrapper wrappedRequest = buildWrappedRequest(req, path);
             HttpServletResponseLegacyWrapper responseWrapper = new HttpServletResponseLegacyWrapper(res);
 
@@ -328,7 +329,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
 
             wrappedRequest.getRequestDispatcher(path).include(wrappedRequest, responseWrapper);
 
-            handleResponse(res, responseWrapper, path);
+            handleResponse(res, responseWrapper, path, contextPath);
 
         } catch (Exception e) {
             log.error("Error processing legacy request {}: {}", path, e.getMessage(), e);
@@ -474,12 +475,12 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
      */
     private void handleResponse(HttpServletResponse res,
             HttpServletResponseLegacyWrapper wrapper,
-            String path) throws IOException {
+            String path, String contextPath) throws IOException {
 
         String output = wrapper.getCapturedOutputAsString();
 
         if (wrapper.isRedirected()) {
-            writeRedirect(res, wrapper);
+            writeRedirect(res, wrapper, contextPath);
             return;
         }
 
@@ -489,10 +490,10 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
     }
 
     private void writeRedirect(HttpServletResponse res,
-            HttpServletResponseLegacyWrapper wrapper) throws IOException {
+            HttpServletResponseLegacyWrapper wrapper, String contextPath) throws IOException {
 
         String location = wrapper.getRedirectLocation();
-        String html = getHtmlRedirect(location, true);
+        String html = getHtmlRedirect(location, true, contextPath);
 
         res.setContentType(wrapper.getContentType());
         res.setStatus(wrapper.getStatus());
@@ -781,10 +782,10 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
      * @param redirectLocation the original redirect URL to be modified
      * @return an HTML string containing the redirect page with meta refresh
      */
-    private static String getHtmlRedirect(String redirectLocation, boolean replacePath) {
+    private static String getHtmlRedirect(String redirectLocation, boolean replacePath, String contextPath) {
         String forwardedUrl;
         if (replacePath) {
-            forwardedUrl = redirectLocation.replace(BASE_PATH, BASE_PATH + META_LEGACY_PATH);
+            forwardedUrl = redirectLocation.replace(contextPath, contextPath + META_LEGACY_PATH);
         } else {
             forwardedUrl = redirectLocation;
         }
