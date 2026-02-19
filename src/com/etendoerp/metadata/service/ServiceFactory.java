@@ -49,6 +49,7 @@ public class ServiceFactory {
         EXACT_MATCH_SERVICES.put(MENU_PATH, MenuService::new);
         EXACT_MATCH_SERVICES.put(MESSAGE_PATH, MessageService::new);
         EXACT_MATCH_SERVICES.put(LABELS_PATH, LabelsService::new);
+        EXACT_MATCH_SERVICES.put(PREFERENCES_PATH, PreferencesService::new);
 
         // Prefix match services (order matters for overlapping prefixes)
         PREFIX_MATCH_SERVICES.put(WINDOW_PATH, WindowService::new);

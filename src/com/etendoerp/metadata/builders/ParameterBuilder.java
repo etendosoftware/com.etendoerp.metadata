@@ -62,7 +62,20 @@ public class ParameterBuilder extends Builder {
 
         if (readOnlyLogic != null && !readOnlyLogic.isBlank()) {
             DynamicExpressionParser parser = new DynamicExpressionParser(readOnlyLogic, parameter, true);
-            return parser.getJSExpression();
+            String expression = parser.getJSExpression();
+            return expression;
+        }
+
+        return null;
+    }
+
+    private String getDisplayLogic(Parameter parameter) {
+        String displayLogic = parameter.getDisplayLogic();
+
+        if (displayLogic != null && !displayLogic.isBlank()) {
+            DynamicExpressionParser parser = new DynamicExpressionParser(displayLogic, parameter, false);
+            String expression = parser.getJSExpression();
+            return expression;
         }
 
         return null;
@@ -74,6 +87,10 @@ public class ParameterBuilder extends Builder {
 
         if (hasReadOnlyLogic(parameter)) {
             json.put("readOnlyLogicExpression", getReadOnlyLogic(parameter));
+        }
+
+        if (hasDisplayLogic(parameter)) {
+            json.put("displayLogicExpression", getDisplayLogic(parameter));
         }
 
         if (isSelectorParameter(parameter)) {
@@ -93,6 +110,10 @@ public class ParameterBuilder extends Builder {
 
     private boolean hasReadOnlyLogic(Parameter parameter) {
         return parameter.getReadOnlyLogic() != null && !parameter.getReadOnlyLogic().isBlank();
+    }
+
+    private boolean hasDisplayLogic(Parameter parameter) {
+        return parameter.getDisplayLogic() != null && !parameter.getDisplayLogic().isBlank();
     }
 
     private JSONObject getWindowInfo(Reference referenceSearchKey) {
