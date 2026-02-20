@@ -62,8 +62,7 @@ public class ParameterBuilder extends Builder {
 
         if (readOnlyLogic != null && !readOnlyLogic.isBlank()) {
             DynamicExpressionParser parser = new DynamicExpressionParser(readOnlyLogic, parameter, true);
-            String expression = parser.getJSExpression();
-            return expression;
+            return parser.getJSExpression();
         }
 
         return null;
@@ -74,8 +73,7 @@ public class ParameterBuilder extends Builder {
 
         if (displayLogic != null && !displayLogic.isBlank()) {
             DynamicExpressionParser parser = new DynamicExpressionParser(displayLogic, parameter, false);
-            String expression = parser.getJSExpression();
-            return expression;
+            return parser.getJSExpression();
         }
 
         return null;

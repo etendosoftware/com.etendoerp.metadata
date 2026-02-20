@@ -35,6 +35,12 @@ import org.openbravo.model.ad.domain.Preference;
  */
 public class PreferencesService extends MetadataService {
 
+    /**
+     * Constructs a new PreferencesService.
+     *
+     * @param request the HttpServletRequest object that contains the request the client has made of the service
+     * @param response the HttpServletResponse object that contains the response the service sends to the client
+     */
     public PreferencesService(HttpServletRequest request, HttpServletResponse response) {
         super(request, response);
     }
@@ -55,33 +61,7 @@ public class PreferencesService extends MetadataService {
             final List<String> handledIds = new ArrayList<>();
 
             for (Preference pref : allPrefs) {
-                String key;
-                if (pref.getProperty() != null) {
-                    key = pref.getProperty();
-                } else {
-                    key = pref.getAttribute();
-                }
-
-                if (key == null) {
-                    continue;
-                }
-
-                String value = pref.getSearchKey();
-
-                // If the preference is window-specific, add a window-scoped entry
-                if (pref.getWindow() != null) {
-                    String windowKey = key + "_" + pref.getWindow().getId();
-                    if (!handledIds.contains(windowKey)) {
-                        handledIds.add(windowKey);
-                        preferences.put(windowKey, value != null ? value : "");
-                    }
-                }
-
-                // Add the global entry (non-window-scoped), skip duplicates
-                if (!handledIds.contains(key)) {
-                    handledIds.add(key);
-                    preferences.put(key, value != null ? value : "");
-                }
+                processPreference(pref, preferences, handledIds);
             }
 
             result.put("preferences", preferences);
@@ -91,6 +71,41 @@ public class PreferencesService extends MetadataService {
             throw new IOException("Error retrieving preferences", e);
         } finally {
             OBContext.restorePreviousMode();
+        }
+    }
+
+    private void processPreference(Preference pref, JSONObject preferences, List<String> handledIds) 
+            throws Exception {
+        String key = getPreferenceKey(pref);
+        if (key == null) {
+            return;
+        }
+
+        String value = pref.getSearchKey();
+
+        // If the preference is window-specific, add a window-scoped entry
+        if (pref.getWindow() != null) {
+            String windowKey = key + "_" + pref.getWindow().getId();
+            addPreferenceIfNotExists(windowKey, value, preferences, handledIds);
+        }
+
+        // Add the global entry (non-window-scoped), skip duplicates
+        addPreferenceIfNotExists(key, value, preferences, handledIds);
+    }
+
+    private String getPreferenceKey(Preference pref) {
+        if (pref.getProperty() != null) {
+            return pref.getProperty();
+        } else {
+            return pref.getAttribute();
+        }
+    }
+
+    private void addPreferenceIfNotExists(String key, String value, JSONObject preferences, 
+            List<String> handledIds) throws Exception {
+        if (!handledIds.contains(key)) {
+            handledIds.add(key);
+            preferences.put(key, value != null ? value : "");
         }
     }
 }
