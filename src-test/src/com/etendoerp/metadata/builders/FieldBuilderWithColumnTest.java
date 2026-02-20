@@ -1,15 +1,33 @@
 package com.etendoerp.metadata.builders;
 
-import static com.etendoerp.metadata.MetadataTestConstants.*;
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import static com.etendoerp.metadata.MetadataTestConstants.COLUMN_ID;
+import static com.etendoerp.metadata.MetadataTestConstants.FIELD_ID;
+import static com.etendoerp.metadata.MetadataTestConstants.LIST_ID;
+import static com.etendoerp.metadata.MetadataTestConstants.REF_LIST;
+import static com.etendoerp.metadata.MetadataTestConstants.TABLE_ID;
+import static com.etendoerp.metadata.MetadataTestConstants.TEST_COLUMN_NAME;
+import static com.etendoerp.metadata.MetadataTestConstants.TEST_FIELD;
+import static com.etendoerp.metadata.MetadataTestConstants.TEST_TABLE_NAME;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockConstruction;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.hibernate.criterion.Criterion;
@@ -31,6 +49,8 @@ import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBCriteria;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.access.FieldAccess;
+import org.openbravo.model.ad.access.Role;
+import org.openbravo.model.ad.access.WindowAccess;
 import org.openbravo.model.ad.datamodel.Column;
 import org.openbravo.model.ad.datamodel.Table;
 import org.openbravo.model.ad.domain.Reference;
@@ -41,6 +61,9 @@ import org.openbravo.model.ad.ui.Tab;
 import org.openbravo.model.ad.ui.Window;
 import org.openbravo.service.json.DataResolvingMode;
 import org.openbravo.service.json.DataToJsonConverter;
+
+import java.lang.reflect.Method;
+import java.util.Map;
 
 import com.etendoerp.etendorx.utils.DataSourceUtils;
 import com.etendoerp.metadata.utils.Constants;
@@ -86,6 +109,15 @@ class FieldBuilderWithColumnTest {
     @Mock
     private OBContext obContext;
     private static final String BUTTON_REF_LIST_STRING = "buttonRefList";
+    private static final String WINDOW_ID_STRING = "window-id";
+    private static final String ROLE_ID_STRING = "role-id";
+
+    private static final String METH_CHECK_ACCESS_IN_DB = "checkAccessInDB";
+    private static final String METH_IS_WINDOW_ACCESSIBLE = "isWindowAccessible";
+    private static final String METH_ADD_LINK_ACCESSIBILITY = "addLinkAccessibilityInfo";
+
+    private static final String IS_REFERENCE_WINDOW_STRING = "isReferencedWindowAccessible";
+    private static final String PROP_REFERENCED_WINDOW_ID = "referencedWindowId";
 
     private FieldBuilderWithColumn fieldBuilder;
 
@@ -112,11 +144,45 @@ class FieldBuilderWithColumnTest {
 
         when(fieldProperty.getEntity()).thenReturn(tabEntity);
         when(tabEntity.getTableId()).thenReturn(TABLE_ID);
+
+        when(obContext.getLanguage()).thenReturn(language);
+
+        // Clear static cache via reflection
+        try {
+            java.lang.reflect.Field cacheField = FieldBuilderWithColumn.class.getDeclaredField("windowAccessCache");
+            cacheField.setAccessible(true);
+            Map<?, ?> cache = (Map<?, ?>) cacheField.get(null);
+            cache.clear();
+        } catch (Exception e) {
+            fail("Could not clear windowAccessCache: " + e.getMessage());
+        }
     }
 
     /* ---------------------------------------------------------------------- */
     /* Helpers */
     /* ---------------------------------------------------------------------- */
+
+    private void setupWindowAccessMocks(String windowId, OBCriteria<WindowAccess> criteriaMock,
+            WindowAccess windowAccess) {
+        when(obDal.get(Window.class, windowId)).thenReturn(mock(Window.class));
+        when(obDal.createCriteria(WindowAccess.class)).thenReturn(criteriaMock);
+        when(criteriaMock.add(any())).thenReturn(criteriaMock);
+        when(criteriaMock.setMaxResults(1)).thenReturn(criteriaMock);
+        when(criteriaMock.uniqueResult()).thenReturn(windowAccess);
+    }
+
+    private Object invokePrivate(Object target, String methodName, Class<?>[] parameterTypes, Object... args)
+            throws Exception {
+        Method method = target.getClass().getDeclaredMethod(methodName, parameterTypes);
+        method.setAccessible(true);
+        return method.invoke(target, args);
+    }
+
+    private void setJson(FieldBuilder builder, JSONObject json) throws Exception {
+        java.lang.reflect.Field jsonField = FieldBuilder.class.getDeclaredField("json");
+        jsonField.setAccessible(true);
+        jsonField.set(builder, json);
+    }
 
     private JSONObject executeToJSON(Runnable extraMocks) throws JSONException {
         try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
@@ -411,6 +477,112 @@ class FieldBuilderWithColumnTest {
             when(field.getColumn()).thenReturn(null);
             // The getColumnUpdatable should return true as fallback
             assertTrue(fieldBuilder.getColumnUpdatable());
+        }
+    }
+
+    @Test
+    void testCheckAccessInDBAccessible() throws Exception {
+        Role role = mock(Role.class);
+        String windowId = WINDOW_ID_STRING;
+        @SuppressWarnings("unchecked")
+        OBCriteria<WindowAccess> criteriaMock = mock(OBCriteria.class);
+
+        try (MockedStatic<OBDal> mockedOBDal = mockStatic(OBDal.class);
+                MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
+                MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class)) {
+
+            mockedOBContext.when(OBContext::getOBContext).thenReturn(obContext);
+            mockedOBDal.when(OBDal::getReadOnlyInstance).thenReturn(obDal);
+            setupWindowAccessMocks(windowId, criteriaMock, mock(WindowAccess.class));
+
+            fieldBuilder = new FieldBuilderWithColumn(field, fieldAccess);
+            boolean result = (boolean) invokePrivate(fieldBuilder, METH_CHECK_ACCESS_IN_DB,
+                    new Class[] { Role.class, String.class }, role, windowId);
+            assertTrue(result);
+        }
+    }
+
+    @Test
+    void testCheckAccessInDBNotAccessible() throws Exception {
+        Role role = mock(Role.class);
+        String windowId = WINDOW_ID_STRING;
+        @SuppressWarnings("unchecked")
+        OBCriteria<WindowAccess> criteriaMock = mock(OBCriteria.class);
+
+        try (MockedStatic<OBDal> mockedOBDal = mockStatic(OBDal.class);
+                MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
+                MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class)) {
+
+            mockedOBContext.when(OBContext::getOBContext).thenReturn(obContext);
+            mockedOBDal.when(OBDal::getReadOnlyInstance).thenReturn(obDal);
+            setupWindowAccessMocks(windowId, criteriaMock, null);
+
+            fieldBuilder = new FieldBuilderWithColumn(field, fieldAccess);
+            boolean result = (boolean) invokePrivate(fieldBuilder, METH_CHECK_ACCESS_IN_DB,
+                    new Class[] { Role.class, String.class }, role, windowId);
+            assertFalse(result);
+        }
+    }
+
+    @Test
+    void testIsWindowAccessibleCached() throws Exception {
+        Role role = mock(Role.class);
+        when(role.getId()).thenReturn(ROLE_ID_STRING);
+        String windowId = WINDOW_ID_STRING;
+        @SuppressWarnings("unchecked")
+        OBCriteria<WindowAccess> criteriaMock = mock(OBCriteria.class);
+
+        try (MockedStatic<OBDal> mockedOBDal = mockStatic(OBDal.class);
+                MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
+                MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class)) {
+            mockedOBContext.when(OBContext::getOBContext).thenReturn(obContext);
+            when(obContext.getRole()).thenReturn(role);
+            mockedOBDal.when(OBDal::getReadOnlyInstance).thenReturn(obDal);
+
+            setupWindowAccessMocks(windowId, criteriaMock, mock(WindowAccess.class));
+
+            fieldBuilder = new FieldBuilderWithColumn(field, fieldAccess);
+
+            // First call hits DB
+            invokePrivate(fieldBuilder, METH_IS_WINDOW_ACCESSIBLE, new Class[] { String.class }, windowId);
+            // Second call should use cache
+            invokePrivate(fieldBuilder, METH_IS_WINDOW_ACCESSIBLE, new Class[] { String.class }, windowId);
+
+            verify(obDal, times(1)).createCriteria(WindowAccess.class);
+        }
+    }
+
+    @Test
+    void testAddLinkAccessibilityInfoWhenAccessible() throws JSONException {
+        // Prepare JSON with referencedWindowId
+        JSONObject json = new JSONObject();
+        json.put(PROP_REFERENCED_WINDOW_ID, WINDOW_ID_STRING);
+
+        Role role = mock(Role.class);
+        when(role.getId()).thenReturn(ROLE_ID_STRING);
+        @SuppressWarnings("unchecked")
+        OBCriteria<WindowAccess> criteriaMock = mock(OBCriteria.class);
+
+        try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
+                MockedStatic<OBDal> mockedOBDal = mockStatic(OBDal.class);
+                MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class)) {
+
+            mockedOBContext.when(OBContext::getOBContext).thenReturn(obContext);
+            when(obContext.getRole()).thenReturn(role);
+            mockedOBDal.when(OBDal::getReadOnlyInstance).thenReturn(obDal);
+
+            setupWindowAccessMocks(WINDOW_ID_STRING, criteriaMock, mock(WindowAccess.class));
+
+            fieldBuilder = new FieldBuilderWithColumn(field, fieldAccess);
+            try {
+                setJson(fieldBuilder, json);
+                invokePrivate(fieldBuilder, METH_ADD_LINK_ACCESSIBILITY, new Class[] {});
+
+                assertTrue(json.has(IS_REFERENCE_WINDOW_STRING));
+                assertTrue(json.getBoolean(IS_REFERENCE_WINDOW_STRING));
+            } catch (Exception e) {
+                fail("Reflection failed: " + e.getMessage());
+            }
         }
     }
 }
