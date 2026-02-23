@@ -39,10 +39,13 @@ class PreferencesServiceTest {
     private HttpServletResponse mockResponse;
     private StringWriter responseWriter;
     private OBContext mockContext;
-    private User mockUser;
-    private Client mockClient;
-    private Organization mockOrg;
-    private Role mockRole;
+
+    private static final String USER_ID = "USER_ID";
+    private static final String CLIENT_ID = "CLIENT_ID";
+    private static final String ORG_ID = "ORG_ID";
+    private static final String ROLE_ID = "ROLE_ID";
+    private static final String PREFERENCES_KEY = "preferences";
+    private static final String VALUE_W = "valueW";
 
     @BeforeEach
     void setUp() throws Exception {
@@ -52,20 +55,20 @@ class PreferencesServiceTest {
         when(mockResponse.getWriter()).thenReturn(new PrintWriter(responseWriter));
 
         mockContext = mock(OBContext.class);
-        mockUser = mock(User.class);
-        mockClient = mock(Client.class);
-        mockOrg = mock(Organization.class);
-        mockRole = mock(Role.class);
+        User mockUser = mock(User.class);
+        Client mockClient = mock(Client.class);
+        Organization mockOrg = mock(Organization.class);
+        Role mockRole = mock(Role.class);
 
         when(mockContext.getUser()).thenReturn(mockUser);
         when(mockContext.getCurrentClient()).thenReturn(mockClient);
         when(mockContext.getCurrentOrganization()).thenReturn(mockOrg);
         when(mockContext.getRole()).thenReturn(mockRole);
 
-        when(mockUser.getId()).thenReturn("USER_ID");
-        when(mockClient.getId()).thenReturn("CLIENT_ID");
-        when(mockOrg.getId()).thenReturn("ORG_ID");
-        when(mockRole.getId()).thenReturn("ROLE_ID");
+        when(mockUser.getId()).thenReturn(USER_ID);
+        when(mockClient.getId()).thenReturn(CLIENT_ID);
+        when(mockOrg.getId()).thenReturn(ORG_ID);
+        when(mockRole.getId()).thenReturn(ROLE_ID);
     }
 
     @Test
@@ -81,7 +84,7 @@ class PreferencesServiceTest {
              MockedStatic<Preferences> mockedPreferences = mockStatic(Preferences.class)) {
 
             mockedOBContext.when(OBContext::getOBContext).thenReturn(mockContext);
-            mockedPreferences.when(() -> Preferences.getAllPreferences("CLIENT_ID", "ORG_ID", "USER_ID", "ROLE_ID"))
+            mockedPreferences.when(() -> Preferences.getAllPreferences(CLIENT_ID, ORG_ID, USER_ID, ROLE_ID))
                              .thenReturn(allPrefs);
 
             PreferencesService service = new PreferencesService(mockRequest, mockResponse);
@@ -89,8 +92,8 @@ class PreferencesServiceTest {
 
             String output = responseWriter.toString();
             JSONObject result = new JSONObject(output);
-            assertTrue(result.has("preferences"));
-            JSONObject preferences = result.getJSONObject("preferences");
+            assertTrue(result.has(PREFERENCES_KEY));
+            JSONObject preferences = result.getJSONObject(PREFERENCES_KEY);
             assertEquals("value1", preferences.getString("property1"));
         }
     }
@@ -99,7 +102,7 @@ class PreferencesServiceTest {
     void processHandlesWindowSpecificPreferences() throws Exception {
         Preference pref1 = mock(Preference.class);
         when(pref1.getAttribute()).thenReturn("attribute1");
-        when(pref1.getSearchKey()).thenReturn("valueW");
+        when(pref1.getSearchKey()).thenReturn(VALUE_W);
         org.openbravo.model.ad.ui.Window mockWindow = mock(org.openbravo.model.ad.ui.Window.class);
         when(mockWindow.getId()).thenReturn("WINDOW_ID");
         when(pref1.getWindow()).thenReturn(mockWindow);
@@ -111,16 +114,16 @@ class PreferencesServiceTest {
              MockedStatic<Preferences> mockedPreferences = mockStatic(Preferences.class)) {
 
             mockedOBContext.when(OBContext::getOBContext).thenReturn(mockContext);
-            mockedPreferences.when(() -> Preferences.getAllPreferences("CLIENT_ID", "ORG_ID", "USER_ID", "ROLE_ID"))
+            mockedPreferences.when(() -> Preferences.getAllPreferences(CLIENT_ID, ORG_ID, USER_ID, ROLE_ID))
                              .thenReturn(allPrefs);
 
             PreferencesService service = new PreferencesService(mockRequest, mockResponse);
             service.process();
 
             JSONObject result = new JSONObject(responseWriter.toString());
-            JSONObject preferences = result.getJSONObject("preferences");
-            assertEquals("valueW", preferences.getString("attribute1_WINDOW_ID"));
-            assertEquals("valueW", preferences.getString("attribute1"));
+            JSONObject preferences = result.getJSONObject(PREFERENCES_KEY);
+            assertEquals(VALUE_W, preferences.getString("attribute1_WINDOW_ID"));
+            assertEquals(VALUE_W, preferences.getString("attribute1"));
         }
     }
 }

@@ -54,6 +54,8 @@ class ParameterBuilderTest {
   private OBContext mockContext;
   private Language mockLanguage;
 
+  private static final String DISPLAY_LOGIC_EXPRESSION = "displayLogicExpression";
+
 
   /**
    * Sets up mock objects before each test execution.
@@ -255,8 +257,8 @@ class ParameterBuilderTest {
       JSONObject result = parameterBuilder.toJSON();
 
       assertNotNull(result);
-      assertTrue(result.has("displayLogicExpression"));
-      assertEquals("parsedDisplayLogic", result.getString("displayLogicExpression"));
+      assertTrue(result.has(DISPLAY_LOGIC_EXPRESSION));
+      assertEquals("parsedDisplayLogic", result.getString(DISPLAY_LOGIC_EXPRESSION));
     }
   }
 
@@ -282,7 +284,7 @@ class ParameterBuilderTest {
       JSONObject result = parameterBuilder.toJSON();
 
       assertNotNull(result);
-      assertFalse(result.has("displayLogicExpression"));
+      assertFalse(result.has(DISPLAY_LOGIC_EXPRESSION));
     }
   }
 
