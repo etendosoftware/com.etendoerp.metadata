@@ -56,52 +56,74 @@ public class ParameterBuilder extends Builder {
             parameter.getReference().getId());
     }
 
-
-    private String getReadOnlyLogic(Parameter parameter) {
-        String readOnlyLogic = parameter.getReadOnlyLogic();
-
-        if (readOnlyLogic != null && !readOnlyLogic.isBlank()) {
-            DynamicExpressionParser parser = new DynamicExpressionParser(readOnlyLogic, parameter, true);
-            return parser.getJSExpression();
-        }
-
-        return null;
-    }
-
     @Override
     public JSONObject toJSON() throws JSONException {
         JSONObject json = converter.toJsonObject(parameter, DataResolvingMode.FULL_TRANSLATABLE);
 
-        if (hasReadOnlyLogic(parameter)) {
-            json.put("readOnlyLogicExpression", getReadOnlyLogic(parameter));
-        }
-
-        if (isSelectorParameter(parameter)) {
-            json.put("selector", getSelectorInfo(parameter.getId(), parameter.getReferenceSearchKey()));
-        }
-
-        if (isListParameter(parameter)) {
-            json.put("refList", getListInfo(parameter.getReferenceSearchKey(), language));
-        }
-
-        if (isWindowReference(parameter)) {
-            json.put("window", getWindowInfo(parameter.getReferenceSearchKey()));
-        }
+        addReadOnlyLogicExpression(json, parameter);
+        addDisplayLogicExpression(json, parameter);
+        addSelectorInfo(json, parameter);
+        addListInfo(json, parameter);
+        addWindowInfo(json, parameter);
 
         return json;
     }
 
-    private boolean hasReadOnlyLogic(Parameter parameter) {
-        return parameter.getReadOnlyLogic() != null && !parameter.getReadOnlyLogic().isBlank();
+    private void addReadOnlyLogicExpression(JSONObject json, Parameter parameter) {
+        try {
+            String readOnlyLogic = parameter.getReadOnlyLogic();
+            if (readOnlyLogic != null && !readOnlyLogic.isBlank()) {
+                DynamicExpressionParser parser = new DynamicExpressionParser(readOnlyLogic, parameter, true);
+                json.put("readOnlyLogicExpression", parser.getJSExpression());
+            }
+        } catch (Exception e) {
+            logger.warn("Error building readOnlyLogic for parameter {}: {}", parameter.getId(), e.getMessage(), e);
+        }
     }
 
-    private JSONObject getWindowInfo(Reference referenceSearchKey) {
-        List<RefWindow> refWindows = referenceSearchKey.getOBUIAPPRefWindowList();
-
-        if (!refWindows.isEmpty()) {
-            return new WindowBuilder(refWindows.get(0).getWindow().getId()).toJSON();
+    private void addDisplayLogicExpression(JSONObject json, Parameter parameter) {
+        try {
+            String displayLogic = parameter.getDisplayLogic();
+            if (displayLogic != null && !displayLogic.isBlank()) {
+                DynamicExpressionParser parser = new DynamicExpressionParser(displayLogic, parameter, false);
+                json.put("displayLogicExpression", parser.getJSExpression());
+            }
+        } catch (Exception e) {
+            logger.warn("Error building displayLogic for parameter {}: {}", parameter.getId(), e.getMessage(), e);
         }
+    }
 
-        return null;
+    private void addSelectorInfo(JSONObject json, Parameter parameter) {
+        try {
+            if (isSelectorParameter(parameter)) {
+                json.put("selector", getSelectorInfo(parameter.getId(), parameter.getReferenceSearchKey()));
+            }
+        } catch (Exception e) {
+            logger.warn("Error building selector info for parameter {}: {}", parameter.getId(), e.getMessage(), e);
+        }
+    }
+
+    private void addListInfo(JSONObject json, Parameter parameter) {
+        try {
+            if (isListParameter(parameter)) {
+                json.put("refList", getListInfo(parameter.getReferenceSearchKey(), language));
+            }
+        } catch (Exception e) {
+            logger.warn("Error building refList for parameter {}: {}", parameter.getId(), e.getMessage(), e);
+        }
+    }
+
+    private void addWindowInfo(JSONObject json, Parameter parameter) {
+        try {
+            if (isWindowReference(parameter)) {
+                Reference referenceSearchKey = parameter.getReferenceSearchKey();
+                List<RefWindow> refWindows = referenceSearchKey.getOBUIAPPRefWindowList();
+                if (!refWindows.isEmpty()) {
+                    json.put("window", new WindowBuilder(refWindows.get(0).getWindow().getId()).toJSON());
+                }
+            }
+        } catch (Exception e) {
+            logger.warn("Error building window info for parameter {}: {}", parameter.getId(), e.getMessage(), e);
+        }
     }
 }
