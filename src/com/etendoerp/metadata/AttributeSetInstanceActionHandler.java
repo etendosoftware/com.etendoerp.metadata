@@ -1,6 +1,7 @@
 package com.etendoerp.metadata;
 
-import java.text.SimpleDateFormat;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -50,7 +51,7 @@ public class AttributeSetInstanceActionHandler extends BaseActionHandler {
   private static final String EXPIRATION_DATE = "expirationDate";
   private static final String STATUS_ERROR = "Error";
   private static final String STATUS_SUCCESS = "Success";
-  private final SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
+  private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd").withZone(ZoneId.systemDefault());
 
   @Override
   protected JSONObject execute(Map<String, Object> parameters, String content) {
@@ -171,7 +172,7 @@ public class AttributeSetInstanceActionHandler extends BaseActionHandler {
     result.put("serialNo", StringUtils.defaultString(asi.getSerialNo(), ""));
 
     if (asi.getExpirationDate() != null) {
-      result.put(EXPIRATION_DATE, dateFormat.format(asi.getExpirationDate()));
+      result.put(EXPIRATION_DATE, DATE_FORMATTER.format(asi.getExpirationDate().toInstant()));
     } else {
       result.put(EXPIRATION_DATE, "");
     }
