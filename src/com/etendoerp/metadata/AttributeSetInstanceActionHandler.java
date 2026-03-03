@@ -1,4 +1,4 @@
-package com.etendoerp.metadata;
+ package com.etendoerp.metadata;
 
 import java.text.SimpleDateFormat;
 import java.util.HashMap;
@@ -43,7 +43,14 @@ public class AttributeSetInstanceActionHandler extends BaseActionHandler {
   private static final Logger log = LogManager.getLogger();
   private static final String BUTTON_VALUE_FETCH = "FETCH";
   private static final String BUTTON_VALUE_CONFIG = "CONFIG";
-  private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd");
+  private static final String PARAMS = "_params";
+  private static final String STATUS = "status";
+  private static final String MESSAGE = "message";
+  private static final String INSTANCE_ID = "instanceId";
+  private static final String EXPIRATION_DATE = "expirationDate";
+  private static final String STATUS_ERROR = "Error";
+  private static final String STATUS_SUCCESS = "Success";
+  private final SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
 
   @Override
   protected JSONObject execute(Map<String, Object> parameters, String content) {
@@ -63,9 +70,10 @@ public class AttributeSetInstanceActionHandler extends BaseActionHandler {
     } catch (Exception e) {
       log.error("Error in AttributeSetInstanceActionHandler", e);
       try {
-        result.put("status", "Error");
-        result.put("message", e.getMessage());
+        result.put(STATUS, STATUS_ERROR);
+        result.put(MESSAGE, e.getMessage());
       } catch (Exception ignored) {
+        log.error("Error setting error result", ignored);
       }
     } finally {
       OBContext.restorePreviousMode();
@@ -75,17 +83,17 @@ public class AttributeSetInstanceActionHandler extends BaseActionHandler {
 
   private JSONObject executeConfig(JSONObject jsonContent) throws Exception {
     JSONObject result = new JSONObject();
-    JSONObject params = jsonContent.getJSONObject("_params");
+    JSONObject params = jsonContent.getJSONObject(PARAMS);
     String attributeSetId = params.getString("attributeSetId");
 
     AttributeSet attrSet = OBDal.getInstance().get(AttributeSet.class, attributeSetId);
     if (attrSet == null) {
-      result.put("status", "Error");
-      result.put("message", "Attribute Set not found");
+      result.put(STATUS, STATUS_ERROR);
+      result.put(MESSAGE, "Attribute Set not found");
       return result;
     }
 
-    result.put("status", "Success");
+    result.put(STATUS, STATUS_SUCCESS);
     result.put("id", attrSet.getId());
     result.put("name", StringUtils.defaultString(attrSet.getName(), ""));
     result.put("isLot", attrSet.isLot());
@@ -140,32 +148,32 @@ public class AttributeSetInstanceActionHandler extends BaseActionHandler {
 
   private JSONObject executeFetch(JSONObject jsonContent) throws Exception {
     JSONObject result = new JSONObject();
-    JSONObject params = jsonContent.getJSONObject("_params");
-    String instanceId = params.getString("instanceId");
+    JSONObject params = jsonContent.getJSONObject(PARAMS);
+    String instanceId = params.getString(INSTANCE_ID);
 
     if (StringUtils.isEmpty(instanceId) || "0".equals(instanceId)) {
-      result.put("status", "Error");
-      result.put("message", "No instance ID provided");
+      result.put(STATUS, STATUS_ERROR);
+      result.put(MESSAGE, "No instance ID provided");
       return result;
     }
 
     AttributeSetInstance asi = OBDal.getInstance().get(AttributeSetInstance.class, instanceId);
     if (asi == null) {
-      result.put("status", "Error");
-      result.put("message", "Attribute Set Instance not found");
+      result.put(STATUS, STATUS_ERROR);
+      result.put(MESSAGE, "Attribute Set Instance not found");
       return result;
     }
 
-    result.put("status", "Success");
-    result.put("instanceId", asi.getId());
+    result.put(STATUS, STATUS_SUCCESS);
+    result.put(INSTANCE_ID, asi.getId());
     result.put("description", StringUtils.defaultString(asi.getDescription(), ""));
     result.put("lotName", StringUtils.defaultString(asi.getLotName(), ""));
     result.put("serialNo", StringUtils.defaultString(asi.getSerialNo(), ""));
 
     if (asi.getExpirationDate() != null) {
-      result.put("expirationDate", DATE_FORMAT.format(asi.getExpirationDate()));
+      result.put(EXPIRATION_DATE, dateFormat.format(asi.getExpirationDate()));
     } else {
-      result.put("expirationDate", "");
+      result.put(EXPIRATION_DATE, "");
     }
 
     // AttributeSetInstance doesn't have a separate guaranteeDate property in the standard model.
@@ -208,13 +216,13 @@ public class AttributeSetInstanceActionHandler extends BaseActionHandler {
 
   private JSONObject executeSave(JSONObject jsonContent) throws Exception {
     JSONObject result = new JSONObject();
-    JSONObject params = jsonContent.getJSONObject("_params");
+    JSONObject params = jsonContent.getJSONObject(PARAMS);
 
     String attributeSetId = params.getString("attributeSetId");
-    String instanceId = params.optString("instanceId", "");
+    String instanceId = params.optString(INSTANCE_ID, "");
     String lot = params.optString("lot", "");
     String serialNo = params.optString("serialNo", "");
-    String expirationDate = convertToClassicDateFormat(params.optString("expirationDate", ""));
+    String expirationDate = convertToClassicDateFormat(params.optString(EXPIRATION_DATE, ""));
     String isLocked = params.optString("isLocked", "N");
     String lockDescription = params.optString("lockDescription", "");
 
@@ -254,9 +262,9 @@ public class AttributeSetInstanceActionHandler extends BaseActionHandler {
     OBError myMessage = attSetValue.setAttributeInstance(conn, vars, attributeSetId, instanceId,
         windowId, isSOTrx, productId, attributeValues);
 
-    result.put("status", myMessage.getType());
-    result.put("message", myMessage.getMessage());
-    result.put("instanceId", attSetValue.getAttSetInstanceId());
+    result.put(STATUS, myMessage.getType());
+    result.put(MESSAGE, myMessage.getMessage());
+    result.put(INSTANCE_ID, attSetValue.getAttSetInstanceId());
 
     // Clear Hibernate session to discard stale cache from the SQL-level save
     OBDal.getInstance().getSession().clear();
