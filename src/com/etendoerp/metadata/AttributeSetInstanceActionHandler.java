@@ -1,4 +1,4 @@
- package com.etendoerp.metadata;
+package com.etendoerp.metadata;
 
 import java.text.SimpleDateFormat;
 import java.util.HashMap;
