@@ -8,12 +8,12 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import org.codehaus.jettison.json.JSONObject;
 import org.junit.jupiter.api.Test;
@@ -25,7 +25,6 @@ import org.openbravo.client.kernel.RequestContext;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBCriteria;
 import org.openbravo.dal.service.OBDal;
-import org.openbravo.erpCommon.utility.OBError;
 import org.openbravo.model.common.plm.Attribute;
 import org.openbravo.model.common.plm.AttributeInstance;
 import org.openbravo.model.common.plm.AttributeSet;
@@ -64,6 +63,89 @@ class AttributeSetInstanceActionHandlerTest {
     private static final String METHOD_CONVERT_DATE = "convertToClassicDateFormat";
     private static final String METHOD_REPLACE = "replace";
 
+    // ======================== Helper methods ========================
+
+    private OBDal mockOBDal(MockedStatic<OBDal> dalMock) {
+        OBDal obDal = mock(OBDal.class);
+        dalMock.when(OBDal::getInstance).thenReturn(obDal);
+        return obDal;
+    }
+
+    private AttributeSet mockAttributeSet(OBDal obDal, String name,
+            boolean isLot, boolean isSerialNo, boolean isExpirationDate) {
+        AttributeSet attrSet = mock(AttributeSet.class);
+        when(obDal.get(AttributeSet.class, ATTR_SET_ID)).thenReturn(attrSet);
+        when(attrSet.getId()).thenReturn(ATTR_SET_ID);
+        when(attrSet.getName()).thenReturn(name);
+        when(attrSet.isLot()).thenReturn(isLot);
+        when(attrSet.isSerialNo()).thenReturn(isSerialNo);
+        when(attrSet.isExpirationDate()).thenReturn(isExpirationDate);
+        return attrSet;
+    }
+
+    @SuppressWarnings("unchecked")
+    private void mockEmptyAttributeUseCriteria(OBDal obDal) {
+        OBCriteria<AttributeUse> useCriteria = mock(OBCriteria.class);
+        when(obDal.createCriteria(AttributeUse.class)).thenReturn(useCriteria);
+        when(useCriteria.list()).thenReturn(Collections.emptyList());
+    }
+
+    private AttributeSetInstance mockBasicAsi(OBDal obDal) {
+        AttributeSetInstance asi = mock(AttributeSetInstance.class);
+        when(obDal.get(AttributeSetInstance.class, INSTANCE_ID_VAL)).thenReturn(asi);
+        when(asi.getId()).thenReturn(INSTANCE_ID_VAL);
+        when(asi.getDescription()).thenReturn("");
+        when(asi.getLotName()).thenReturn("");
+        when(asi.getSerialNo()).thenReturn("");
+        when(asi.getExpirationDate()).thenReturn(null);
+        return asi;
+    }
+
+    @SuppressWarnings("unchecked")
+    private void mockEmptyAttributeInstanceCriteria(OBDal obDal) {
+        OBCriteria<AttributeInstance> aiCriteria = mock(OBCriteria.class);
+        when(obDal.createCriteria(AttributeInstance.class)).thenReturn(aiCriteria);
+        when(aiCriteria.list()).thenReturn(Collections.emptyList());
+    }
+
+    private VariablesSecureApp mockRequestContext(MockedStatic<RequestContext> reqCtxMock) {
+        RequestContext requestContext = mock(RequestContext.class);
+        reqCtxMock.when(RequestContext::get).thenReturn(requestContext);
+        VariablesSecureApp vars = mock(VariablesSecureApp.class);
+        when(requestContext.getVariablesSecureApp()).thenReturn(vars);
+        return vars;
+    }
+
+    private String buildConfigContent() throws Exception {
+        return new JSONObject()
+                .put(BUTTON_VALUE_KEY, BUTTON_VALUE_CONFIG)
+                .put(PARAMS_KEY, new JSONObject().put(ATTRIBUTE_SET_ID_KEY, ATTR_SET_ID))
+                .toString();
+    }
+
+    private String buildFetchContent(String instanceId) throws Exception {
+        return new JSONObject()
+                .put(BUTTON_VALUE_KEY, BUTTON_VALUE_FETCH)
+                .put(PARAMS_KEY, new JSONObject().put(INSTANCE_ID_KEY, instanceId))
+                .toString();
+    }
+
+    @SuppressWarnings("java:S3011")
+    private Method getConvertDateMethod() throws ReflectiveOperationException {
+        Method method = AttributeSetInstanceActionHandler.class
+                .getDeclaredMethod(METHOD_CONVERT_DATE, String.class);
+        method.setAccessible(true);
+        return method;
+    }
+
+    @SuppressWarnings("java:S3011")
+    private Method getReplaceMethod() throws ReflectiveOperationException {
+        Method method = AttributeSetInstanceActionHandler.class
+                .getDeclaredMethod(METHOD_REPLACE, String.class);
+        method.setAccessible(true);
+        return method;
+    }
+
     // ======================== executeConfig tests ========================
 
     @Test
@@ -71,17 +153,11 @@ class AttributeSetInstanceActionHandlerTest {
         try (MockedStatic<OBContext> ctxMock = mockStatic(OBContext.class);
              MockedStatic<OBDal> dalMock = mockStatic(OBDal.class)) {
 
-            OBDal obDal = mock(OBDal.class);
-            dalMock.when(OBDal::getInstance).thenReturn(obDal);
+            OBDal obDal = mockOBDal(dalMock);
             when(obDal.get(AttributeSet.class, ATTR_SET_ID)).thenReturn(null);
 
-            AttributeSetInstanceActionHandler handler = new AttributeSetInstanceActionHandler();
-            String content = new JSONObject()
-                    .put(BUTTON_VALUE_KEY, BUTTON_VALUE_CONFIG)
-                    .put(PARAMS_KEY, new JSONObject().put(ATTRIBUTE_SET_ID_KEY, ATTR_SET_ID))
-                    .toString();
-
-            JSONObject result = handler.execute(new HashMap<>(), content);
+            JSONObject result = new AttributeSetInstanceActionHandler()
+                    .execute(new HashMap<>(), buildConfigContent());
 
             assertEquals(ERROR_STATUS, result.getString(STATUS_KEY));
             assertEquals("Attribute Set not found", result.getString(MESSAGE_KEY));
@@ -93,30 +169,13 @@ class AttributeSetInstanceActionHandlerTest {
         try (MockedStatic<OBContext> ctxMock = mockStatic(OBContext.class);
              MockedStatic<OBDal> dalMock = mockStatic(OBDal.class)) {
 
-            OBDal obDal = mock(OBDal.class);
-            dalMock.when(OBDal::getInstance).thenReturn(obDal);
-
-            AttributeSet attrSet = mock(AttributeSet.class);
-            when(obDal.get(AttributeSet.class, ATTR_SET_ID)).thenReturn(attrSet);
-            when(attrSet.getId()).thenReturn(ATTR_SET_ID);
-            when(attrSet.getName()).thenReturn("Test Set");
-            when(attrSet.isLot()).thenReturn(true);
-            when(attrSet.isSerialNo()).thenReturn(false);
-            when(attrSet.isExpirationDate()).thenReturn(true);
+            OBDal obDal = mockOBDal(dalMock);
+            AttributeSet attrSet = mockAttributeSet(obDal, "Test Set", true, false, true);
             when(attrSet.getGuaranteedDays()).thenReturn(30L);
+            mockEmptyAttributeUseCriteria(obDal);
 
-            @SuppressWarnings("unchecked")
-            OBCriteria<AttributeUse> useCriteria = mock(OBCriteria.class);
-            when(obDal.createCriteria(AttributeUse.class)).thenReturn(useCriteria);
-            when(useCriteria.list()).thenReturn(Collections.emptyList());
-
-            AttributeSetInstanceActionHandler handler = new AttributeSetInstanceActionHandler();
-            String content = new JSONObject()
-                    .put(BUTTON_VALUE_KEY, BUTTON_VALUE_CONFIG)
-                    .put(PARAMS_KEY, new JSONObject().put(ATTRIBUTE_SET_ID_KEY, ATTR_SET_ID))
-                    .toString();
-
-            JSONObject result = handler.execute(new HashMap<>(), content);
+            JSONObject result = new AttributeSetInstanceActionHandler()
+                    .execute(new HashMap<>(), buildConfigContent());
 
             assertEquals(SUCCESS_STATUS, result.getString(STATUS_KEY));
             assertEquals(ATTR_SET_ID, result.getString("id"));
@@ -133,18 +192,9 @@ class AttributeSetInstanceActionHandlerTest {
         try (MockedStatic<OBContext> ctxMock = mockStatic(OBContext.class);
              MockedStatic<OBDal> dalMock = mockStatic(OBDal.class)) {
 
-            OBDal obDal = mock(OBDal.class);
-            dalMock.when(OBDal::getInstance).thenReturn(obDal);
+            OBDal obDal = mockOBDal(dalMock);
+            mockAttributeSet(obDal, SET_NAME_VAL, false, false, false);
 
-            AttributeSet attrSet = mock(AttributeSet.class);
-            when(obDal.get(AttributeSet.class, ATTR_SET_ID)).thenReturn(attrSet);
-            when(attrSet.getId()).thenReturn(ATTR_SET_ID);
-            when(attrSet.getName()).thenReturn(SET_NAME_VAL);
-            when(attrSet.isLot()).thenReturn(false);
-            when(attrSet.isSerialNo()).thenReturn(false);
-            when(attrSet.isExpirationDate()).thenReturn(false);
-
-            // Build a list attribute via AttributeUse
             Attribute attr = mock(Attribute.class);
             when(attr.getId()).thenReturn("attrId1");
             when(attr.getName()).thenReturn("Color");
@@ -158,11 +208,8 @@ class AttributeSetInstanceActionHandlerTest {
             @SuppressWarnings("unchecked")
             OBCriteria<AttributeUse> useCriteria = mock(OBCriteria.class);
             when(obDal.createCriteria(AttributeUse.class)).thenReturn(useCriteria);
-            List<AttributeUse> useList = new ArrayList<>();
-            useList.add(use);
-            when(useCriteria.list()).thenReturn(useList);
+            when(useCriteria.list()).thenReturn(List.of(use));
 
-            // Build attribute values
             AttributeValue av = mock(AttributeValue.class);
             when(av.getId()).thenReturn("val1");
             when(av.getName()).thenReturn("Red");
@@ -170,17 +217,10 @@ class AttributeSetInstanceActionHandlerTest {
             @SuppressWarnings("unchecked")
             OBCriteria<AttributeValue> valCriteria = mock(OBCriteria.class);
             when(obDal.createCriteria(AttributeValue.class)).thenReturn(valCriteria);
-            List<AttributeValue> valList = new ArrayList<>();
-            valList.add(av);
-            when(valCriteria.list()).thenReturn(valList);
+            when(valCriteria.list()).thenReturn(List.of(av));
 
-            AttributeSetInstanceActionHandler handler = new AttributeSetInstanceActionHandler();
-            String content = new JSONObject()
-                    .put(BUTTON_VALUE_KEY, BUTTON_VALUE_CONFIG)
-                    .put(PARAMS_KEY, new JSONObject().put(ATTRIBUTE_SET_ID_KEY, ATTR_SET_ID))
-                    .toString();
-
-            JSONObject result = handler.execute(new HashMap<>(), content);
+            JSONObject result = new AttributeSetInstanceActionHandler()
+                    .execute(new HashMap<>(), buildConfigContent());
 
             assertEquals(SUCCESS_STATUS, result.getString(STATUS_KEY));
             assertEquals(1, result.getJSONArray(CUSTOM_ATTRIBUTES_KEY).length());
@@ -198,35 +238,19 @@ class AttributeSetInstanceActionHandlerTest {
         try (MockedStatic<OBContext> ctxMock = mockStatic(OBContext.class);
              MockedStatic<OBDal> dalMock = mockStatic(OBDal.class)) {
 
-            OBDal obDal = mock(OBDal.class);
-            dalMock.when(OBDal::getInstance).thenReturn(obDal);
+            OBDal obDal = mockOBDal(dalMock);
+            mockAttributeSet(obDal, SET_NAME_VAL, false, false, false);
 
-            AttributeSet attrSet = mock(AttributeSet.class);
-            when(obDal.get(AttributeSet.class, ATTR_SET_ID)).thenReturn(attrSet);
-            when(attrSet.getId()).thenReturn(ATTR_SET_ID);
-            when(attrSet.getName()).thenReturn(SET_NAME_VAL);
-            when(attrSet.isLot()).thenReturn(false);
-            when(attrSet.isSerialNo()).thenReturn(false);
-            when(attrSet.isExpirationDate()).thenReturn(false);
-
-            // An AttributeUse with null attribute
             AttributeUse use = mock(AttributeUse.class);
             when(use.getAttribute()).thenReturn(null);
 
             @SuppressWarnings("unchecked")
             OBCriteria<AttributeUse> useCriteria = mock(OBCriteria.class);
             when(obDal.createCriteria(AttributeUse.class)).thenReturn(useCriteria);
-            List<AttributeUse> useList = new ArrayList<>();
-            useList.add(use);
-            when(useCriteria.list()).thenReturn(useList);
+            when(useCriteria.list()).thenReturn(List.of(use));
 
-            AttributeSetInstanceActionHandler handler = new AttributeSetInstanceActionHandler();
-            String content = new JSONObject()
-                    .put(BUTTON_VALUE_KEY, BUTTON_VALUE_CONFIG)
-                    .put(PARAMS_KEY, new JSONObject().put(ATTRIBUTE_SET_ID_KEY, ATTR_SET_ID))
-                    .toString();
-
-            JSONObject result = handler.execute(new HashMap<>(), content);
+            JSONObject result = new AttributeSetInstanceActionHandler()
+                    .execute(new HashMap<>(), buildConfigContent());
 
             assertEquals(SUCCESS_STATUS, result.getString(STATUS_KEY));
             assertEquals(0, result.getJSONArray(CUSTOM_ATTRIBUTES_KEY).length());
@@ -238,30 +262,13 @@ class AttributeSetInstanceActionHandlerTest {
         try (MockedStatic<OBContext> ctxMock = mockStatic(OBContext.class);
              MockedStatic<OBDal> dalMock = mockStatic(OBDal.class)) {
 
-            OBDal obDal = mock(OBDal.class);
-            dalMock.when(OBDal::getInstance).thenReturn(obDal);
-
-            AttributeSet attrSet = mock(AttributeSet.class);
-            when(obDal.get(AttributeSet.class, ATTR_SET_ID)).thenReturn(attrSet);
-            when(attrSet.getId()).thenReturn(ATTR_SET_ID);
-            when(attrSet.getName()).thenReturn(SET_NAME_VAL);
-            when(attrSet.isLot()).thenReturn(false);
-            when(attrSet.isSerialNo()).thenReturn(false);
-            when(attrSet.isExpirationDate()).thenReturn(true);
+            OBDal obDal = mockOBDal(dalMock);
+            AttributeSet attrSet = mockAttributeSet(obDal, SET_NAME_VAL, false, false, true);
             when(attrSet.getGuaranteedDays()).thenReturn(null);
+            mockEmptyAttributeUseCriteria(obDal);
 
-            @SuppressWarnings("unchecked")
-            OBCriteria<AttributeUse> useCriteria = mock(OBCriteria.class);
-            when(obDal.createCriteria(AttributeUse.class)).thenReturn(useCriteria);
-            when(useCriteria.list()).thenReturn(Collections.emptyList());
-
-            AttributeSetInstanceActionHandler handler = new AttributeSetInstanceActionHandler();
-            String content = new JSONObject()
-                    .put(BUTTON_VALUE_KEY, BUTTON_VALUE_CONFIG)
-                    .put(PARAMS_KEY, new JSONObject().put(ATTRIBUTE_SET_ID_KEY, ATTR_SET_ID))
-                    .toString();
-
-            JSONObject result = handler.execute(new HashMap<>(), content);
+            JSONObject result = new AttributeSetInstanceActionHandler()
+                    .execute(new HashMap<>(), buildConfigContent());
 
             assertFalse(result.getBoolean("isGuaranteeDate"));
         }
@@ -274,16 +281,10 @@ class AttributeSetInstanceActionHandlerTest {
         try (MockedStatic<OBContext> ctxMock = mockStatic(OBContext.class);
              MockedStatic<OBDal> dalMock = mockStatic(OBDal.class)) {
 
-            OBDal obDal = mock(OBDal.class);
-            dalMock.when(OBDal::getInstance).thenReturn(obDal);
+            mockOBDal(dalMock);
 
-            AttributeSetInstanceActionHandler handler = new AttributeSetInstanceActionHandler();
-            String content = new JSONObject()
-                    .put(BUTTON_VALUE_KEY, BUTTON_VALUE_FETCH)
-                    .put(PARAMS_KEY, new JSONObject().put(INSTANCE_ID_KEY, ""))
-                    .toString();
-
-            JSONObject result = handler.execute(new HashMap<>(), content);
+            JSONObject result = new AttributeSetInstanceActionHandler()
+                    .execute(new HashMap<>(), buildFetchContent(""));
 
             assertEquals(ERROR_STATUS, result.getString(STATUS_KEY));
             assertEquals("No instance ID provided", result.getString(MESSAGE_KEY));
@@ -295,16 +296,10 @@ class AttributeSetInstanceActionHandlerTest {
         try (MockedStatic<OBContext> ctxMock = mockStatic(OBContext.class);
              MockedStatic<OBDal> dalMock = mockStatic(OBDal.class)) {
 
-            OBDal obDal = mock(OBDal.class);
-            dalMock.when(OBDal::getInstance).thenReturn(obDal);
+            mockOBDal(dalMock);
 
-            AttributeSetInstanceActionHandler handler = new AttributeSetInstanceActionHandler();
-            String content = new JSONObject()
-                    .put(BUTTON_VALUE_KEY, BUTTON_VALUE_FETCH)
-                    .put(PARAMS_KEY, new JSONObject().put(INSTANCE_ID_KEY, "0"))
-                    .toString();
-
-            JSONObject result = handler.execute(new HashMap<>(), content);
+            JSONObject result = new AttributeSetInstanceActionHandler()
+                    .execute(new HashMap<>(), buildFetchContent("0"));
 
             assertEquals(ERROR_STATUS, result.getString(STATUS_KEY));
             assertEquals("No instance ID provided", result.getString(MESSAGE_KEY));
@@ -316,17 +311,11 @@ class AttributeSetInstanceActionHandlerTest {
         try (MockedStatic<OBContext> ctxMock = mockStatic(OBContext.class);
              MockedStatic<OBDal> dalMock = mockStatic(OBDal.class)) {
 
-            OBDal obDal = mock(OBDal.class);
-            dalMock.when(OBDal::getInstance).thenReturn(obDal);
+            OBDal obDal = mockOBDal(dalMock);
             when(obDal.get(AttributeSetInstance.class, INSTANCE_ID_VAL)).thenReturn(null);
 
-            AttributeSetInstanceActionHandler handler = new AttributeSetInstanceActionHandler();
-            String content = new JSONObject()
-                    .put(BUTTON_VALUE_KEY, BUTTON_VALUE_FETCH)
-                    .put(PARAMS_KEY, new JSONObject().put(INSTANCE_ID_KEY, INSTANCE_ID_VAL))
-                    .toString();
-
-            JSONObject result = handler.execute(new HashMap<>(), content);
+            JSONObject result = new AttributeSetInstanceActionHandler()
+                    .execute(new HashMap<>(), buildFetchContent(INSTANCE_ID_VAL));
 
             assertEquals(ERROR_STATUS, result.getString(STATUS_KEY));
             assertEquals("Attribute Set Instance not found", result.getString(MESSAGE_KEY));
@@ -338,9 +327,7 @@ class AttributeSetInstanceActionHandlerTest {
         try (MockedStatic<OBContext> ctxMock = mockStatic(OBContext.class);
              MockedStatic<OBDal> dalMock = mockStatic(OBDal.class)) {
 
-            OBDal obDal = mock(OBDal.class);
-            dalMock.when(OBDal::getInstance).thenReturn(obDal);
-
+            OBDal obDal = mockOBDal(dalMock);
             AttributeSetInstance asi = mock(AttributeSetInstance.class);
             when(obDal.get(AttributeSetInstance.class, INSTANCE_ID_VAL)).thenReturn(asi);
             when(asi.getId()).thenReturn(INSTANCE_ID_VAL);
@@ -351,19 +338,10 @@ class AttributeSetInstanceActionHandlerTest {
             @SuppressWarnings("deprecation")
             Date expDate = new Date(125, 5, 15);
             when(asi.getExpirationDate()).thenReturn(expDate);
+            mockEmptyAttributeInstanceCriteria(obDal);
 
-            @SuppressWarnings("unchecked")
-            OBCriteria<AttributeInstance> aiCriteria = mock(OBCriteria.class);
-            when(obDal.createCriteria(AttributeInstance.class)).thenReturn(aiCriteria);
-            when(aiCriteria.list()).thenReturn(Collections.emptyList());
-
-            AttributeSetInstanceActionHandler handler = new AttributeSetInstanceActionHandler();
-            String content = new JSONObject()
-                    .put(BUTTON_VALUE_KEY, BUTTON_VALUE_FETCH)
-                    .put(PARAMS_KEY, new JSONObject().put(INSTANCE_ID_KEY, INSTANCE_ID_VAL))
-                    .toString();
-
-            JSONObject result = handler.execute(new HashMap<>(), content);
+            JSONObject result = new AttributeSetInstanceActionHandler()
+                    .execute(new HashMap<>(), buildFetchContent(INSTANCE_ID_VAL));
 
             assertEquals(SUCCESS_STATUS, result.getString(STATUS_KEY));
             assertEquals(INSTANCE_ID_VAL, result.getString(INSTANCE_ID_KEY));
@@ -380,9 +358,7 @@ class AttributeSetInstanceActionHandlerTest {
         try (MockedStatic<OBContext> ctxMock = mockStatic(OBContext.class);
              MockedStatic<OBDal> dalMock = mockStatic(OBDal.class)) {
 
-            OBDal obDal = mock(OBDal.class);
-            dalMock.when(OBDal::getInstance).thenReturn(obDal);
-
+            OBDal obDal = mockOBDal(dalMock);
             AttributeSetInstance asi = mock(AttributeSetInstance.class);
             when(obDal.get(AttributeSetInstance.class, INSTANCE_ID_VAL)).thenReturn(asi);
             when(asi.getId()).thenReturn(INSTANCE_ID_VAL);
@@ -390,19 +366,10 @@ class AttributeSetInstanceActionHandlerTest {
             when(asi.getLotName()).thenReturn(null);
             when(asi.getSerialNo()).thenReturn(null);
             when(asi.getExpirationDate()).thenReturn(null);
+            mockEmptyAttributeInstanceCriteria(obDal);
 
-            @SuppressWarnings("unchecked")
-            OBCriteria<AttributeInstance> aiCriteria = mock(OBCriteria.class);
-            when(obDal.createCriteria(AttributeInstance.class)).thenReturn(aiCriteria);
-            when(aiCriteria.list()).thenReturn(Collections.emptyList());
-
-            AttributeSetInstanceActionHandler handler = new AttributeSetInstanceActionHandler();
-            String content = new JSONObject()
-                    .put(BUTTON_VALUE_KEY, BUTTON_VALUE_FETCH)
-                    .put(PARAMS_KEY, new JSONObject().put(INSTANCE_ID_KEY, INSTANCE_ID_VAL))
-                    .toString();
-
-            JSONObject result = handler.execute(new HashMap<>(), content);
+            JSONObject result = new AttributeSetInstanceActionHandler()
+                    .execute(new HashMap<>(), buildFetchContent(INSTANCE_ID_VAL));
 
             assertEquals(SUCCESS_STATUS, result.getString(STATUS_KEY));
             assertEquals("", result.getString(EXPIRATION_DATE_KEY));
@@ -417,18 +384,9 @@ class AttributeSetInstanceActionHandlerTest {
         try (MockedStatic<OBContext> ctxMock = mockStatic(OBContext.class);
              MockedStatic<OBDal> dalMock = mockStatic(OBDal.class)) {
 
-            OBDal obDal = mock(OBDal.class);
-            dalMock.when(OBDal::getInstance).thenReturn(obDal);
+            OBDal obDal = mockOBDal(dalMock);
+            mockBasicAsi(obDal);
 
-            AttributeSetInstance asi = mock(AttributeSetInstance.class);
-            when(obDal.get(AttributeSetInstance.class, INSTANCE_ID_VAL)).thenReturn(asi);
-            when(asi.getId()).thenReturn(INSTANCE_ID_VAL);
-            when(asi.getDescription()).thenReturn("");
-            when(asi.getLotName()).thenReturn("");
-            when(asi.getSerialNo()).thenReturn("");
-            when(asi.getExpirationDate()).thenReturn(null);
-
-            // Build an AttributeInstance with an AttributeValue
             Attribute attr = mock(Attribute.class);
             when(attr.getId()).thenReturn("customAttrId");
 
@@ -440,21 +398,13 @@ class AttributeSetInstanceActionHandlerTest {
             when(ai.getAttribute()).thenReturn(attr);
             when(ai.getAttributeValue()).thenReturn(attrVal);
 
-            List<AttributeInstance> aiList = new ArrayList<>();
-            aiList.add(ai);
-
             @SuppressWarnings("unchecked")
             OBCriteria<AttributeInstance> aiCriteria = mock(OBCriteria.class);
             when(obDal.createCriteria(AttributeInstance.class)).thenReturn(aiCriteria);
-            when(aiCriteria.list()).thenReturn(aiList);
+            when(aiCriteria.list()).thenReturn(List.of(ai));
 
-            AttributeSetInstanceActionHandler handler = new AttributeSetInstanceActionHandler();
-            String content = new JSONObject()
-                    .put(BUTTON_VALUE_KEY, BUTTON_VALUE_FETCH)
-                    .put(PARAMS_KEY, new JSONObject().put(INSTANCE_ID_KEY, INSTANCE_ID_VAL))
-                    .toString();
-
-            JSONObject result = handler.execute(new HashMap<>(), content);
+            JSONObject result = new AttributeSetInstanceActionHandler()
+                    .execute(new HashMap<>(), buildFetchContent(INSTANCE_ID_VAL));
 
             JSONObject customAttrs = result.getJSONObject(CUSTOM_ATTRIBUTES_KEY);
             assertEquals("selectedValueId", customAttrs.getString("customAttrId"));
@@ -467,16 +417,8 @@ class AttributeSetInstanceActionHandlerTest {
         try (MockedStatic<OBContext> ctxMock = mockStatic(OBContext.class);
              MockedStatic<OBDal> dalMock = mockStatic(OBDal.class)) {
 
-            OBDal obDal = mock(OBDal.class);
-            dalMock.when(OBDal::getInstance).thenReturn(obDal);
-
-            AttributeSetInstance asi = mock(AttributeSetInstance.class);
-            when(obDal.get(AttributeSetInstance.class, INSTANCE_ID_VAL)).thenReturn(asi);
-            when(asi.getId()).thenReturn(INSTANCE_ID_VAL);
-            when(asi.getDescription()).thenReturn("");
-            when(asi.getLotName()).thenReturn("");
-            when(asi.getSerialNo()).thenReturn("");
-            when(asi.getExpirationDate()).thenReturn(null);
+            OBDal obDal = mockOBDal(dalMock);
+            mockBasicAsi(obDal);
 
             Attribute attr = mock(Attribute.class);
             when(attr.getId()).thenReturn("freeTextAttrId");
@@ -486,21 +428,13 @@ class AttributeSetInstanceActionHandlerTest {
             when(ai.getAttributeValue()).thenReturn(null);
             when(ai.getSearchKey()).thenReturn(FREE_TEXT_VALUE);
 
-            List<AttributeInstance> aiList = new ArrayList<>();
-            aiList.add(ai);
-
             @SuppressWarnings("unchecked")
             OBCriteria<AttributeInstance> aiCriteria = mock(OBCriteria.class);
             when(obDal.createCriteria(AttributeInstance.class)).thenReturn(aiCriteria);
-            when(aiCriteria.list()).thenReturn(aiList);
+            when(aiCriteria.list()).thenReturn(List.of(ai));
 
-            AttributeSetInstanceActionHandler handler = new AttributeSetInstanceActionHandler();
-            String content = new JSONObject()
-                    .put(BUTTON_VALUE_KEY, BUTTON_VALUE_FETCH)
-                    .put(PARAMS_KEY, new JSONObject().put(INSTANCE_ID_KEY, INSTANCE_ID_VAL))
-                    .toString();
-
-            JSONObject result = handler.execute(new HashMap<>(), content);
+            JSONObject result = new AttributeSetInstanceActionHandler()
+                    .execute(new HashMap<>(), buildFetchContent(INSTANCE_ID_VAL));
 
             JSONObject customAttrs = result.getJSONObject(CUSTOM_ATTRIBUTES_KEY);
             assertEquals(FREE_TEXT_VALUE, customAttrs.getString("freeTextAttrId"));
@@ -513,36 +447,19 @@ class AttributeSetInstanceActionHandlerTest {
         try (MockedStatic<OBContext> ctxMock = mockStatic(OBContext.class);
              MockedStatic<OBDal> dalMock = mockStatic(OBDal.class)) {
 
-            OBDal obDal = mock(OBDal.class);
-            dalMock.when(OBDal::getInstance).thenReturn(obDal);
+            OBDal obDal = mockOBDal(dalMock);
+            mockBasicAsi(obDal);
 
-            AttributeSetInstance asi = mock(AttributeSetInstance.class);
-            when(obDal.get(AttributeSetInstance.class, INSTANCE_ID_VAL)).thenReturn(asi);
-            when(asi.getId()).thenReturn(INSTANCE_ID_VAL);
-            when(asi.getDescription()).thenReturn("");
-            when(asi.getLotName()).thenReturn("");
-            when(asi.getSerialNo()).thenReturn("");
-            when(asi.getExpirationDate()).thenReturn(null);
-
-            // An instance with null attribute
             AttributeInstance ai = mock(AttributeInstance.class);
             when(ai.getAttribute()).thenReturn(null);
-
-            List<AttributeInstance> aiList = new ArrayList<>();
-            aiList.add(ai);
 
             @SuppressWarnings("unchecked")
             OBCriteria<AttributeInstance> aiCriteria = mock(OBCriteria.class);
             when(obDal.createCriteria(AttributeInstance.class)).thenReturn(aiCriteria);
-            when(aiCriteria.list()).thenReturn(aiList);
+            when(aiCriteria.list()).thenReturn(List.of(ai));
 
-            AttributeSetInstanceActionHandler handler = new AttributeSetInstanceActionHandler();
-            String content = new JSONObject()
-                    .put(BUTTON_VALUE_KEY, BUTTON_VALUE_FETCH)
-                    .put(PARAMS_KEY, new JSONObject().put(INSTANCE_ID_KEY, INSTANCE_ID_VAL))
-                    .toString();
-
-            JSONObject result = handler.execute(new HashMap<>(), content);
+            JSONObject result = new AttributeSetInstanceActionHandler()
+                    .execute(new HashMap<>(), buildFetchContent(INSTANCE_ID_VAL));
 
             assertEquals(SUCCESS_STATUS, result.getString(STATUS_KEY));
             assertEquals(0, result.getJSONObject(CUSTOM_ATTRIBUTES_KEY).length());
@@ -554,16 +471,8 @@ class AttributeSetInstanceActionHandlerTest {
         try (MockedStatic<OBContext> ctxMock = mockStatic(OBContext.class);
              MockedStatic<OBDal> dalMock = mockStatic(OBDal.class)) {
 
-            OBDal obDal = mock(OBDal.class);
-            dalMock.when(OBDal::getInstance).thenReturn(obDal);
-
-            AttributeSetInstance asi = mock(AttributeSetInstance.class);
-            when(obDal.get(AttributeSetInstance.class, INSTANCE_ID_VAL)).thenReturn(asi);
-            when(asi.getId()).thenReturn(INSTANCE_ID_VAL);
-            when(asi.getDescription()).thenReturn("");
-            when(asi.getLotName()).thenReturn("");
-            when(asi.getSerialNo()).thenReturn("");
-            when(asi.getExpirationDate()).thenReturn(null);
+            OBDal obDal = mockOBDal(dalMock);
+            mockBasicAsi(obDal);
 
             Attribute attr = mock(Attribute.class);
             when(attr.getId()).thenReturn("emptyAttrId");
@@ -573,21 +482,13 @@ class AttributeSetInstanceActionHandlerTest {
             when(ai.getAttributeValue()).thenReturn(null);
             when(ai.getSearchKey()).thenReturn("");
 
-            List<AttributeInstance> aiList = new ArrayList<>();
-            aiList.add(ai);
-
             @SuppressWarnings("unchecked")
             OBCriteria<AttributeInstance> aiCriteria = mock(OBCriteria.class);
             when(obDal.createCriteria(AttributeInstance.class)).thenReturn(aiCriteria);
-            when(aiCriteria.list()).thenReturn(aiList);
+            when(aiCriteria.list()).thenReturn(List.of(ai));
 
-            AttributeSetInstanceActionHandler handler = new AttributeSetInstanceActionHandler();
-            String content = new JSONObject()
-                    .put(BUTTON_VALUE_KEY, BUTTON_VALUE_FETCH)
-                    .put(PARAMS_KEY, new JSONObject().put(INSTANCE_ID_KEY, INSTANCE_ID_VAL))
-                    .toString();
-
-            JSONObject result = handler.execute(new HashMap<>(), content);
+            JSONObject result = new AttributeSetInstanceActionHandler()
+                    .execute(new HashMap<>(), buildFetchContent(INSTANCE_ID_VAL));
 
             assertEquals(SUCCESS_STATUS, result.getString(STATUS_KEY));
             assertEquals(0, result.getJSONObject(CUSTOM_ATTRIBUTES_KEY).length());
@@ -602,21 +503,9 @@ class AttributeSetInstanceActionHandlerTest {
              MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
              MockedStatic<RequestContext> reqCtxMock = mockStatic(RequestContext.class)) {
 
-            OBDal obDal = mock(OBDal.class);
-            dalMock.when(OBDal::getInstance).thenReturn(obDal);
+            mockOBDal(dalMock);
+            mockRequestContext(reqCtxMock);
 
-            // Mock RequestContext
-            RequestContext requestContext = mock(RequestContext.class);
-            reqCtxMock.when(RequestContext::get).thenReturn(requestContext);
-            VariablesSecureApp vars = mock(VariablesSecureApp.class);
-            when(requestContext.getVariablesSecureApp()).thenReturn(vars);
-
-            // The handler creates AttributeSetInstanceValue internally and calls
-            // setAttributeInstance which requires a DB. We cannot easily mock this
-            // constructor-created object, so we test the exception path instead.
-            // This test verifies the execute() catch block handles the exception.
-
-            AttributeSetInstanceActionHandler handler = new AttributeSetInstanceActionHandler();
             JSONObject params = new JSONObject()
                     .put(ATTRIBUTE_SET_ID_KEY, ATTR_SET_ID)
                     .put(INSTANCE_ID_KEY, INSTANCE_ID_VAL)
@@ -629,15 +518,13 @@ class AttributeSetInstanceActionHandlerTest {
                     .put("isSOTrx", "Y")
                     .put("productId", "testProduct");
 
-            String content = new JSONObject()
-                    .put(PARAMS_KEY, params)
-                    .toString();
+            String content = new JSONObject().put(PARAMS_KEY, params).toString();
 
-            // This will go to executeSave which creates DalConnectionProvider(true)
-            // which won't mock easily. So it will throw and be caught by execute().
-            JSONObject result = handler.execute(new HashMap<>(), content);
+            // executeSave creates DalConnectionProvider(true) which cannot be mocked,
+            // so the exception is caught by execute() and returned as an Error result.
+            JSONObject result = new AttributeSetInstanceActionHandler()
+                    .execute(new HashMap<>(), content);
 
-            // The execute() method catches exceptions and sets Error status
             assertNotNull(result);
             assertTrue(result.has(STATUS_KEY));
         }
@@ -649,31 +536,22 @@ class AttributeSetInstanceActionHandlerTest {
              MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
              MockedStatic<RequestContext> reqCtxMock = mockStatic(RequestContext.class)) {
 
-            OBDal obDal = mock(OBDal.class);
-            dalMock.when(OBDal::getInstance).thenReturn(obDal);
+            mockOBDal(dalMock);
+            mockRequestContext(reqCtxMock);
 
-            RequestContext requestContext = mock(RequestContext.class);
-            reqCtxMock.when(RequestContext::get).thenReturn(requestContext);
-            VariablesSecureApp vars = mock(VariablesSecureApp.class);
-            when(requestContext.getVariablesSecureApp()).thenReturn(vars);
-
-            // Build params with attributes including an _identifier entry
             JSONObject attrs = new JSONObject()
                     .put("someAttrId", "someValue")
                     .put("someAttrId_identifier", "ShouldBeSkipped");
 
-            JSONObject params = new JSONObject()
-                    .put(ATTRIBUTE_SET_ID_KEY, ATTR_SET_ID)
-                    .put("attributes", attrs);
-
             String content = new JSONObject()
-                    .put(PARAMS_KEY, params)
+                    .put(PARAMS_KEY, new JSONObject()
+                            .put(ATTRIBUTE_SET_ID_KEY, ATTR_SET_ID)
+                            .put("attributes", attrs))
                     .toString();
 
-            AttributeSetInstanceActionHandler handler = new AttributeSetInstanceActionHandler();
-            JSONObject result = handler.execute(new HashMap<>(), content);
+            JSONObject result = new AttributeSetInstanceActionHandler()
+                    .execute(new HashMap<>(), content);
 
-            // The executeSave will fail when trying DalConnectionProvider, caught by execute
             assertNotNull(result);
             assertTrue(result.has(STATUS_KEY));
         }
@@ -685,27 +563,17 @@ class AttributeSetInstanceActionHandlerTest {
              MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
              MockedStatic<RequestContext> reqCtxMock = mockStatic(RequestContext.class)) {
 
-            OBDal obDal = mock(OBDal.class);
-            dalMock.when(OBDal::getInstance).thenReturn(obDal);
-
-            RequestContext requestContext = mock(RequestContext.class);
-            reqCtxMock.when(RequestContext::get).thenReturn(requestContext);
-            VariablesSecureApp vars = mock(VariablesSecureApp.class);
-            when(requestContext.getVariablesSecureApp()).thenReturn(vars);
-
-            JSONObject params = new JSONObject()
-                    .put(ATTRIBUTE_SET_ID_KEY, ATTR_SET_ID)
-                    .put(EXPIRATION_DATE_KEY, "2025-12-31");
+            mockOBDal(dalMock);
+            mockRequestContext(reqCtxMock);
 
             String content = new JSONObject()
-                    .put(PARAMS_KEY, params)
+                    .put(PARAMS_KEY, new JSONObject()
+                            .put(ATTRIBUTE_SET_ID_KEY, ATTR_SET_ID)
+                            .put(EXPIRATION_DATE_KEY, "2025-12-31"))
                     .toString();
 
-            AttributeSetInstanceActionHandler handler = new AttributeSetInstanceActionHandler();
-            JSONObject result = handler.execute(new HashMap<>(), content);
-
-            // This exercises the convertToClassicDateFormat path (yyyy-MM-dd -> dd-MM-yyyy)
-            assertNotNull(result);
+            // Exercises the convertToClassicDateFormat path (yyyy-MM-dd -> dd-MM-yyyy)
+            assertNotNull(new AttributeSetInstanceActionHandler().execute(new HashMap<>(), content));
         }
     }
 
@@ -714,9 +582,8 @@ class AttributeSetInstanceActionHandlerTest {
     @Test
     void executeHandlesExceptionAndReturnsError() throws Exception {
         try (MockedStatic<OBContext> ctxMock = mockStatic(OBContext.class)) {
-            // Passing invalid JSON will cause an exception in the execute method
-            AttributeSetInstanceActionHandler handler = new AttributeSetInstanceActionHandler();
-            JSONObject result = handler.execute(new HashMap<>(), "invalid json");
+            JSONObject result = new AttributeSetInstanceActionHandler()
+                    .execute(new HashMap<>(), "invalid json");
 
             assertEquals(ERROR_STATUS, result.getString(STATUS_KEY));
             assertNotNull(result.getString(MESSAGE_KEY));
@@ -729,24 +596,16 @@ class AttributeSetInstanceActionHandlerTest {
              MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
              MockedStatic<RequestContext> reqCtxMock = mockStatic(RequestContext.class)) {
 
-            OBDal obDal = mock(OBDal.class);
-            dalMock.when(OBDal::getInstance).thenReturn(obDal);
-
-            RequestContext requestContext = mock(RequestContext.class);
-            reqCtxMock.when(RequestContext::get).thenReturn(requestContext);
-            VariablesSecureApp vars = mock(VariablesSecureApp.class);
-            when(requestContext.getVariablesSecureApp()).thenReturn(vars);
-
-            JSONObject params = new JSONObject()
-                    .put(ATTRIBUTE_SET_ID_KEY, ATTR_SET_ID);
+            mockOBDal(dalMock);
+            mockRequestContext(reqCtxMock);
 
             // No _buttonValue — should default to "DONE" and go to executeSave
             String content = new JSONObject()
-                    .put(PARAMS_KEY, params)
+                    .put(PARAMS_KEY, new JSONObject().put(ATTRIBUTE_SET_ID_KEY, ATTR_SET_ID))
                     .toString();
 
-            AttributeSetInstanceActionHandler handler = new AttributeSetInstanceActionHandler();
-            JSONObject result = handler.execute(new HashMap<>(), content);
+            JSONObject result = new AttributeSetInstanceActionHandler()
+                    .execute(new HashMap<>(), content);
 
             assertNotNull(result);
             assertTrue(result.has(STATUS_KEY));
@@ -759,24 +618,16 @@ class AttributeSetInstanceActionHandlerTest {
              MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
              MockedStatic<RequestContext> reqCtxMock = mockStatic(RequestContext.class)) {
 
-            OBDal obDal = mock(OBDal.class);
-            dalMock.when(OBDal::getInstance).thenReturn(obDal);
-
-            RequestContext requestContext = mock(RequestContext.class);
-            reqCtxMock.when(RequestContext::get).thenReturn(requestContext);
-            VariablesSecureApp vars = mock(VariablesSecureApp.class);
-            when(requestContext.getVariablesSecureApp()).thenReturn(vars);
-
-            JSONObject params = new JSONObject()
-                    .put(ATTRIBUTE_SET_ID_KEY, ATTR_SET_ID);
+            mockOBDal(dalMock);
+            mockRequestContext(reqCtxMock);
 
             String content = new JSONObject()
                     .put(BUTTON_VALUE_KEY, "DONE")
-                    .put(PARAMS_KEY, params)
+                    .put(PARAMS_KEY, new JSONObject().put(ATTRIBUTE_SET_ID_KEY, ATTR_SET_ID))
                     .toString();
 
-            AttributeSetInstanceActionHandler handler = new AttributeSetInstanceActionHandler();
-            JSONObject result = handler.execute(new HashMap<>(), content);
+            JSONObject result = new AttributeSetInstanceActionHandler()
+                    .execute(new HashMap<>(), content);
 
             assertNotNull(result);
             assertTrue(result.has(STATUS_KEY));
@@ -787,44 +638,24 @@ class AttributeSetInstanceActionHandlerTest {
 
     @Test
     void convertToClassicDateFormatConvertsValidDate() throws Exception {
-        // We test this indirectly through executeSave by providing a date in
-        // yyyy-MM-dd format and verifying it reaches the handler without error.
-        // Direct testing via reflection for completeness:
-        java.lang.reflect.Method method = AttributeSetInstanceActionHandler.class
-                .getDeclaredMethod(METHOD_CONVERT_DATE, String.class);
-        method.setAccessible(true);
-
-        String result = (String) method.invoke(null, EXPIRATION_DATE_VAL);
+        String result = (String) getConvertDateMethod().invoke(null, EXPIRATION_DATE_VAL);
         assertEquals("15-06-2025", result);
     }
 
     @Test
     void convertToClassicDateFormatReturnsEmptyForEmpty() throws Exception {
-        java.lang.reflect.Method method = AttributeSetInstanceActionHandler.class
-                .getDeclaredMethod(METHOD_CONVERT_DATE, String.class);
-        method.setAccessible(true);
-
-        String result = (String) method.invoke(null, "");
+        String result = (String) getConvertDateMethod().invoke(null, "");
         assertEquals("", result);
     }
 
     @Test
     void convertToClassicDateFormatReturnsNullForNull() throws Exception {
-        java.lang.reflect.Method method = AttributeSetInstanceActionHandler.class
-                .getDeclaredMethod(METHOD_CONVERT_DATE, String.class);
-        method.setAccessible(true);
-
-        String result = (String) method.invoke(null, (String) null);
-        assertEquals(null, result);
+        assertEquals(null, getConvertDateMethod().invoke(null, (String) null));
     }
 
     @Test
     void convertToClassicDateFormatReturnsUnchangedForNonMatchingFormat() throws Exception {
-        java.lang.reflect.Method method = AttributeSetInstanceActionHandler.class
-                .getDeclaredMethod(METHOD_CONVERT_DATE, String.class);
-        method.setAccessible(true);
-
-        String result = (String) method.invoke(null, "15/06/2025");
+        String result = (String) getConvertDateMethod().invoke(null, "15/06/2025");
         assertEquals("15/06/2025", result);
     }
 
@@ -832,37 +663,22 @@ class AttributeSetInstanceActionHandlerTest {
 
     @Test
     void replaceRemovesSpecialCharacters() throws Exception {
-        java.lang.reflect.Method method = AttributeSetInstanceActionHandler.class
-                .getDeclaredMethod(METHOD_REPLACE, String.class);
-        method.setAccessible(true);
-
         AttributeSetInstanceActionHandler handler = new AttributeSetInstanceActionHandler();
-
-        String result = (String) method.invoke(handler, "Test Name (With #Chars, & More)");
+        String result = (String) getReplaceMethod().invoke(handler, "Test Name (With #Chars, & More)");
         assertEquals("TestNameWithCharsMore", result);
     }
 
     @Test
     void replaceReturnsEmptyForNull() throws Exception {
-        java.lang.reflect.Method method = AttributeSetInstanceActionHandler.class
-                .getDeclaredMethod(METHOD_REPLACE, String.class);
-        method.setAccessible(true);
-
         AttributeSetInstanceActionHandler handler = new AttributeSetInstanceActionHandler();
-
-        String result = (String) method.invoke(handler, (String) null);
+        String result = (String) getReplaceMethod().invoke(handler, (String) null);
         assertEquals("", result);
     }
 
     @Test
     void replaceReturnsUnchangedForCleanString() throws Exception {
-        java.lang.reflect.Method method = AttributeSetInstanceActionHandler.class
-                .getDeclaredMethod(METHOD_REPLACE, String.class);
-        method.setAccessible(true);
-
         AttributeSetInstanceActionHandler handler = new AttributeSetInstanceActionHandler();
-
-        String result = (String) method.invoke(handler, "CleanName");
+        String result = (String) getReplaceMethod().invoke(handler, "CleanName");
         assertEquals("CleanName", result);
     }
 
@@ -873,18 +689,9 @@ class AttributeSetInstanceActionHandlerTest {
         try (MockedStatic<OBContext> ctxMock = mockStatic(OBContext.class);
              MockedStatic<OBDal> dalMock = mockStatic(OBDal.class)) {
 
-            OBDal obDal = mock(OBDal.class);
-            dalMock.when(OBDal::getInstance).thenReturn(obDal);
+            OBDal obDal = mockOBDal(dalMock);
+            mockAttributeSet(obDal, SET_NAME_VAL, false, false, false);
 
-            AttributeSet attrSet = mock(AttributeSet.class);
-            when(obDal.get(AttributeSet.class, ATTR_SET_ID)).thenReturn(attrSet);
-            when(attrSet.getId()).thenReturn(ATTR_SET_ID);
-            when(attrSet.getName()).thenReturn(SET_NAME_VAL);
-            when(attrSet.isLot()).thenReturn(false);
-            when(attrSet.isSerialNo()).thenReturn(false);
-            when(attrSet.isExpirationDate()).thenReturn(false);
-
-            // A non-list attribute
             Attribute attr = mock(Attribute.class);
             when(attr.getId()).thenReturn("attrId2");
             when(attr.getName()).thenReturn("Size");
@@ -898,17 +705,10 @@ class AttributeSetInstanceActionHandlerTest {
             @SuppressWarnings("unchecked")
             OBCriteria<AttributeUse> useCriteria = mock(OBCriteria.class);
             when(obDal.createCriteria(AttributeUse.class)).thenReturn(useCriteria);
-            List<AttributeUse> useList = new ArrayList<>();
-            useList.add(use);
-            when(useCriteria.list()).thenReturn(useList);
+            when(useCriteria.list()).thenReturn(List.of(use));
 
-            AttributeSetInstanceActionHandler handler = new AttributeSetInstanceActionHandler();
-            String content = new JSONObject()
-                    .put(BUTTON_VALUE_KEY, BUTTON_VALUE_CONFIG)
-                    .put(PARAMS_KEY, new JSONObject().put(ATTRIBUTE_SET_ID_KEY, ATTR_SET_ID))
-                    .toString();
-
-            JSONObject result = handler.execute(new HashMap<>(), content);
+            JSONObject result = new AttributeSetInstanceActionHandler()
+                    .execute(new HashMap<>(), buildConfigContent());
 
             assertEquals(SUCCESS_STATUS, result.getString(STATUS_KEY));
             JSONObject customAttr = result.getJSONArray(CUSTOM_ATTRIBUTES_KEY).getJSONObject(0);
