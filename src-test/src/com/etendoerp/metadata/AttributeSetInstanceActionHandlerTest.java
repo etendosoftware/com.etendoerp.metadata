@@ -4,8 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
@@ -49,6 +47,22 @@ class AttributeSetInstanceActionHandlerTest {
     private static final String MESSAGE_KEY = "message";
     private static final String SUCCESS_STATUS = "Success";
     private static final String ERROR_STATUS = "Error";
+    private static final String BUTTON_VALUE_CONFIG = "CONFIG";
+    private static final String BUTTON_VALUE_FETCH = "FETCH";
+    private static final String BUTTON_VALUE_KEY = "_buttonValue";
+    private static final String PARAMS_KEY = "_params";
+    private static final String ATTRIBUTE_SET_ID_KEY = "attributeSetId";
+    private static final String INSTANCE_ID_KEY = "instanceId";
+    private static final String CUSTOM_ATTRIBUTES_KEY = "customAttributes";
+    private static final String SERIAL_NO_KEY = "serialNo";
+    private static final String SERIAL_NO_VAL = "SN-001";
+    private static final String EXPIRATION_DATE_KEY = "expirationDate";
+    private static final String EXPIRATION_DATE_VAL = "2025-06-15";
+    private static final String VALUES_KEY = "values";
+    private static final String FREE_TEXT_VALUE = "FreeTextValue";
+    private static final String SET_NAME_VAL = "SetName";
+    private static final String METHOD_CONVERT_DATE = "convertToClassicDateFormat";
+    private static final String METHOD_REPLACE = "replace";
 
     // ======================== executeConfig tests ========================
 
@@ -63,8 +77,8 @@ class AttributeSetInstanceActionHandlerTest {
 
             AttributeSetInstanceActionHandler handler = new AttributeSetInstanceActionHandler();
             String content = new JSONObject()
-                    .put("_buttonValue", "CONFIG")
-                    .put("_params", new JSONObject().put("attributeSetId", ATTR_SET_ID))
+                    .put(BUTTON_VALUE_KEY, BUTTON_VALUE_CONFIG)
+                    .put(PARAMS_KEY, new JSONObject().put(ATTRIBUTE_SET_ID_KEY, ATTR_SET_ID))
                     .toString();
 
             JSONObject result = handler.execute(new HashMap<>(), content);
@@ -98,8 +112,8 @@ class AttributeSetInstanceActionHandlerTest {
 
             AttributeSetInstanceActionHandler handler = new AttributeSetInstanceActionHandler();
             String content = new JSONObject()
-                    .put("_buttonValue", "CONFIG")
-                    .put("_params", new JSONObject().put("attributeSetId", ATTR_SET_ID))
+                    .put(BUTTON_VALUE_KEY, BUTTON_VALUE_CONFIG)
+                    .put(PARAMS_KEY, new JSONObject().put(ATTRIBUTE_SET_ID_KEY, ATTR_SET_ID))
                     .toString();
 
             JSONObject result = handler.execute(new HashMap<>(), content);
@@ -125,7 +139,7 @@ class AttributeSetInstanceActionHandlerTest {
             AttributeSet attrSet = mock(AttributeSet.class);
             when(obDal.get(AttributeSet.class, ATTR_SET_ID)).thenReturn(attrSet);
             when(attrSet.getId()).thenReturn(ATTR_SET_ID);
-            when(attrSet.getName()).thenReturn("SetName");
+            when(attrSet.getName()).thenReturn(SET_NAME_VAL);
             when(attrSet.isLot()).thenReturn(false);
             when(attrSet.isSerialNo()).thenReturn(false);
             when(attrSet.isExpirationDate()).thenReturn(false);
@@ -162,20 +176,20 @@ class AttributeSetInstanceActionHandlerTest {
 
             AttributeSetInstanceActionHandler handler = new AttributeSetInstanceActionHandler();
             String content = new JSONObject()
-                    .put("_buttonValue", "CONFIG")
-                    .put("_params", new JSONObject().put("attributeSetId", ATTR_SET_ID))
+                    .put(BUTTON_VALUE_KEY, BUTTON_VALUE_CONFIG)
+                    .put(PARAMS_KEY, new JSONObject().put(ATTRIBUTE_SET_ID_KEY, ATTR_SET_ID))
                     .toString();
 
             JSONObject result = handler.execute(new HashMap<>(), content);
 
             assertEquals(SUCCESS_STATUS, result.getString(STATUS_KEY));
-            assertEquals(1, result.getJSONArray("customAttributes").length());
-            JSONObject customAttr = result.getJSONArray("customAttributes").getJSONObject(0);
+            assertEquals(1, result.getJSONArray(CUSTOM_ATTRIBUTES_KEY).length());
+            JSONObject customAttr = result.getJSONArray(CUSTOM_ATTRIBUTES_KEY).getJSONObject(0);
             assertEquals("attrId1", customAttr.getString("id"));
             assertEquals("Color", customAttr.getString("name"));
             assertTrue(customAttr.getBoolean("isList"));
-            assertEquals(1, customAttr.getJSONArray("values").length());
-            assertEquals("Red", customAttr.getJSONArray("values").getJSONObject(0).getString("name"));
+            assertEquals(1, customAttr.getJSONArray(VALUES_KEY).length());
+            assertEquals("Red", customAttr.getJSONArray(VALUES_KEY).getJSONObject(0).getString("name"));
         }
     }
 
@@ -190,7 +204,7 @@ class AttributeSetInstanceActionHandlerTest {
             AttributeSet attrSet = mock(AttributeSet.class);
             when(obDal.get(AttributeSet.class, ATTR_SET_ID)).thenReturn(attrSet);
             when(attrSet.getId()).thenReturn(ATTR_SET_ID);
-            when(attrSet.getName()).thenReturn("SetName");
+            when(attrSet.getName()).thenReturn(SET_NAME_VAL);
             when(attrSet.isLot()).thenReturn(false);
             when(attrSet.isSerialNo()).thenReturn(false);
             when(attrSet.isExpirationDate()).thenReturn(false);
@@ -208,14 +222,14 @@ class AttributeSetInstanceActionHandlerTest {
 
             AttributeSetInstanceActionHandler handler = new AttributeSetInstanceActionHandler();
             String content = new JSONObject()
-                    .put("_buttonValue", "CONFIG")
-                    .put("_params", new JSONObject().put("attributeSetId", ATTR_SET_ID))
+                    .put(BUTTON_VALUE_KEY, BUTTON_VALUE_CONFIG)
+                    .put(PARAMS_KEY, new JSONObject().put(ATTRIBUTE_SET_ID_KEY, ATTR_SET_ID))
                     .toString();
 
             JSONObject result = handler.execute(new HashMap<>(), content);
 
             assertEquals(SUCCESS_STATUS, result.getString(STATUS_KEY));
-            assertEquals(0, result.getJSONArray("customAttributes").length());
+            assertEquals(0, result.getJSONArray(CUSTOM_ATTRIBUTES_KEY).length());
         }
     }
 
@@ -230,7 +244,7 @@ class AttributeSetInstanceActionHandlerTest {
             AttributeSet attrSet = mock(AttributeSet.class);
             when(obDal.get(AttributeSet.class, ATTR_SET_ID)).thenReturn(attrSet);
             when(attrSet.getId()).thenReturn(ATTR_SET_ID);
-            when(attrSet.getName()).thenReturn("SetName");
+            when(attrSet.getName()).thenReturn(SET_NAME_VAL);
             when(attrSet.isLot()).thenReturn(false);
             when(attrSet.isSerialNo()).thenReturn(false);
             when(attrSet.isExpirationDate()).thenReturn(true);
@@ -243,8 +257,8 @@ class AttributeSetInstanceActionHandlerTest {
 
             AttributeSetInstanceActionHandler handler = new AttributeSetInstanceActionHandler();
             String content = new JSONObject()
-                    .put("_buttonValue", "CONFIG")
-                    .put("_params", new JSONObject().put("attributeSetId", ATTR_SET_ID))
+                    .put(BUTTON_VALUE_KEY, BUTTON_VALUE_CONFIG)
+                    .put(PARAMS_KEY, new JSONObject().put(ATTRIBUTE_SET_ID_KEY, ATTR_SET_ID))
                     .toString();
 
             JSONObject result = handler.execute(new HashMap<>(), content);
@@ -265,8 +279,8 @@ class AttributeSetInstanceActionHandlerTest {
 
             AttributeSetInstanceActionHandler handler = new AttributeSetInstanceActionHandler();
             String content = new JSONObject()
-                    .put("_buttonValue", "FETCH")
-                    .put("_params", new JSONObject().put("instanceId", ""))
+                    .put(BUTTON_VALUE_KEY, BUTTON_VALUE_FETCH)
+                    .put(PARAMS_KEY, new JSONObject().put(INSTANCE_ID_KEY, ""))
                     .toString();
 
             JSONObject result = handler.execute(new HashMap<>(), content);
@@ -286,8 +300,8 @@ class AttributeSetInstanceActionHandlerTest {
 
             AttributeSetInstanceActionHandler handler = new AttributeSetInstanceActionHandler();
             String content = new JSONObject()
-                    .put("_buttonValue", "FETCH")
-                    .put("_params", new JSONObject().put("instanceId", "0"))
+                    .put(BUTTON_VALUE_KEY, BUTTON_VALUE_FETCH)
+                    .put(PARAMS_KEY, new JSONObject().put(INSTANCE_ID_KEY, "0"))
                     .toString();
 
             JSONObject result = handler.execute(new HashMap<>(), content);
@@ -308,8 +322,8 @@ class AttributeSetInstanceActionHandlerTest {
 
             AttributeSetInstanceActionHandler handler = new AttributeSetInstanceActionHandler();
             String content = new JSONObject()
-                    .put("_buttonValue", "FETCH")
-                    .put("_params", new JSONObject().put("instanceId", INSTANCE_ID_VAL))
+                    .put(BUTTON_VALUE_KEY, BUTTON_VALUE_FETCH)
+                    .put(PARAMS_KEY, new JSONObject().put(INSTANCE_ID_KEY, INSTANCE_ID_VAL))
                     .toString();
 
             JSONObject result = handler.execute(new HashMap<>(), content);
@@ -332,7 +346,7 @@ class AttributeSetInstanceActionHandlerTest {
             when(asi.getId()).thenReturn(INSTANCE_ID_VAL);
             when(asi.getDescription()).thenReturn("Lot #123");
             when(asi.getLotName()).thenReturn("LOT-A");
-            when(asi.getSerialNo()).thenReturn("SN-001");
+            when(asi.getSerialNo()).thenReturn(SERIAL_NO_VAL);
             // 2025-06-15
             @SuppressWarnings("deprecation")
             Date expDate = new Date(125, 5, 15);
@@ -345,18 +359,18 @@ class AttributeSetInstanceActionHandlerTest {
 
             AttributeSetInstanceActionHandler handler = new AttributeSetInstanceActionHandler();
             String content = new JSONObject()
-                    .put("_buttonValue", "FETCH")
-                    .put("_params", new JSONObject().put("instanceId", INSTANCE_ID_VAL))
+                    .put(BUTTON_VALUE_KEY, BUTTON_VALUE_FETCH)
+                    .put(PARAMS_KEY, new JSONObject().put(INSTANCE_ID_KEY, INSTANCE_ID_VAL))
                     .toString();
 
             JSONObject result = handler.execute(new HashMap<>(), content);
 
             assertEquals(SUCCESS_STATUS, result.getString(STATUS_KEY));
-            assertEquals(INSTANCE_ID_VAL, result.getString("instanceId"));
+            assertEquals(INSTANCE_ID_VAL, result.getString(INSTANCE_ID_KEY));
             assertEquals("Lot #123", result.getString("description"));
             assertEquals("LOT-A", result.getString("lotName"));
-            assertEquals("SN-001", result.getString("serialNo"));
-            assertEquals("2025-06-15", result.getString("expirationDate"));
+            assertEquals(SERIAL_NO_VAL, result.getString(SERIAL_NO_KEY));
+            assertEquals(EXPIRATION_DATE_VAL, result.getString(EXPIRATION_DATE_KEY));
             assertEquals("", result.getString("guaranteeDate"));
         }
     }
@@ -384,17 +398,17 @@ class AttributeSetInstanceActionHandlerTest {
 
             AttributeSetInstanceActionHandler handler = new AttributeSetInstanceActionHandler();
             String content = new JSONObject()
-                    .put("_buttonValue", "FETCH")
-                    .put("_params", new JSONObject().put("instanceId", INSTANCE_ID_VAL))
+                    .put(BUTTON_VALUE_KEY, BUTTON_VALUE_FETCH)
+                    .put(PARAMS_KEY, new JSONObject().put(INSTANCE_ID_KEY, INSTANCE_ID_VAL))
                     .toString();
 
             JSONObject result = handler.execute(new HashMap<>(), content);
 
             assertEquals(SUCCESS_STATUS, result.getString(STATUS_KEY));
-            assertEquals("", result.getString("expirationDate"));
+            assertEquals("", result.getString(EXPIRATION_DATE_KEY));
             assertEquals("", result.getString("description"));
             assertEquals("", result.getString("lotName"));
-            assertEquals("", result.getString("serialNo"));
+            assertEquals("", result.getString(SERIAL_NO_KEY));
         }
     }
 
@@ -436,13 +450,13 @@ class AttributeSetInstanceActionHandlerTest {
 
             AttributeSetInstanceActionHandler handler = new AttributeSetInstanceActionHandler();
             String content = new JSONObject()
-                    .put("_buttonValue", "FETCH")
-                    .put("_params", new JSONObject().put("instanceId", INSTANCE_ID_VAL))
+                    .put(BUTTON_VALUE_KEY, BUTTON_VALUE_FETCH)
+                    .put(PARAMS_KEY, new JSONObject().put(INSTANCE_ID_KEY, INSTANCE_ID_VAL))
                     .toString();
 
             JSONObject result = handler.execute(new HashMap<>(), content);
 
-            JSONObject customAttrs = result.getJSONObject("customAttributes");
+            JSONObject customAttrs = result.getJSONObject(CUSTOM_ATTRIBUTES_KEY);
             assertEquals("selectedValueId", customAttrs.getString("customAttrId"));
             assertEquals("Red Color", customAttrs.getString("customAttrId_identifier"));
         }
@@ -470,7 +484,7 @@ class AttributeSetInstanceActionHandlerTest {
             AttributeInstance ai = mock(AttributeInstance.class);
             when(ai.getAttribute()).thenReturn(attr);
             when(ai.getAttributeValue()).thenReturn(null);
-            when(ai.getSearchKey()).thenReturn("FreeTextValue");
+            when(ai.getSearchKey()).thenReturn(FREE_TEXT_VALUE);
 
             List<AttributeInstance> aiList = new ArrayList<>();
             aiList.add(ai);
@@ -482,15 +496,15 @@ class AttributeSetInstanceActionHandlerTest {
 
             AttributeSetInstanceActionHandler handler = new AttributeSetInstanceActionHandler();
             String content = new JSONObject()
-                    .put("_buttonValue", "FETCH")
-                    .put("_params", new JSONObject().put("instanceId", INSTANCE_ID_VAL))
+                    .put(BUTTON_VALUE_KEY, BUTTON_VALUE_FETCH)
+                    .put(PARAMS_KEY, new JSONObject().put(INSTANCE_ID_KEY, INSTANCE_ID_VAL))
                     .toString();
 
             JSONObject result = handler.execute(new HashMap<>(), content);
 
-            JSONObject customAttrs = result.getJSONObject("customAttributes");
-            assertEquals("FreeTextValue", customAttrs.getString("freeTextAttrId"));
-            assertEquals("FreeTextValue", customAttrs.getString("freeTextAttrId_identifier"));
+            JSONObject customAttrs = result.getJSONObject(CUSTOM_ATTRIBUTES_KEY);
+            assertEquals(FREE_TEXT_VALUE, customAttrs.getString("freeTextAttrId"));
+            assertEquals(FREE_TEXT_VALUE, customAttrs.getString("freeTextAttrId_identifier"));
         }
     }
 
@@ -524,14 +538,14 @@ class AttributeSetInstanceActionHandlerTest {
 
             AttributeSetInstanceActionHandler handler = new AttributeSetInstanceActionHandler();
             String content = new JSONObject()
-                    .put("_buttonValue", "FETCH")
-                    .put("_params", new JSONObject().put("instanceId", INSTANCE_ID_VAL))
+                    .put(BUTTON_VALUE_KEY, BUTTON_VALUE_FETCH)
+                    .put(PARAMS_KEY, new JSONObject().put(INSTANCE_ID_KEY, INSTANCE_ID_VAL))
                     .toString();
 
             JSONObject result = handler.execute(new HashMap<>(), content);
 
             assertEquals(SUCCESS_STATUS, result.getString(STATUS_KEY));
-            assertEquals(0, result.getJSONObject("customAttributes").length());
+            assertEquals(0, result.getJSONObject(CUSTOM_ATTRIBUTES_KEY).length());
         }
     }
 
@@ -569,14 +583,14 @@ class AttributeSetInstanceActionHandlerTest {
 
             AttributeSetInstanceActionHandler handler = new AttributeSetInstanceActionHandler();
             String content = new JSONObject()
-                    .put("_buttonValue", "FETCH")
-                    .put("_params", new JSONObject().put("instanceId", INSTANCE_ID_VAL))
+                    .put(BUTTON_VALUE_KEY, BUTTON_VALUE_FETCH)
+                    .put(PARAMS_KEY, new JSONObject().put(INSTANCE_ID_KEY, INSTANCE_ID_VAL))
                     .toString();
 
             JSONObject result = handler.execute(new HashMap<>(), content);
 
             assertEquals(SUCCESS_STATUS, result.getString(STATUS_KEY));
-            assertEquals(0, result.getJSONObject("customAttributes").length());
+            assertEquals(0, result.getJSONObject(CUSTOM_ATTRIBUTES_KEY).length());
         }
     }
 
@@ -604,11 +618,11 @@ class AttributeSetInstanceActionHandlerTest {
 
             AttributeSetInstanceActionHandler handler = new AttributeSetInstanceActionHandler();
             JSONObject params = new JSONObject()
-                    .put("attributeSetId", ATTR_SET_ID)
-                    .put("instanceId", INSTANCE_ID_VAL)
+                    .put(ATTRIBUTE_SET_ID_KEY, ATTR_SET_ID)
+                    .put(INSTANCE_ID_KEY, INSTANCE_ID_VAL)
                     .put("lot", "LOT-1")
-                    .put("serialNo", "SN-001")
-                    .put("expirationDate", "2025-06-15")
+                    .put(SERIAL_NO_KEY, SERIAL_NO_VAL)
+                    .put(EXPIRATION_DATE_KEY, EXPIRATION_DATE_VAL)
                     .put("isLocked", "N")
                     .put("lockDescription", "")
                     .put("windowId", "testWindow")
@@ -616,7 +630,7 @@ class AttributeSetInstanceActionHandlerTest {
                     .put("productId", "testProduct");
 
             String content = new JSONObject()
-                    .put("_params", params)
+                    .put(PARAMS_KEY, params)
                     .toString();
 
             // This will go to executeSave which creates DalConnectionProvider(true)
@@ -649,11 +663,11 @@ class AttributeSetInstanceActionHandlerTest {
                     .put("someAttrId_identifier", "ShouldBeSkipped");
 
             JSONObject params = new JSONObject()
-                    .put("attributeSetId", ATTR_SET_ID)
+                    .put(ATTRIBUTE_SET_ID_KEY, ATTR_SET_ID)
                     .put("attributes", attrs);
 
             String content = new JSONObject()
-                    .put("_params", params)
+                    .put(PARAMS_KEY, params)
                     .toString();
 
             AttributeSetInstanceActionHandler handler = new AttributeSetInstanceActionHandler();
@@ -680,11 +694,11 @@ class AttributeSetInstanceActionHandlerTest {
             when(requestContext.getVariablesSecureApp()).thenReturn(vars);
 
             JSONObject params = new JSONObject()
-                    .put("attributeSetId", ATTR_SET_ID)
-                    .put("expirationDate", "2025-12-31");
+                    .put(ATTRIBUTE_SET_ID_KEY, ATTR_SET_ID)
+                    .put(EXPIRATION_DATE_KEY, "2025-12-31");
 
             String content = new JSONObject()
-                    .put("_params", params)
+                    .put(PARAMS_KEY, params)
                     .toString();
 
             AttributeSetInstanceActionHandler handler = new AttributeSetInstanceActionHandler();
@@ -724,11 +738,11 @@ class AttributeSetInstanceActionHandlerTest {
             when(requestContext.getVariablesSecureApp()).thenReturn(vars);
 
             JSONObject params = new JSONObject()
-                    .put("attributeSetId", ATTR_SET_ID);
+                    .put(ATTRIBUTE_SET_ID_KEY, ATTR_SET_ID);
 
             // No _buttonValue — should default to "DONE" and go to executeSave
             String content = new JSONObject()
-                    .put("_params", params)
+                    .put(PARAMS_KEY, params)
                     .toString();
 
             AttributeSetInstanceActionHandler handler = new AttributeSetInstanceActionHandler();
@@ -754,11 +768,11 @@ class AttributeSetInstanceActionHandlerTest {
             when(requestContext.getVariablesSecureApp()).thenReturn(vars);
 
             JSONObject params = new JSONObject()
-                    .put("attributeSetId", ATTR_SET_ID);
+                    .put(ATTRIBUTE_SET_ID_KEY, ATTR_SET_ID);
 
             String content = new JSONObject()
-                    .put("_buttonValue", "DONE")
-                    .put("_params", params)
+                    .put(BUTTON_VALUE_KEY, "DONE")
+                    .put(PARAMS_KEY, params)
                     .toString();
 
             AttributeSetInstanceActionHandler handler = new AttributeSetInstanceActionHandler();
@@ -777,17 +791,17 @@ class AttributeSetInstanceActionHandlerTest {
         // yyyy-MM-dd format and verifying it reaches the handler without error.
         // Direct testing via reflection for completeness:
         java.lang.reflect.Method method = AttributeSetInstanceActionHandler.class
-                .getDeclaredMethod("convertToClassicDateFormat", String.class);
+                .getDeclaredMethod(METHOD_CONVERT_DATE, String.class);
         method.setAccessible(true);
 
-        String result = (String) method.invoke(null, "2025-06-15");
+        String result = (String) method.invoke(null, EXPIRATION_DATE_VAL);
         assertEquals("15-06-2025", result);
     }
 
     @Test
     void convertToClassicDateFormatReturnsEmptyForEmpty() throws Exception {
         java.lang.reflect.Method method = AttributeSetInstanceActionHandler.class
-                .getDeclaredMethod("convertToClassicDateFormat", String.class);
+                .getDeclaredMethod(METHOD_CONVERT_DATE, String.class);
         method.setAccessible(true);
 
         String result = (String) method.invoke(null, "");
@@ -797,7 +811,7 @@ class AttributeSetInstanceActionHandlerTest {
     @Test
     void convertToClassicDateFormatReturnsNullForNull() throws Exception {
         java.lang.reflect.Method method = AttributeSetInstanceActionHandler.class
-                .getDeclaredMethod("convertToClassicDateFormat", String.class);
+                .getDeclaredMethod(METHOD_CONVERT_DATE, String.class);
         method.setAccessible(true);
 
         String result = (String) method.invoke(null, (String) null);
@@ -807,7 +821,7 @@ class AttributeSetInstanceActionHandlerTest {
     @Test
     void convertToClassicDateFormatReturnsUnchangedForNonMatchingFormat() throws Exception {
         java.lang.reflect.Method method = AttributeSetInstanceActionHandler.class
-                .getDeclaredMethod("convertToClassicDateFormat", String.class);
+                .getDeclaredMethod(METHOD_CONVERT_DATE, String.class);
         method.setAccessible(true);
 
         String result = (String) method.invoke(null, "15/06/2025");
@@ -819,7 +833,7 @@ class AttributeSetInstanceActionHandlerTest {
     @Test
     void replaceRemovesSpecialCharacters() throws Exception {
         java.lang.reflect.Method method = AttributeSetInstanceActionHandler.class
-                .getDeclaredMethod("replace", String.class);
+                .getDeclaredMethod(METHOD_REPLACE, String.class);
         method.setAccessible(true);
 
         AttributeSetInstanceActionHandler handler = new AttributeSetInstanceActionHandler();
@@ -831,7 +845,7 @@ class AttributeSetInstanceActionHandlerTest {
     @Test
     void replaceReturnsEmptyForNull() throws Exception {
         java.lang.reflect.Method method = AttributeSetInstanceActionHandler.class
-                .getDeclaredMethod("replace", String.class);
+                .getDeclaredMethod(METHOD_REPLACE, String.class);
         method.setAccessible(true);
 
         AttributeSetInstanceActionHandler handler = new AttributeSetInstanceActionHandler();
@@ -843,7 +857,7 @@ class AttributeSetInstanceActionHandlerTest {
     @Test
     void replaceReturnsUnchangedForCleanString() throws Exception {
         java.lang.reflect.Method method = AttributeSetInstanceActionHandler.class
-                .getDeclaredMethod("replace", String.class);
+                .getDeclaredMethod(METHOD_REPLACE, String.class);
         method.setAccessible(true);
 
         AttributeSetInstanceActionHandler handler = new AttributeSetInstanceActionHandler();
@@ -865,7 +879,7 @@ class AttributeSetInstanceActionHandlerTest {
             AttributeSet attrSet = mock(AttributeSet.class);
             when(obDal.get(AttributeSet.class, ATTR_SET_ID)).thenReturn(attrSet);
             when(attrSet.getId()).thenReturn(ATTR_SET_ID);
-            when(attrSet.getName()).thenReturn("SetName");
+            when(attrSet.getName()).thenReturn(SET_NAME_VAL);
             when(attrSet.isLot()).thenReturn(false);
             when(attrSet.isSerialNo()).thenReturn(false);
             when(attrSet.isExpirationDate()).thenReturn(false);
@@ -890,19 +904,19 @@ class AttributeSetInstanceActionHandlerTest {
 
             AttributeSetInstanceActionHandler handler = new AttributeSetInstanceActionHandler();
             String content = new JSONObject()
-                    .put("_buttonValue", "CONFIG")
-                    .put("_params", new JSONObject().put("attributeSetId", ATTR_SET_ID))
+                    .put(BUTTON_VALUE_KEY, BUTTON_VALUE_CONFIG)
+                    .put(PARAMS_KEY, new JSONObject().put(ATTRIBUTE_SET_ID_KEY, ATTR_SET_ID))
                     .toString();
 
             JSONObject result = handler.execute(new HashMap<>(), content);
 
             assertEquals(SUCCESS_STATUS, result.getString(STATUS_KEY));
-            JSONObject customAttr = result.getJSONArray("customAttributes").getJSONObject(0);
+            JSONObject customAttr = result.getJSONArray(CUSTOM_ATTRIBUTES_KEY).getJSONObject(0);
             assertEquals("attrId2", customAttr.getString("id"));
             assertEquals("Size", customAttr.getString("name"));
             assertFalse(customAttr.getBoolean("isList"));
             assertTrue(customAttr.getBoolean("isMandatory"));
-            assertFalse(customAttr.has("values"));
+            assertFalse(customAttr.has(VALUES_KEY));
         }
     }
 }
