@@ -17,9 +17,11 @@
 
 package com.etendoerp.metadata.service;
 
+import org.codehaus.jettison.json.JSONException;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
+import org.mockito.MockedConstruction;
 import org.mockito.junit.MockitoJUnitRunner;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -27,8 +29,14 @@ import org.mockito.quality.Strictness;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 
 import static org.junit.Assert.*;
+import static org.mockito.Mockito.*;
+
+import com.etendoerp.metadata.builders.LabelsBuilder;
+import com.etendoerp.metadata.exceptions.InternalServerException;
 
 /**
  * Test class for LabelsService.
@@ -76,19 +84,56 @@ public class LabelsServiceTest {
 
     /**
      * Tests LabelsService process method exception handling.
-     * 
+     *
      * @throws IOException if an I/O error occurs during processing
      */
     @Test
     public void testProcessWithException() throws IOException {
         LabelsService service = new LabelsService(mockRequest, mockResponse);
-        
+
         // Test that the service can be created and handles exceptions gracefully
         try {
             service.process();
         } catch (Exception e) {
             // Any exception is acceptable in test environment
             assertNotNull("Exception should not be null", e);
+        }
+    }
+
+    /**
+     * Tests that the process method wraps JSONException in InternalServerException.
+     * This covers the catch(JSONException) branch in LabelsService.process().
+     */
+    @Test(expected = InternalServerException.class)
+    public void testProcessThrowsInternalServerExceptionOnJSONException() throws IOException {
+        try (MockedConstruction<LabelsBuilder> builderMock = mockConstruction(LabelsBuilder.class,
+                (mock, context) -> when(mock.toJSON()).thenThrow(new JSONException("test json error")))) {
+            LabelsService service = new LabelsService(mockRequest, mockResponse);
+            service.process();
+        }
+    }
+
+    /**
+     * Tests the successful process execution with a properly mocked LabelsBuilder.
+     * Covers the happy path of process() where LabelsBuilder.toJSON() succeeds.
+     */
+    @Test
+    public void testProcessSuccess() throws Exception {
+        StringWriter stringWriter = new StringWriter();
+        PrintWriter printWriter = new PrintWriter(stringWriter);
+        when(mockResponse.getWriter()).thenReturn(printWriter);
+
+        org.codehaus.jettison.json.JSONObject labelsJson = new org.codehaus.jettison.json.JSONObject();
+        labelsJson.put("label1", "value1");
+
+        try (MockedConstruction<LabelsBuilder> builderMock = mockConstruction(LabelsBuilder.class,
+                (mock, context) -> when(mock.toJSON()).thenReturn(labelsJson))) {
+            LabelsService service = new LabelsService(mockRequest, mockResponse);
+            service.process();
+
+            String output = stringWriter.toString();
+            assertNotNull("Output should not be null", output);
+            assertTrue("Output should contain label data", output.contains("label1"));
         }
     }
 }

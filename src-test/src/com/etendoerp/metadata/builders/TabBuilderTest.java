@@ -5,9 +5,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.function.Consumer;
 
+import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.junit.jupiter.api.Test;
@@ -15,8 +17,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.MockedConstruction;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.openbravo.client.application.DynamicExpressionParser;
 import org.openbravo.client.kernel.KernelUtils;
 import org.openbravo.dal.core.OBContext;
+import org.openbravo.model.ad.access.FieldAccess;
+import org.openbravo.model.ad.access.TabAccess;
 import org.openbravo.model.ad.datamodel.Column;
 import org.openbravo.model.ad.datamodel.Table;
 import org.openbravo.model.ad.system.Language;
@@ -24,6 +29,7 @@ import org.openbravo.model.ad.ui.Tab;
 import org.openbravo.service.json.DataToJsonConverter;
 
 import com.etendoerp.metadata.data.TabProcessor;
+import com.etendoerp.metadata.exceptions.InternalServerException;
 
 /**
  * Unit tests for audit fields functionality in TabBuilder
@@ -383,6 +389,216 @@ class TabBuilderAuditFieldsTest {
         lenient().when(mockTable.getADColumnList()).thenReturn(columns);
         lenient().when(mockTab.getTabLevel()).thenReturn(0L);
         lenient().when(mockKernelUtils.getParentTab(mockTab)).thenReturn(null);
+    }
+
+    /**
+     * Tests that display logic expression is parsed and added when displayLogic is non-blank.
+     */
+    @Test
+    void toJSONWithDisplayLogicParsesExpression() throws Exception {
+        TestContext ctx = setupTestContext();
+        List<Column> columns = createAllAuditColumns();
+        setupBasicMocks(ctx.context, ctx.language, ctx.tab, ctx.table, ctx.kernelUtils, columns);
+        when(ctx.tab.getDisplayLogic()).thenReturn("@Processed@='Y'");
+
+        try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
+             MockedStatic<KernelUtils> mockedKernelUtils = mockStatic(KernelUtils.class);
+             MockedStatic<TabProcessor> mockedTabProcessor = mockStatic(TabProcessor.class);
+             MockedConstruction<DataToJsonConverter> ignoredConverter = mockConstruction(DataToJsonConverter.class,
+                     (mock, context) -> when(mock.toJsonObject(any(), any())).thenReturn(new JSONObject()));
+             MockedConstruction<DynamicExpressionParser> parserMock = mockConstruction(DynamicExpressionParser.class,
+                     (mock, context) -> when(mock.getJSExpression()).thenReturn("OB.context.Processed==='Y'"))) {
+
+            mockedOBContext.when(OBContext::getOBContext).thenReturn(ctx.context);
+            mockedKernelUtils.when(KernelUtils::getInstance).thenReturn(ctx.kernelUtils);
+            mockedTabProcessor.when(() -> TabProcessor.getTabFields(ctx.tab)).thenReturn(new JSONObject());
+
+            TabBuilder tabBuilder = new TabBuilder(ctx.tab, null);
+            JSONObject result = tabBuilder.toJSON();
+
+            assertTrue(result.has("displayLogicExpression"));
+            assertEquals("OB.context.Processed==='Y'", result.getString("displayLogicExpression"));
+        }
+    }
+
+    /**
+     * Tests that display logic expression parsing failure returns null (no key in JSON).
+     */
+    @Test
+    void toJSONWithDisplayLogicParserExceptionSkipsExpression() throws Exception {
+        TestContext ctx = setupTestContext();
+        List<Column> columns = createAllAuditColumns();
+        setupBasicMocks(ctx.context, ctx.language, ctx.tab, ctx.table, ctx.kernelUtils, columns);
+        when(ctx.tab.getDisplayLogic()).thenReturn("@Invalid@");
+
+        try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
+             MockedStatic<KernelUtils> mockedKernelUtils = mockStatic(KernelUtils.class);
+             MockedStatic<TabProcessor> mockedTabProcessor = mockStatic(TabProcessor.class);
+             MockedConstruction<DataToJsonConverter> ignoredConverter = mockConstruction(DataToJsonConverter.class,
+                     (mock, context) -> when(mock.toJsonObject(any(), any())).thenReturn(new JSONObject()));
+             MockedConstruction<DynamicExpressionParser> parserMock = mockConstruction(DynamicExpressionParser.class,
+                     (mock, context) -> when(mock.getJSExpression()).thenThrow(new RuntimeException("parse error")))) {
+
+            mockedOBContext.when(OBContext::getOBContext).thenReturn(ctx.context);
+            mockedKernelUtils.when(KernelUtils::getInstance).thenReturn(ctx.kernelUtils);
+            mockedTabProcessor.when(() -> TabProcessor.getTabFields(ctx.tab)).thenReturn(new JSONObject());
+
+            TabBuilder tabBuilder = new TabBuilder(ctx.tab, null);
+            JSONObject result = tabBuilder.toJSON();
+
+            assertFalse(result.has("displayLogicExpression"));
+        }
+    }
+
+    /**
+     * Tests that parent columns are returned when tab level > 0 and columns have linkToParentColumn.
+     */
+    @Test
+    void toJSONWithNonZeroTabLevelReturnsParentColumns() throws Exception {
+        TestContext ctx = setupTestContext();
+        List<Column> auditColumns = createAllAuditColumns();
+
+        lenient().when(ctx.context.getLanguage()).thenReturn(ctx.language);
+        when(ctx.tab.getFilterClause()).thenReturn("");
+        when(ctx.tab.getDisplayLogic()).thenReturn("");
+        when(ctx.tab.getTable()).thenReturn(ctx.table);
+        when(ctx.table.getName()).thenReturn(TEST_TABLE_NAME);
+        when(ctx.table.getADColumnList()).thenReturn(auditColumns);
+        when(ctx.tab.getTabLevel()).thenReturn(1L);
+        when(ctx.kernelUtils.getParentTab(ctx.tab)).thenReturn(null);
+
+        Column parentColumn = mock(Column.class);
+        when(parentColumn.isLinkToParentColumn()).thenReturn(true);
+        when(parentColumn.getDBColumnName()).thenReturn("parent_id");
+
+        Column regularColumn = mock(Column.class);
+        when(regularColumn.isLinkToParentColumn()).thenReturn(false);
+
+        List<Column> tableColumns = new ArrayList<>();
+        tableColumns.add(parentColumn);
+        tableColumns.add(regularColumn);
+        tableColumns.addAll(auditColumns);
+
+        when(ctx.table.getADColumnList()).thenReturn(tableColumns);
+
+        try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
+             MockedStatic<KernelUtils> mockedKernelUtils = mockStatic(KernelUtils.class);
+             MockedStatic<TabProcessor> mockedTabProcessor = mockStatic(TabProcessor.class);
+             MockedConstruction<DataToJsonConverter> ignoredConverter = mockConstruction(DataToJsonConverter.class,
+                     (mock, context) -> when(mock.toJsonObject(any(), any())).thenReturn(new JSONObject()))) {
+
+            mockedOBContext.when(OBContext::getOBContext).thenReturn(ctx.context);
+            mockedKernelUtils.when(KernelUtils::getInstance).thenReturn(ctx.kernelUtils);
+            mockedTabProcessor.when(() -> TabProcessor.getTabFields(ctx.tab)).thenReturn(new JSONObject());
+            mockedTabProcessor.when(() -> TabProcessor.getEntityColumnName(parentColumn)).thenReturn("parentEntity");
+
+            TabBuilder tabBuilder = new TabBuilder(ctx.tab, null);
+            JSONObject result = tabBuilder.toJSON();
+
+            assertTrue(result.has("parentColumns"));
+            JSONArray parentCols = result.getJSONArray("parentColumns");
+            assertEquals(1, parentCols.length());
+            assertEquals("parentEntity", parentCols.getString(0));
+        }
+    }
+
+    /**
+     * Tests that parentTabId is added when parent tab exists.
+     */
+    @Test
+    void toJSONWithParentTabAddsParentTabId() throws Exception {
+        TestContext ctx = setupTestContext();
+        List<Column> columns = createAllAuditColumns();
+        setupBasicMocks(ctx.context, ctx.language, ctx.tab, ctx.table, ctx.kernelUtils, columns);
+
+        Tab parentTab = mock(Tab.class);
+        when(parentTab.getId()).thenReturn("parent-tab-123");
+        when(ctx.kernelUtils.getParentTab(ctx.tab)).thenReturn(parentTab);
+
+        executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), result -> {
+            try {
+                assertTrue(result.has("parentTabId"));
+                assertEquals("parent-tab-123", result.getString("parentTabId"));
+            } catch (JSONException e) {
+                fail(JSON_EXCEPTION + ": " + e.getMessage());
+            }
+        });
+    }
+
+    /**
+     * Tests that getFields delegates to TabProcessor.getTabFields(tabAccess) when tabAccess has field access list.
+     */
+    @Test
+    void toJSONWithTabAccessDelegatesToTabAccessFields() throws Exception {
+        TestContext ctx = setupTestContext();
+        List<Column> columns = createAllAuditColumns();
+        setupBasicMocks(ctx.context, ctx.language, ctx.tab, ctx.table, ctx.kernelUtils, columns);
+
+        TabAccess tabAccess = mock(TabAccess.class);
+        FieldAccess fieldAccess = mock(FieldAccess.class);
+        List<FieldAccess> fieldAccessList = Collections.singletonList(fieldAccess);
+        when(tabAccess.getADFieldAccessList()).thenReturn(fieldAccessList);
+
+        JSONObject accessFields = new JSONObject();
+        accessFields.put("someField", new JSONObject().put("name", "AccessField"));
+
+        try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
+             MockedStatic<KernelUtils> mockedKernelUtils = mockStatic(KernelUtils.class);
+             MockedStatic<TabProcessor> mockedTabProcessor = mockStatic(TabProcessor.class);
+             MockedConstruction<DataToJsonConverter> ignoredConverter = mockConstruction(DataToJsonConverter.class,
+                     (mock, context) -> when(mock.toJsonObject(any(), any())).thenReturn(new JSONObject()))) {
+
+            mockedOBContext.when(OBContext::getOBContext).thenReturn(ctx.context);
+            mockedKernelUtils.when(KernelUtils::getInstance).thenReturn(ctx.kernelUtils);
+            mockedTabProcessor.when(() -> TabProcessor.getTabFields(tabAccess)).thenReturn(accessFields);
+
+            TabBuilder tabBuilder = new TabBuilder(ctx.tab, tabAccess);
+            JSONObject result = tabBuilder.toJSON();
+
+            assertTrue(result.has(FIELDS_KEY));
+            JSONObject fields = result.getJSONObject(FIELDS_KEY);
+            assertTrue(fields.has("someField"));
+        }
+    }
+
+    /**
+     * Tests that enrichWithAuditFields returns early when table is null.
+     */
+    @Test
+    void toJSONWithNullTableSkipsAuditFields() throws Exception {
+        OBContext mockContext = mock(OBContext.class);
+        Language mockLanguage = mock(Language.class);
+        Tab mockTab = mock(Tab.class);
+        KernelUtils mockKernelUtils = mock(KernelUtils.class);
+
+        when(mockContext.getLanguage()).thenReturn(mockLanguage);
+        when(mockTab.getFilterClause()).thenReturn("");
+        when(mockTab.getDisplayLogic()).thenReturn("");
+        when(mockTab.getTabLevel()).thenReturn(0L);
+        when(mockKernelUtils.getParentTab(mockTab)).thenReturn(null);
+
+        // First call returns a table with a name, second returns null for enrichWithAuditFields
+        Table tableForName = mock(Table.class);
+        when(tableForName.getName()).thenReturn("TestTable");
+        when(tableForName.getADColumnList()).thenReturn(Collections.emptyList());
+        when(mockTab.getTable()).thenReturn(tableForName).thenReturn(null).thenReturn(tableForName);
+
+        try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
+             MockedStatic<KernelUtils> mockedKernelUtils = mockStatic(KernelUtils.class);
+             MockedStatic<TabProcessor> mockedTabProcessor = mockStatic(TabProcessor.class);
+             MockedConstruction<DataToJsonConverter> ignoredConverter = mockConstruction(DataToJsonConverter.class,
+                     (mock, context) -> when(mock.toJsonObject(any(), any())).thenReturn(new JSONObject()))) {
+
+            mockedOBContext.when(OBContext::getOBContext).thenReturn(mockContext);
+            mockedKernelUtils.when(KernelUtils::getInstance).thenReturn(mockKernelUtils);
+            mockedTabProcessor.when(() -> TabProcessor.getTabFields(mockTab)).thenReturn(new JSONObject());
+
+            TabBuilder tabBuilder = new TabBuilder(mockTab, null);
+            JSONObject result = tabBuilder.toJSON();
+
+            // Should have fields key but no audit fields (since table was null for enrichment)
+            assertTrue(result.has(FIELDS_KEY));
+        }
     }
 
     /**
