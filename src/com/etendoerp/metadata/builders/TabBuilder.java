@@ -48,10 +48,12 @@ public class TabBuilder extends Builder {
 
   private final Tab tab;
   private final TabAccess tabAccess;
+  private final boolean isWindowReadOnly;
 
-  public TabBuilder(Tab tab, TabAccess tabAccess) {
+  public TabBuilder(Tab tab, TabAccess tabAccess, boolean isWindowReadOnly) {
     this.tab = tab;
     this.tabAccess = tabAccess;
+    this.isWindowReadOnly = isWindowReadOnly;
   }
 
   public JSONObject toJSON() {
@@ -80,6 +82,12 @@ public class TabBuilder extends Builder {
 
       if (parentTab != null) {
         json.put("parentTabId", parentTab.getId());
+      }
+
+      boolean isTabReadOnly = isWindowReadOnly || (tabAccess != null && !tabAccess.isEditableField());
+      if (isTabReadOnly) {
+        json.put("uIPattern", "RO");
+        json.put("readOnly", true);
       }
 
       return json;
