@@ -54,6 +54,8 @@ class ParameterBuilderTest {
   private OBContext mockContext;
   private Language mockLanguage;
 
+  private static final String DISPLAY_LOGIC_EXPRESSION = "displayLogicExpression";
+
 
   /**
    * Sets up mock objects before each test execution.
@@ -224,6 +226,65 @@ class ParameterBuilderTest {
       assertTrue(result.has(SELECTOR));
       JSONObject selector = result.getJSONObject(SELECTOR);
       assertEquals("TestDataSource", selector.getString(DATASOURCE_NAME));
+    }
+  }
+
+  /**
+   * Tests the toJSON method includes display logic expression when present.
+   * Verifies that when a parameter has display logic defined, the method
+   * processes it through DynamicExpressionParser and includes the JavaScript expression.
+   * 
+   * @throws Exception if JSON processing or expression parsing fails
+   */
+  @Test
+  void toJSONWithDisplayLogicIncludesExpression() throws Exception {
+    when(mockParameter.getDisplayLogic()).thenReturn("P_Display_Logic");
+    when(mockParameter.getReference()).thenReturn(null);
+
+    try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
+         MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class,
+             (mock, context) -> {
+               JSONObject parameterJson = new JSONObject();
+               parameterJson.put("id", PARAMETER_ID);
+               when(mock.toJsonObject(any(), eq(DataResolvingMode.FULL_TRANSLATABLE))).thenReturn(parameterJson);
+             });
+         MockedConstruction<DynamicExpressionParser> ignored2 = mockConstruction(DynamicExpressionParser.class,
+             (mock, context) -> when(mock.getJSExpression()).thenReturn("parsedDisplayLogic"))) {
+
+      mockedOBContext.when(OBContext::getOBContext).thenReturn(mockContext);
+
+      ParameterBuilder parameterBuilder = new ParameterBuilder(mockParameter);
+      JSONObject result = parameterBuilder.toJSON();
+
+      assertNotNull(result);
+      assertTrue(result.has(DISPLAY_LOGIC_EXPRESSION));
+      assertEquals("parsedDisplayLogic", result.getString(DISPLAY_LOGIC_EXPRESSION));
+    }
+  }
+
+  /**
+   * Tests the toJSON method excludes display logic expression when blank.
+   */
+  @Test
+  void toJSONWithBlankDisplayLogicDoesNotIncludeExpression() throws Exception {
+    when(mockParameter.getDisplayLogic()).thenReturn("   ");
+    when(mockParameter.getReference()).thenReturn(null);
+
+    try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
+         MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class,
+             (mock, context) -> {
+               JSONObject parameterJson = new JSONObject();
+               parameterJson.put("id", PARAMETER_ID);
+               when(mock.toJsonObject(any(), eq(DataResolvingMode.FULL_TRANSLATABLE))).thenReturn(parameterJson);
+             })) {
+
+      mockedOBContext.when(OBContext::getOBContext).thenReturn(mockContext);
+
+      ParameterBuilder parameterBuilder = new ParameterBuilder(mockParameter);
+      JSONObject result = parameterBuilder.toJSON();
+
+      assertNotNull(result);
+      assertFalse(result.has(DISPLAY_LOGIC_EXPRESSION));
     }
   }
 

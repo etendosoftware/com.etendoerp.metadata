@@ -31,6 +31,7 @@ import org.openbravo.client.application.ApplicationConstants;
 import org.openbravo.client.application.DynamicExpressionParser;
 import org.openbravo.client.kernel.KernelUtils;
 import org.openbravo.dal.service.OBDal;
+import org.openbravo.data.Sqlc;
 import org.openbravo.model.ad.access.FieldAccess;
 import org.openbravo.model.ad.datamodel.Column;
 import org.openbravo.model.ad.datamodel.Table;
@@ -148,8 +149,19 @@ public class FieldBuilderWithColumn extends FieldBuilder {
         boolean mandatory = column.isMandatory();
         boolean isParentRecordProperty = isParentRecordProperty(field, field.getTab());
         JSONObject columnJson = converter.toJsonObject(field.getColumn(), DataResolvingMode.FULL_TRANSLATABLE);
-        String inputName = getInputName(column);
         String columnName = column.getDBColumnName();
+
+        String propertyPath = field.getProperty();
+        String inputName;
+        if (propertyPath != null && !propertyPath.isEmpty()) {
+            // Property field: inputName must match FormInitializationComponent.setValuesInRequest()
+            // convention: "inp_propertyField_" + lowerCamelCase(fieldName) + "_" + columnDBName
+            String transformedFieldName = Sqlc.TransformaNombreColumna(field.getName()).replace(" ", "");
+            inputName = "inp_propertyField_" + transformedFieldName + "_" + columnName;
+            columnJson.put("propertyPath", propertyPath);
+        } else {
+            inputName = getInputName(column);
+        }
 
         json.put(COLUMN_NAME, columnName);
         json.put(COLUMN, columnJson);
