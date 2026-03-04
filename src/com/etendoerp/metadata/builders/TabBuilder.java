@@ -50,6 +50,19 @@ public class TabBuilder extends Builder {
   private final TabAccess tabAccess;
   private final boolean isWindowReadOnly;
 
+  /**
+   * Constructs a TabBuilder for the given tab.
+   *
+   * @param tab              the tab entity to build JSON for
+   * @param tabAccess        the role-specific tab access configuration, or {@code null} if the tab
+   *                         has no explicit access record (e.g. when called from TabService or when
+   *                         the window has no TabAccess entries for the current role)
+   * @param isWindowReadOnly {@code true} if the parent window was resolved as read-only (either
+   *                         because {@code WindowAccess.isEditableField()} is {@code false} or
+   *                         because the role has no explicit WindowAccess and the fallback is
+   *                         implicit read-only); when {@code true}, the generated JSON will have
+   *                         {@code uIPattern = "RO"} regardless of the tab-level access settings
+   */
   public TabBuilder(Tab tab, TabAccess tabAccess, boolean isWindowReadOnly) {
     this.tab = tab;
     this.tabAccess = tabAccess;

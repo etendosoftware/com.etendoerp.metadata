@@ -300,7 +300,7 @@ class TabBuilderAuditFieldsTest {
             mockedKernelUtils.when(KernelUtils::getInstance).thenReturn(mockKernelUtils);
             mockedTabProcessor.when(() -> TabProcessor.getTabFields(mockTab)).thenReturn(tabFields);
 
-            TabBuilder tabBuilder = new TabBuilder(mockTab, null);
+            TabBuilder tabBuilder = new TabBuilder(mockTab, null, false);
             JSONObject result = tabBuilder.toJSON();
 
             assertions.accept(result);
