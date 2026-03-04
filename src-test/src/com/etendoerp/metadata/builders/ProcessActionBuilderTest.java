@@ -12,7 +12,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
@@ -26,14 +30,19 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.MockedConstruction;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.openbravo.client.application.DynamicExpressionParser;
 import org.openbravo.dal.core.OBContext;
+import org.openbravo.erpCommon.utility.Utility;
+import org.openbravo.model.ad.datamodel.Column;
 import org.openbravo.model.ad.domain.Reference;
 import org.openbravo.model.ad.system.Language;
 import org.openbravo.model.ad.ui.Field;
 import org.openbravo.model.ad.ui.Process;
 import org.openbravo.model.ad.ui.ProcessParameter;
+import org.openbravo.model.ad.ui.Tab;
 import org.openbravo.service.json.DataResolvingMode;
 import org.openbravo.service.json.DataToJsonConverter;
 
@@ -473,6 +482,177 @@ class ProcessActionBuilderTest {
             
             assertTrue(foundSelector);
             assertTrue(foundList);
+        }
+    }
+
+    /**
+     * Tests getFieldProcess with a valid (non-null) process.
+     * This covers the main branch of getFieldProcess where it creates a ProcessActionBuilder,
+     * calls toJSON, and enriches the result with field-related data.
+     */
+    @Test
+    void testGetFieldProcessWithValidProcess() throws JSONException {
+        Process process = mock(Process.class);
+        Field field = mock(Field.class);
+        Column column = mock(Column.class);
+        Reference colRef = mock(Reference.class);
+        Tab tab = mock(Tab.class);
+
+        when(field.getId()).thenReturn("field-1");
+        when(field.getName()).thenReturn("TestField");
+        when(field.getDisplayLogic()).thenReturn("");
+        when(field.getColumn()).thenReturn(column);
+        when(field.getTab()).thenReturn(tab);
+        when(column.getId()).thenReturn("col-1");
+        when(column.getName()).thenReturn("ButtonText");
+        when(column.getReference()).thenReturn(colRef);
+        when(colRef.getId()).thenReturn("28");
+        when(process.getADProcessParameterList()).thenReturn(Collections.emptyList());
+
+        JSONObject processJson = new JSONObject();
+        processJson.put("id", "proc-1");
+
+        try (MockedStatic<OBContext> ctxMock = mockStatic(OBContext.class);
+             MockedStatic<Utility> utilMock = mockStatic(Utility.class);
+             MockedConstruction<DataToJsonConverter> converterMock = mockConstruction(DataToJsonConverter.class,
+                 (mock, context) -> when(mock.toJsonObject(any(), any())).thenReturn(new JSONObject().put("id", "proc-1")))) {
+
+            ctxMock.when(OBContext::getOBContext).thenReturn(mockOBContext);
+            lenient().when(mockOBContext.getLanguage()).thenReturn(mockLanguage);
+            utilMock.when(() -> Utility.getTabURL(eq(tab), any(), eq(false))).thenReturn("/test/url");
+
+            JSONObject result = ProcessActionBuilder.getFieldProcess(field, process);
+
+            assertNotNull(result);
+            assertEquals("field-1", result.getString("fieldId"));
+            assertEquals("col-1", result.getString("columnId"));
+            assertEquals("ButtonText", result.getString("buttonText"));
+            assertEquals("TestField", result.getString("fieldName"));
+            assertEquals("28", result.getString("reference"));
+            assertEquals("/test/url", result.getString("manualURL"));
+        }
+    }
+
+    /**
+     * Tests getFieldProcess with a non-blank display logic string.
+     * This covers the display logic parsing branch where DynamicExpressionParser is invoked.
+     */
+    @Test
+    void testGetFieldProcessWithDisplayLogic() throws JSONException {
+        Process process = mock(Process.class);
+        Field field = mock(Field.class);
+        Column column = mock(Column.class);
+        Reference colRef = mock(Reference.class);
+        Tab tab = mock(Tab.class);
+
+        when(field.getId()).thenReturn("field-2");
+        when(field.getName()).thenReturn("TestField2");
+        when(field.getDisplayLogic()).thenReturn("@Processed@='Y'");
+        when(field.getColumn()).thenReturn(column);
+        when(field.getTab()).thenReturn(tab);
+        when(column.getId()).thenReturn("col-2");
+        when(column.getName()).thenReturn("Button2");
+        when(column.getReference()).thenReturn(colRef);
+        when(colRef.getId()).thenReturn("28");
+        when(process.getADProcessParameterList()).thenReturn(Collections.emptyList());
+
+        try (MockedStatic<OBContext> ctxMock = mockStatic(OBContext.class);
+             MockedStatic<Utility> utilMock = mockStatic(Utility.class);
+             MockedConstruction<DataToJsonConverter> converterMock = mockConstruction(DataToJsonConverter.class,
+                 (mock, context) -> when(mock.toJsonObject(any(), any())).thenReturn(new JSONObject().put("id", "proc-2")));
+             MockedConstruction<DynamicExpressionParser> parserMock = mockConstruction(DynamicExpressionParser.class,
+                 (mock, context) -> when(mock.getJSExpression()).thenReturn("OB.context.Processed === 'Y'"))) {
+
+            ctxMock.when(OBContext::getOBContext).thenReturn(mockOBContext);
+            lenient().when(mockOBContext.getLanguage()).thenReturn(mockLanguage);
+            utilMock.when(() -> Utility.getTabURL(eq(tab), any(), eq(false))).thenReturn("/test/url2");
+
+            JSONObject result = ProcessActionBuilder.getFieldProcess(field, process);
+
+            assertNotNull(result);
+            assertTrue(result.has("displayLogicExpression"));
+            assertEquals("OB.context.Processed === 'Y'", result.getString("displayLogicExpression"));
+        }
+    }
+
+    /**
+     * Tests getFieldProcess when the DynamicExpressionParser throws an exception.
+     * The code catches the exception silently, so the result should still be valid
+     * but without a displayLogicExpression key.
+     */
+    @Test
+    void testGetFieldProcessWithDisplayLogicParserException() throws JSONException {
+        Process process = mock(Process.class);
+        Field field = mock(Field.class);
+        Column column = mock(Column.class);
+        Reference colRef = mock(Reference.class);
+        Tab tab = mock(Tab.class);
+
+        when(field.getId()).thenReturn("field-3");
+        when(field.getName()).thenReturn("TestField3");
+        when(field.getDisplayLogic()).thenReturn("@Invalid@");
+        when(field.getColumn()).thenReturn(column);
+        when(field.getTab()).thenReturn(tab);
+        when(column.getId()).thenReturn("col-3");
+        when(column.getName()).thenReturn("Button3");
+        when(column.getReference()).thenReturn(colRef);
+        when(colRef.getId()).thenReturn("28");
+        when(process.getADProcessParameterList()).thenReturn(Collections.emptyList());
+
+        try (MockedStatic<OBContext> ctxMock = mockStatic(OBContext.class);
+             MockedStatic<Utility> utilMock = mockStatic(Utility.class);
+             MockedConstruction<DataToJsonConverter> converterMock = mockConstruction(DataToJsonConverter.class,
+                 (mock, context) -> when(mock.toJsonObject(any(), any())).thenReturn(new JSONObject().put("id", "proc-3")));
+             MockedConstruction<DynamicExpressionParser> parserMock = mockConstruction(DynamicExpressionParser.class,
+                 (mock, context) -> when(mock.getJSExpression()).thenThrow(new RuntimeException("Parse error")))) {
+
+            ctxMock.when(OBContext::getOBContext).thenReturn(mockOBContext);
+            lenient().when(mockOBContext.getLanguage()).thenReturn(mockLanguage);
+            utilMock.when(() -> Utility.getTabURL(eq(tab), any(), eq(false))).thenReturn("/test/url3");
+
+            JSONObject result = ProcessActionBuilder.getFieldProcess(field, process);
+
+            assertNotNull(result);
+            assertFalse(result.has("displayLogicExpression"));
+            assertEquals("field-3", result.getString("fieldId"));
+        }
+    }
+
+    /**
+     * Tests getFieldProcess with null displayLogic (covers the null check in the if-condition).
+     */
+    @Test
+    void testGetFieldProcessWithNullDisplayLogic() throws JSONException {
+        Process process = mock(Process.class);
+        Field field = mock(Field.class);
+        Column column = mock(Column.class);
+        Reference colRef = mock(Reference.class);
+        Tab tab = mock(Tab.class);
+
+        when(field.getId()).thenReturn("field-4");
+        when(field.getName()).thenReturn("TestField4");
+        when(field.getDisplayLogic()).thenReturn(null);
+        when(field.getColumn()).thenReturn(column);
+        when(field.getTab()).thenReturn(tab);
+        when(column.getId()).thenReturn("col-4");
+        when(column.getName()).thenReturn("Button4");
+        when(column.getReference()).thenReturn(colRef);
+        when(colRef.getId()).thenReturn("28");
+        when(process.getADProcessParameterList()).thenReturn(Collections.emptyList());
+
+        try (MockedStatic<OBContext> ctxMock = mockStatic(OBContext.class);
+             MockedStatic<Utility> utilMock = mockStatic(Utility.class);
+             MockedConstruction<DataToJsonConverter> converterMock = mockConstruction(DataToJsonConverter.class,
+                 (mock, context) -> when(mock.toJsonObject(any(), any())).thenReturn(new JSONObject().put("id", "proc-4")))) {
+
+            ctxMock.when(OBContext::getOBContext).thenReturn(mockOBContext);
+            lenient().when(mockOBContext.getLanguage()).thenReturn(mockLanguage);
+            utilMock.when(() -> Utility.getTabURL(eq(tab), any(), eq(false))).thenReturn("/test/url4");
+
+            JSONObject result = ProcessActionBuilder.getFieldProcess(field, process);
+
+            assertNotNull(result);
+            assertFalse(result.has("displayLogicExpression"));
         }
     }
 }

@@ -14,8 +14,10 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.mockStatic;
 
 /**
@@ -172,6 +174,128 @@ public class ForwarderServletTest {
       spyServlet.doDelete(TEST_PATH, request, response);
 
       verify(spyServlet).process(request, response);
+    }
+  }
+
+  /**
+   * Tests that process delegates to DataSourceServlet.doPost when HTTP method is POST.
+   */
+  @Test
+  public void processShouldDelegateToDoPostForPostMethod() throws Exception {
+    try (MockedStatic<WeldUtils> weldUtilsMock = mockStatic(WeldUtils.class)) {
+      weldUtilsMock.when(() -> WeldUtils.getInstanceFromStaticBeanManager(DataSourceServlet.class))
+              .thenReturn(dataSourceServlet);
+
+      when(request.getMethod()).thenReturn("POST");
+      when(request.getPathInfo()).thenReturn(TEST_PATH);
+
+      forwarderServlet.process(request, response);
+
+      verify(dataSourceServlet).doPost(request, response);
+    }
+  }
+
+  /**
+   * Tests that process delegates to DataSourceServlet.doDelete when HTTP method is DELETE.
+   */
+  @Test
+  public void processShouldDelegateToDoDeleteForDeleteMethod() throws Exception {
+    try (MockedStatic<WeldUtils> weldUtilsMock = mockStatic(WeldUtils.class)) {
+      weldUtilsMock.when(() -> WeldUtils.getInstanceFromStaticBeanManager(DataSourceServlet.class))
+              .thenReturn(dataSourceServlet);
+
+      when(request.getMethod()).thenReturn("DELETE");
+      when(request.getPathInfo()).thenReturn(TEST_PATH);
+
+      forwarderServlet.process(request, response);
+
+      verify(dataSourceServlet).doDelete(request, response);
+    }
+  }
+
+  /**
+   * Tests that process delegates to DataSourceServlet.doPut when HTTP method is PUT.
+   */
+  @Test
+  public void processShouldDelegateToDoPutForPutMethod() throws Exception {
+    try (MockedStatic<WeldUtils> weldUtilsMock = mockStatic(WeldUtils.class)) {
+      weldUtilsMock.when(() -> WeldUtils.getInstanceFromStaticBeanManager(DataSourceServlet.class))
+              .thenReturn(dataSourceServlet);
+
+      when(request.getMethod()).thenReturn("PUT");
+      when(request.getPathInfo()).thenReturn(TEST_PATH);
+
+      forwarderServlet.process(request, response);
+
+      verify(dataSourceServlet).doPut(request, response);
+    }
+  }
+
+  /**
+   * Tests that process delegates to DataSourceServlet.doGet for unknown HTTP method.
+   */
+  @Test
+  public void processShouldDefaultToDoGetForUnknownMethod() throws Exception {
+    try (MockedStatic<WeldUtils> weldUtilsMock = mockStatic(WeldUtils.class)) {
+      weldUtilsMock.when(() -> WeldUtils.getInstanceFromStaticBeanManager(DataSourceServlet.class))
+              .thenReturn(dataSourceServlet);
+
+      when(request.getMethod()).thenReturn("PATCH");
+      when(request.getPathInfo()).thenReturn(TEST_PATH);
+
+      forwarderServlet.process(request, response);
+
+      verify(dataSourceServlet).doGet(request, response);
+    }
+  }
+
+  /**
+   * Tests that process rethrows IOException from DataSourceServlet.
+   */
+  @Test(expected = IOException.class)
+  public void processShouldRethrowIOException() throws Exception {
+    try (MockedStatic<WeldUtils> weldUtilsMock = mockStatic(WeldUtils.class)) {
+      weldUtilsMock.when(() -> WeldUtils.getInstanceFromStaticBeanManager(DataSourceServlet.class))
+              .thenReturn(dataSourceServlet);
+
+      when(request.getPathInfo()).thenReturn(TEST_PATH);
+      doThrow(new IOException("IO error")).when(dataSourceServlet).doGet(request, response);
+
+      forwarderServlet.process(request, response);
+    }
+  }
+
+  /**
+   * Tests that process rethrows ServletException from DataSourceServlet.
+   */
+  @Test(expected = ServletException.class)
+  public void processShouldRethrowServletException() throws Exception {
+    try (MockedStatic<WeldUtils> weldUtilsMock = mockStatic(WeldUtils.class)) {
+      weldUtilsMock.when(() -> WeldUtils.getInstanceFromStaticBeanManager(DataSourceServlet.class))
+              .thenReturn(dataSourceServlet);
+
+      when(request.getPathInfo()).thenReturn(TEST_PATH);
+      doThrow(new ServletException("Servlet error")).when(dataSourceServlet).doGet(request, response);
+
+      forwarderServlet.process(request, response);
+    }
+  }
+
+  /**
+   * Tests process with case-insensitive POST method.
+   */
+  @Test
+  public void processShouldHandleLowercasePostMethod() throws Exception {
+    try (MockedStatic<WeldUtils> weldUtilsMock = mockStatic(WeldUtils.class)) {
+      weldUtilsMock.when(() -> WeldUtils.getInstanceFromStaticBeanManager(DataSourceServlet.class))
+              .thenReturn(dataSourceServlet);
+
+      when(request.getMethod()).thenReturn("post");
+      when(request.getPathInfo()).thenReturn(TEST_PATH);
+
+      forwarderServlet.process(request, response);
+
+      verify(dataSourceServlet).doPost(request, response);
     }
   }
 }
