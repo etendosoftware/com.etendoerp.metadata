@@ -31,6 +31,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
+import org.openbravo.base.exception.OBException;
 import org.openbravo.base.model.Entity;
 import org.openbravo.base.model.ModelProvider;
 import org.openbravo.base.model.Property;
@@ -46,6 +47,7 @@ import com.etendoerp.metadata.builders.FieldBuilderWithColumn;
 import com.etendoerp.redis.interfaces.CachedConcurrentMap;
 import java.util.function.BiFunction;
 import java.util.function.BiConsumer;
+import org.hibernate.exception.GenericJDBCException;
 
 public class TabProcessor {
   private static final Logger logger = LogManager.getLogger(TabProcessor.class);
@@ -107,6 +109,8 @@ public class TabProcessor {
         if (accessPredicate.test(fieldLike)) {
           processFieldItem(fieldLike, processors, result);
         }
+      } catch (GenericJDBCException e) {
+          throw new OBException("Error processing tab fields via JDBC", e.getSQLException());
       } catch (Exception e) {
         logger.warn("Error processing field: {} - {}", fieldLike, e.getMessage(), e);
       }
