@@ -37,7 +37,7 @@ public class TabService extends MetadataService {
                 throw new NotFoundException("Tab not found: " + tabId);
             }
 
-            write(new TabBuilder(tab, null).toJSON());
+            write(new TabBuilder(tab, null, false).toJSON());
         } finally {
             OBContext.restorePreviousMode();
         }

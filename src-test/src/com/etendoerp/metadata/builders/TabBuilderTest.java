@@ -17,6 +17,7 @@ import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.openbravo.client.kernel.KernelUtils;
 import org.openbravo.dal.core.OBContext;
+import org.openbravo.model.ad.access.TabAccess;
 import org.openbravo.model.ad.datamodel.Column;
 import org.openbravo.model.ad.datamodel.Table;
 import org.openbravo.model.ad.system.Language;
@@ -60,6 +61,9 @@ class TabBuilderAuditFieldsTest {
     private static final String SELECTOR_KEY = "selector";
     private static final String NAME_KEY = "name";
     private static final String JSON_EXCEPTION = "JSON exception";
+    private static final String UI_PATTERN_KEY = "uIPattern";
+    private static final String READ_ONLY_KEY = "readOnly";
+    private static final String RO_PATTERN = "RO";
 
     // Test data
     private static final String TEST_TABLE_NAME = "TestTable";
@@ -279,6 +283,72 @@ class TabBuilderAuditFieldsTest {
         });
     }
 
+    /**
+     * Tests that uIPattern is set to "RO" and readOnly to true when isWindowReadOnly is true
+     */
+    @Test
+    void toJSONSetsReadOnlyPatternWhenWindowIsReadOnly() throws Exception {
+        TestContext ctx = setupTestContext();
+        setupBasicMocks(ctx.context, ctx.language, ctx.tab, ctx.table, ctx.kernelUtils, List.of());
+
+        executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), true, null, result -> {
+            try {
+                assertEquals(RO_PATTERN, result.getString(UI_PATTERN_KEY),
+                        "uIPattern should be RO when window is read-only");
+                assertTrue(result.getBoolean(READ_ONLY_KEY),
+                        "readOnly should be true when window is read-only");
+            } catch (JSONException e) {
+                fail(JSON_EXCEPTION + ": " + e.getMessage());
+            }
+        });
+    }
+
+    /**
+     * Tests that uIPattern is set to "RO" when the TabAccess marks the tab as not editable
+     */
+    @Test
+    void toJSONSetsReadOnlyPatternWhenTabAccessIsNotEditable() throws Exception {
+        TestContext ctx = setupTestContext();
+        TabAccess mockTabAccess = mock(TabAccess.class);
+        when(mockTabAccess.isEditableField()).thenReturn(false);
+        when(mockTabAccess.getADFieldAccessList()).thenReturn(List.of());
+        setupBasicMocks(ctx.context, ctx.language, ctx.tab, ctx.table, ctx.kernelUtils, List.of());
+
+        executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), false, mockTabAccess, result -> {
+            try {
+                assertEquals(RO_PATTERN, result.getString(UI_PATTERN_KEY),
+                        "uIPattern should be RO when tabAccess is not editable");
+                assertTrue(result.getBoolean(READ_ONLY_KEY),
+                        "readOnly should be true when tabAccess is not editable");
+            } catch (JSONException e) {
+                fail(JSON_EXCEPTION + ": " + e.getMessage());
+            }
+        });
+    }
+
+    /**
+     * Tests that uIPattern is NOT forced to "RO" when window is editable and TabAccess allows editing
+     */
+    @Test
+    void toJSONDoesNotSetReadOnlyPatternWhenEditable() throws Exception {
+        TestContext ctx = setupTestContext();
+        TabAccess mockTabAccess = mock(TabAccess.class);
+        when(mockTabAccess.isEditableField()).thenReturn(true);
+        when(mockTabAccess.getADFieldAccessList()).thenReturn(List.of());
+        setupBasicMocks(ctx.context, ctx.language, ctx.tab, ctx.table, ctx.kernelUtils, List.of());
+
+        executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), false, mockTabAccess, result -> {
+            try {
+                assertFalse(result.has(READ_ONLY_KEY) && result.getBoolean(READ_ONLY_KEY),
+                        "readOnly should not be set to true when window and tab are editable");
+                assertFalse(RO_PATTERN.equals(result.optString(UI_PATTERN_KEY, "")),
+                        "uIPattern should not be RO when window and tab are editable");
+            } catch (JSONException e) {
+                fail(JSON_EXCEPTION + ": " + e.getMessage());
+            }
+        });
+    }
+
     // Helper methods
 
     /**
@@ -300,7 +370,36 @@ class TabBuilderAuditFieldsTest {
             mockedKernelUtils.when(KernelUtils::getInstance).thenReturn(mockKernelUtils);
             mockedTabProcessor.when(() -> TabProcessor.getTabFields(mockTab)).thenReturn(tabFields);
 
-            TabBuilder tabBuilder = new TabBuilder(mockTab, null);
+            TabBuilder tabBuilder = new TabBuilder(mockTab, null, false);
+            JSONObject result = tabBuilder.toJSON();
+
+            assertions.accept(result);
+        } catch (Exception e) {
+            fail("Unexpected exception: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Executes a TabBuilder test with explicit isWindowReadOnly and tabAccess control
+     */
+    private void executeTabBuilderTest(OBContext mockContext, KernelUtils mockKernelUtils,
+                                       Tab mockTab, JSONObject tabFields,
+                                       boolean isWindowReadOnly, TabAccess tabAccess,
+                                       Consumer<JSONObject> assertions) {
+        try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
+             MockedStatic<KernelUtils> mockedKernelUtils = mockStatic(KernelUtils.class);
+             MockedStatic<TabProcessor> mockedTabProcessor = mockStatic(TabProcessor.class);
+             MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class,
+                     (mock, context) -> {
+                         JSONObject tabJson = new JSONObject();
+                         when(mock.toJsonObject(any(), any())).thenReturn(tabJson);
+                     })) {
+
+            mockedOBContext.when(OBContext::getOBContext).thenReturn(mockContext);
+            mockedKernelUtils.when(KernelUtils::getInstance).thenReturn(mockKernelUtils);
+            mockedTabProcessor.when(() -> TabProcessor.getTabFields(mockTab)).thenReturn(tabFields);
+
+            TabBuilder tabBuilder = new TabBuilder(mockTab, tabAccess, isWindowReadOnly);
             JSONObject result = tabBuilder.toJSON();
 
             assertions.accept(result);
