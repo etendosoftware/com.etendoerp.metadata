@@ -553,6 +553,23 @@ class FieldBuilderWithColumnTest {
     }
 
     @Test
+    void testToJSONWithPropertyFieldSetsCorrectInputNameAndPropertyPath() throws JSONException {
+        // field.getProperty() returns a non-null value → triggers the property-field branch
+        // in addColumnSpecificProperties(), which generates inp_propertyField_* inputName
+        // and adds column.propertyPath.
+        String propertyPath = "testEntity.testProp";
+        String expectedInputName = "inp_propertyField_testfield_testColumn"; // Sqlc("testField") → "testfield"
+
+        JSONObject result = executeToJSON(() -> when(field.getProperty()).thenReturn(propertyPath));
+
+        assertEquals(expectedInputName, result.getString("inputName"),
+                "inputName for property fields must follow FormInitializationComponent naming convention");
+        assertTrue(result.getJSONObject("column").has("propertyPath"),
+                "column JSON must expose propertyPath so the frontend can detect property fields");
+        assertEquals(propertyPath, result.getJSONObject("column").getString("propertyPath"));
+    }
+
+    @Test
     void testAddLinkAccessibilityInfoWhenAccessible() throws JSONException {
         // Prepare JSON with referencedWindowId
         JSONObject json = new JSONObject();
