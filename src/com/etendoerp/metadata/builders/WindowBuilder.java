@@ -18,8 +18,11 @@
 package com.etendoerp.metadata.builders;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.codehaus.jettison.json.JSONArray;
@@ -63,53 +66,42 @@ public class WindowBuilder extends Builder {
                 .uniqueResult();
 
         if (windowAccess == null) {
-            windowAccess = (WindowAccess) dal.createCriteria(WindowAccess.class) //
+            boolean windowExistsForSomeRole = dal.createCriteria(WindowAccess.class) //
                     .add(Restrictions.eq(WindowAccess.PROPERTY_ACTIVE, true)) //
-                    .add(Restrictions.eq(WindowAccess.PROPERTY_WINDOW, adWindow))//
+                    .add(Restrictions.eq(WindowAccess.PROPERTY_WINDOW, adWindow)) //
                     .setMaxResults(1) //
-                    .uniqueResult();
-        }
+                    .uniqueResult() != null;
 
-        if (windowAccess == null) {
-            throw new UnauthorizedException("Role " + role.getName() + " is not authorized for window " + id);
+            if (!windowExistsForSomeRole) {
+                throw new UnauthorizedException("Role " + role.getName() + " is not authorized for window " + id);
+            }
+
+            // Role has no explicit access configured: signal implicit read-only access
+            return null;
         }
 
         return windowAccess;
     }
 
-    private static JSONArray createTabsJson(List<TabAccess> tabAccesses, List<Tab> tabs) {
-        final int tabsSize = tabs.size();
-        final int tabAccessSize = tabAccesses.size();
-        final int max = Math.max(tabAccessSize, tabsSize);
-        final List<JSONObject> tabJsonObjects = new ArrayList<>(tabAccessSize + tabsSize);
+    private static JSONArray createTabsJson(List<TabAccess> tabAccesses, List<Tab> tabs, boolean isWindowReadOnly) {
+        final List<JSONObject> result = new ArrayList<>();
+        final Set<String> processedTabIds = new HashSet<>();
 
-        for (int i = 0; i < max; i++) {
-            if (i < tabAccessSize) {
-                TabAccess tabAccess = tabAccesses.get(i);
-                JSONObject json = getTabJson(tabAccess, tabAccess.getTab());
-
-                if (json != null) {
-                    tabJsonObjects.add(json);
-                }
-            }
-            if (i < tabsSize) {
-                Tab tab = tabs.get(i);
-
-                if (isTabAllowedCached(tab)) {
-                    tabJsonObjects.add(new TabBuilder(tab, null).toJSON());
-                }
+        for (TabAccess tabAccess : tabAccesses) {
+            Tab tab = tabAccess.getTab();
+            if (tabAccess.isActive() && tabAccess.isAllowRead() && isTabAllowedCached(tab)) {
+                result.add(new TabBuilder(tab, tabAccess, isWindowReadOnly).toJSON());
+                processedTabIds.add(tab.getId());
             }
         }
 
-        return new JSONArray(tabJsonObjects);
-    }
-
-    private static JSONObject getTabJson(TabAccess tabAccess, Tab tab) {
-        if (tabAccess.isActive() && tabAccess.isAllowRead() && isTabAllowedCached(tab)) {
-            return new TabBuilder(tab, tabAccess).toJSON();
+        for (Tab tab : tabs) {
+            if (!processedTabIds.contains(tab.getId()) && isTabAllowedCached(tab)) {
+                result.add(new TabBuilder(tab, null, isWindowReadOnly).toJSON());
+            }
         }
 
-        return null;
+        return new JSONArray(result);
     }
 
     private static boolean isTabAllowedCached(Tab tab) {
@@ -119,12 +111,21 @@ public class WindowBuilder extends Builder {
 
     public JSONObject toJSON() {
         WindowAccess windowAccess = getWindowAccess(id);
-        Window window = windowAccess.getWindow();
+        boolean isReadOnly = (windowAccess == null) || !windowAccess.isEditableField();
+
+        Window window = windowAccess != null
+                ? windowAccess.getWindow()
+                : OBDal.getReadOnlyInstance().get(Window.class, id);
+
+        List<TabAccess> tabAccesses = windowAccess != null
+                ? windowAccess.getADTabAccessList()
+                : Collections.emptyList();
+
         JSONObject windowJson = converter.toJsonObject(window, DataResolvingMode.FULL_TRANSLATABLE);
 
         try {
             windowJson.put("id", window.getId());
-            windowJson.put("tabs", createTabsJson(windowAccess.getADTabAccessList(), window.getADTabList()));
+            windowJson.put("tabs", createTabsJson(tabAccesses, window.getADTabList(), isReadOnly));
         } catch (JSONException e) {
             logger.error("Error creating JSON for window tabs: {}", e.getMessage(), e);
         }

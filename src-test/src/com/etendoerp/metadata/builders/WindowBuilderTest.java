@@ -366,6 +366,31 @@ class WindowBuilderTest {
   }
 
   /**
+   * Tests that when the current role has no explicit WindowAccess but at least one other role does,
+   * toJSON() returns valid JSON (implicit read-only fallback path) instead of throwing.
+   * This covers the getWindowAccess() null-return path introduced to prevent privilege escalation.
+   */
+  @Test
+  void toJSONWithNoRoleAccessButWindowExistsForOtherRoleReturnsJSON() throws Exception {
+    when(mockOBDal.get(Window.class, WINDOW_ID)).thenReturn(mockWindow);
+    when(mockOBDal.createCriteria(WindowAccess.class)).thenReturn(mockCriteria);
+    when(mockCriteria.add(any())).thenReturn(mockCriteria);
+    when(mockCriteria.setMaxResults(1)).thenReturn(mockCriteria);
+    // First uniqueResult call: role-specific query → null (no explicit access for this role)
+    // Second uniqueResult call: fallback query → mockWindowAccess (window exists for another role)
+    when(mockCriteria.uniqueResult()).thenReturn(null, mockWindowAccess);
+    when(mockWindow.getId()).thenReturn(WINDOW_ID);
+    when(mockWindow.getADTabList()).thenReturn(new ArrayList<>());
+
+    WindowBuilder windowBuilder = createWindowBuilder();
+    JSONObject result = executeToJSON(windowBuilder);
+
+    assertNotNull(result);
+    assertTrue(result.has("tabs"), "Result must contain a tabs array");
+    assertEquals(0, result.getJSONArray("tabs").length(), "No tabs should be present (empty access list)");
+  }
+
+  /**
    * Sets up the mock behavior for TabAccess and Tab entities.
    *
    * @param isActive   whether the tab access is active
