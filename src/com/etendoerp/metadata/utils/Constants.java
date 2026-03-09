@@ -91,4 +91,8 @@ public class Constants {
     public static final String DB_CREATED_BY = "CreatedBy";
     public static final String DB_UPDATED = "Updated";
     public static final String DB_UPDATED_BY = "UpdatedBy";
+
+    // Color
+    public static final String COLOR_REFERENCE_ID = "27";
+    public static final String COLOR_FIELD_NAME = "colorFieldName";
 }
