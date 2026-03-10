@@ -45,7 +45,7 @@ import static org.mockito.Mockito.when;
 public class ExtraPropertiesEnricherTest {
 
     private static final String FK_PROP_PRIORITY = "priority";
-    private static final String CACHED_ENTITY    = CACHED_ENTITY;
+    private static final String CACHED_ENTITY    = "ETASK_Cached";
 
     /**
      * Clears the {@link ExtraPropertiesEnricher} cache after each test to prevent cross-test pollution.
