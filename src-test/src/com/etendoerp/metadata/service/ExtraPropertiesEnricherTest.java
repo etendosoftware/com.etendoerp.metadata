@@ -44,6 +44,12 @@ import static org.mockito.Mockito.when;
  */
 public class ExtraPropertiesEnricherTest {
 
+    private static final String FK_PROP_PRIORITY = "priority";
+    private static final String CACHED_ENTITY    = CACHED_ENTITY;
+
+    /**
+     * Clears the {@link ExtraPropertiesEnricher} cache after each test to prevent cross-test pollution.
+     */
     @After
     public void tearDown() {
         ExtraPropertiesEnricher.clearCache();
@@ -102,7 +108,7 @@ public class ExtraPropertiesEnricherTest {
             mpMock.when(ModelProvider::getInstance).thenReturn(mp);
 
             Entity referencedEntity = mockEntityWithColorProperty("color");
-            Property fkProp = mockFkProperty("priority", referencedEntity);
+            Property fkProp = mockFkProperty(FK_PROP_PRIORITY, referencedEntity);
 
             Entity entity = mock(Entity.class);
             when(entity.getProperties()).thenReturn(Collections.singletonList(fkProp));
@@ -110,7 +116,7 @@ public class ExtraPropertiesEnricherTest {
 
             String result = ExtraPropertiesEnricher.getExtraProperties("ETASK_TaskType");
 
-            assertEquals("priority.color", result);
+            assertEquals(FK_PROP_PRIORITY + ".color", result);
         }
     }
 
@@ -125,7 +131,7 @@ public class ExtraPropertiesEnricherTest {
             mpMock.when(ModelProvider::getInstance).thenReturn(mp);
 
             Property fk1 = mockFkProperty("status", mockEntityWithColorProperty("statusColor"));
-            Property fk2 = mockFkProperty("priority", mockEntityWithColorProperty("color"));
+            Property fk2 = mockFkProperty(FK_PROP_PRIORITY, mockEntityWithColorProperty("color"));
 
             Entity entity = mock(Entity.class);
             when(entity.getProperties()).thenReturn(Arrays.asList(fk1, fk2));
@@ -133,7 +139,7 @@ public class ExtraPropertiesEnricherTest {
 
             String result = ExtraPropertiesEnricher.getExtraProperties("ETASK_Task");
 
-            assertEquals("status.statusColor,priority.color", result);
+            assertEquals("status.statusColor," + FK_PROP_PRIORITY + ".color", result);
         }
     }
 
@@ -184,7 +190,7 @@ public class ExtraPropertiesEnricherTest {
             Entity referencedEntity = mock(Entity.class);
             when(referencedEntity.getProperties()).thenReturn(Collections.singletonList(nonColorProp));
 
-            Property fkProp = mockFkProperty("priority", referencedEntity);
+            Property fkProp = mockFkProperty(FK_PROP_PRIORITY, referencedEntity);
 
             Entity entity = mock(Entity.class);
             when(entity.getProperties()).thenReturn(Collections.singletonList(fkProp));
@@ -205,12 +211,12 @@ public class ExtraPropertiesEnricherTest {
         try (MockedStatic<ModelProvider> mpMock = mockStatic(ModelProvider.class)) {
             ModelProvider mp = mock(ModelProvider.class);
             mpMock.when(ModelProvider::getInstance).thenReturn(mp);
-            when(mp.getEntity("ETASK_Cached", false)).thenReturn(null);
+            when(mp.getEntity(CACHED_ENTITY, false)).thenReturn(null);
 
-            ExtraPropertiesEnricher.getExtraProperties("ETASK_Cached");
-            ExtraPropertiesEnricher.getExtraProperties("ETASK_Cached");
+            ExtraPropertiesEnricher.getExtraProperties(CACHED_ENTITY);
+            ExtraPropertiesEnricher.getExtraProperties(CACHED_ENTITY);
 
-            verify(mp, times(1)).getEntity("ETASK_Cached", false);
+            verify(mp, times(1)).getEntity(CACHED_ENTITY, false);
         }
     }
 

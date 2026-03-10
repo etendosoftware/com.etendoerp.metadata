@@ -55,6 +55,10 @@ public class ForwarderServletTest {
     private static final String TEST_PATH = "/some/path";
     private static final String ENTITY_PATH = "/ETASK_TaskType";
     private static final String ENTITY_NAME = "ETASK_TaskType";
+    private static final String OPERATION_TYPE_PARAM = "_operationType";
+    private static final String EXTRA_PROPERTIES_PARAM = "_extraProperties";
+    private static final String FETCH_OPERATION = "fetch";
+    private static final String COLOR_EXTRA_PROP = "priority.color";
 
     private ForwarderServlet forwarderServlet;
 
@@ -78,6 +82,9 @@ public class ForwarderServletTest {
 
     /**
      * GET requests must be forwarded to {@link DataSourceServlet#doGet}.
+     *
+     * @throws ServletException if servlet processing fails
+     * @throws IOException      if an I/O error occurs
      */
     @Test
     public void processGetShouldDelegateToDataSourceServletDoGet() throws ServletException, IOException {
@@ -95,6 +102,9 @@ public class ForwarderServletTest {
     /**
      * POST requests that are not fetch operations must be forwarded to {@link DataSourceServlet#doPost}
      * with the original (unwrapped) request.
+     *
+     * @throws ServletException if servlet processing fails
+     * @throws IOException      if an I/O error occurs
      */
     @Test
     public void processNonFetchPostShouldDelegateToDataSourceServletDoPostUnchanged()
@@ -104,7 +114,7 @@ public class ForwarderServletTest {
                     .thenReturn(dataSourceServlet);
             when(request.getMethod()).thenReturn("POST");
             when(request.getPathInfo()).thenReturn(ENTITY_PATH);
-            when(request.getParameter("_operationType")).thenReturn("add");
+            when(request.getParameter(OPERATION_TYPE_PARAM)).thenReturn("add");
 
             forwarderServlet.process(request, response);
 
@@ -114,6 +124,9 @@ public class ForwarderServletTest {
 
     /**
      * DELETE requests must be forwarded to {@link DataSourceServlet#doDelete}.
+     *
+     * @throws ServletException if servlet processing fails
+     * @throws IOException      if an I/O error occurs
      */
     @Test
     public void processDeleteShouldDelegateToDataSourceServletDoDelete() throws ServletException, IOException {
@@ -130,6 +143,9 @@ public class ForwarderServletTest {
 
     /**
      * PUT requests must be forwarded to {@link DataSourceServlet#doPut}.
+     *
+     * @throws ServletException if servlet processing fails
+     * @throws IOException      if an I/O error occurs
      */
     @Test
     public void processPutShouldDelegateToDataSourceServletDoPut() throws ServletException, IOException {
@@ -152,6 +168,9 @@ public class ForwarderServletTest {
      * A POST fetch request for an entity that has FK fields with Color columns must be
      * forwarded to {@link DataSourceServlet#doPost} with an enriched wrapper that carries
      * {@code _extraProperties}.
+     *
+     * @throws ServletException if servlet processing fails
+     * @throws IOException      if an I/O error occurs
      */
     @Test
     public void processFetchPostShouldInjectExtraPropertiesIntoWrapper()
@@ -162,24 +181,27 @@ public class ForwarderServletTest {
             weldUtilsMock.when(() -> WeldUtils.getInstanceFromStaticBeanManager(DataSourceServlet.class))
                     .thenReturn(dataSourceServlet);
             enricherMock.when(() -> ExtraPropertiesEnricher.getExtraProperties(ENTITY_NAME))
-                    .thenReturn("priority.color");
+                    .thenReturn(COLOR_EXTRA_PROP);
 
             when(request.getMethod()).thenReturn("POST");
             when(request.getPathInfo()).thenReturn(ENTITY_PATH);
-            when(request.getParameter("_operationType")).thenReturn("fetch");
+            when(request.getParameter(OPERATION_TYPE_PARAM)).thenReturn(FETCH_OPERATION);
             when(request.getParameterMap()).thenReturn(Collections.emptyMap());
 
             ArgumentCaptor<HttpServletRequest> reqCaptor = ArgumentCaptor.forClass(HttpServletRequest.class);
             forwarderServlet.process(request, response);
 
             verify(dataSourceServlet).doPost(reqCaptor.capture(), eq(response));
-            assertEquals("priority.color", reqCaptor.getValue().getParameter("_extraProperties"));
+            assertEquals(COLOR_EXTRA_PROP, reqCaptor.getValue().getParameter(EXTRA_PROPERTIES_PARAM));
         }
     }
 
     /**
      * When the request already carries {@code _extraProperties}, the enriched value must
      * be appended with a comma separator rather than replacing the existing value.
+     *
+     * @throws ServletException if servlet processing fails
+     * @throws IOException      if an I/O error occurs
      */
     @Test
     public void processFetchPostShouldAppendToExistingExtraProperties()
@@ -190,25 +212,28 @@ public class ForwarderServletTest {
             weldUtilsMock.when(() -> WeldUtils.getInstanceFromStaticBeanManager(DataSourceServlet.class))
                     .thenReturn(dataSourceServlet);
             enricherMock.when(() -> ExtraPropertiesEnricher.getExtraProperties(ENTITY_NAME))
-                    .thenReturn("priority.color");
+                    .thenReturn(COLOR_EXTRA_PROP);
 
             when(request.getMethod()).thenReturn("POST");
             when(request.getPathInfo()).thenReturn(ENTITY_PATH);
-            when(request.getParameter("_operationType")).thenReturn("fetch");
+            when(request.getParameter(OPERATION_TYPE_PARAM)).thenReturn(FETCH_OPERATION);
             when(request.getParameterMap()).thenReturn(
-                    Collections.singletonMap("_extraProperties", new String[]{ "existing.prop" }));
+                    Collections.singletonMap(EXTRA_PROPERTIES_PARAM, new String[]{ "existing.prop" }));
 
             ArgumentCaptor<HttpServletRequest> reqCaptor = ArgumentCaptor.forClass(HttpServletRequest.class);
             forwarderServlet.process(request, response);
 
             verify(dataSourceServlet).doPost(reqCaptor.capture(), eq(response));
-            assertEquals("existing.prop,priority.color", reqCaptor.getValue().getParameter("_extraProperties"));
+            assertEquals("existing.prop," + COLOR_EXTRA_PROP, reqCaptor.getValue().getParameter(EXTRA_PROPERTIES_PARAM));
         }
     }
 
     /**
      * A POST fetch request for an entity with no Color FK fields must be forwarded with the
      * original request object (no wrapper created).
+     *
+     * @throws ServletException if servlet processing fails
+     * @throws IOException      if an I/O error occurs
      */
     @Test
     public void processFetchPostWithNoColorPropertiesShouldNotWrapRequest()
@@ -223,7 +248,7 @@ public class ForwarderServletTest {
 
             when(request.getMethod()).thenReturn("POST");
             when(request.getPathInfo()).thenReturn(ENTITY_PATH);
-            when(request.getParameter("_operationType")).thenReturn("fetch");
+            when(request.getParameter(OPERATION_TYPE_PARAM)).thenReturn(FETCH_OPERATION);
 
             forwarderServlet.process(request, response);
 
@@ -237,6 +262,8 @@ public class ForwarderServletTest {
 
     /**
      * {@link ForwarderServlet#doGet} must delegate to {@link ForwarderServlet#process}.
+     *
+     * @throws Exception if an error occurs during invocation
      */
     @Test
     public void doGetShouldCallProcessMethod() throws Exception {
@@ -253,6 +280,8 @@ public class ForwarderServletTest {
 
     /**
      * {@link ForwarderServlet#doPost} must delegate to {@link ForwarderServlet#process}.
+     *
+     * @throws Exception if an error occurs during invocation
      */
     @Test
     public void doPostShouldCallProcessMethod() throws Exception {
@@ -271,6 +300,8 @@ public class ForwarderServletTest {
 
     /**
      * {@link ForwarderServlet#doPut} must delegate to {@link ForwarderServlet#process}.
+     *
+     * @throws Exception if an error occurs during invocation
      */
     @Test
     public void doPutShouldCallProcessMethod() throws Exception {
@@ -287,6 +318,8 @@ public class ForwarderServletTest {
 
     /**
      * {@link ForwarderServlet#doDelete} must delegate to {@link ForwarderServlet#process}.
+     *
+     * @throws Exception if an error occurs during invocation
      */
     @Test
     public void doDeleteShouldCallProcessMethod() throws Exception {

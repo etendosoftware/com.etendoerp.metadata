@@ -88,18 +88,14 @@ public class ExtraPropertiesEnricher {
 
             List<String> parts = new ArrayList<>();
             for (Property prop : entity.getProperties()) {
-                if (prop.isOneToMany() || prop.isId() || prop.isPrimitive()) {
-                    continue;
-                }
-
-                Entity targetEntity = prop.getTargetEntity();
-                if (targetEntity == null) {
-                    continue;
-                }
-
-                Property colorProp = findColorProperty(targetEntity);
-                if (colorProp != null) {
-                    parts.add(prop.getName() + "." + colorProp.getName());
+                if (!prop.isOneToMany() && !prop.isId() && !prop.isPrimitive()) {
+                    Entity targetEntity = prop.getTargetEntity();
+                    if (targetEntity != null) {
+                        Property colorProp = findColorProperty(targetEntity);
+                        if (colorProp != null) {
+                            parts.add(prop.getName() + "." + colorProp.getName());
+                        }
+                    }
                 }
             }
 
