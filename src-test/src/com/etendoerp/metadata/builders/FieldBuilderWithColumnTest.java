@@ -42,6 +42,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.openbravo.base.model.Entity;
 import org.openbravo.base.model.Property;
+import org.openbravo.base.model.domaintype.DomainType;
 import org.openbravo.client.application.ApplicationConstants;
 import org.openbravo.client.application.DynamicExpressionParser;
 import org.openbravo.client.kernel.KernelUtils;
@@ -567,6 +568,111 @@ class FieldBuilderWithColumnTest {
         assertTrue(result.getJSONObject("column").has("propertyPath"),
                 "column JSON must expose propertyPath so the frontend can detect property fields");
         assertEquals(propertyPath, result.getJSONObject("column").getString("propertyPath"));
+    }
+
+    /* ---------------------------------------------------------------------- */
+    /* Color field name tests */
+    /* ---------------------------------------------------------------------- */
+
+    /**
+     * Helper that builds a full try-with-resources block, allowing callers to provide extra
+     * mock setup for {@code Utils} and the referenced property/entity.
+     */
+    private JSONObject executeToJSONWithUtils(Runnable extraMocks) throws JSONException {
+        try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
+                MockedStatic<KernelUtils> mockedKernelUtils = mockStatic(KernelUtils.class);
+                MockedStatic<DataSourceUtils> mockedDataSourceUtils = mockStatic(DataSourceUtils.class);
+                MockedStatic<OBDal> mockedOBDal = mockStatic(OBDal.class);
+                MockedStatic<Utils> mockedUtils = mockStatic(Utils.class);
+                MockedConstruction<DataToJsonConverter> ignored = mockConstruction(
+                        DataToJsonConverter.class,
+                        (mock, context) -> {
+                            JSONObject base = new JSONObject().put("id", FIELD_ID);
+                            when(mock.toJsonObject(any(Field.class),
+                                    eq(DataResolvingMode.FULL_TRANSLATABLE))).thenReturn(base);
+                            when(mock.toJsonObject(any(Column.class),
+                                    eq(DataResolvingMode.FULL_TRANSLATABLE)))
+                                    .thenReturn(new JSONObject().put("id", COLUMN_ID));
+                        })) {
+
+            mockedOBContext.when(OBContext::getOBContext).thenReturn(obContext);
+            when(obContext.getLanguage()).thenReturn(language);
+            mockedKernelUtils.when(() -> KernelUtils.getProperty(field)).thenReturn(fieldProperty);
+            mockedUtils.when(() -> Utils.getReferencedTab(any(Property.class))).thenReturn(null);
+            mockedDataSourceUtils.when(
+                    () -> DataSourceUtils.getHQLColumnName(true, TEST_TABLE_NAME, TEST_COLUMN_NAME))
+                    .thenReturn(new String[] { TEST_FIELD });
+
+            // Prevent OBDal.get() from hitting EntityAccessChecker when referencedProperty is non-null
+            mockedOBDal.when(OBDal::getInstance).thenReturn(obDal);
+            when(obDal.get(eq(Table.class), any())).thenReturn(table);
+            when(obDal.createCriteria(Tab.class)).thenReturn(criteria);
+            when(criteria.add(any(Criterion.class))).thenReturn(criteria);
+            when(criteria.setMaxResults(anyInt())).thenReturn(criteria);
+            when(criteria.uniqueResult()).thenReturn(null);
+
+            if (extraMocks != null) {
+                extraMocks.run();
+            }
+
+            fieldBuilder = new FieldBuilderWithColumn(field, fieldAccess);
+            return fieldBuilder.toJSON();
+        }
+    }
+
+    @Test
+    void testColorFieldNamePresentWhenReferencedEntityHasColorProperty() throws JSONException {
+        Property colorProperty = mock(Property.class);
+        DomainType colorDomainType = mock(DomainType.class);
+        org.openbravo.base.model.Reference colorReference = mock(org.openbravo.base.model.Reference.class);
+
+        when(colorProperty.isOneToMany()).thenReturn(false);
+        when(colorProperty.isId()).thenReturn(false);
+        when(colorProperty.getDomainType()).thenReturn(colorDomainType);
+        when(colorDomainType.getReference()).thenReturn(colorReference);
+        when(colorReference.getId()).thenReturn(Constants.COLOR_REFERENCE_ID);
+        when(colorProperty.getName()).thenReturn("color");
+
+        when(fieldProperty.getReferencedProperty()).thenReturn(referencedProperty);
+        when(referencedProperty.getEntity()).thenReturn(referencedEntity);
+        when(referencedEntity.getProperties()).thenReturn(List.of(colorProperty));
+
+        JSONObject result = executeToJSONWithUtils(null);
+
+        assertTrue(result.has(Constants.COLOR_FIELD_NAME),
+                "colorFieldName must be present when referenced entity has a Color-typed property");
+        assertEquals("color", result.getString(Constants.COLOR_FIELD_NAME));
+    }
+
+    @Test
+    void testColorFieldNameAbsentWhenReferencedEntityHasNoColorProperty() throws JSONException {
+        Property nonColorProperty = mock(Property.class);
+        DomainType nonColorDomainType = mock(DomainType.class);
+        org.openbravo.base.model.Reference nonColorReference = mock(org.openbravo.base.model.Reference.class);
+
+        when(nonColorProperty.isOneToMany()).thenReturn(false);
+        when(nonColorProperty.isId()).thenReturn(false);
+        when(nonColorProperty.getDomainType()).thenReturn(nonColorDomainType);
+        when(nonColorDomainType.getReference()).thenReturn(nonColorReference);
+        when(nonColorReference.getId()).thenReturn("10"); // String reference, not Color
+
+        when(fieldProperty.getReferencedProperty()).thenReturn(referencedProperty);
+        when(referencedProperty.getEntity()).thenReturn(referencedEntity);
+        when(referencedEntity.getProperties()).thenReturn(List.of(nonColorProperty));
+
+        JSONObject result = executeToJSONWithUtils(null);
+
+        assertFalse(result.has(Constants.COLOR_FIELD_NAME),
+                "colorFieldName must be absent when referenced entity has no Color-typed property");
+    }
+
+    @Test
+    void testColorFieldNameAbsentWhenNoReferencedProperty() throws JSONException {
+        // fieldProperty.getReferencedProperty() returns null by default (not mocked)
+        JSONObject result = executeToJSONWithUtils(null);
+
+        assertFalse(result.has(Constants.COLOR_FIELD_NAME),
+                "colorFieldName must be absent when the field has no referenced property");
     }
 
     @Test

@@ -42,6 +42,7 @@ import org.openbravo.model.ad.ui.Window;
 import org.openbravo.service.json.DataResolvingMode;
 
 import static com.etendoerp.metadata.utils.Utils.getReferencedTab;
+import org.openbravo.base.model.domaintype.DomainType;
 import org.openbravo.dal.core.OBContext;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -288,7 +289,40 @@ public class FieldBuilderWithColumn extends FieldBuilder {
                 json.put(REFERENCED_WINDOW_ID, referencedTab.getWindow().getId());
                 json.put(REFERENCED_TAB_ID, referencedTab.getId());
             }
+
+            Property colorProp = findColorProperty(referenced.getEntity());
+            if (colorProp != null) {
+                json.put(Constants.COLOR_FIELD_NAME, colorProp.getName());
+            }
         }
+    }
+
+    /**
+     * Finds the first property in the given entity that has a Color-type AD_Reference (ID "27").
+     *
+     * @param entity The referenced entity to inspect
+     * @return The color property, or null if none found
+     */
+    private Property findColorProperty(Entity entity) {
+        return entity.getProperties().stream()
+                .filter(p -> !p.isOneToMany() && !p.isId() && isColorProperty(p))
+                .findFirst()
+                .orElse(null);
+    }
+
+    /**
+     * Returns true if the property's domain type corresponds to the Color AD_Reference (ID "27").
+     *
+     * @param p The property to check
+     * @return true if the property is a Color-typed column
+     */
+    private boolean isColorProperty(Property p) {
+        DomainType dt = p.getDomainType();
+        if (dt == null) {
+            return false;
+        }
+        org.openbravo.base.model.Reference ref = dt.getReference();
+        return ref != null && Constants.COLOR_REFERENCE_ID.equals(ref.getId());
     }
 
     /**
