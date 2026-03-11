@@ -125,8 +125,19 @@ public class ConstantsTest {
      */
     @Test
     public void testServletPathLength() {
-        assertEquals("Servlet path length should match actual length", 
-                     Constants.SERVLET_PATH.length(), Constants.SERVLET_PATH_LENGTH);
+        assertEquals("Servlet path length should match actual length",
+                Constants.SERVLET_PATH.length(), Constants.SERVLET_PATH_LENGTH);
+    }
+
+    /**
+     * Tests color-related constants used for FK color-field enrichment.
+     */
+    @Test
+    public void testColorConstants() {
+        assertEquals("Color reference ID must be the AD_Reference ID for Color",
+                "27", Constants.COLOR_REFERENCE_ID);
+        assertEquals("Color field name key used in metadata JSON",
+                "colorFieldName", Constants.COLOR_FIELD_NAME);
     }
 
     /**
