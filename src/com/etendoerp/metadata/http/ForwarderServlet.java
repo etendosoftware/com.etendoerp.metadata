@@ -62,21 +62,21 @@ public class ForwarderServlet extends BaseWebService {
 
     private void processForwardRequest(String path, HttpServletRequest request, HttpServletResponse response)
             throws IOException, ServletException {
-
         org.openbravo.service.datasource.DataSourceServlet dataSourceServlet =
                 WeldUtils.getInstanceFromStaticBeanManager(org.openbravo.service.datasource.DataSourceServlet.class);
-
         String method = request.getMethod();
-        HttpServletRequest enrichedRequest = "POST".equalsIgnoreCase(method) ? tryEnrichRequest(request, path) : request;
 
+        HttpServletRequest enrichedRequest = ("POST".equalsIgnoreCase(method) || "PUT".equalsIgnoreCase(method) || "GET".equalsIgnoreCase(method))
+                ? tryEnrichRequest(request, path)
+                : request;
         if ("POST".equalsIgnoreCase(method)) {
             dataSourceServlet.doPost(enrichedRequest, response);
         } else if ("DELETE".equalsIgnoreCase(method)) {
             dataSourceServlet.doDelete(request, response);
         } else if ("PUT".equalsIgnoreCase(method)) {
-            dataSourceServlet.doPut(request, response);
+            dataSourceServlet.doPut(enrichedRequest, response);
         } else {
-            dataSourceServlet.doGet(request, response);
+            dataSourceServlet.doGet(enrichedRequest, response);
         }
     }
 
@@ -91,7 +91,9 @@ public class ForwarderServlet extends BaseWebService {
      */
     private HttpServletRequest tryEnrichRequest(HttpServletRequest request, String pathInfo) {
         String operationType = request.getParameter("_operationType");
-        if (!"fetch".equals(operationType)) {
+
+        if (operationType != null && !operationType.isEmpty() &&
+                !"fetch".equals(operationType) && !"add".equals(operationType) && !"update".equals(operationType)) {
             return request;
         }
         String entityName = request.getParameter("_entityName");

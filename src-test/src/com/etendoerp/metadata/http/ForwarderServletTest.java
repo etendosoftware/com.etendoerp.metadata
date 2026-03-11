@@ -57,7 +57,8 @@ public class ForwarderServletTest {
     private static final String ENTITY_NAME = "ETASK_TaskType";
     private static final String OPERATION_TYPE_PARAM = "_operationType";
     private static final String EXTRA_PROPERTIES_PARAM = "_extraProperties";
-    private static final String FETCH_OPERATION = "fetch";
+    private static final String FETCH_OPERATION  = "fetch";
+    private static final String REMOVE_OPERATION = "remove";
     private static final String COLOR_EXTRA_PROP = "priority.color";
 
     private ForwarderServlet forwarderServlet;
@@ -100,21 +101,21 @@ public class ForwarderServletTest {
     }
 
     /**
-     * POST requests that are not fetch operations must be forwarded to {@link DataSourceServlet#doPost}
-     * with the original (unwrapped) request.
+     * POST requests with an operation type that is not enriched (e.g. {@code "remove"}) must be
+     * forwarded to {@link DataSourceServlet#doPost} with the original (unwrapped) request.
      *
      * @throws ServletException if servlet processing fails
      * @throws IOException      if an I/O error occurs
      */
     @Test
-    public void processNonFetchPostShouldDelegateToDataSourceServletDoPostUnchanged()
+    public void processNonEnrichablePostShouldDelegateToDataSourceServletDoPostUnchanged()
             throws ServletException, IOException {
         try (MockedStatic<WeldUtils> weldUtilsMock = mockStatic(WeldUtils.class)) {
             weldUtilsMock.when(() -> WeldUtils.getInstanceFromStaticBeanManager(DataSourceServlet.class))
                     .thenReturn(dataSourceServlet);
             when(request.getMethod()).thenReturn("POST");
             when(request.getPathInfo()).thenReturn(ENTITY_PATH);
-            when(request.getParameter(OPERATION_TYPE_PARAM)).thenReturn("add");
+            when(request.getParameter(OPERATION_TYPE_PARAM)).thenReturn(REMOVE_OPERATION);
 
             forwarderServlet.process(request, response);
 
