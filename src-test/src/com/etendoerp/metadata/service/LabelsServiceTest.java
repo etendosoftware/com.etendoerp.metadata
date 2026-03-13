@@ -17,18 +17,27 @@
 
 package com.etendoerp.metadata.service;
 
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.Writer;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import org.codehaus.jettison.json.JSONException;
+import org.codehaus.jettison.json.JSONObject;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
+import org.mockito.MockedConstruction;
+import org.mockito.MockedStatic;
 import org.mockito.junit.MockitoJUnitRunner;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import java.io.IOException;
-
+import org.openbravo.dal.core.OBContext;
+import com.etendoerp.metadata.builders.LabelsBuilder;
+import com.etendoerp.metadata.exceptions.InternalServerException;
 import static org.junit.Assert.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
 
 /**
  * Test class for LabelsService.
@@ -43,6 +52,9 @@ public class LabelsServiceTest {
     @Mock
     private HttpServletResponse mockResponse;
 
+    @Mock
+    private Writer mockWriter;
+
     /**
      * Tests LabelsService constructor and inheritance.
      */
@@ -56,9 +68,6 @@ public class LabelsServiceTest {
 
     /**
      * Tests LabelsService process method execution.
-     * Expects exceptions in test environment due to missing dependencies.
-     * 
-     * @throws IOException if an I/O error occurs during processing
      */
     @Test
     public void testProcess() throws IOException {
@@ -75,20 +84,18 @@ public class LabelsServiceTest {
     }
 
     /**
-     * Tests LabelsService process method exception handling.
-     * 
-     * @throws IOException if an I/O error occurs during processing
+     * Tests LabelsService process method with JSONException.
      */
-    @Test
-    public void testProcessWithException() throws IOException {
+    @Test(expected = InternalServerException.class)
+    public void testProcessWithJSONException() throws IOException {
         LabelsService service = new LabelsService(mockRequest, mockResponse);
-        
-        // Test that the service can be created and handles exceptions gracefully
-        try {
+
+        try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
+             MockedConstruction<LabelsBuilder> mockedBuilder = mockConstruction(LabelsBuilder.class, (mock, context) -> {
+                 when(mock.toJSON()).thenThrow(new JSONException("test exception"));
+             })) {
+            
             service.process();
-        } catch (Exception e) {
-            // Any exception is acceptable in test environment
-            assertNotNull("Exception should not be null", e);
         }
     }
 }
