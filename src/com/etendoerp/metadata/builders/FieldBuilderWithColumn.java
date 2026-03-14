@@ -197,18 +197,58 @@ public class FieldBuilderWithColumn extends FieldBuilder {
         }
 
         if (referenced != null) {
+            Tab referencedTab = resolveReferencedTab(referenced);
+
+            if (referencedTab != null) {
+                json.put(REFERENCED_ENTITY, referenced.getEntity().getName());
+                json.put(REFERENCED_WINDOW_ID, referencedTab.getWindow().getId());
+                json.put(REFERENCED_TAB_ID, referencedTab.getId());
+            }
+        }
+    }
+
+    /**
+     * Resolves the referenced tab, taking into account the current window's sales transaction status.
+     * It attempts to find a "twin" window that matches the sales transaction status of the current window.
+     *
+     * @param referenced the referenced property
+     * @return the resolved Tab, or null if not found
+     */
+    private Tab resolveReferencedTab(Property referenced) {
+        if (referenced == null) {
+            return null;
+        }
+
+        try {
             String tableId = referenced.getEntity().getTableId();
             Table table = OBDal.getInstance().get(Table.class, tableId);
-            Tab referencedTab = (Tab) OBDal.getInstance().createCriteria(Tab.class).add(
-                    Restrictions.eq(Tab.PROPERTY_TABLE, table)).setMaxResults(1).uniqueResult();
-            Window referencedWindow = referencedTab != null ? referencedTab.getWindow() : null;
-            String tabId = referencedTab != null ? referencedTab.getId() : null;
-            String windowId = referencedWindow != null ? referencedWindow.getId() : null;
+            if (table == null) {
+                return null;
+            }
 
-            json.put(REFERENCED_ENTITY, referenced.getEntity().getName());
-            json.put(REFERENCED_WINDOW_ID, windowId);
-            json.put(REFERENCED_TAB_ID, tabId);
+            Window currentWindow = field.getTab().getWindow();
+            if (currentWindow != null) {
+                boolean currentIsSales = currentWindow.isSalesTransaction();
+
+                OBCriteria<Tab> criteria = OBDal.getInstance().createCriteria(Tab.class);
+                criteria.createAlias(Tab.PROPERTY_WINDOW, "w");
+                criteria.add(Restrictions.eq(Tab.PROPERTY_TABLE, table));
+                criteria.add(Restrictions.eq(Tab.PROPERTY_ACTIVE, true));
+                criteria.add(Restrictions.eq("w.salesTransaction", currentIsSales));
+                criteria.add(Restrictions.eq("tabLevel", 0L));
+                criteria.setMaxResults(1);
+
+                Tab resolvedTab = (Tab) criteria.uniqueResult();
+                if (resolvedTab != null) {
+                    return resolvedTab;
+                }
+            }
+        } catch (Exception e) {
+            logger.warn("Error resolving referenced tab for property {}: {}", referenced.getName(), e.getMessage());
         }
+
+        // Fallback to default resolution
+        return getReferencedTab(referenced);
     }
 
     /**
@@ -282,7 +322,7 @@ public class FieldBuilderWithColumn extends FieldBuilder {
         }
 
         if (referenced != null) {
-            Tab referencedTab = getReferencedTab(referenced);
+            Tab referencedTab = resolveReferencedTab(referenced);
 
             if (referencedTab != null) {
                 json.put(REFERENCED_ENTITY, referenced.getEntity().getName());
