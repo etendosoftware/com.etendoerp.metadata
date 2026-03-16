@@ -17,6 +17,7 @@
 
 package com.etendoerp.metadata.builders;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -25,6 +26,7 @@ import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.client.kernel.KernelUtils;
+import org.openbravo.client.application.ApplicationUtils;
 import org.openbravo.model.ad.access.FieldAccess;
 import org.openbravo.model.ad.access.TabAccess;
 import org.openbravo.model.ad.datamodel.Column;
@@ -136,10 +138,33 @@ public class TabBuilder extends Builder {
 
     if (tab.getTabLevel() == 0) return jsonColumns;
 
+    Tab parentTab = getParentTab();
+    List<String> linkToParentColumns = new ArrayList<>();
+
     for (Column column : tab.getTable().getADColumnList()) {
       if (column.isLinkToParentColumn()) {
-        jsonColumns.put(TabProcessor.getEntityColumnName(column));
+        String entityColumnName = TabProcessor.getEntityColumnName(column);
+        if (StringUtils.isNotBlank(entityColumnName)) {
+          linkToParentColumns.add(entityColumnName);
+        }
       }
+    }
+
+    if (parentTab != null) {
+      String parentProperty = ApplicationUtils.getParentProperty(tab, parentTab);
+      if (StringUtils.isNotBlank(parentProperty)) {
+        jsonColumns.put(parentProperty);
+        if (!linkToParentColumns.isEmpty() && !linkToParentColumns.contains(parentProperty)) {
+          logger.warn(
+              "Parent columns mismatch in tab {} ({}). parentTabId={}, parentProperty='{}', linkToParentColumns={}",
+              tab.getId(), tab.getName(), parentTab.getId(), parentProperty, linkToParentColumns);
+        }
+        return jsonColumns;
+      }
+    }
+
+    for (String columnName : linkToParentColumns) {
+      jsonColumns.put(columnName);
     }
 
     return jsonColumns;

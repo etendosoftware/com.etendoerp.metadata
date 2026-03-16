@@ -16,11 +16,26 @@ import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+
+import com.auth0.jwt.interfaces.Claim;
+import com.auth0.jwt.interfaces.DecodedJWT;
+import com.smf.securewebservices.utils.SecureWebServicesUtils;
+import org.mockito.MockedStatic;
+import org.openbravo.dal.core.OBContext;
+import org.openbravo.dal.service.OBDal;
+import org.openbravo.model.ad.access.User;
+
+import javax.servlet.http.Cookie;
 
 import static com.etendoerp.metadata.MetadataTestConstants.SALES_INVOICE_HEADER_EDITION_HTML;
 import static com.etendoerp.metadata.MetadataTestConstants.TOKEN;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
@@ -44,6 +59,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
     private static final String TEST_UPPERCASE_JS_FILE = "/web/js/script.JS";
     public static final String REDIRECT = "/redirect";
     public static final String LOCATION = "location";
+    private static final String USER_ID_KEY = "userId";
 
     @Mock
     private HttpServletRequest request;
@@ -471,5 +487,140 @@ public class LegacyProcessServletTest extends OBBaseTest {
         if (!condition) {
             throw new AssertionError(message);
         }
+    }
+
+    // ========== Tests for newly requested methods (using reflection for
+    // private/protected) ==========
+
+    private Object invokePrivateMethod(Object obj, String methodName, Class<?>[] parameterTypes, Object... args)
+            throws Exception {
+        Method method = obj.getClass().getDeclaredMethod(methodName, parameterTypes);
+        method.setAccessible(true);
+        return method.invoke(obj, args);
+    }
+
+    /**
+     * Tests setSessionCookie method.
+     */
+    @Test
+    public void testSetSessionCookie() throws Exception {
+        when(response.getHeaders("Set-Cookie")).thenReturn(Collections.emptyList());
+
+        invokePrivateMethod(legacyProcessServlet, "setSessionCookie",
+                new Class<?>[] { HttpServletResponse.class, String.class },
+                response, "test-session-id");
+
+        verify(response).addHeader(eq("Set-Cookie"), contains("JSESSIONID=test-session-id"));
+    }
+
+    /**
+     * Tests processRedirectRequest with invalid token.
+     */
+    @Test
+    public void testProcessRedirectRequestInvalidToken() throws Exception {
+        when(request.getParameter("token")).thenReturn("invalid-token");
+
+        try (MockedStatic<SecureWebServicesUtils> mockedUtils = mockStatic(SecureWebServicesUtils.class)) {
+            mockedUtils.when(() -> SecureWebServicesUtils.decodeToken("invalid-token"))
+                    .thenThrow(new RuntimeException("invalid"));
+
+            invokePrivateMethod(legacyProcessServlet, "processRedirectRequest",
+                    new Class<?>[] { HttpServletRequest.class, HttpServletResponse.class, String.class },
+                    request, response, REDIRECT);
+
+            verify(response).sendError(eq(HttpServletResponse.SC_UNAUTHORIZED), anyString());
+        }
+    }
+
+    /**
+     * Tests authenticateWithToken success path.
+     */
+    @Test
+    public void testAuthenticateWithToken() throws Exception {
+        DecodedJWT decodedJWT = mock(DecodedJWT.class);
+        Claim userClaim = mock(Claim.class);
+        Claim roleClaim = mock(Claim.class);
+        Claim clientClaim = mock(Claim.class);
+        Claim orgClaim = mock(Claim.class);
+        User mockUser = mock(User.class);
+
+        when(userClaim.asString()).thenReturn(USER_ID_KEY);
+        when(roleClaim.asString()).thenReturn("roleId");
+        when(clientClaim.asString()).thenReturn("clientId");
+        when(orgClaim.asString()).thenReturn("orgId");
+        when(decodedJWT.getClaim("user")).thenReturn(userClaim);
+        when(decodedJWT.getClaim("role")).thenReturn(roleClaim);
+        when(decodedJWT.getClaim("client")).thenReturn(clientClaim);
+        when(decodedJWT.getClaim("organization")).thenReturn(orgClaim);
+        when(mockUser.getUsername()).thenReturn("testuser");
+
+        try (MockedStatic<SecureWebServicesUtils> mockedUtils = mockStatic(SecureWebServicesUtils.class);
+                MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
+                MockedStatic<OBDal> mockedOBDal = mockStatic(OBDal.class)) {
+
+            mockedUtils.when(() -> SecureWebServicesUtils.decodeToken("valid-token")).thenReturn(decodedJWT);
+
+            OBDal dal = mock(OBDal.class);
+            mockedOBDal.when(OBDal::getInstance).thenReturn(dal);
+            when(dal.get(User.class, USER_ID_KEY)).thenReturn(mockUser);
+
+            invokePrivateMethod(legacyProcessServlet, "authenticateWithToken",
+                    new Class<?>[] { HttpServletRequest.class, String.class },
+                    request, "valid-token");
+
+            mockedOBContext
+                    .verify(() -> OBContext.setOBContext(eq(USER_ID_KEY), eq("roleId"), eq("clientId"), eq("orgId"),
+                            isNull(), isNull()));
+        }
+    }
+
+    /**
+     * Tests sendErrorResponse.
+     */
+    @Test
+    public void testSendErrorResponse() throws Exception {
+        invokePrivateMethod(legacyProcessServlet, "sendErrorResponse",
+                new Class<?>[] { HttpServletResponse.class, int.class, String.class },
+                response, 403, "Forbidden");
+        verify(response).sendError(403, "Forbidden");
+    }
+
+    /**
+     * Tests createDBSession.
+     */
+    @Test
+    public void testCreateDBSessionNullUser() throws Exception {
+        String result = (String) invokePrivateMethod(legacyProcessServlet, "createDBSession",
+                new Class<?>[] { HttpServletRequest.class, String.class, String.class },
+                request, null, null);
+        assertNull("Should return null if user info is missing", result);
+    }
+
+    /**
+     * Tests processLegacyFollowupRequest without token in session.
+     */
+    @Test
+    public void testProcessLegacyFollowupRequestNoToken() throws Exception {
+        when(request.getSession(false)).thenReturn(session);
+        when(session.getAttribute("LEGACY_TOKEN")).thenReturn(null);
+
+        invokePrivateMethod(legacyProcessServlet, "processLegacyFollowupRequest",
+                new Class<?>[] { HttpServletRequest.class, HttpServletResponse.class },
+                request, response);
+
+        verify(response).sendError(eq(HttpServletResponse.SC_UNAUTHORIZED), anyString());
+    }
+
+    /**
+     * Tests injectCodeAfterFunctionCall.
+     */
+    @Test
+    public void testInjectCodeAfterFunctionCall() throws Exception {
+        String original = "function test() { submitThisPage('action'); }";
+        String result = (String) invokePrivateMethod(legacyProcessServlet, "injectCodeAfterFunctionCall",
+                new Class<?>[] { String.class, String.class, String.class, boolean.class },
+                original, "submitThisPage\\(([^)]+)\\);", "extra();", true);
+
+        assertTrue("Should contain injected code", result.contains("submitThisPage('action');extra();"));
     }
 }
