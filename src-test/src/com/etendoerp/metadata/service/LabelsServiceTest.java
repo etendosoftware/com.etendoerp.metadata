@@ -68,6 +68,8 @@ public class LabelsServiceTest {
 
     /**
      * Tests LabelsService process method execution.
+     * 
+     * @throws IOException if an I/O error occurs
      */
     @Test
     public void testProcess() throws IOException {
@@ -85,15 +87,17 @@ public class LabelsServiceTest {
 
     /**
      * Tests LabelsService process method with JSONException.
+     * 
+     * @throws IOException if an I/O error occurs
      */
     @Test(expected = InternalServerException.class)
     public void testProcessWithJSONException() throws IOException {
         LabelsService service = new LabelsService(mockRequest, mockResponse);
 
         try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
-             MockedConstruction<LabelsBuilder> mockedBuilder = mockConstruction(LabelsBuilder.class, (mock, context) -> {
-                 when(mock.toJSON()).thenThrow(new JSONException("test exception"));
-             })) {
+             MockedConstruction<LabelsBuilder> mockedBuilder = mockConstruction(LabelsBuilder.class, (mock, context) -> 
+                 when(mock.toJSON()).thenThrow(new JSONException("test exception"))
+             )) {
             
             service.process();
         }

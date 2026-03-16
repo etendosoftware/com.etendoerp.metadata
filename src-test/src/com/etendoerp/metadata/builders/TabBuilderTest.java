@@ -73,6 +73,7 @@ class TabBuilderTest {
     private static final String UI_PATTERN_KEY = "uIPattern";
     private static final String READ_ONLY_KEY = "readOnly";
     private static final String RO_PATTERN = "RO";
+    private static final String PARENT_COLUMN_KEY = "parentColumns";
 
     // Test data
     private static final String TEST_TABLE_NAME = "TestTable";
@@ -419,9 +420,9 @@ class TabBuilderTest {
         when(ctx.tab.getDisplayLogic()).thenReturn(displayLogic);
 
         try (MockedConstruction<DynamicExpressionParser> mockedParser = mockConstruction(DynamicExpressionParser.class,
-                (mock, context) -> {
-                    when(mock.getJSExpression()).thenReturn(parsedExpression);
-                })) {
+                (mock, context) -> 
+                    when(mock.getJSExpression()).thenReturn(parsedExpression)
+                )) {
 
             executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), result -> {
                 try {
@@ -444,13 +445,13 @@ class TabBuilderTest {
         when(ctx.tab.getDisplayLogic()).thenReturn(displayLogic);
 
         try (MockedConstruction<DynamicExpressionParser> mockedParser = mockConstruction(DynamicExpressionParser.class,
-                (mock, context) -> {
-                    when(mock.getJSExpression()).thenThrow(new RuntimeException("Parse error"));
-                })) {
+                (mock, context) -> 
+                    when(mock.getJSExpression()).thenThrow(new RuntimeException("Parse error"))
+                )) {
 
-            executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), result -> {
-                assertFalse(result.has("displayLogicExpression"));
-            });
+            executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), result -> 
+                assertFalse(result.has("displayLogicExpression"))
+            );
         }
     }
 
@@ -465,7 +466,7 @@ class TabBuilderTest {
 
         executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), result -> {
             try {
-                JSONArray parentColumns = result.getJSONArray("parentColumns");
+                JSONArray parentColumns = result.getJSONArray(PARENT_COLUMN_KEY);
                 assertEquals(0, parentColumns.length());
             } catch (JSONException e) {
                 fail(JSON_EXCEPTION + ": " + e.getMessage());
@@ -492,7 +493,7 @@ class TabBuilderTest {
 
             executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), result -> {
                 try {
-                    JSONArray parentColumns = result.getJSONArray("parentColumns");
+                    JSONArray parentColumns = result.getJSONArray(PARENT_COLUMN_KEY);
                     assertEquals(1, parentColumns.length());
                     assertEquals(parentProperty, parentColumns.getString(0));
                 } catch (JSONException e) {
@@ -522,7 +523,7 @@ class TabBuilderTest {
             mockedProcessor.when(() -> TabProcessor.getEntityColumnName(any())).thenReturn(columnName);
         }, result -> {
             try {
-                JSONArray parentColumns = result.getJSONArray("parentColumns");
+                JSONArray parentColumns = result.getJSONArray(PARENT_COLUMN_KEY);
                 assertEquals(1, parentColumns.length());
                 assertEquals(columnName, parentColumns.getString(0));
             } catch (JSONException e) {
@@ -587,10 +588,7 @@ class TabBuilderTest {
                 MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class,
                         (mock, context) -> {
                             JSONObject tabJson = new JSONObject();
-                            try {
-                                tabJson.put("entityName", TEST_TABLE_NAME);
-                            } catch (JSONException ignored_exc) {
-                            }
+                            tabJson.put("entityName", TEST_TABLE_NAME);
                             when(mock.toJsonObject(any(), any())).thenReturn(tabJson);
                         })) {
 

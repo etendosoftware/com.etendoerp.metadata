@@ -59,6 +59,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
     private static final String TEST_UPPERCASE_JS_FILE = "/web/js/script.JS";
     public static final String REDIRECT = "/redirect";
     public static final String LOCATION = "location";
+    private static final String USER_ID_KEY = "userId";
 
     @Mock
     private HttpServletRequest request;
@@ -488,7 +489,8 @@ public class LegacyProcessServletTest extends OBBaseTest {
         }
     }
 
-    // ========== Tests for newly requested methods (using reflection for private/protected) ==========
+    // ========== Tests for newly requested methods (using reflection for
+    // private/protected) ==========
 
     private Object invokePrivateMethod(Object obj, String methodName, Class<?>[] parameterTypes, Object... args)
             throws Exception {
@@ -503,7 +505,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
     @Test
     public void testSetSessionCookie() throws Exception {
         when(response.getHeaders("Set-Cookie")).thenReturn(Collections.emptyList());
-        
+
         invokePrivateMethod(legacyProcessServlet, "setSessionCookie",
                 new Class<?>[] { HttpServletResponse.class, String.class },
                 response, "test-session-id");
@@ -517,14 +519,15 @@ public class LegacyProcessServletTest extends OBBaseTest {
     @Test
     public void testProcessRedirectRequestInvalidToken() throws Exception {
         when(request.getParameter("token")).thenReturn("invalid-token");
-        
+
         try (MockedStatic<SecureWebServicesUtils> mockedUtils = mockStatic(SecureWebServicesUtils.class)) {
-            mockedUtils.when(() -> SecureWebServicesUtils.decodeToken("invalid-token")).thenThrow(new RuntimeException("invalid"));
-            
+            mockedUtils.when(() -> SecureWebServicesUtils.decodeToken("invalid-token"))
+                    .thenThrow(new RuntimeException("invalid"));
+
             invokePrivateMethod(legacyProcessServlet, "processRedirectRequest",
                     new Class<?>[] { HttpServletRequest.class, HttpServletResponse.class, String.class },
-                    request, response, "/redirect");
-            
+                    request, response, REDIRECT);
+
             verify(response).sendError(eq(HttpServletResponse.SC_UNAUTHORIZED), anyString());
         }
     }
@@ -541,7 +544,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
         Claim orgClaim = mock(Claim.class);
         User mockUser = mock(User.class);
 
-        when(userClaim.asString()).thenReturn("userId");
+        when(userClaim.asString()).thenReturn(USER_ID_KEY);
         when(roleClaim.asString()).thenReturn("roleId");
         when(clientClaim.asString()).thenReturn("clientId");
         when(orgClaim.asString()).thenReturn("orgId");
@@ -552,20 +555,22 @@ public class LegacyProcessServletTest extends OBBaseTest {
         when(mockUser.getUsername()).thenReturn("testuser");
 
         try (MockedStatic<SecureWebServicesUtils> mockedUtils = mockStatic(SecureWebServicesUtils.class);
-             MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
-             MockedStatic<OBDal> mockedOBDal = mockStatic(OBDal.class)) {
-            
+                MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
+                MockedStatic<OBDal> mockedOBDal = mockStatic(OBDal.class)) {
+
             mockedUtils.when(() -> SecureWebServicesUtils.decodeToken("valid-token")).thenReturn(decodedJWT);
-            
+
             OBDal dal = mock(OBDal.class);
             mockedOBDal.when(OBDal::getInstance).thenReturn(dal);
-            when(dal.get(User.class, "userId")).thenReturn(mockUser);
-            
+            when(dal.get(User.class, USER_ID_KEY)).thenReturn(mockUser);
+
             invokePrivateMethod(legacyProcessServlet, "authenticateWithToken",
                     new Class<?>[] { HttpServletRequest.class, String.class },
                     request, "valid-token");
-            
-            mockedOBContext.verify(() -> OBContext.setOBContext(eq("userId"), eq("roleId"), eq("clientId"), eq("orgId"), isNull(), isNull()));
+
+            mockedOBContext
+                    .verify(() -> OBContext.setOBContext(eq(USER_ID_KEY), eq("roleId"), eq("clientId"), eq("orgId"),
+                            isNull(), isNull()));
         }
     }
 
@@ -615,7 +620,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
         String result = (String) invokePrivateMethod(legacyProcessServlet, "injectCodeAfterFunctionCall",
                 new Class<?>[] { String.class, String.class, String.class, boolean.class },
                 original, "submitThisPage\\(([^)]+)\\);", "extra();", true);
-        
+
         assertTrue("Should contain injected code", result.contains("submitThisPage('action');extra();"));
     }
 }
