@@ -31,6 +31,7 @@ import org.openbravo.client.application.ApplicationConstants;
 import org.openbravo.client.application.DynamicExpressionParser;
 import org.openbravo.client.kernel.KernelUtils;
 import org.openbravo.dal.service.OBDal;
+import org.openbravo.data.Sqlc;
 import org.openbravo.model.ad.access.FieldAccess;
 import org.openbravo.model.ad.datamodel.Column;
 import org.openbravo.model.ad.datamodel.Table;
@@ -41,6 +42,7 @@ import org.openbravo.model.ad.ui.Window;
 import org.openbravo.service.json.DataResolvingMode;
 
 import static com.etendoerp.metadata.utils.Utils.getReferencedTab;
+import org.openbravo.base.model.domaintype.DomainType;
 import org.openbravo.dal.core.OBContext;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -148,8 +150,19 @@ public class FieldBuilderWithColumn extends FieldBuilder {
         boolean mandatory = column.isMandatory();
         boolean isParentRecordProperty = isParentRecordProperty(field, field.getTab());
         JSONObject columnJson = converter.toJsonObject(field.getColumn(), DataResolvingMode.FULL_TRANSLATABLE);
-        String inputName = getInputName(column);
         String columnName = column.getDBColumnName();
+
+        String propertyPath = field.getProperty();
+        String inputName;
+        if (propertyPath != null && !propertyPath.isEmpty()) {
+            // Property field: inputName must match FormInitializationComponent.setValuesInRequest()
+            // convention: "inp_propertyField_" + lowerCamelCase(fieldName) + "_" + columnDBName
+            String transformedFieldName = Sqlc.TransformaNombreColumna(field.getName()).replace(" ", "");
+            inputName = "inp_propertyField_" + transformedFieldName + "_" + columnName;
+            columnJson.put("propertyPath", propertyPath);
+        } else {
+            inputName = getInputName(column);
+        }
 
         json.put(COLUMN_NAME, columnName);
         json.put(COLUMN, columnJson);
@@ -276,7 +289,40 @@ public class FieldBuilderWithColumn extends FieldBuilder {
                 json.put(REFERENCED_WINDOW_ID, referencedTab.getWindow().getId());
                 json.put(REFERENCED_TAB_ID, referencedTab.getId());
             }
+
+            Property colorProp = findColorProperty(referenced.getEntity());
+            if (colorProp != null) {
+                json.put(Constants.COLOR_FIELD_NAME, colorProp.getName());
+            }
         }
+    }
+
+    /**
+     * Finds the first property in the given entity that has a Color-type AD_Reference (ID "27").
+     *
+     * @param entity The referenced entity to inspect
+     * @return The color property, or null if none found
+     */
+    private Property findColorProperty(Entity entity) {
+        return entity.getProperties().stream()
+                .filter(p -> !p.isOneToMany() && !p.isId() && isColorProperty(p))
+                .findFirst()
+                .orElse(null);
+    }
+
+    /**
+     * Returns true if the property's domain type corresponds to the Color AD_Reference (ID "27").
+     *
+     * @param p The property to check
+     * @return true if the property is a Color-typed column
+     */
+    private boolean isColorProperty(Property p) {
+        DomainType dt = p.getDomainType();
+        if (dt == null) {
+            return false;
+        }
+        org.openbravo.base.model.Reference ref = dt.getReference();
+        return ref != null && Constants.COLOR_REFERENCE_ID.equals(ref.getId());
     }
 
     /**

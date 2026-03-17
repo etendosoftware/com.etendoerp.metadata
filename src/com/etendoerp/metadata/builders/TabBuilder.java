@@ -17,6 +17,7 @@
 
 package com.etendoerp.metadata.builders;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -25,6 +26,7 @@ import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.client.kernel.KernelUtils;
+import org.openbravo.client.application.ApplicationUtils;
 import org.openbravo.model.ad.access.FieldAccess;
 import org.openbravo.model.ad.access.TabAccess;
 import org.openbravo.model.ad.datamodel.Column;
@@ -48,10 +50,25 @@ public class TabBuilder extends Builder {
 
   private final Tab tab;
   private final TabAccess tabAccess;
+  private final boolean isWindowReadOnly;
 
-  public TabBuilder(Tab tab, TabAccess tabAccess) {
+  /**
+   * Constructs a TabBuilder for the given tab.
+   *
+   * @param tab              the tab entity to build JSON for
+   * @param tabAccess        the role-specific tab access configuration, or {@code null} if the tab
+   *                         has no explicit access record (e.g. when called from TabService or when
+   *                         the window has no TabAccess entries for the current role)
+   * @param isWindowReadOnly {@code true} if the parent window was resolved as read-only (either
+   *                         because {@code WindowAccess.isEditableField()} is {@code false} or
+   *                         because the role has no explicit WindowAccess and the fallback is
+   *                         implicit read-only); when {@code true}, the generated JSON will have
+   *                         {@code uIPattern = "RO"} regardless of the tab-level access settings
+   */
+  public TabBuilder(Tab tab, TabAccess tabAccess, boolean isWindowReadOnly) {
     this.tab = tab;
     this.tabAccess = tabAccess;
+    this.isWindowReadOnly = isWindowReadOnly;
   }
 
   public JSONObject toJSON() {
@@ -80,6 +97,12 @@ public class TabBuilder extends Builder {
 
       if (parentTab != null) {
         json.put("parentTabId", parentTab.getId());
+      }
+
+      boolean isTabReadOnly = isWindowReadOnly || (tabAccess != null && !tabAccess.isEditableField());
+      if (isTabReadOnly) {
+        json.put("uIPattern", "RO");
+        json.put("readOnly", true);
       }
 
       return json;
@@ -115,10 +138,33 @@ public class TabBuilder extends Builder {
 
     if (tab.getTabLevel() == 0) return jsonColumns;
 
+    Tab parentTab = getParentTab();
+    List<String> linkToParentColumns = new ArrayList<>();
+
     for (Column column : tab.getTable().getADColumnList()) {
       if (column.isLinkToParentColumn()) {
-        jsonColumns.put(TabProcessor.getEntityColumnName(column));
+        String entityColumnName = TabProcessor.getEntityColumnName(column);
+        if (StringUtils.isNotBlank(entityColumnName)) {
+          linkToParentColumns.add(entityColumnName);
+        }
       }
+    }
+
+    if (parentTab != null) {
+      String parentProperty = ApplicationUtils.getParentProperty(tab, parentTab);
+      if (StringUtils.isNotBlank(parentProperty)) {
+        jsonColumns.put(parentProperty);
+        if (!linkToParentColumns.isEmpty() && !linkToParentColumns.contains(parentProperty)) {
+          logger.warn(
+              "Parent columns mismatch in tab {} ({}). parentTabId={}, parentProperty='{}', linkToParentColumns={}",
+              tab.getId(), tab.getName(), parentTab.getId(), parentProperty, linkToParentColumns);
+        }
+        return jsonColumns;
+      }
+    }
+
+    for (String columnName : linkToParentColumns) {
+      jsonColumns.put(columnName);
     }
 
     return jsonColumns;
