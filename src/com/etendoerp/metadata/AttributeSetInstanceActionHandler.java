@@ -30,6 +30,7 @@ import org.openbravo.model.common.plm.AttributeSet;
 import org.openbravo.model.common.plm.AttributeSetInstance;
 import org.openbravo.model.common.plm.AttributeUse;
 import org.openbravo.model.common.plm.AttributeValue;
+import org.openbravo.model.common.plm.Product;
 import org.openbravo.service.db.DalConnectionProvider;
 
 /**
@@ -44,10 +45,12 @@ public class AttributeSetInstanceActionHandler extends BaseActionHandler {
   private static final Logger log = LogManager.getLogger();
   private static final String BUTTON_VALUE_FETCH = "FETCH";
   private static final String BUTTON_VALUE_CONFIG = "CONFIG";
+  private static final String BUTTON_VALUE_PRODUCT = "PRODUCT";
   private static final String PARAMS = "_params";
   private static final String STATUS = "status";
   private static final String MESSAGE = "message";
   private static final String INSTANCE_ID = "instanceId";
+  private static final String ATTRIBUTE_SET_ID = "attributeSetId";
   private static final String EXPIRATION_DATE = "expirationDate";
   private static final String STATUS_ERROR = "Error";
   private static final String STATUS_SUCCESS = "Success";
@@ -65,6 +68,8 @@ public class AttributeSetInstanceActionHandler extends BaseActionHandler {
         result = executeFetch(jsonContent);
       } else if (BUTTON_VALUE_CONFIG.equals(buttonValue)) {
         result = executeConfig(jsonContent);
+      } else if (BUTTON_VALUE_PRODUCT.equals(buttonValue)) {
+        result = executeProductConfig(jsonContent);
       } else {
         result = executeSave(jsonContent);
       }
@@ -82,10 +87,34 @@ public class AttributeSetInstanceActionHandler extends BaseActionHandler {
     return result;
   }
 
+  private JSONObject executeProductConfig(JSONObject jsonContent) throws Exception {
+    JSONObject result = new JSONObject();
+    JSONObject params = jsonContent.getJSONObject(PARAMS);
+    String productId = params.getString("productId");
+
+    Product product = OBDal.getInstance().get(Product.class, productId);
+    if (product == null) {
+      result.put(STATUS, STATUS_ERROR);
+      result.put(MESSAGE, "Product not found");
+      return result;
+    }
+
+    AttributeSet attributeSet = product.getAttributeSet();
+    if (attributeSet == null) {
+      result.put(STATUS, STATUS_ERROR);
+      result.put(MESSAGE, "No Attribute Set configured for this product");
+      return result;
+    }
+
+    result.put(STATUS, STATUS_SUCCESS);
+    result.put(ATTRIBUTE_SET_ID, attributeSet.getId());
+    return result;
+  }
+
   private JSONObject executeConfig(JSONObject jsonContent) throws Exception {
     JSONObject result = new JSONObject();
     JSONObject params = jsonContent.getJSONObject(PARAMS);
-    String attributeSetId = params.getString("attributeSetId");
+    String attributeSetId = params.getString(ATTRIBUTE_SET_ID);
 
     AttributeSet attrSet = OBDal.getInstance().get(AttributeSet.class, attributeSetId);
     if (attrSet == null) {
@@ -219,7 +248,7 @@ public class AttributeSetInstanceActionHandler extends BaseActionHandler {
     JSONObject result = new JSONObject();
     JSONObject params = jsonContent.getJSONObject(PARAMS);
 
-    String attributeSetId = params.getString("attributeSetId");
+    String attributeSetId = params.getString(ATTRIBUTE_SET_ID);
     String instanceId = params.optString(INSTANCE_ID, "");
     String lot = params.optString("lot", "");
     String serialNo = params.optString("serialNo", "");
