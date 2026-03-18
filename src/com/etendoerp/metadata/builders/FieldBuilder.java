@@ -314,6 +314,7 @@ public abstract class FieldBuilder extends Builder {
 
         if (selector.getProcessDefintion() != null) {
             selectorInfo.put("hasProcessDefinitionRelated", true);
+            selectorInfo.put("processDefinitionId", selector.getProcessDefintion().getId());
         }
 
         JSONArray gridColumns = new JSONArray();
