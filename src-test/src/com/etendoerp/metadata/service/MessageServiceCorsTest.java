@@ -41,6 +41,8 @@ import org.junit.Test;
  */
 public class MessageServiceCorsTest extends BaseMetadataServiceTest {
 
+  private static final String ACCESS_CONTROL_ALLOW_METHODS = "Access-Control-Allow-Methods";
+
   @Override
   protected String getServicePath() {
     return "/meta/message";
@@ -67,7 +69,7 @@ public class MessageServiceCorsTest extends BaseMetadataServiceTest {
     new MessageService(mockRequest, mockResponse).process();
 
     verify(mockResponse).setHeader(ACCESS_CONTROL_ALLOW_ORIGIN, HTTP_LOCALHOST_8080);
-    verify(mockResponse).setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
+    verify(mockResponse).setHeader(ACCESS_CONTROL_ALLOW_METHODS, "POST, GET, OPTIONS");
     verify(mockResponse).setHeader("Access-Control-Allow-Credentials", "true");
     verify(mockResponse).setHeader("Access-Control-Allow-Headers",
         "Content-Type, origin, accept, X-Requested-With");
@@ -84,7 +86,7 @@ public class MessageServiceCorsTest extends BaseMetadataServiceTest {
     new MessageService(mockRequest, mockResponse).process();
 
     verify(mockResponse, never()).setHeader(eq(ACCESS_CONTROL_ALLOW_ORIGIN), anyString());
-    verify(mockResponse, never()).setHeader(eq("Access-Control-Allow-Methods"), anyString());
+    verify(mockResponse, never()).setHeader(eq(ACCESS_CONTROL_ALLOW_METHODS), anyString());
   }
 
   /**
@@ -98,7 +100,7 @@ public class MessageServiceCorsTest extends BaseMetadataServiceTest {
     new MessageService(mockRequest, mockResponse).process();
 
     verify(mockResponse, never()).setHeader(eq(ACCESS_CONTROL_ALLOW_ORIGIN), anyString());
-    verify(mockResponse, never()).setHeader(eq("Access-Control-Allow-Methods"), anyString());
+    verify(mockResponse, never()).setHeader(eq(ACCESS_CONTROL_ALLOW_METHODS), anyString());
   }
 
   /**

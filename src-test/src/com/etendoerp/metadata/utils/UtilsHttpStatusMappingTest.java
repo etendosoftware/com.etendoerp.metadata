@@ -49,6 +49,7 @@ import com.etendoerp.metadata.exceptions.UnprocessableContentException;
 class UtilsHttpStatusMappingTest {
 
   private static final String UTF_8 = "UTF-8";
+  private static final String APPLICATION_JSON = "application/json";
 
   // ─── getHttpStatusFor ────────────────────────────────────────────────────────
 
@@ -153,7 +154,7 @@ class UtilsHttpStatusMappingTest {
     Utils.writeJsonResponse(mockResponse, 200, jsonContent);
 
     verify(mockResponse).setStatus(200);
-    verify(mockResponse).setContentType("application/json");
+    verify(mockResponse).setContentType(APPLICATION_JSON);
     verify(mockResponse).setCharacterEncoding(UTF_8);
     assertEquals(jsonContent, stringWriter.toString());
   }
@@ -170,7 +171,7 @@ class UtilsHttpStatusMappingTest {
     Utils.writeJsonResponse(mockResponse, 404, "{\"error\":\"not found\"}");
 
     verify(mockResponse).setStatus(404);
-    verify(mockResponse).setContentType("application/json");
+    verify(mockResponse).setContentType(APPLICATION_JSON);
     verify(mockResponse).setCharacterEncoding(UTF_8);
   }
 
@@ -186,7 +187,7 @@ class UtilsHttpStatusMappingTest {
     Utils.writeJsonResponse(mockResponse, 500, "{\"error\":\"internal error\"}");
 
     verify(mockResponse).setStatus(500);
-    verify(mockResponse).setContentType("application/json");
+    verify(mockResponse).setContentType(APPLICATION_JSON);
     verify(mockResponse).setCharacterEncoding(UTF_8);
   }
 
