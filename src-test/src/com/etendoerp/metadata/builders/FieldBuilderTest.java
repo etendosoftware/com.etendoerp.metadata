@@ -855,4 +855,167 @@ class FieldBuilderTest {
     assertFalse(result.getJSONObject(1).getBoolean("active"));
   }
 
+  /**
+   * Tests addSelectorInfo when a selector has a ProcessDefinition and grid columns
+   */
+  @Test
+  void testAddSelectorInfoWithProcessDefinitionAndGridColumns() throws Exception {
+    org.openbravo.client.application.Process processDef = mock(org.openbravo.client.application.Process.class);
+    when(processDef.getId()).thenReturn("process-def-id");
+    when(selector.getProcessDefintion()).thenReturn(processDef);
+
+    SelectorField gridField = mock(SelectorField.class);
+    when(gridField.isActive()).thenReturn(true);
+    when(gridField.isShowingrid()).thenReturn(true);
+    when(gridField.getId()).thenReturn("grid-field-id");
+    Language lang = mock(Language.class);
+    when(gridField.get(SelectorField.PROPERTY_NAME, lang)).thenReturn("Header");
+    when(gridField.isSortable()).thenReturn(true);
+    when(gridField.isFilterable()).thenReturn(true);
+    when(gridField.getSortno()).thenReturn(10L);
+    
+    // Setting up resolveReferenceId using Reference
+    Reference ref = mock(Reference.class);
+    when(ref.getId()).thenReturn("ref-id");
+    when(gridField.getReference()).thenReturn(ref);
+    
+    // Setting up getPropertyOrDataSourceField
+    when(gridField.getProperty()).thenReturn("propertyField");
+
+    when(selector.getOBUISELSelectorFieldList()).thenReturn(List.of(gridField));
+    
+    // Boilerplate for addSelectorInfo
+    when(selector.getObserdsDatasource()).thenReturn(null);
+    when(selector.isCustomQuery()).thenReturn(true);
+    when(selector.getId()).thenReturn("selector-id");
+    when(selector.getSuggestiontextmatchstyle()).thenReturn("exact");
+    when(selector.getDisplayfield()).thenReturn(null);
+    when(selector.getValuefield()).thenReturn(null);
+    
+    try (MockedStatic<FieldBuilder> mockedStatic = mockStatic(FieldBuilder.class, CALLS_REAL_METHODS);
+         MockedStatic<OBContext> obContextMockedStatic = mockStatic(OBContext.class)) {
+      OBContext obContext = mock(OBContext.class);
+      obContextMockedStatic.when(OBContext::getOBContext).thenReturn(obContext);
+      when(obContext.getLanguage()).thenReturn(lang);
+
+      mockedStatic.when(() -> FieldBuilder.getDisplayField(selector)).thenReturn("identifier");
+      mockedStatic.when(() -> FieldBuilder.getValueField(selector)).thenReturn("id");
+      mockedStatic.when(() -> FieldBuilder.getExtraSearchFields(selector)).thenReturn("");
+      
+      JSONObject result = FieldBuilder.addSelectorInfo(FIELD_ID, selector);
+      
+      assertTrue(result.getBoolean("hasProcessDefinitionRelated"));
+      assertEquals("process-def-id", result.getString("processDefinitionId"));
+      
+      assertTrue(result.getBoolean("hasTableRelated"));
+      JSONArray gridColumns = result.getJSONArray("gridColumns");
+      assertEquals(1, gridColumns.length());
+      
+      JSONObject col = gridColumns.getJSONObject(0);
+      assertEquals("grid-field-id", col.getString("id"));
+      assertEquals("Header", col.getString("header"));
+      assertEquals("propertyField", col.getString("accessorKey"));
+      assertTrue(col.getBoolean("enableSorting"));
+      assertTrue(col.getBoolean("enableFiltering"));
+      assertEquals("ref-id", col.getString("referenceId"));
+      assertEquals(10L, col.getLong("sortNo"));
+    }
+  }
+
+  /**
+   * Tests addSelectorInfo to ensure resolveReferenceId works through Column reference fallback
+   */
+  @Test
+  void testAddSelectorInfoWithGridColumnFallbackColumnReference() throws Exception {
+    when(selector.getProcessDefintion()).thenReturn(null);
+
+    SelectorField gridField = mock(SelectorField.class);
+    when(gridField.isActive()).thenReturn(true);
+    when(gridField.isShowingrid()).thenReturn(true);
+    when(gridField.getId()).thenReturn("grid-field-col");
+    Language lang = mock(Language.class);
+    when(gridField.getProperty()).thenReturn("propertyField");
+
+    // Setting up resolveReferenceId using Column Reference
+    when(gridField.getReference()).thenReturn(null);
+    Column gridCol = mock(Column.class);
+    Reference colRef = mock(Reference.class);
+    when(colRef.getId()).thenReturn("col-ref-id");
+    when(gridCol.getReference()).thenReturn(colRef);
+    when(gridField.getColumn()).thenReturn(gridCol);
+
+    when(selector.getOBUISELSelectorFieldList()).thenReturn(List.of(gridField));
+    
+    when(selector.getObserdsDatasource()).thenReturn(null);
+    when(selector.isCustomQuery()).thenReturn(true);
+    when(selector.getSuggestiontextmatchstyle()).thenReturn("exact");
+    when(selector.getId()).thenReturn("selector-id");
+    
+    try (MockedStatic<FieldBuilder> mockedStatic = mockStatic(FieldBuilder.class, CALLS_REAL_METHODS);
+         MockedStatic<OBContext> obContextMockedStatic = mockStatic(OBContext.class)) {
+      OBContext obContext = mock(OBContext.class);
+      obContextMockedStatic.when(OBContext::getOBContext).thenReturn(obContext);
+      when(obContext.getLanguage()).thenReturn(lang);
+
+      mockedStatic.when(() -> FieldBuilder.getDisplayField(selector)).thenReturn("identifier");
+      mockedStatic.when(() -> FieldBuilder.getValueField(selector)).thenReturn("id");
+      mockedStatic.when(() -> FieldBuilder.getExtraSearchFields(selector)).thenReturn("");
+      
+      JSONObject result = FieldBuilder.addSelectorInfo(FIELD_ID, selector);
+      
+      JSONArray gridColumns = result.getJSONArray("gridColumns");
+      JSONObject col = gridColumns.getJSONObject(0);
+      assertEquals("col-ref-id", col.getString("referenceId"));
+    }
+  }
+
+  /**
+   * Tests addSelectorInfo to ensure resolveReferenceId works through DataSourceField reference fallback
+   */
+  @Test
+  void testAddSelectorInfoWithGridColumnFallbackDatasourceReference() throws Exception {
+    when(selector.getProcessDefintion()).thenReturn(null);
+
+    SelectorField gridField = mock(SelectorField.class);
+    when(gridField.isActive()).thenReturn(true);
+    when(gridField.isShowingrid()).thenReturn(true);
+    when(gridField.getId()).thenReturn("grid-field-ds");
+    Language lang = mock(Language.class);
+    when(gridField.getProperty()).thenReturn("propertyField");
+
+    // Setting up resolveReferenceId using DataSourceField Reference
+    when(gridField.getReference()).thenReturn(null);
+    when(gridField.getColumn()).thenReturn(null);
+    
+    DatasourceField dsField = mock(DatasourceField.class);
+    Reference dsColRef = mock(Reference.class);
+    when(dsColRef.getId()).thenReturn("ds-ref-id");
+    when(dsField.getReference()).thenReturn(dsColRef);
+    when(gridField.getObserdsDatasourceField()).thenReturn(dsField);
+
+    when(selector.getOBUISELSelectorFieldList()).thenReturn(List.of(gridField));
+    
+    when(selector.getObserdsDatasource()).thenReturn(null);
+    when(selector.isCustomQuery()).thenReturn(true);
+    when(selector.getSuggestiontextmatchstyle()).thenReturn("exact");
+    when(selector.getId()).thenReturn("selector-id");
+    
+    try (MockedStatic<FieldBuilder> mockedStatic = mockStatic(FieldBuilder.class, CALLS_REAL_METHODS);
+         MockedStatic<OBContext> obContextMockedStatic = mockStatic(OBContext.class)) {
+      OBContext obContext = mock(OBContext.class);
+      obContextMockedStatic.when(OBContext::getOBContext).thenReturn(obContext);
+      when(obContext.getLanguage()).thenReturn(lang);
+
+      mockedStatic.when(() -> FieldBuilder.getDisplayField(selector)).thenReturn("identifier");
+      mockedStatic.when(() -> FieldBuilder.getValueField(selector)).thenReturn("id");
+      mockedStatic.when(() -> FieldBuilder.getExtraSearchFields(selector)).thenReturn("");
+      
+      JSONObject result = FieldBuilder.addSelectorInfo(FIELD_ID, selector);
+      
+      JSONArray gridColumns = result.getJSONArray("gridColumns");
+      JSONObject col = gridColumns.getJSONObject(0);
+      assertEquals("ds-ref-id", col.getString("referenceId"));
+    }
+  }
+
 }
