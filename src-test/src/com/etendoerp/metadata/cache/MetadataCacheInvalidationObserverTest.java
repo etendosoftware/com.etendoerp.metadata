@@ -65,9 +65,10 @@ class MetadataCacheInvalidationObserverTest {
         MockedStatic<WindowBuilder> windowBuilderMock = mockStatic(WindowBuilder.class);
         MockedStatic<FieldBuilderWithColumn> fieldBuilderMock = mockStatic(FieldBuilderWithColumn.class)
     ) {
-      Entity observedEntity = setupMocks(modelProviderMock, triggerMock);
+      setupMocks(modelProviderMock, triggerMock);
 
       MetadataCacheInvalidationObserver observer = new MetadataCacheInvalidationObserver();
+      Entity observedEntity = observer.getObservedEntities()[0];
 
       EntityNewEvent event = createNewEvent(observedEntity);
       observer.onNew(event);
@@ -88,9 +89,10 @@ class MetadataCacheInvalidationObserverTest {
         MockedStatic<WindowBuilder> windowBuilderMock = mockStatic(WindowBuilder.class);
         MockedStatic<FieldBuilderWithColumn> fieldBuilderMock = mockStatic(FieldBuilderWithColumn.class)
     ) {
-      Entity observedEntity = setupMocks(modelProviderMock, triggerMock);
+      setupMocks(modelProviderMock, triggerMock);
 
       MetadataCacheInvalidationObserver observer = new MetadataCacheInvalidationObserver();
+      Entity observedEntity = observer.getObservedEntities()[0];
 
       EntityUpdateEvent event = createUpdateEvent(observedEntity);
       observer.onUpdate(event);
@@ -108,9 +110,10 @@ class MetadataCacheInvalidationObserverTest {
         MockedStatic<WindowBuilder> windowBuilderMock = mockStatic(WindowBuilder.class);
         MockedStatic<FieldBuilderWithColumn> fieldBuilderMock = mockStatic(FieldBuilderWithColumn.class)
     ) {
-      Entity observedEntity = setupMocks(modelProviderMock, triggerMock);
+      setupMocks(modelProviderMock, triggerMock);
 
       MetadataCacheInvalidationObserver observer = new MetadataCacheInvalidationObserver();
+      Entity observedEntity = observer.getObservedEntities()[0];
 
       EntityDeleteEvent event = createDeleteEvent(observedEntity);
       observer.onDelete(event);
@@ -128,12 +131,13 @@ class MetadataCacheInvalidationObserverTest {
         MockedStatic<WindowBuilder> windowBuilderMock = mockStatic(WindowBuilder.class);
         MockedStatic<FieldBuilderWithColumn> fieldBuilderMock = mockStatic(FieldBuilderWithColumn.class)
     ) {
-      Entity observedEntity = setupMocks(modelProviderMock, triggerMock);
+      setupMocks(modelProviderMock, triggerMock);
 
       TriggerHandler mockTriggerHandler = TriggerHandler.getInstance();
       when(mockTriggerHandler.isDisabled()).thenReturn(true);
 
       MetadataCacheInvalidationObserver observer = new MetadataCacheInvalidationObserver();
+      Entity observedEntity = observer.getObservedEntities()[0];
 
       EntityNewEvent event = createNewEvent(observedEntity);
       observer.onNew(event);
