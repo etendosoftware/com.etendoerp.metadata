@@ -60,6 +60,11 @@ import org.openbravo.dal.service.OBCriteria;
  */
 public class FieldBuilderWithColumn extends FieldBuilder {
     private static final Map<String, Boolean> windowAccessCache = new ConcurrentHashMap<>();
+
+    public static void clearWindowAccessCache() {
+        windowAccessCache.clear();
+    }
+
     private static final String COLUMN_NAME = "columnName";
     private static final String COLUMN = "column";
     private static final String IS_MANDATORY = "isMandatory";

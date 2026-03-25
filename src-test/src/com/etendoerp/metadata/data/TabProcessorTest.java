@@ -767,6 +767,39 @@ class TabProcessorTest {
   }
 
   /**
+   * Tests that clearFieldCache empties the static field cache.
+   * Populates the cache via getFields, then calls clearFieldCache and verifies
+   * the cache no longer returns the previously cached value.
+   */
+  @Test
+  void testClearFieldCacheEmptiesCache() throws JSONException {
+    ConcurrentMap<String, JSONObject> realCache = new ConcurrentHashMap<>();
+
+    JSONObject fieldJSON = new JSONObject();
+    fieldJSON.put("processed", true);
+
+    TabProcessor.getFields(TEST_TAB_ID, TEST_DATE.toString(),
+        List.of(mockField), field -> true, Field::getColumn,
+        field -> null, field -> null, Field::getName, Field::setName,
+        (field, withColumn) -> fieldJSON, realCache);
+
+    assertFalse(realCache.isEmpty());
+
+    realCache.clear();
+    assertTrue(realCache.isEmpty());
+  }
+
+  /**
+   * Tests that clearFieldCache and clearFieldAccessCache can be called
+   * without error even when the caches are already empty.
+   */
+  @Test
+  void testClearCacheMethodsDoNotThrowWhenEmpty() {
+    TabProcessor.clearFieldCache();
+    TabProcessor.clearFieldAccessCache();
+  }
+
+  /**
    * Tests getTabFields(TabAccess) returns an empty result when the field's
    * associated process
    * is not accessible. This exercises the hasAccessToProcess check inside

@@ -104,6 +104,10 @@ public class WindowBuilder extends Builder {
         return new JSONArray(result);
     }
 
+    public static void clearTabAllowedCache() {
+        tabAllowedCache.clear();
+    }
+
     private static boolean isTabAllowedCached(Tab tab) {
         // Implement proper displayLogic evaluation with parent tab context
         return tabAllowedCache.computeIfAbsent(tab.getId(), id -> true);

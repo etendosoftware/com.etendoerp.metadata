@@ -232,6 +232,14 @@ public class TabProcessor {
     }
   }
 
+  public static void clearFieldCache() {
+    fieldCache.clear();
+  }
+
+  public static void clearFieldAccessCache() {
+    fieldAccessCache.clear();
+  }
+
   public static boolean hasAccessToProcess(Field field, String windowId) {
     Column col = field.getColumn();
 

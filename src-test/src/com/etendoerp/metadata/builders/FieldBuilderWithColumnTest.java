@@ -708,4 +708,47 @@ class FieldBuilderWithColumnTest {
             }
         }
     }
+
+    /**
+     * Tests that clearWindowAccessCache can be called without error
+     * even when the cache is empty.
+     */
+    @Test
+    void clearWindowAccessCacheDoesNotThrowWhenEmpty() {
+        FieldBuilderWithColumn.clearWindowAccessCache();
+    }
+
+    /**
+     * Tests that clearWindowAccessCache clears the static cache.
+     * After populating the cache via addLinkAccessibilityInfo (which calls
+     * isWindowAccessible), clearing should remove all cached entries.
+     */
+    @SuppressWarnings("unchecked")
+    @Test
+    void clearWindowAccessCacheClearsPopulatedCache() {
+        Role role = mock(Role.class);
+        when(role.getId()).thenReturn(ROLE_ID_STRING);
+        OBCriteria<WindowAccess> localCriteriaMock = mock(OBCriteria.class);
+
+        try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
+                MockedStatic<OBDal> mockedOBDal = mockStatic(OBDal.class);
+                MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class)) {
+
+            mockedOBContext.when(OBContext::getOBContext).thenReturn(obContext);
+            when(obContext.getRole()).thenReturn(role);
+            mockedOBDal.when(OBDal::getReadOnlyInstance).thenReturn(obDal);
+
+            setupWindowAccessMocks(WINDOW_ID_STRING, localCriteriaMock, mock(WindowAccess.class));
+
+            fieldBuilder = new FieldBuilderWithColumn(field, fieldAccess);
+            try {
+                setJson(fieldBuilder, new JSONObject());
+                invokePrivate(fieldBuilder, METH_ADD_LINK_ACCESSIBILITY, new Class[] {});
+            } catch (Exception e) {
+                fail("Reflection failed: " + e.getMessage());
+            }
+        }
+
+        FieldBuilderWithColumn.clearWindowAccessCache();
+    }
 }

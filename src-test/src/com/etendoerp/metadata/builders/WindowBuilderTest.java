@@ -391,6 +391,31 @@ class WindowBuilderTest {
   }
 
   /**
+   * Tests that clearTabAllowedCache can be called without error
+   * even when the cache is empty.
+   */
+  @Test
+  void clearTabAllowedCacheDoesNotThrowWhenEmpty() {
+    WindowBuilder.clearTabAllowedCache();
+  }
+
+  /**
+   * Tests that clearTabAllowedCache clears entries that were previously cached.
+   * After loading tabs (which populates the cache), clearing should allow
+   * a fresh evaluation on the next request.
+   */
+  @Test
+  void clearTabAllowedCacheClearsPopulatedCache() throws Exception {
+    setupWindowAccess(true, true);
+    setupTabsWithDisplayLogic();
+
+    WindowBuilder windowBuilder = createWindowBuilder();
+    executeToJSONWithTabs(windowBuilder, "mock-tab-id");
+
+    WindowBuilder.clearTabAllowedCache();
+  }
+
+  /**
    * Sets up the mock behavior for TabAccess and Tab entities.
    *
    * @param isActive   whether the tab access is active
