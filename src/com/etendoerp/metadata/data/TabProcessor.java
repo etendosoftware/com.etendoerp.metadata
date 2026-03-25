@@ -232,10 +232,20 @@ public class TabProcessor {
     }
   }
 
+  /**
+   * Clears the internal field metadata cache.
+   * This method removes all cached JSONObject representations of standard fields
+   * to ensure that subsequent requests fetch fresh metadata from the database.
+   */
   public static void clearFieldCache() {
     fieldCache.clear();
   }
 
+  /**
+   * Clears the internal field access metadata cache.
+   * This method removes all cached JSONObject representations of fields accessed
+   * via specific tab access configurations, ensuring fresh metadata is loaded.
+   */
   public static void clearFieldAccessCache() {
     fieldAccessCache.clear();
   }

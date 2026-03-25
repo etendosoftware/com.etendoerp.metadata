@@ -104,6 +104,10 @@ public class WindowBuilder extends Builder {
         return new JSONArray(result);
     }
 
+    /**
+     * Clears the cache used to store whether a tab is allowed for the current context.
+     * This forces a re-evaluation of tab access permissions on subsequent requests.
+     */
     public static void clearTabAllowedCache() {
         tabAllowedCache.clear();
     }

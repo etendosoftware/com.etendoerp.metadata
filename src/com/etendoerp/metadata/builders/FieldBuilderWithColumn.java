@@ -61,6 +61,10 @@ import org.openbravo.dal.service.OBCriteria;
 public class FieldBuilderWithColumn extends FieldBuilder {
     private static final Map<String, Boolean> windowAccessCache = new ConcurrentHashMap<>();
 
+    /**
+     * Clears the cache used to store window accessibility results for roles.
+     * This forces a database check on subsequent evaluations of referenced window accessibility.
+     */
     public static void clearWindowAccessCache() {
         windowAccessCache.clear();
     }
