@@ -9,7 +9,7 @@
  * "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
  * implied. See the License for the specific language governing rights
  * and limitations under the License.
- * All portions are Copyright © 2021–2025 FUTIT SERVICES, S.L
+ * All portions are Copyright © 2021-2026 FUTIT SERVICES, S.L
  * All Rights Reserved.
  * Contributor(s): Futit Services S.L.
  *************************************************************************
@@ -60,6 +60,15 @@ import org.openbravo.dal.service.OBCriteria;
  */
 public class FieldBuilderWithColumn extends FieldBuilder {
     private static final Map<String, Boolean> windowAccessCache = new ConcurrentHashMap<>();
+
+    /**
+     * Clears the cache used to store window accessibility results for roles.
+     * This forces a database check on subsequent evaluations of referenced window accessibility.
+     */
+    public static void clearWindowAccessCache() {
+        windowAccessCache.clear();
+    }
+
     private static final String COLUMN_NAME = "columnName";
     private static final String COLUMN = "column";
     private static final String IS_MANDATORY = "isMandatory";

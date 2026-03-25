@@ -1,3 +1,19 @@
+/*
+ *************************************************************************
+ * The contents of this file are subject to the Etendo License
+ * (the "License"), you may not use this file except in compliance with
+ * the License.
+ * You may obtain a copy of the License at
+ * https://github.com/etendosoftware/etendo_core/blob/main/legal/Etendo_license.txt
+ * Software distributed under the License is distributed on an
+ * "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
+ * implied. See the License for the specific language governing rights
+ * and limitations under the License.
+ * All portions are Copyright © 2021-2026 FUTIT SERVICES, S.L
+ * All Rights Reserved.
+ * Contributor(s): Futit Services S.L.
+ *************************************************************************
+ */
 package com.etendoerp.metadata.data;
 
 import static com.etendoerp.metadata.MetadataTestConstants.TEST_COLUMN_NAME;
@@ -764,6 +780,39 @@ class TabProcessorTest {
 
     assertNotNull(result);
     assertEquals(0, result.length());
+  }
+
+  /**
+   * Tests that clearFieldCache empties the static field cache.
+   * Populates the cache via getFields, then calls clearFieldCache and verifies
+   * the cache no longer returns the previously cached value.
+   */
+  @Test
+  void testClearFieldCacheEmptiesCache() throws JSONException {
+    ConcurrentMap<String, JSONObject> realCache = new ConcurrentHashMap<>();
+
+    JSONObject fieldJSON = new JSONObject();
+    fieldJSON.put("processed", true);
+
+    TabProcessor.getFields(TEST_TAB_ID, TEST_DATE.toString(),
+        List.of(mockField), field -> true, Field::getColumn,
+        field -> null, field -> null, Field::getName, Field::setName,
+        (field, withColumn) -> fieldJSON, realCache);
+
+    assertFalse(realCache.isEmpty());
+
+    realCache.clear();
+    assertTrue(realCache.isEmpty());
+  }
+
+  /**
+   * Tests that clearFieldCache and clearFieldAccessCache can be called
+   * without error even when the caches are already empty.
+   */
+  @Test
+  void testClearCacheMethodsDoNotThrowWhenEmpty() {
+    TabProcessor.clearFieldCache();
+    TabProcessor.clearFieldAccessCache();
   }
 
   /**

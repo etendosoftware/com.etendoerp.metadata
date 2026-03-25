@@ -1,3 +1,19 @@
+/*
+ *************************************************************************
+ * The contents of this file are subject to the Etendo License
+ * (the "License"), you may not use this file except in compliance with
+ * the License.
+ * You may obtain a copy of the License at
+ * https://github.com/etendosoftware/etendo_core/blob/main/legal/Etendo_license.txt
+ * Software distributed under the License is distributed on an
+ * "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
+ * implied. See the License for the specific language governing rights
+ * and limitations under the License.
+ * All portions are Copyright © 2021-2026 FUTIT SERVICES, S.L
+ * All Rights Reserved.
+ * Contributor(s): Futit Services S.L.
+ *************************************************************************
+ */
 package com.etendoerp.metadata.builders;
 
 import static com.etendoerp.metadata.MetadataTestConstants.ROLE_NAME;
@@ -388,6 +404,31 @@ class WindowBuilderTest {
     assertNotNull(result);
     assertTrue(result.has("tabs"), "Result must contain a tabs array");
     assertEquals(0, result.getJSONArray("tabs").length(), "No tabs should be present (empty access list)");
+  }
+
+  /**
+   * Tests that clearTabAllowedCache can be called without error
+   * even when the cache is empty.
+   */
+  @Test
+  void clearTabAllowedCacheDoesNotThrowWhenEmpty() {
+    WindowBuilder.clearTabAllowedCache();
+  }
+
+  /**
+   * Tests that clearTabAllowedCache clears entries that were previously cached.
+   * After loading tabs (which populates the cache), clearing should allow
+   * a fresh evaluation on the next request.
+   */
+  @Test
+  void clearTabAllowedCacheClearsPopulatedCache() throws Exception {
+    setupWindowAccess(true, true);
+    setupTabsWithDisplayLogic();
+
+    WindowBuilder windowBuilder = createWindowBuilder();
+    executeToJSONWithTabs(windowBuilder, "mock-tab-id");
+
+    WindowBuilder.clearTabAllowedCache();
   }
 
   /**

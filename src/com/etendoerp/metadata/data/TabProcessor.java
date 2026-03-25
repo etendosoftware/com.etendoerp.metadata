@@ -9,7 +9,7 @@
  * "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
  * implied. See the License for the specific language governing rights
  * and limitations under the License.
- * All portions are Copyright © 2021–2025 FUTIT SERVICES, S.L
+ * All portions are Copyright © 2021-2026 FUTIT SERVICES, S.L
  * All Rights Reserved.
  * Contributor(s): Futit Services S.L.
  *************************************************************************
@@ -230,6 +230,24 @@ public class TabProcessor {
 
       return new JSONObject();
     }
+  }
+
+  /**
+   * Clears the internal field metadata cache.
+   * This method removes all cached JSONObject representations of standard fields
+   * to ensure that subsequent requests fetch fresh metadata from the database.
+   */
+  public static void clearFieldCache() {
+    fieldCache.clear();
+  }
+
+  /**
+   * Clears the internal field access metadata cache.
+   * This method removes all cached JSONObject representations of fields accessed
+   * via specific tab access configurations, ensuring fresh metadata is loaded.
+   */
+  public static void clearFieldAccessCache() {
+    fieldAccessCache.clear();
   }
 
   public static boolean hasAccessToProcess(Field field, String windowId) {

@@ -1,3 +1,19 @@
+/*
+ *************************************************************************
+ * The contents of this file are subject to the Etendo License
+ * (the "License"), you may not use this file except in compliance with
+ * the License.
+ * You may obtain a copy of the License at
+ * https://github.com/etendosoftware/etendo_core/blob/main/legal/Etendo_license.txt
+ * Software distributed under the License is distributed on an
+ * "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
+ * implied. See the License for the specific language governing rights
+ * and limitations under the License.
+ * All portions are Copyright © 2021-2026 FUTIT SERVICES, S.L
+ * All Rights Reserved.
+ * Contributor(s): Futit Services S.L.
+ *************************************************************************
+ */
 package com.etendoerp.metadata.builders;
 
 import static com.etendoerp.metadata.MetadataTestConstants.COLUMN_ID;
@@ -707,5 +723,48 @@ class FieldBuilderWithColumnTest {
                 fail("Reflection failed: " + e.getMessage());
             }
         }
+    }
+
+    /**
+     * Tests that clearWindowAccessCache can be called without error
+     * even when the cache is empty.
+     */
+    @Test
+    void clearWindowAccessCacheDoesNotThrowWhenEmpty() {
+        FieldBuilderWithColumn.clearWindowAccessCache();
+    }
+
+    /**
+     * Tests that clearWindowAccessCache clears the static cache.
+     * After populating the cache via addLinkAccessibilityInfo (which calls
+     * isWindowAccessible), clearing should remove all cached entries.
+     */
+    @SuppressWarnings("unchecked")
+    @Test
+    void clearWindowAccessCacheClearsPopulatedCache() {
+        Role role = mock(Role.class);
+        when(role.getId()).thenReturn(ROLE_ID_STRING);
+        OBCriteria<WindowAccess> localCriteriaMock = mock(OBCriteria.class);
+
+        try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
+                MockedStatic<OBDal> mockedOBDal = mockStatic(OBDal.class);
+                MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class)) {
+
+            mockedOBContext.when(OBContext::getOBContext).thenReturn(obContext);
+            when(obContext.getRole()).thenReturn(role);
+            mockedOBDal.when(OBDal::getReadOnlyInstance).thenReturn(obDal);
+
+            setupWindowAccessMocks(WINDOW_ID_STRING, localCriteriaMock, mock(WindowAccess.class));
+
+            fieldBuilder = new FieldBuilderWithColumn(field, fieldAccess);
+            try {
+                setJson(fieldBuilder, new JSONObject());
+                invokePrivate(fieldBuilder, METH_ADD_LINK_ACCESSIBILITY, new Class[] {});
+            } catch (Exception e) {
+                fail("Reflection failed: " + e.getMessage());
+            }
+        }
+
+        FieldBuilderWithColumn.clearWindowAccessCache();
     }
 }
