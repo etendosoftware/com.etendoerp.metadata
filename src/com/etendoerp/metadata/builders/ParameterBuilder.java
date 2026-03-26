@@ -85,7 +85,7 @@ public class ParameterBuilder extends Builder {
         try {
             String displayLogic = parameter.getDisplayLogic();
             if (displayLogic != null && !displayLogic.isBlank()) {
-                DynamicExpressionParser parser = new DynamicExpressionParser(displayLogic, parameter, false);
+                DynamicExpressionParser parser = new DynamicExpressionParser(displayLogic, parameter, true);
                 json.put("displayLogicExpression", parser.getJSExpression());
             }
         } catch (Exception e) {

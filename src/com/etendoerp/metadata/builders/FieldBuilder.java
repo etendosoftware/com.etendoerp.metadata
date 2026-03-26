@@ -25,6 +25,7 @@ import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.hibernate.criterion.Restrictions;
 import org.openbravo.base.exception.OBException;
+import org.openbravo.client.application.ApplicationConstants;
 import org.openbravo.base.model.Entity;
 import org.openbravo.base.model.ModelProvider;
 import org.openbravo.base.model.Property;
@@ -689,12 +690,15 @@ public abstract class FieldBuilder extends Builder {
     protected static String getHqlName(Field field) {
         try {
             Column fieldColumn = field.getColumn();
-            String dbTableName = fieldColumn.getTable().getDBTableName();
-            String dbColumnName = fieldColumn.getDBColumnName();
-            String[] names = DataSourceUtils.getHQLColumnName(true, dbTableName, dbColumnName);
+            // Only attempt DAL entity lookup for physical table-based tables (not HQL or other virtual types)
+            if (ApplicationConstants.TABLEBASEDTABLE.equals(fieldColumn.getTable().getDataOriginType())) {
+                String dbTableName = fieldColumn.getTable().getDBTableName();
+                String dbColumnName = fieldColumn.getDBColumnName();
+                String[] names = DataSourceUtils.getHQLColumnName(true, dbTableName, dbColumnName);
 
-            if (names.length > 0) {
-                return names[0];
+                if (names.length > 0) {
+                    return names[0];
+                }
             }
         } catch (Exception e) {
             logger.warn(e.getMessage(), e);
