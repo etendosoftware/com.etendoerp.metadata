@@ -74,68 +74,62 @@ public class ServiceFactory {
     private static MetadataService buildLegacyForwardService(HttpServletRequest req, HttpServletResponse res,
             String path) {
         return new MetadataService(req, res) {
-
             @Override
             public void process() throws ServletException, IOException {
                 try {
                     handleLegacySession(req, path);
-                    forwardRequest(req, res, path);
+                    forwardToPath(req, res, path);
                 } catch (Exception e) {
-                    handleException(e);
+                    rethrowLegacyException(e);
                 }
-            }
-
-            private void handleLegacySession(HttpServletRequest req, String path) {
-                if (!LegacyPaths.USED_BY_LINK.equals(path)) {
-                    return;
-                }
-                String windowId = req.getParameter("windowId");
-                String entityName = req.getParameter("entityName");
-                String recordId = req.getParameter("recordId");
-
-                if (windowId == null || entityName == null || recordId == null) {
-                    return;
-                }
-
-                Entity entity = ModelProvider.getInstance().getEntity(entityName);
-                if (entity == null) {
-                    log.warn("Entity '{}' not found in ModelProvider, cannot set session for UsedByLink", entityName);
-                    return;
-                }
-
-                java.util.List<Property> idProps = entity.getIdProperties();
-                if (idProps == null || idProps.size() != 1) {
-                    log.warn("Expected exactly one ID property for entity '{}', got {}", entityName, idProps);
-                    return;
-                }
-
-                String columnName = idProps.get(0).getColumnName();
-                String sessionAttribute = windowId + "|" + columnName;
-
-                HttpSession session = req.getSession(true);
-                session.setAttribute(sessionAttribute, recordId);
-            }
-
-            private void forwardRequest(HttpServletRequest req, HttpServletResponse res, String path)
-                    throws ServletException, IOException {
-
-                RequestDispatcher dispatcher = req.getServletContext().getRequestDispatcher(path);
-
-                if (dispatcher == null) {
-                    throw new ServletException("No dispatcher found for path: " + path);
-                }
-
-                dispatcher.forward(req, res);
-            }
-
-            private void handleException(Exception e) throws ServletException, IOException {
-                if (e instanceof ServletException)
-                    throw (ServletException) e;
-                if (e instanceof IOException)
-                    throw (IOException) e;
-                throw new InternalServerException("Failed to forward legacy request: " + e.getMessage(), e);
             }
         };
+    }
+
+    private static void handleLegacySession(HttpServletRequest req, String path) {
+        if (!LegacyPaths.USED_BY_LINK.equals(path)) {
+            return;
+        }
+        String windowId = req.getParameter("windowId");
+        String entityName = req.getParameter("entityName");
+        String recordId = req.getParameter("recordId");
+
+        if (windowId == null || entityName == null || recordId == null) {
+            return;
+        }
+
+        Entity entity = ModelProvider.getInstance().getEntity(entityName);
+        if (entity == null) {
+            log.warn("Entity '{}' not found in ModelProvider, cannot set session for UsedByLink", entityName);
+            return;
+        }
+
+        java.util.List<Property> idProps = entity.getIdProperties();
+        if (idProps == null || idProps.size() != 1) {
+            log.warn("Expected exactly one ID property for entity '{}', got {}", entityName, idProps);
+            return;
+        }
+
+        String columnName = idProps.get(0).getColumnName();
+        HttpSession session = req.getSession(true);
+        session.setAttribute(windowId + "|" + columnName, recordId);
+    }
+
+    private static void forwardToPath(HttpServletRequest req, HttpServletResponse res, String path)
+            throws ServletException, IOException {
+        RequestDispatcher dispatcher = req.getServletContext().getRequestDispatcher(path);
+        if (dispatcher == null) {
+            throw new ServletException("No dispatcher found for path: " + path);
+        }
+        dispatcher.forward(req, res);
+    }
+
+    private static void rethrowLegacyException(Exception e) throws ServletException, IOException {
+        if (e instanceof ServletException)
+            throw (ServletException) e;
+        if (e instanceof IOException)
+            throw (IOException) e;
+        throw new InternalServerException("Failed to forward legacy request: " + e.getMessage(), e);
     }
 
     public static MetadataService getService(final HttpServletRequest req, final HttpServletResponse res) {
