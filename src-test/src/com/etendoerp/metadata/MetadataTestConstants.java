@@ -191,6 +191,9 @@ public final class MetadataTestConstants {
   public static final String WELD_CONTAINER_NOT_INITIALIZED_ERROR = "IllegalStateException due to Weld container not being initialized is expected in unit tests";
   public static final String SINGLETON_NOT_SET_ERROR = "Singleton not set for STATIC_INSTANCE";
   public static final String TAB_PATH = "/tab/";
+  public static final String EMAIL_PATH = "/email";
+  public static final String EMAIL_SEND_PATH = "/email/send";
+  public static final String EMAIL_CONFIG_PATH = "/email/config";
   public static final String LEGACY_REQUEST_FAILED = "Failed to process legacy request";
   public static final String ENTITY_NAME_PROPERTY = "entityName";
   public static final String IDENTIFIER_PROPERTY = "identifier";
