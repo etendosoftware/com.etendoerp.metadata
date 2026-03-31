@@ -50,6 +50,9 @@ public class ServiceFactory {
         EXACT_MATCH_SERVICES.put(MESSAGE_PATH, MessageService::new);
         EXACT_MATCH_SERVICES.put(LABELS_PATH, LabelsService::new);
         EXACT_MATCH_SERVICES.put(PREFERENCES_PATH, PreferencesService::new);
+        EXACT_MATCH_SERVICES.put(EMAIL_SEND_PATH, EmailSendService::new);
+        EXACT_MATCH_SERVICES.put(EMAIL_CONFIG_PATH, EmailConfigService::new);
+        EXACT_MATCH_SERVICES.put(EMAIL_ATTACHMENTS_PATH, EmailAttachmentService::new);
 
         // Prefix match services (order matters for overlapping prefixes)
         PREFIX_MATCH_SERVICES.put(WINDOW_PATH, WindowService::new);
@@ -60,6 +63,7 @@ public class ServiceFactory {
         PREFIX_MATCH_SERVICES.put(REPORT_AND_PROCESS_PATH, ReportAndProcessService::new);
         PREFIX_MATCH_SERVICES.put(PROCESS_EXECUTION_PATH, ProcessExecutionService::new);
         PREFIX_MATCH_SERVICES.put(PROCESS_PATH, ProcessMetadataService::new);
+        PREFIX_MATCH_SERVICES.put(EMAIL_PATH, EmailService::new);
         PREFIX_MATCH_SERVICES.put(LEGACY_PATH, LegacyService::new);
     }
 
