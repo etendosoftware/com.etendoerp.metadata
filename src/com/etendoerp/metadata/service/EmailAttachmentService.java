@@ -17,16 +17,11 @@
 
 package com.etendoerp.metadata.service;
 
-import java.io.IOException;
-import java.util.List;
-
-import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONObject;
-import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.ui.Tab;
 
@@ -48,21 +43,7 @@ public class EmailAttachmentService extends EmailBaseService {
     }
 
     @Override
-    public void process() throws IOException, ServletException {
-        JSONObject result = new JSONObject();
-        try {
-            OBContext.setAdminMode(true);
-            try {
-                executeAttachmentLookup(result);
-            } finally {
-                OBContext.restorePreviousMode();
-            }
-        } catch (Exception ex) {
-            handleServiceError(result, ex, "Failed to load attachments.");
-        }
-    }
-
-    private void executeAttachmentLookup(JSONObject result) throws Exception {
+    protected void executeEmailAction(JSONObject result) throws Exception {
         String recordId = getRequest().getParameter("recordId");
         String tabId    = getRequest().getParameter("tabId");
 
@@ -78,34 +59,13 @@ public class EmailAttachmentService extends EmailBaseService {
         }
 
         JSONArray attachments = queryAttachments(tab.getTable().getId(), recordId);
-        result.put(KEY_SUCCESS,    true);
-        result.put("attachments",  attachments);
+        result.put(KEY_SUCCESS,   true);
+        result.put("attachments", attachments);
         write(result);
     }
 
-    private JSONArray queryAttachments(String tableId, String recordId) {
-        JSONArray attachments = new JSONArray();
-        try {
-            String normalizedId = recordId.replace("-", "").toUpperCase();
-            @SuppressWarnings("unchecked")
-            List<Object[]> rows = OBDal.getInstance().getSession()
-                .createNativeQuery(
-                    "SELECT c_file_id, name FROM c_file " +
-                    "WHERE ad_table_id = :tId " +
-                    "AND REPLACE(UPPER(ad_record_id), '-', '') = :rId " +
-                    "AND isactive = 'Y' ORDER BY name")
-                .setParameter("tId", tableId)
-                .setParameter("rId", normalizedId)
-                .list();
-            for (Object[] row : rows) {
-                JSONObject att = new JSONObject();
-                att.put("id",   row[0]);
-                att.put("name", row[1]);
-                attachments.put(att);
-            }
-        } catch (Exception ex) {
-            logger.warn("Could not load record attachments: {}", ex.getMessage());
-        }
-        return attachments;
+    @Override
+    protected String getFallbackErrorMessage() {
+        return "Failed to load attachments.";
     }
 }

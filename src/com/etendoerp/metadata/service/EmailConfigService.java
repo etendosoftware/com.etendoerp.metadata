@@ -17,19 +17,13 @@
 
 package com.etendoerp.metadata.service;
 
-import java.io.IOException;
-import java.util.List;
-
-import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONObject;
-import org.openbravo.base.model.ModelProvider;
 import org.openbravo.base.structure.BaseOBObject;
 import org.openbravo.dal.core.OBContext;
-import org.openbravo.dal.service.OBDal;
 import org.openbravo.database.ConnectionProvider;
 import org.openbravo.erpCommon.utility.reporting.TemplateData;
 import org.openbravo.erpCommon.utility.reporting.TemplateInfo;
@@ -63,64 +57,24 @@ public class EmailConfigService extends EmailBaseService {
     }
 
     @Override
-    public void process() throws IOException, ServletException {
-        JSONObject result = new JSONObject();
-        try {
-            OBContext.setAdminMode(true);
-            try {
-                executeConfig(result);
-            } finally {
-                OBContext.restorePreviousMode();
-            }
-        } catch (Exception ex) {
-            handleServiceError(result, ex, "Failed to load email configuration.");
-        }
-    }
-
-    private void executeConfig(JSONObject result) throws Exception {
-        String recordId = getRequest().getParameter("recordId");
-        String tabId    = getRequest().getParameter("tabId");
-
-        if (recordId == null || tabId == null) {
-            respond(result, false, "Missing recordId or tabId parameter.");
-            return;
-        }
-
-        Tab tab = OBDal.getInstance().get(Tab.class, tabId);
-        if (tab == null || tab.getTable() == null) {
-            respond(result, false, "Tab not found.");
-            return;
-        }
-
-        String entityName = ModelProvider.getInstance()
-                .getEntityByTableName(tab.getTable().getDBTableName()).getName();
-        BaseOBObject dataRecord = OBDal.getInstance().get(entityName, recordId);
-        if (dataRecord == null) {
-            respond(result, false, "Record not found.");
-            return;
-        }
-
-        Organization org = resolveOrganization(dataRecord);
-        String senderAddress = resolveSenderAddress(org);
-        if (senderAddress.isEmpty()) {
-            respond(result, false,
-                    "No sender defined. Please check Email Server configuration in Client settings.");
-            return;
-        }
-
-        Object docStatus = getDocumentStatus(dataRecord);
-        if (docStatus != null && !docStatus.equals("CO") && !docStatus.equals("CL")) {
-            respond(result, false,
-                    "Only completed or closed documents can be sent via email.");
-            return;
-        }
-
-        populateEmailConfig(result, tab, dataRecord, org, senderAddress, recordId);
+    protected void executeEmailAction(JSONObject result) throws Exception {
+        ValidationContext ctx = validateEmailRequest(result);
+        if (ctx == null) return;
+        populateEmailConfig(result, ctx);
         write(result);
     }
 
-    private void populateEmailConfig(JSONObject result, Tab tab, BaseOBObject dataRecord,
-            Organization org, String senderAddress, String recordId) throws Exception {
+    @Override
+    protected String getFallbackErrorMessage() {
+        return "Failed to load email configuration.";
+    }
+
+    private void populateEmailConfig(JSONObject result, ValidationContext ctx) throws Exception {
+        Tab tab             = ctx.getTab();
+        BaseOBObject dataRecord = ctx.getDataRecord();
+        Organization org    = ctx.getOrg();
+        String senderAddress = ctx.getSenderAddress();
+        String recordId     = ctx.getRecordId();
 
         result.put(KEY_SUCCESS,      true);
         result.put("to",             getRecipientEmail(dataRecord));
@@ -150,36 +104,7 @@ public class EmailConfigService extends EmailBaseService {
 
         result.put(SUBJECT, subject);
         result.put(BODY,    body);
-        result.put("recordAttachments", queryRecordAttachments(tab.getTable().getId(), recordId));
-    }
-
-    // ── Attachment query against c_file ──
-
-    private JSONArray queryRecordAttachments(String tableId, String recordId) {
-        JSONArray attachments = new JSONArray();
-        if (tableId == null || recordId == null) return attachments;
-        try {
-            String normalizedId = recordId.replace("-", "").toUpperCase();
-            @SuppressWarnings("unchecked")
-            List<Object[]> rows = OBDal.getInstance().getSession()
-                .createNativeQuery(
-                    "SELECT c_file_id, name FROM c_file " +
-                    "WHERE ad_table_id = :tId " +
-                    "AND REPLACE(UPPER(ad_record_id), '-', '') = :rId " +
-                    "AND isactive = 'Y' ORDER BY name")
-                .setParameter("tId", tableId)
-                .setParameter("rId", normalizedId)
-                .list();
-            for (Object[] row : rows) {
-                JSONObject att = new JSONObject();
-                att.put("id",   row[0]);
-                att.put("name", row[1]);
-                attachments.put(att);
-            }
-        } catch (Exception ex) {
-            logger.warn("Could not load record attachments: {}", ex.getMessage());
-        }
-        return attachments;
+        result.put("recordAttachments", queryAttachments(tab.getTable().getId(), recordId));
     }
 
     // ── Field helpers ──
