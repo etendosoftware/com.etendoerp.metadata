@@ -148,12 +148,15 @@ public class EmailSendService extends MetadataService {
         } catch (UnsupportedOperationException e) {
             tempDir = Files.createTempDirectory("etendo_email_attachments_");
             File file = tempDir.toFile();
-            file.setReadable(false, false);
-            file.setWritable(false, false);
-            file.setExecutable(false, false);
-            file.setReadable(true, true);
-            file.setWritable(true, true);
-            file.setExecutable(true, true);
+            boolean success = file.setReadable(false, false);
+            success &= file.setWritable(false, false);
+            success &= file.setExecutable(false, false);
+            success &= file.setReadable(true, true);
+            success &= file.setWritable(true, true);
+            success &= file.setExecutable(true, true);
+            if (!success) {
+                logger.warn("Could not fully restrict permissions on temporary directory: {}", tempDir);
+            }
         }
         return tempDir;
     }
