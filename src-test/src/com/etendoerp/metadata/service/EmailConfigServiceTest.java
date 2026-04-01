@@ -51,7 +51,7 @@ public class EmailConfigServiceTest extends BaseMetadataServiceTest {
     }
 
     @Test
-    public void testProcessMissingParameters() throws IOException {
+    public void testProcessMissingParameters() throws IOException, javax.servlet.ServletException {
         when(mockRequest.getParameter("recordId")).thenReturn(null);
         when(mockRequest.getParameter("tabId")).thenReturn(null);
 

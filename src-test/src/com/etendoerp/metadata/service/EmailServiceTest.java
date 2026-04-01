@@ -51,7 +51,7 @@ public class EmailServiceTest extends BaseMetadataServiceTest {
     }
 
     @Test
-    public void testProcessMissingParameters() throws IOException {
+    public void testProcessMissingParameters() throws IOException, javax.servlet.ServletException {
         when(mockRequest.getParameter("recordId")).thenReturn(null);
         when(mockRequest.getParameter("tabId")).thenReturn(null);
 
@@ -68,7 +68,7 @@ public class EmailServiceTest extends BaseMetadataServiceTest {
     }
 
     @Test
-    public void testProcessTabNotFound() throws IOException {
+    public void testProcessTabNotFound() throws IOException, javax.servlet.ServletException {
         when(mockRequest.getParameter("recordId")).thenReturn("some-id");
         when(mockRequest.getParameter("tabId")).thenReturn("non-existent-tab");
 
