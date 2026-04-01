@@ -173,4 +173,52 @@ public class EmailConfigServiceTest extends BaseMetadataServiceTest {
         assertTrue("Success should be true", result.getBoolean(KEY_SUCCESS));
         assertNotNull("templates key should be present", result.get("templates"));
     }
+
+    /**
+     * Tests populateEmailConfig when documentType is a real BaseOBObject with a non-null id.
+     * Exercises: getDocumentTypeId BOB path, getTemplateData (returns empty for unknown id),
+     * getTemplatesJson (empty loop), loadEmailDefinition (early return on empty templates),
+     * getPropertyString deep path via BP email property, and safeStr.
+     */
+    @Test
+    public void testPopulateEmailConfig_withDocumentTypeAsBob() throws Exception {
+        BaseOBObject mockDocType = mock(BaseOBObject.class);
+        when(mockDocType.getId()).thenReturn("doc-type-id-test");
+
+        Entity bpEntity = mock(Entity.class);
+        when(bpEntity.hasProperty("email")).thenReturn(true);
+        when(bpEntity.hasProperty("name")).thenReturn(true);
+        BaseOBObject mockBp = mock(BaseOBObject.class);
+        when(mockBp.getEntity()).thenReturn(bpEntity);
+        when(mockBp.get("email")).thenReturn("partner@test.com");
+        when(mockBp.get("name")).thenReturn("Test Partner");
+
+        Entity mockEntity = mock(Entity.class);
+        when(mockEntity.hasProperty(any(String.class))).thenReturn(false);
+        when(mockEntity.hasProperty("documentType")).thenReturn(true);
+        when(mockEntity.hasProperty("businessPartner")).thenReturn(true);
+
+        BaseOBObject mockRecord = mock(BaseOBObject.class);
+        when(mockRecord.getEntity()).thenReturn(mockEntity);
+        when(mockRecord.get("documentType")).thenReturn(mockDocType);
+        when(mockRecord.get("businessPartner")).thenReturn(mockBp);
+
+        Tab mockTab = mock(Tab.class, RETURNS_DEEP_STUBS);
+        when(mockTab.getTable().getId()).thenReturn("400");
+        when(mockTab.getTable().getName()).thenReturn("OrderTable");
+
+        Organization mockOrg = mock(Organization.class);
+        when(mockOrg.getId()).thenReturn("org-test-id");
+
+        EmailBaseService.ValidationContext ctx =
+                new EmailBaseService.ValidationContext(mockTab, mockRecord, mockOrg, "from@test.com", "order-001");
+
+        JSONObject result = new JSONObject();
+        emailConfigService.populateEmailConfig(result, ctx);
+
+        assertTrue("Success should be true", result.getBoolean(KEY_SUCCESS));
+        assertEquals("to should come from BP email", "partner@test.com", result.getString("to"));
+        assertEquals("toName should come from BP name", "Test Partner", result.getString("toName"));
+        assertNotNull("templates should be present", result.get("templates"));
+    }
 }

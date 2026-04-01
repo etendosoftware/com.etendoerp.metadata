@@ -21,10 +21,13 @@ import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
 
 import java.io.IOException;
+import java.util.List;
 
 import org.codehaus.jettison.json.JSONObject;
 import org.junit.Before;
 import org.junit.Test;
+import org.openbravo.dal.service.OBDal;
+import org.openbravo.model.ad.ui.Tab;
 
 import com.etendoerp.metadata.MetadataTestConstants;
 
@@ -32,6 +35,11 @@ import com.etendoerp.metadata.MetadataTestConstants;
  * Test class for {@link EmailService}.
  */
 public class EmailServiceTest extends BaseMetadataServiceTest {
+
+    private static final String PARAM_RECORD_ID  = "recordId";
+    private static final String PARAM_TAB_ID     = "tabId";
+    private static final String KEY_SUCCESS      = "success";
+    private static final String INVALID_JSON_MSG = "Response should be valid JSON: ";
 
     private EmailService emailService;
 
@@ -52,35 +60,56 @@ public class EmailServiceTest extends BaseMetadataServiceTest {
 
     @Test
     public void testProcessMissingParameters() throws IOException, javax.servlet.ServletException {
-        when(mockRequest.getParameter("recordId")).thenReturn(null);
-        when(mockRequest.getParameter("tabId")).thenReturn(null);
+        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(null);
+        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(null);
 
         emailService.process();
         String responseContent = responseWriter.toString();
-        
+
         try {
             JSONObject jsonResponse = new JSONObject(responseContent);
-            assertFalse("Success should be false for missing parameters", jsonResponse.getBoolean("success"));
+            assertFalse("Success should be false for missing parameters", jsonResponse.getBoolean(KEY_SUCCESS));
             assertTrue("Should have error message", jsonResponse.has("message"));
         } catch (Exception e) {
-            fail("Response should be valid JSON: " + e.getMessage());
+            fail(INVALID_JSON_MSG + e.getMessage());
         }
     }
 
     @Test
     public void testProcessTabNotFound() throws IOException, javax.servlet.ServletException {
-        when(mockRequest.getParameter("recordId")).thenReturn("some-id");
-        when(mockRequest.getParameter("tabId")).thenReturn("non-existent-tab");
+        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn("some-id");
+        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn("non-existent-tab");
 
         emailService.process();
         String responseContent = responseWriter.toString();
-        
+
         try {
             JSONObject jsonResponse = new JSONObject(responseContent);
-            assertFalse("Success should be false for non-existent tab", jsonResponse.getBoolean("success"));
+            assertFalse("Success should be false for non-existent tab", jsonResponse.getBoolean(KEY_SUCCESS));
             assertEquals("Tab not found.", jsonResponse.getString("message"));
         } catch (Exception e) {
-            fail("Response should be valid JSON: " + e.getMessage());
+            fail(INVALID_JSON_MSG + e.getMessage());
+        }
+    }
+
+    @Test
+    public void testProcessRecordNotFound_withRealTab() throws IOException, javax.servlet.ServletException {
+        @SuppressWarnings("unchecked")
+        List<Tab> tabs = OBDal.getInstance().createCriteria(Tab.class).setMaxResults(1).list();
+        if (tabs.isEmpty()) {
+            return;
+        }
+        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn("00000000000000000000000000000001");
+        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(tabs.get(0).getId());
+
+        emailService.process();
+        String responseContent = responseWriter.toString();
+
+        try {
+            JSONObject jsonResponse = new JSONObject(responseContent);
+            assertFalse("Validation should fail for non-existent record", jsonResponse.getBoolean(KEY_SUCCESS));
+        } catch (Exception e) {
+            fail(INVALID_JSON_MSG + e.getMessage());
         }
     }
 }
