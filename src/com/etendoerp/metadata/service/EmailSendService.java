@@ -136,6 +136,8 @@ public class EmailSendService extends MetadataService {
     }
 
     private Path createSecureTempDir() throws IOException {
+        // Create a temporary directory in the system's temp location with POSIX 700 permissions (rwx------)
+        // for secure multi-tenant isolation on Unix-like systems.
         try {
             FileAttribute<Set<PosixFilePermission>> attrs = PosixFilePermissions.asFileAttribute(
                 PosixFilePermissions.fromString("rwx------")

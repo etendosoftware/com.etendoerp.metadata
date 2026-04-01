@@ -94,7 +94,6 @@ public abstract class MetadataService {
         } catch (Exception e) {
             handleProcessError(this.getClass().getSimpleName(), result, e);
         }
-        write(result);
     }
 
     /**

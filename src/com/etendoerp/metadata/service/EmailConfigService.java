@@ -62,6 +62,7 @@ public class EmailConfigService extends MetadataService {
         if (ctx == null) return;
 
         populateEmailConfig(result, ctx.getTab(), ctx.getDataRecord(), ctx.getOrg(), ctx.getSenderAddress());
+        write(result);
     }
 
     private void populateEmailConfig(JSONObject result, Tab tab, BaseOBObject dataRecord, Organization org, String senderAddress) throws JSONException, IOException {

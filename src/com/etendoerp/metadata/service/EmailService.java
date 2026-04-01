@@ -44,5 +44,6 @@ public class EmailService extends MetadataService {
     protected void execute(JSONObject result) throws ServletException, IOException, JSONException {
         if (validateAndGetContext(result) == null) return;
         result.put(SUCCESS, true);
+        write(result);
     }
 }

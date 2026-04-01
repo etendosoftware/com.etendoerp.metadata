@@ -54,5 +54,6 @@ public class EmailAttachmentService extends MetadataService {
 
         result.put(SUCCESS, true);
         result.put("attachments", attachments);
+        write(result);
     }
 }
