@@ -180,10 +180,8 @@ public class EmailSendServiceTest extends BaseMetadataServiceTest {
 
     @Test
     public void testResolveRecord_noEntityMapping_returnsNull() {
-        org.openbravo.model.ad.ui.Table mockTable = mock(org.openbravo.model.ad.ui.Table.class);
-        when(mockTable.getDBTableName()).thenReturn("non_existent_table_xyz_abc");
-        Tab mockTab = mock(Tab.class);
-        when(mockTab.getTable()).thenReturn(mockTable);
+        Tab mockTab = mock(Tab.class, RETURNS_DEEP_STUBS);
+        when(mockTab.getTable().getDBTableName()).thenReturn("non_existent_table_xyz_abc");
         assertNull("Should return null when entity mapping does not exist", emailSendService.resolveRecord(mockTab, "some-id"));
     }
 }

@@ -122,12 +122,9 @@ public class EmailConfigServiceTest extends BaseMetadataServiceTest {
         BaseOBObject mockRecord = mock(BaseOBObject.class);
         when(mockRecord.getEntity()).thenReturn(mockEntity);
 
-        org.openbravo.model.ad.ui.Table mockTable = mock(org.openbravo.model.ad.ui.Table.class);
-        when(mockTable.getId()).thenReturn("100");
-        when(mockTable.getName()).thenReturn("TestTable");
-
-        Tab mockTab = mock(Tab.class);
-        when(mockTab.getTable()).thenReturn(mockTable);
+        Tab mockTab = mock(Tab.class, RETURNS_DEEP_STUBS);
+        when(mockTab.getTable().getId()).thenReturn("100");
+        when(mockTab.getTable().getName()).thenReturn("TestTable");
 
         Organization mockOrg = mock(Organization.class);
 
@@ -148,8 +145,8 @@ public class EmailConfigServiceTest extends BaseMetadataServiceTest {
 
     /**
      * Tests populateEmailConfig when the record has a documentType property that
-     * returns null (not a BaseOBObject), so getDocumentTypeId returns null and
-     * the null docTypeId branch is followed.
+     * returns a non-BOB value, so getDocumentTypeId returns null and
+     * the null docTypeId branch is followed (templates = empty array).
      */
     @Test
     public void testPopulateEmailConfig_docTypePropertyPresent_returnsNonBob() throws Exception {
@@ -161,12 +158,9 @@ public class EmailConfigServiceTest extends BaseMetadataServiceTest {
         when(mockRecord.getEntity()).thenReturn(mockEntity);
         when(mockRecord.get("documentType")).thenReturn("notABaseOBObject");
 
-        org.openbravo.model.ad.ui.Table mockTable = mock(org.openbravo.model.ad.ui.Table.class);
-        when(mockTable.getId()).thenReturn("200");
-        when(mockTable.getName()).thenReturn("InvoiceTable");
-
-        Tab mockTab = mock(Tab.class);
-        when(mockTab.getTable()).thenReturn(mockTable);
+        Tab mockTab = mock(Tab.class, RETURNS_DEEP_STUBS);
+        when(mockTab.getTable().getId()).thenReturn("200");
+        when(mockTab.getTable().getName()).thenReturn("InvoiceTable");
 
         Organization mockOrg = mock(Organization.class);
 
