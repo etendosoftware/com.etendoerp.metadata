@@ -25,7 +25,6 @@ import javax.servlet.http.HttpServletResponse;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.dal.core.OBContext;
-import org.openbravo.dal.service.OBDal;
 import org.openbravo.database.ConnectionProvider;
 import org.openbravo.erpCommon.utility.reporting.TemplateData;
 import org.openbravo.erpCommon.utility.reporting.TemplateInfo;
@@ -62,24 +61,11 @@ public class EmailConfigService extends MetadataService {
         try {
             OBContext.setAdminMode(true);
             try {
-                String recordId = getRequest().getParameter("recordId");
-                String tabId = getRequest().getParameter("tabId");
-
-                if (recordId == null || tabId == null) {
-                    handleErrorResponse(result, "Missing recordId or tabId parameter.");
-                    return;
-                }
-
-                Tab tab = OBDal.getInstance().get(Tab.class, tabId);
-                if (tab == null) {
-                    handleErrorResponse(result, "Tab not found.");
-                    return;
-                }
-
-                if (tab.getTable() == null) {
-                    handleErrorResponse(result, "Table not found for the given tab.");
-                    return;
-                }
+                String recordId = getRequestedRecordId(result);
+                if (recordId == null) return;
+                
+                Tab tab = getRequestedTab(result);
+                if (tab == null) return;
 
                 BaseOBObject dataRecord = getRecord(tab, recordId);
                 Organization org = getRecordOrganization(dataRecord);
@@ -209,18 +195,6 @@ public class EmailConfigService extends MetadataService {
         return name;
     }
 
-    private boolean checkDocumentStatus(BaseOBObject dataRecord) {
-        Object status = null;
-        if (dataRecord != null) {
-            if (dataRecord.getEntity().hasProperty("documentStatus")) {
-                status = dataRecord.get("documentStatus");
-            } else if (dataRecord.getEntity().hasProperty("docstatus")) {
-                status = dataRecord.get("docstatus");
-            }
-        }
-        return status == null || status.equals("CO") || status.equals("CL");
-    }
-
     private String getCurrentUserEmail() {
         try {
             return safeString(OBContext.getOBContext().getUser().getEmail());
@@ -282,6 +256,7 @@ public class EmailConfigService extends MetadataService {
         }
     }
 
+    private String getDocumentTypeId(BaseOBObject dataRecord) {
         if (dataRecord == null || !dataRecord.getEntity().hasProperty("documentType")) return null;
         try {
             Object docTypeObj = dataRecord.get("documentType");
@@ -292,6 +267,8 @@ public class EmailConfigService extends MetadataService {
         } catch (Exception e) { 
             logger.debug("Could not retrieve documentType: " + e.getMessage());
         }
+        return null;
+    }
 
     private TemplateData[] getTemplateData(String docTypeId, Organization org) {
         try {

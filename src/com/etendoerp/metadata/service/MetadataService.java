@@ -55,6 +55,8 @@ public abstract class MetadataService {
 
     protected static final String SUCCESS = "success";
     protected static final String MESSAGE = "message";
+    protected static final String RECORD_ID = "recordId";
+    protected static final String TAB_ID = "tabId";
 
     public MetadataService(HttpServletRequest request, HttpServletResponse response) {
         requestThreadLocal.set(request);
@@ -112,6 +114,33 @@ public abstract class MetadataService {
         }
     }
 
+    protected Tab getRequestedTab(JSONObject result) throws IOException {
+        String tabId = getRequest().getParameter(TAB_ID);
+        if (tabId == null) {
+            handleErrorResponse(result, "Missing " + TAB_ID + " parameter.");
+            return null;
+        }
+        Tab tab = OBDal.getInstance().get(Tab.class, tabId);
+        if (tab == null) {
+            handleErrorResponse(result, "Tab not found.");
+            return null;
+        }
+        if (tab.getTable() == null) {
+            handleErrorResponse(result, "Table not found for the given tab.");
+            return null;
+        }
+        return tab;
+    }
+
+    protected String getRequestedRecordId(JSONObject result) throws IOException {
+        String recordId = getRequest().getParameter(RECORD_ID);
+        if (recordId == null) {
+            handleErrorResponse(result, "Missing " + RECORD_ID + " parameter.");
+            return null;
+        }
+        return recordId;
+    }
+
     protected BaseOBObject getRecord(Tab tab, String recordId) {
         if (tab == null || tab.getTable() == null) {
             return null;
@@ -150,7 +179,7 @@ public abstract class MetadataService {
                 crit.setMaxResults(1);
                 config = (EmailServerConfiguration) crit.uniqueResult();
             } catch (Exception e) {
-                logger.debug("Could not find any fallback Email Server Configuration: " + e.getMessage());
+                logger.debug("Could find any fallback Email Server Configuration: " + e.getMessage());
             }
         }
         return config;
@@ -179,6 +208,19 @@ public abstract class MetadataService {
             logger.warn("Could not load record attachments using DAL: " + e.getMessage());
         }
         return recordAttachments;
+    }
+
+    protected boolean checkDocumentStatus(BaseOBObject dataRecord) {
+        if (dataRecord == null) {
+            return true;
+        }
+        Object status = null;
+        if (dataRecord.getEntity().hasProperty("documentStatus")) {
+            status = dataRecord.get("documentStatus");
+        } else if (dataRecord.getEntity().hasProperty("docstatus")) {
+            status = dataRecord.get("docstatus");
+        }
+        return status == null || status.equals("CO") || status.equals("CL");
     }
 
     protected String safeString(Object value) {

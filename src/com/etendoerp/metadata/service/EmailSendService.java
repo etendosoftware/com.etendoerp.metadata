@@ -50,9 +50,6 @@ import org.openbravo.model.common.enterprise.Organization;
  */
 public class EmailSendService extends MetadataService {
 
-    private static final String RECORD_ID = "recordId";
-    private static final String TAB_ID = "tabId";
-    private static final String SUBJECT = "subject";
     private static final String ATTACH_PATH_PROP = "attach.path";
 
     /**
@@ -68,13 +65,15 @@ public class EmailSendService extends MetadataService {
     public void process() throws IOException {
         JSONObject result = new JSONObject();
         List<File> tempFiles = new ArrayList<>();
+        Path tempDir = null;
         try {
             OBContext.setAdminMode(true);
             Map<String, String> params = new HashMap<>();
             List<String> recordAttachmentIds = new ArrayList<>();
 
             if (isMultipartRequest()) {
-                extractMultipartParams(params, recordAttachmentIds, tempFiles);
+                tempDir = Files.createTempDirectory("etendo_email_attachments_");
+                extractMultipartParams(params, recordAttachmentIds, tempFiles, tempDir);
             }
             populateParamsFromRequest(params, recordAttachmentIds);
 
@@ -105,12 +104,12 @@ public class EmailSendService extends MetadataService {
             handleProcessError("EmailSendService", result, e);
         } finally {
             OBContext.restorePreviousMode();
-            cleanupTempFiles(tempFiles);
+            cleanupTempFiles(tempFiles, tempDir);
         }
     }
 
     private void populateParamsFromRequest(Map<String, String> params, List<String> recordAttachmentIds) {
-        String[] fieldNames = { RECORD_ID, TAB_ID, "to", SUBJECT, "notes", "archive", "cc", "bcc", "replyTo", "templateId" };
+        String[] fieldNames = { RECORD_ID, TAB_ID, "to", "subject", "notes", "archive", "cc", "bcc", "replyTo", "templateId" };
         for (String field : fieldNames) {
             if (isNullOrEmpty(params.get(field))) {
                 String value = getRequest().getParameter(field);
@@ -135,7 +134,7 @@ public class EmailSendService extends MetadataService {
 
     private boolean validateParams(JSONObject result, Map<String, String> params) throws IOException {
         if (isNullOrEmpty(params.get(RECORD_ID)) || isNullOrEmpty(params.get(TAB_ID))
-                || isNullOrEmpty(params.get("to")) || isNullOrEmpty(params.get(SUBJECT))) {
+                || isNullOrEmpty(params.get("to")) || isNullOrEmpty(params.get("subject"))) {
             handleErrorResponse(result, "Missing required parameters: recordId, tabId, to, subject.");
             return false;
         }
@@ -151,7 +150,7 @@ public class EmailSendService extends MetadataService {
                 .setRecipientCC(params.getOrDefault("cc", ""))
                 .setRecipientBCC(params.getOrDefault("bcc", ""))
                 .setReplyTo(params.getOrDefault("replyTo", ""))
-                .setSubject(params.get(SUBJECT))
+                .setSubject(params.get("subject"))
                 .setContent(params.getOrDefault("notes", ""))
                 .setContentType("text/plain; charset=utf-8")
                 .setAttachments(allAttachments)
@@ -183,12 +182,19 @@ public class EmailSendService extends MetadataService {
         return recordFiles;
     }
 
-    private void cleanupTempFiles(List<File> tempFiles) {
+    private void cleanupTempFiles(List<File> tempFiles, Path tempDir) {
         for (File f : tempFiles) {
             try {
                 Files.delete(f.toPath());
             } catch (Exception e) {
                 logger.debug("Could not delete temp file: " + f.getAbsolutePath());
+            }
+        }
+        if (tempDir != null) {
+            try {
+                Files.delete(tempDir);
+            } catch (Exception e) {
+                logger.debug("Could not delete temp directory: " + tempDir.toAbsolutePath());
             }
         }
     }
@@ -198,7 +204,7 @@ public class EmailSendService extends MetadataService {
         return ct != null && ct.toLowerCase().startsWith("multipart/");
     }
 
-    private void extractMultipartParams(Map<String, String> params, List<String> recordAttachmentIds, List<File> tempFiles) {
+    private void extractMultipartParams(Map<String, String> params, List<String> recordAttachmentIds, List<File> tempFiles, Path tempDir) {
         try {
             DiskFileItemFactory factory = new DiskFileItemFactory();
             ServletFileUpload upload = new ServletFileUpload(factory);
@@ -209,7 +215,7 @@ public class EmailSendService extends MetadataService {
                 if (item.isFormField()) {
                     processFormField(item, params, recordAttachmentIds);
                 } else {
-                    processUploadedFile(item, tempFiles);
+                    processUploadedFile(item, tempFiles, tempDir);
                 }
             }
         } catch (Exception e) {
@@ -226,10 +232,10 @@ public class EmailSendService extends MetadataService {
         }
     }
 
-    private void processUploadedFile(FileItem item, List<File> tempFiles) throws Exception {
+    private void processUploadedFile(FileItem item, List<File> tempFiles, Path tempDir) throws Exception {
         String fileName = item.getName();
         if (item.getFieldName() != null && item.getFieldName().startsWith("attachment") && fileName != null && !fileName.trim().isEmpty()) {
-            Path tempPath = Files.createTempFile("email_attach_", "_" + fileName);
+            Path tempPath = Files.createTempFile(tempDir, "attach_", "_" + fileName);
             File tempFile = tempPath.toFile();
             tempFile.deleteOnExit();
             item.write(tempFile);

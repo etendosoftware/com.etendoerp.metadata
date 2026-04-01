@@ -25,7 +25,6 @@ import javax.servlet.http.HttpServletResponse;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.dal.core.OBContext;
-import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.ui.Tab;
 
 /**
@@ -48,24 +47,11 @@ public class EmailAttachmentService extends MetadataService {
         try {
             OBContext.setAdminMode(true);
             try {
-                String recordId = getRequest().getParameter("recordId");
-                String tabId    = getRequest().getParameter("tabId");
-
-                if (recordId == null || tabId == null) {
-                    handleErrorResponse(result, "Missing recordId or tabId parameter.");
-                    return;
-                }
-
-                Tab tab = OBDal.getInstance().get(Tab.class, tabId);
-                if (tab == null) {
-                    handleErrorResponse(result, "Tab not found.");
-                    return;
-                }
-
-                if (tab.getTable() == null) {
-                    handleErrorResponse(result, "Table not found for the given tab.");
-                    return;
-                }
+                String recordId = getRequestedRecordId(result);
+                if (recordId == null) return;
+                
+                Tab tab = getRequestedTab(result);
+                if (tab == null) return;
 
                 JSONArray attachments = getRecordAttachments(tab.getTable().getId(), recordId);
 

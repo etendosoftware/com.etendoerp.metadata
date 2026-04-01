@@ -23,14 +23,11 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.codehaus.jettison.json.JSONObject;
-import org.openbravo.base.model.Entity;
-import org.openbravo.base.model.ModelProvider;
-import org.openbravo.base.structure.BaseOBObject;
 import org.openbravo.dal.core.OBContext;
-import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.ui.Tab;
 import org.openbravo.model.common.enterprise.EmailServerConfiguration;
 import org.openbravo.model.common.enterprise.Organization;
+import org.openbravo.base.structure.BaseOBObject;
 
 /**
  * Service to validate email configuration and record status before sending.
@@ -51,68 +48,38 @@ public class EmailService extends MetadataService {
         JSONObject result = new JSONObject();
         try {
             OBContext.setAdminMode(true);
+            try {
+                String recordId = getRequestedRecordId(result);
+                if (recordId == null) return;
+                
+                Tab tab = getRequestedTab(result);
+                if (tab == null) return;
 
-            String recordId = getRequest().getParameter("recordId");
-            String tabId = getRequest().getParameter("tabId");
+                BaseOBObject dataRecord = getRecord(tab, recordId);
+                Organization org = getRecordOrganization(dataRecord);
+                EmailServerConfiguration emailConfig = getEmailConfiguration(org);
+                
+                String senderAddress = (emailConfig != null && emailConfig.getSmtpServerSenderAddress() != null)
+                        ? emailConfig.getSmtpServerSenderAddress().trim() : "";
 
-            if (recordId == null || tabId == null) {
-                handleErrorResponse(result, "Missing recordId or tabId parameter.");
-                return;
+                if (senderAddress.isEmpty()) {
+                    handleErrorResponse(result, "No sender defined. Please check Email Server configuration in Client settings.");
+                    return;
+                }
+
+                if (dataRecord != null && !checkDocumentStatus(dataRecord)) {
+                    handleErrorResponse(result, "Only completed or closed documents can be sent via email.");
+                    return;
+                }
+
+                result.put(SUCCESS, true);
+                write(result);
+
+            } finally {
+                OBContext.restorePreviousMode();
             }
-
-            Tab tab = OBDal.getInstance().get(Tab.class, tabId);
-            if (tab == null) {
-                handleErrorResponse(result, "Tab not found.");
-                return;
-            }
-
-            Entity entity = ModelProvider.getInstance().getEntityByTableName(tab.getTable().getDBTableName());
-            if (entity == null) {
-                handleErrorResponse(result, "Entity not found for table " + tab.getTable().getDBTableName());
-                return;
-            }
-
-            BaseOBObject dataRecord = OBDal.getInstance().get(entity.getName(), recordId);
-
-            Organization org = getRecordOrganization(dataRecord);
-            EmailServerConfiguration emailConfig = getEmailConfiguration(org);
-            String senderAddress = (emailConfig != null && emailConfig.getSmtpServerSenderAddress() != null)
-                    ? emailConfig.getSmtpServerSenderAddress().trim() : "";
-
-            if (senderAddress.isEmpty()) {
-                handleErrorResponse(result, "No sender defined. Please check Email Server configuration in Client settings.");
-                return;
-            }
-
-            if (dataRecord != null && !checkDocumentStatus(dataRecord)) {
-                handleErrorResponse(result, "Only completed or closed documents can be sent via email.");
-                return;
-            }
-
-            result.put(SUCCESS, true);
-            write(result);
-
         } catch (Exception e) {
             handleProcessError("EmailService", result, e);
-        } finally {
-            OBContext.restorePreviousMode();
         }
-    }
-
-    private boolean checkDocumentStatus(BaseOBObject dataRecord) {
-        Object status = getDocumentStatus(dataRecord);
-        return status == null || status.equals("CO") || status.equals("CL");
-    }
-
-    private Object getDocumentStatus(BaseOBObject dataRecord) {
-        Object status = null;
-        if (dataRecord != null) {
-            if (dataRecord.getEntity().hasProperty("documentStatus")) {
-                status = dataRecord.get("documentStatus");
-            } else if (dataRecord.getEntity().hasProperty("docstatus")) {
-                status = dataRecord.get("docstatus");
-            }
-        }
-        return status;
     }
 }
