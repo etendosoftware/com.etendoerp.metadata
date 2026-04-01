@@ -167,9 +167,4 @@ public class EmailService extends MetadataService {
             }
         }
     }
-
-    private String safeString(Object value) {
-        if (value == null) return "";
-        return value.toString().trim();
-    }
 }

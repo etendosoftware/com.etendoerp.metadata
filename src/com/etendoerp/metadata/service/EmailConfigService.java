@@ -50,7 +50,19 @@ public class EmailConfigService extends MetadataService {
 
     private static final String SUCCESS = "success";
     private static final String MESSAGE = "message";
+    private static final String SUBJECT = "subject";
+    private static final String USER_CONTACT = "userContact";
+    private static final String EMAIL = "email";
+    private static final String BUSINESS_PARTNER = "businessPartner";
+    private static final String DOCUMENT_NO = "documentNo";
+    private static final String ORGANIZATION = "organization";
+    private static final String BODY = "body";
 
+    /**
+     * Constructor for EmailConfigService.
+     * @param request The HttpServletRequest object.
+     * @param response The HttpServletResponse object.
+     */
     public EmailConfigService(HttpServletRequest request, HttpServletResponse response) {
         super(request, response);
     }
@@ -80,8 +92,8 @@ public class EmailConfigService extends MetadataService {
                     return;
                 }
 
-                BaseOBObject record = getRecord(tab, recordId);
-                Organization org = getRecordOrganization(record);
+                BaseOBObject dataRecord = getRecord(tab, recordId);
+                Organization org = getRecordOrganization(dataRecord);
                 EmailServerConfiguration emailServerConfig = getSmtpConfiguration(org);
                 
                 String senderAddress = (emailServerConfig != null && emailServerConfig.getSmtpServerSenderAddress() != null)
@@ -92,12 +104,12 @@ public class EmailConfigService extends MetadataService {
                     return;
                 }
 
-                if (record != null && !checkDocumentStatus(record)) {
+                if (dataRecord != null && !checkDocumentStatus(dataRecord)) {
                     handleErrorResponse(result, "Only completed or closed documents can be sent via email.");
                     return;
                 }
 
-                populateEmailConfig(result, tab, record, org, senderAddress);
+                populateEmailConfig(result, tab, dataRecord, org, senderAddress);
                 write(result);
 
             } finally {
@@ -126,21 +138,21 @@ public class EmailConfigService extends MetadataService {
         }
     }
 
-    private void populateEmailConfig(JSONObject result, Tab tab, BaseOBObject record, Organization org, String senderAddress) throws Exception {
+    private void populateEmailConfig(JSONObject result, Tab tab, BaseOBObject dataRecord, Organization org, String senderAddress) throws Exception {
         result.put(SUCCESS, true);
-        result.put("to", getRecipientEmail(record));
-        result.put("toName", getRecipientName(record));
+        result.put("to", getRecipientEmail(dataRecord));
+        result.put("toName", getRecipientName(dataRecord));
         result.put("bcc", getCurrentUserEmail());
         result.put("bccName", getCurrentUserName());
-        result.put("replyTo", getSalesRepEmail(record));
+        result.put("replyTo", getSalesRepEmail(dataRecord));
         result.put("senderAddress", senderAddress);
         
-        String subject = getRecordSubject(tab, record);
+        String subject = getRecordSubject(tab, dataRecord);
         String body = "";
         
-        result.put("reportFileName", getReportFileName(tab, record));
+        result.put("reportFileName", getReportFileName(tab, dataRecord));
 
-        String docTypeId = getDocumentTypeId(record);
+        String docTypeId = getDocumentTypeId(dataRecord);
         if (docTypeId != null) {
             ConnectionProvider conn = DalConnectionProvider.getReadOnlyConnectionProvider();
             TemplateData[] templateData = getTemplateData(docTypeId, org);
@@ -148,23 +160,23 @@ public class EmailConfigService extends MetadataService {
             
             JSONObject emailDef = loadEmailDefinition(conn, docTypeId, org, templateData);
             if (emailDef != null) {
-                if (emailDef.has("subject")) subject = emailDef.getString("subject");
-                if (emailDef.has("body")) body = emailDef.getString("body");
+                if (emailDef.has(SUBJECT)) subject = emailDef.getString(SUBJECT);
+                if (emailDef.has(BODY)) body = emailDef.getString(BODY);
             }
         } else {
             result.put("templates", new JSONArray());
         }
         
-        result.put("subject", subject);
-        result.put("body", body);
-        result.put("recordAttachments", getRecordAttachments(tab.getTable().getId(), record != null ? record.getId().toString() : null));
+        result.put(SUBJECT, subject);
+        result.put(BODY, body);
+        result.put("recordAttachments", getRecordAttachments(tab.getTable().getId(), dataRecord != null ? dataRecord.getId().toString() : null));
     }
 
-    private Organization getRecordOrganization(BaseOBObject record) {
+    private Organization getRecordOrganization(BaseOBObject dataRecord) {
         Organization org = OBContext.getOBContext().getCurrentOrganization();
-        if (record != null && record.getEntity().hasProperty("organization")) {
+        if (dataRecord != null && dataRecord.getEntity().hasProperty(ORGANIZATION)) {
             try {
-                Object orgObj = record.get("organization");
+                Object orgObj = dataRecord.get(ORGANIZATION);
                 if (orgObj instanceof Organization) {
                     org = (Organization) orgObj;
                 }
@@ -193,25 +205,25 @@ public class EmailConfigService extends MetadataService {
         return config;
     }
 
-    private String getRecipientEmail(BaseOBObject record) {
-        if (record == null) return "";
+    private String getRecipientEmail(BaseOBObject dataRecord) {
+        if (dataRecord == null) return "";
         String email = "";
-        if (record.getEntity().hasProperty("userContact")) {
+        if (dataRecord.getEntity().hasProperty(USER_CONTACT)) {
             try {
-                BaseOBObject contact = (BaseOBObject) record.get("userContact");
-                if (contact != null && contact.getEntity().hasProperty("email")) {
-                    email = safeString(contact.get("email"));
+                BaseOBObject contact = (BaseOBObject) dataRecord.get(USER_CONTACT);
+                if (contact != null && contact.getEntity().hasProperty(EMAIL)) {
+                    email = safeString(contact.get(EMAIL));
                 }
             } catch (Exception e) { 
                 logger.debug("Could not retrieve email from userContact: " + e.getMessage());
             }
         }
 
-        if (email.isEmpty() && record.getEntity().hasProperty("businessPartner")) {
+        if (email.isEmpty() && dataRecord.getEntity().hasProperty(BUSINESS_PARTNER)) {
             try {
-                BaseOBObject bp = (BaseOBObject) record.get("businessPartner");
-                if (bp != null && bp.getEntity().hasProperty("email")) {
-                    email = safeString(bp.get("email"));
+                BaseOBObject bp = (BaseOBObject) dataRecord.get(BUSINESS_PARTNER);
+                if (bp != null && bp.getEntity().hasProperty(EMAIL)) {
+                    email = safeString(bp.get(EMAIL));
                 }
             } catch (Exception e) { 
                  logger.debug("Could not retrieve email from businessPartner: " + e.getMessage());
@@ -220,12 +232,12 @@ public class EmailConfigService extends MetadataService {
         return email;
     }
 
-    private String getRecipientName(BaseOBObject record) {
-        if (record == null) return "";
+    private String getRecipientName(BaseOBObject dataRecord) {
+        if (dataRecord == null) return "";
         String name = "";
-        if (record.getEntity().hasProperty("userContact")) {
+        if (dataRecord.getEntity().hasProperty(USER_CONTACT)) {
             try {
-                BaseOBObject contact = (BaseOBObject) record.get("userContact");
+                BaseOBObject contact = (BaseOBObject) dataRecord.get(USER_CONTACT);
                 if (contact != null && contact.getEntity().hasProperty("name")) {
                     name = safeString(contact.get("name"));
                 }
@@ -234,9 +246,9 @@ public class EmailConfigService extends MetadataService {
             }
         }
 
-        if (name.isEmpty() && record.getEntity().hasProperty("businessPartner")) {
+        if (name.isEmpty() && dataRecord.getEntity().hasProperty(BUSINESS_PARTNER)) {
             try {
-                BaseOBObject bp = (BaseOBObject) record.get("businessPartner");
+                BaseOBObject bp = (BaseOBObject) dataRecord.get(BUSINESS_PARTNER);
                 if (bp != null && bp.getEntity().hasProperty("name")) {
                     name = safeString(bp.get("name"));
                 }
@@ -247,19 +259,16 @@ public class EmailConfigService extends MetadataService {
         return name;
     }
 
-    private boolean checkDocumentStatus(BaseOBObject record) {
+    private boolean checkDocumentStatus(BaseOBObject dataRecord) {
         Object status = null;
-        if (record != null) {
-            if (record.getEntity().hasProperty("documentStatus")) {
-                status = record.get("documentStatus");
-            } else if (record.getEntity().hasProperty("docstatus")) {
-                status = record.get("docstatus");
+        if (dataRecord != null) {
+            if (dataRecord.getEntity().hasProperty("documentStatus")) {
+                status = dataRecord.get("documentStatus");
+            } else if (dataRecord.getEntity().hasProperty("docstatus")) {
+                status = dataRecord.get("docstatus");
             }
         }
-        if (status != null && !status.equals("CO") && !status.equals("CL")) {
-            return false;
-        }
-        return true;
+        return status == null || status.equals("CO") || status.equals("CL");
     }
 
     private String getCurrentUserEmail() {
@@ -280,13 +289,13 @@ public class EmailConfigService extends MetadataService {
         }
     }
 
-    private String getSalesRepEmail(BaseOBObject record) {
-        if (record == null) return "";
-        if (record.getEntity().hasProperty("salesRepresentative")) {
+    private String getSalesRepEmail(BaseOBObject dataRecord) {
+        if (dataRecord == null) return "";
+        if (dataRecord.getEntity().hasProperty("salesRepresentative")) {
             try {
-                BaseOBObject salesRep = (BaseOBObject) record.get("salesRepresentative");
-                if (salesRep != null && salesRep.getEntity().hasProperty("email")) {
-                    return safeString(salesRep.get("email"));
+                BaseOBObject salesRep = (BaseOBObject) dataRecord.get("salesRepresentative");
+                if (salesRep != null && salesRep.getEntity().hasProperty(EMAIL)) {
+                    return safeString(salesRep.get(EMAIL));
                 }
             } catch (Exception e) { 
                 logger.debug("Could not retrieve email from salesRepresentative: " + e.getMessage());
@@ -295,11 +304,11 @@ public class EmailConfigService extends MetadataService {
         return "";
     }
 
-    private String getRecordSubject(Tab tab, BaseOBObject record) {
+    private String getRecordSubject(Tab tab, BaseOBObject dataRecord) {
         try {
             String windowName = tab.getWindow().getName();
-            String documentNo = (record != null && record.getEntity().hasProperty("documentNo")) 
-                    ? safeString(record.get("documentNo")) : "";
+            String documentNo = (dataRecord != null && dataRecord.getEntity().hasProperty(DOCUMENT_NO)) 
+                    ? safeString(dataRecord.get(DOCUMENT_NO)) : "";
             return (windowName + " " + documentNo).trim();
         } catch (Exception e) {
             logger.debug("Could not determine record subject: " + e.getMessage());
@@ -307,12 +316,12 @@ public class EmailConfigService extends MetadataService {
         }
     }
 
-    private String getReportFileName(Tab tab, BaseOBObject record) {
-        if (record == null) return "";
+    private String getReportFileName(Tab tab, BaseOBObject dataRecord) {
+        if (dataRecord == null) return "";
         try {
             String entitySimpleName = tab.getTable().getName();
-            String documentNo = record.getEntity().hasProperty("documentNo") 
-                    ? safeString(record.get("documentNo")) : "";
+            String documentNo = dataRecord.getEntity().hasProperty(DOCUMENT_NO) 
+                    ? safeString(dataRecord.get(DOCUMENT_NO)) : "";
             return "Report" + entitySimpleName + "_" + documentNo + ".pdf";
         } catch (Exception e) {
             logger.debug("Could not determine report file name: " + e.getMessage());
@@ -320,10 +329,10 @@ public class EmailConfigService extends MetadataService {
         }
     }
 
-    private String getDocumentTypeId(BaseOBObject record) {
-        if (record == null || !record.getEntity().hasProperty("documentType")) return null;
+    private String getDocumentTypeId(BaseOBObject dataRecord) {
+        if (dataRecord == null || !dataRecord.getEntity().hasProperty("documentType")) return null;
         try {
-            BaseOBObject docType = (BaseOBObject) record.get("documentType");
+            BaseOBObject docType = (BaseOBObject) dataRecord.get("documentType");
             if (docType != null) return docType.getId().toString();
         } catch (Exception e) { 
             logger.debug("Could not retrieve documentType: " + e.getMessage());
@@ -360,10 +369,10 @@ public class EmailConfigService extends MetadataService {
             TemplateInfo.EmailDefinition emailDef = tplInfo.get_DefaultEmailDefinition();
             if (emailDef != null) {
                 JSONObject res = new JSONObject();
-                String subject = emailDef.getSubject();
-                if (subject != null && !subject.trim().isEmpty()) res.put("subject", subject);
-                String body = emailDef.getBody();
-                if (body != null) res.put("body", body);
+                String emailSubject = emailDef.getSubject();
+                if (emailSubject != null && !emailSubject.trim().isEmpty()) res.put(SUBJECT, emailSubject);
+                String emailBody = emailDef.getBody();
+                if (emailBody != null) res.put(BODY, emailBody);
                 return res;
             }
         } catch (Exception e) {
@@ -373,8 +382,8 @@ public class EmailConfigService extends MetadataService {
     }
 
     private JSONArray getRecordAttachments(String tableId, String recordId) {
-        JSONArray recordAttachments = new JSONArray();
-        if (recordId == null) return recordAttachments;
+        JSONArray recordAttachmentsList = new JSONArray();
+        if (recordId == null) return recordAttachmentsList;
         try {
             OBCriteria<Attachment> criteria = OBDal.getInstance().createCriteria(Attachment.class);
             criteria.add(Restrictions.eq(Attachment.PROPERTY_TABLE, OBDal.getInstance().getProxy(org.openbravo.model.ad.datamodel.Table.class, tableId)));
@@ -387,12 +396,12 @@ public class EmailConfigService extends MetadataService {
                 JSONObject att = new JSONObject();
                 att.put("id", attachment.getId());
                 att.put("name", attachment.getName());
-                recordAttachments.put(att);
+                recordAttachmentsList.put(att);
             }
         } catch (Exception e) {
             logger.warn("Could not load record attachments using DAL: " + e.getMessage());
         }
-        return recordAttachments;
+        return recordAttachmentsList;
     }
 
     private void handleProcessError(JSONObject result, Exception e) throws IOException {
