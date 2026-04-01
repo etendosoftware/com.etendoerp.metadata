@@ -18,27 +18,24 @@
 package com.etendoerp.metadata.service;
 
 import java.io.IOException;
+
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.base.model.Entity;
+import org.openbravo.base.model.ModelProvider;
+import org.openbravo.base.structure.BaseOBObject;
 import org.openbravo.dal.core.OBContext;
-import org.openbravo.email.EmailUtils;
+import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.ui.Tab;
 import org.openbravo.model.common.enterprise.EmailServerConfiguration;
 import org.openbravo.model.common.enterprise.Organization;
-import org.openbravo.base.model.ModelProvider;
-import org.openbravo.dal.service.OBDal;
-import org.openbravo.base.structure.BaseOBObject;
 
 /**
  * Service to validate email configuration and record status before sending.
  */
 public class EmailService extends MetadataService {
-
-    private static final String SUCCESS = "success";
-    private static final String MESSAGE = "message";
 
     /**
      * Constructor for EmailService.
@@ -54,10 +51,10 @@ public class EmailService extends MetadataService {
         JSONObject result = new JSONObject();
         try {
             OBContext.setAdminMode(true);
-            
+
             String recordId = getRequest().getParameter("recordId");
             String tabId = getRequest().getParameter("tabId");
-            
+
             if (recordId == null || tabId == null) {
                 handleErrorResponse(result, "Missing recordId or tabId parameter.");
                 return;
@@ -78,9 +75,11 @@ public class EmailService extends MetadataService {
             BaseOBObject dataRecord = OBDal.getInstance().get(entity.getName(), recordId);
 
             Organization org = getRecordOrganization(dataRecord);
-            String senderAddress = getSenderAddress(org);
-            
-            if (senderAddress == null || senderAddress.isEmpty()) {
+            EmailServerConfiguration emailConfig = getEmailConfiguration(org);
+            String senderAddress = (emailConfig != null && emailConfig.getSmtpServerSenderAddress() != null)
+                    ? emailConfig.getSmtpServerSenderAddress().trim() : "";
+
+            if (senderAddress.isEmpty()) {
                 handleErrorResponse(result, "No sender defined. Please check Email Server configuration in Client settings.");
                 return;
             }
@@ -94,51 +93,15 @@ public class EmailService extends MetadataService {
             write(result);
 
         } catch (Exception e) {
-            handleProcessError(result, e);
+            handleProcessError("EmailService", result, e);
         } finally {
             OBContext.restorePreviousMode();
         }
     }
 
-    private void handleErrorResponse(JSONObject result, String message) throws IOException {
-        try {
-            result.put(SUCCESS, false);
-            result.put(MESSAGE, message);
-            write(result);
-        } catch (Exception e) {
-            logger.error("Error writing error response: " + e.getMessage(), e);
-        }
-    }
-
-    private Organization getRecordOrganization(BaseOBObject dataRecord) {
-        Organization org = OBContext.getOBContext().getCurrentOrganization();
-        if (dataRecord != null && dataRecord.getEntity().hasProperty("organization")) {
-            try {
-                Object orgObj = dataRecord.get("organization");
-                if (orgObj instanceof Organization) {
-                    org = (Organization) orgObj;
-                }
-            } catch (Exception e) { 
-                logger.debug("Could not retrieve organization from record, using session organization: " + e.getMessage());
-            }
-        }
-        return org;
-    }
-
-    private String getSenderAddress(Organization org) {
-        EmailServerConfiguration emailConfig = EmailUtils.getEmailConfiguration(org);
-        if (emailConfig != null && emailConfig.getSmtpServerSenderAddress() != null) {
-            return emailConfig.getSmtpServerSenderAddress().trim();
-        }
-        return null;
-    }
-
     private boolean checkDocumentStatus(BaseOBObject dataRecord) {
         Object status = getDocumentStatus(dataRecord);
-        if (status == null) {
-            return true;
-        }
-        return status.equals("CO") || status.equals("CL");
+        return status == null || status.equals("CO") || status.equals("CL");
     }
 
     private Object getDocumentStatus(BaseOBObject dataRecord) {
@@ -151,20 +114,5 @@ public class EmailService extends MetadataService {
             }
         }
         return status;
-    }
-
-    private void handleProcessError(JSONObject result, Exception e) throws IOException {
-        logger.error("Error in EmailService: " + e.getMessage(), e);
-        try {
-            result.put(SUCCESS, false);
-            result.put(MESSAGE, e.getMessage());
-            write(result);
-        } catch (Exception jsonEx) {
-            try {
-                getResponse().getWriter().write("{\"success\":false,\"message\":\"" + e.getMessage() + "\"}");
-            } catch (IOException ioEx) {
-                logger.error("Fatal error writing response: " + ioEx.getMessage(), ioEx);
-            }
-        }
     }
 }

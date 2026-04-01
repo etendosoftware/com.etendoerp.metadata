@@ -18,28 +18,20 @@
 package com.etendoerp.metadata.service;
 
 import java.io.IOException;
-import java.util.List;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONObject;
-import org.hibernate.criterion.Order;
-import org.hibernate.criterion.Restrictions;
-import org.openbravo.base.model.Entity;
 import org.openbravo.dal.core.OBContext;
-import org.openbravo.dal.service.OBCriteria;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.database.ConnectionProvider;
-import org.openbravo.email.EmailUtils;
 import org.openbravo.erpCommon.utility.reporting.TemplateData;
 import org.openbravo.erpCommon.utility.reporting.TemplateInfo;
 import org.openbravo.model.ad.ui.Tab;
-import org.openbravo.model.ad.utility.Attachment;
 import org.openbravo.model.common.enterprise.EmailServerConfiguration;
 import org.openbravo.model.common.enterprise.Organization;
-import org.openbravo.base.model.ModelProvider;
 import org.openbravo.base.structure.BaseOBObject;
 import org.openbravo.service.db.DalConnectionProvider;
 
@@ -48,8 +40,6 @@ import org.openbravo.service.db.DalConnectionProvider;
  */
 public class EmailConfigService extends MetadataService {
 
-    private static final String SUCCESS = "success";
-    private static final String MESSAGE = "message";
     private static final String SUBJECT = "subject";
     private static final String USER_CONTACT = "userContact";
     private static final String EMAIL = "email";
@@ -94,7 +84,7 @@ public class EmailConfigService extends MetadataService {
 
                 BaseOBObject dataRecord = getRecord(tab, recordId);
                 Organization org = getRecordOrganization(dataRecord);
-                EmailServerConfiguration emailServerConfig = getSmtpConfiguration(org);
+                EmailServerConfiguration emailServerConfig = getEmailConfiguration(org);
                 
                 String senderAddress = (emailServerConfig != null && emailServerConfig.getSmtpServerSenderAddress() != null)
                         ? emailServerConfig.getSmtpServerSenderAddress().trim() : "";
@@ -116,25 +106,7 @@ public class EmailConfigService extends MetadataService {
                 OBContext.restorePreviousMode();
             }
         } catch (Exception e) {
-            handleProcessError(result, e);
-        }
-    }
-
-    private BaseOBObject getRecord(Tab tab, String recordId) {
-        Entity entity = ModelProvider.getInstance().getEntityByTableName(tab.getTable().getDBTableName());
-        if (entity == null) {
-            return null;
-        }
-        return OBDal.getInstance().get(entity.getName(), recordId);
-    }
-
-    private void handleErrorResponse(JSONObject result, String message) throws IOException {
-        try {
-            result.put(SUCCESS, false);
-            result.put(MESSAGE, message);
-            write(result);
-        } catch (Exception e) {
-            logger.error("Error writing error response: " + e.getMessage(), e);
+            handleProcessError("EmailConfigService", result, e);
         }
     }
 
@@ -170,39 +142,6 @@ public class EmailConfigService extends MetadataService {
         result.put(SUBJECT, subject);
         result.put(BODY, body);
         result.put("recordAttachments", getRecordAttachments(tab.getTable().getId(), dataRecord != null ? dataRecord.getId().toString() : null));
-    }
-
-    private Organization getRecordOrganization(BaseOBObject dataRecord) {
-        Organization org = OBContext.getOBContext().getCurrentOrganization();
-        if (dataRecord != null && dataRecord.getEntity().hasProperty(ORGANIZATION)) {
-            try {
-                Object orgObj = dataRecord.get(ORGANIZATION);
-                if (orgObj instanceof Organization) {
-                    org = (Organization) orgObj;
-                }
-            } catch (Exception e) {
-                logger.debug("Could not retrieve organization from record, using session organization: " + e.getMessage());
-            }
-        }
-        return org;
-    }
-
-    private EmailServerConfiguration getSmtpConfiguration(Organization org) {
-        EmailServerConfiguration config = EmailUtils.getEmailConfiguration(org);
-        if (config == null) {
-            config = EmailUtils.getEmailConfiguration(OBContext.getOBContext().getCurrentOrganization());
-        }
-        if (config == null) {
-            try {
-                OBCriteria<EmailServerConfiguration> crit = OBDal.getInstance().createCriteria(EmailServerConfiguration.class);
-                crit.add(Restrictions.isNotNull("smtpServerSenderAddress"));
-                crit.setMaxResults(1);
-                config = (EmailServerConfiguration) crit.uniqueResult();
-            } catch (Exception e) {
-                logger.debug("Could not find any fallback Email Server Configuration: " + e.getMessage());
-            }
-        }
-        return config;
     }
 
     private String getRecipientEmail(BaseOBObject dataRecord) {
@@ -307,9 +246,9 @@ public class EmailConfigService extends MetadataService {
     private String getRecordSubject(Tab tab, BaseOBObject dataRecord) {
         try {
             String windowName = tab.getWindow().getName();
-            String documentNo = (dataRecord != null && dataRecord.getEntity().hasProperty(DOCUMENT_NO)) 
+            String documentNoResource = (dataRecord != null && dataRecord.getEntity().hasProperty(DOCUMENT_NO)) 
                     ? safeString(dataRecord.get(DOCUMENT_NO)) : "";
-            return (windowName + " " + documentNo).trim();
+            return (windowName + " " + documentNoResource).trim();
         } catch (Exception e) {
             logger.debug("Could not determine record subject: " + e.getMessage());
             return "";
@@ -320,9 +259,9 @@ public class EmailConfigService extends MetadataService {
         if (dataRecord == null) return "";
         try {
             String entitySimpleName = tab.getTable().getName();
-            String documentNo = dataRecord.getEntity().hasProperty(DOCUMENT_NO) 
+            String documentNoResource = dataRecord.getEntity().hasProperty(DOCUMENT_NO) 
                     ? safeString(dataRecord.get(DOCUMENT_NO)) : "";
-            return "Report" + entitySimpleName + "_" + documentNo + ".pdf";
+            return "Report" + entitySimpleName + "_" + documentNoResource + ".pdf";
         } catch (Exception e) {
             logger.debug("Could not determine report file name: " + e.getMessage());
             return "";
@@ -379,48 +318,5 @@ public class EmailConfigService extends MetadataService {
             logger.warn("Could not load email definition: " + e.getMessage());
         }
         return null;
-    }
-
-    private JSONArray getRecordAttachments(String tableId, String recordId) {
-        JSONArray recordAttachmentsList = new JSONArray();
-        if (recordId == null) return recordAttachmentsList;
-        try {
-            OBCriteria<Attachment> criteria = OBDal.getInstance().createCriteria(Attachment.class);
-            criteria.add(Restrictions.eq(Attachment.PROPERTY_TABLE, OBDal.getInstance().getProxy(org.openbravo.model.ad.datamodel.Table.class, tableId)));
-            criteria.add(Restrictions.eq(Attachment.PROPERTY_RECORD, recordId));
-            criteria.add(Restrictions.eq(Attachment.PROPERTY_ACTIVE, true));
-            criteria.addOrder(Order.asc(Attachment.PROPERTY_NAME));
-            
-            List<Attachment> attachmentsList = criteria.list();
-            for (Attachment attachment : attachmentsList) {
-                JSONObject att = new JSONObject();
-                att.put("id", attachment.getId());
-                att.put("name", attachment.getName());
-                recordAttachmentsList.put(att);
-            }
-        } catch (Exception e) {
-            logger.warn("Could not load record attachments using DAL: " + e.getMessage());
-        }
-        return recordAttachmentsList;
-    }
-
-    private void handleProcessError(JSONObject result, Exception e) throws IOException {
-        logger.error("Error in EmailConfigService: " + e.getMessage(), e);
-        try {
-            result.put(SUCCESS, false);
-            result.put(MESSAGE, e.getMessage() != null ? e.getMessage() : "Failed to load email configuration.");
-            write(result);
-        } catch (Exception jsonEx) {
-            try {
-                getResponse().getWriter().write("{\"success\":false,\"message\":\"Failed to load email configuration.\"}");
-            } catch (IOException ioEx) {
-                logger.error("Fatal error writing response: " + ioEx.getMessage(), ioEx);
-            }
-        }
-    }
-
-    private String safeString(Object value) {
-        if (value == null) return "";
-        return value.toString().trim();
     }
 }

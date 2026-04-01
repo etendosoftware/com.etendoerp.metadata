@@ -20,6 +20,7 @@ package com.etendoerp.metadata.service;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -33,15 +34,10 @@ import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.fileupload.disk.DiskFileItemFactory;
 import org.apache.commons.fileupload.servlet.ServletFileUpload;
 import org.codehaus.jettison.json.JSONObject;
-import org.hibernate.criterion.Restrictions;
-import org.openbravo.base.model.Entity;
-import org.openbravo.base.model.ModelProvider;
 import org.openbravo.base.session.OBPropertiesProvider;
 import org.openbravo.base.structure.BaseOBObject;
 import org.openbravo.dal.core.OBContext;
-import org.openbravo.dal.service.OBCriteria;
 import org.openbravo.dal.service.OBDal;
-import org.openbravo.email.EmailUtils;
 import org.openbravo.erpCommon.utility.poc.EmailInfo;
 import org.openbravo.erpCommon.utility.poc.EmailManager;
 import org.openbravo.model.ad.ui.Tab;
@@ -54,8 +50,6 @@ import org.openbravo.model.common.enterprise.Organization;
  */
 public class EmailSendService extends MetadataService {
 
-    private static final String SUCCESS = "success";
-    private static final String MESSAGE = "message";
     private static final String RECORD_ID = "recordId";
     private static final String TAB_ID = "tabId";
     private static final String SUBJECT = "subject";
@@ -98,7 +92,7 @@ public class EmailSendService extends MetadataService {
             Organization org = getRecordOrganization(dataRecord);
             EmailServerConfiguration emailConfig = getEmailConfiguration(org);
 
-            if (emailConfig == null) {
+            if (emailConfig == null || emailConfig.getSmtpServerSenderAddress() == null || emailConfig.getSmtpServerSenderAddress().trim().isEmpty()) {
                 handleErrorResponse(result, "No sender defined. Please check Email Server configuration in Client settings.");
                 return;
             }
@@ -108,7 +102,7 @@ public class EmailSendService extends MetadataService {
             write(result);
 
         } catch (Exception e) {
-            handleProcessError(result, e);
+            handleProcessError("EmailSendService", result, e);
         } finally {
             OBContext.restorePreviousMode();
             cleanupTempFiles(tempFiles);
@@ -148,47 +142,9 @@ public class EmailSendService extends MetadataService {
         return true;
     }
 
-    private BaseOBObject getRecord(Tab tab, String recordId) {
-        if (tab.getTable() == null) return null;
-        Entity entity = ModelProvider.getInstance().getEntityByTableName(tab.getTable().getDBTableName());
-        if (entity == null) return null;
-        return OBDal.getInstance().get(entity.getName(), recordId);
-    }
-
-    private Organization getRecordOrganization(BaseOBObject dataRecord) {
-        Organization org = OBContext.getOBContext().getCurrentOrganization();
-        if (dataRecord != null && dataRecord.getEntity().hasProperty("organization")) {
-            try {
-                Object orgObj = dataRecord.get("organization");
-                if (orgObj instanceof Organization) org = (Organization) orgObj;
-            } catch (Exception e) {
-                logger.debug("Could not retrieve organization from record: " + e.getMessage());
-            }
-        }
-        return org;
-    }
-
-    private EmailServerConfiguration getEmailConfiguration(Organization org) {
-        EmailServerConfiguration config = EmailUtils.getEmailConfiguration(org);
-        if (config == null) {
-            config = EmailUtils.getEmailConfiguration(OBContext.getOBContext().getCurrentOrganization());
-        }
-        if (config == null) {
-            try {
-                OBCriteria<EmailServerConfiguration> crit = OBDal.getInstance().createCriteria(EmailServerConfiguration.class);
-                crit.add(Restrictions.isNotNull("smtpServerSenderAddress"));
-                crit.setMaxResults(1);
-                config = (EmailServerConfiguration) crit.uniqueResult();
-            } catch (Exception e) {
-                logger.debug("Could not retrieve fallback email configuration: " + e.getMessage());
-            }
-        }
-        return (config != null && config.getSmtpServerSenderAddress() != null && !config.getSmtpServerSenderAddress().trim().isEmpty()) ? config : null;
-    }
-
     private void sendEmail(Map<String, String> params, List<String> recordAttachmentIds, List<File> tempFiles, EmailServerConfiguration emailConfig) throws Exception {
         List<File> allAttachments = new ArrayList<>(tempFiles);
-        allAttachments.addAll(getRecordAttachments(recordAttachmentIds));
+        allAttachments.addAll(getFilesFromAttachments(recordAttachmentIds));
 
         EmailInfo email = new EmailInfo.Builder()
                 .setRecipientTO(params.get("to"))
@@ -205,7 +161,7 @@ public class EmailSendService extends MetadataService {
         EmailManager.sendEmail(emailConfig, email);
     }
 
-    private List<File> getRecordAttachments(List<String> recordAttachmentIds) {
+    private List<File> getFilesFromAttachments(List<String> recordAttachmentIds) {
         List<File> recordFiles = new ArrayList<>();
         if (recordAttachmentIds.isEmpty()) return recordFiles;
         try {
@@ -237,31 +193,6 @@ public class EmailSendService extends MetadataService {
         }
     }
 
-    private void handleErrorResponse(JSONObject result, String message) throws IOException {
-        try {
-            result.put(SUCCESS, false);
-            result.put(MESSAGE, message);
-            write(result);
-        } catch (Exception e) {
-            logger.error("Error writing error response: " + e.getMessage(), e);
-        }
-    }
-
-    private void handleProcessError(JSONObject result, Exception e) throws IOException {
-        logger.error("Error in EmailSendService: " + e.getMessage(), e);
-        try {
-            result.put(SUCCESS, false);
-            result.put(MESSAGE, e.getMessage() != null ? e.getMessage() : "Failed to send email.");
-            write(result);
-        } catch (Exception jsonEx) {
-            try {
-                getResponse().getWriter().write("{\"success\":false,\"message\":\"Failed to send email.\"}");
-            } catch (IOException ioEx) {
-                logger.error("Fatal error writing response: " + ioEx.getMessage(), ioEx);
-            }
-        }
-    }
-
     private boolean isMultipartRequest() {
         String ct = getRequest().getContentType();
         return ct != null && ct.toLowerCase().startsWith("multipart/");
@@ -276,12 +207,7 @@ public class EmailSendService extends MetadataService {
 
             for (FileItem item : items) {
                 if (item.isFormField()) {
-                    if ("recordAttachmentId".equals(item.getFieldName())) {
-                        String val = item.getString("UTF-8");
-                        if (val != null && !val.trim().isEmpty()) recordAttachmentIds.add(val.trim());
-                    } else {
-                        params.put(item.getFieldName(), item.getString("UTF-8"));
-                    }
+                    processFormField(item, params, recordAttachmentIds);
                 } else {
                     processUploadedFile(item, tempFiles);
                 }
@@ -291,10 +217,20 @@ public class EmailSendService extends MetadataService {
         }
     }
 
+    private void processFormField(FileItem item, Map<String, String> params, List<String> recordAttachmentIds) throws Exception {
+        if ("recordAttachmentId".equals(item.getFieldName())) {
+            String val = item.getString("UTF-8");
+            if (val != null && !val.trim().isEmpty()) recordAttachmentIds.add(val.trim());
+        } else {
+            params.put(item.getFieldName(), item.getString("UTF-8"));
+        }
+    }
+
     private void processUploadedFile(FileItem item, List<File> tempFiles) throws Exception {
         String fileName = item.getName();
         if (item.getFieldName() != null && item.getFieldName().startsWith("attachment") && fileName != null && !fileName.trim().isEmpty()) {
-            File tempFile = File.createTempFile("email_attach_", "_" + fileName);
+            Path tempPath = Files.createTempFile("email_attach_", "_" + fileName);
+            File tempFile = tempPath.toFile();
             tempFile.deleteOnExit();
             item.write(tempFile);
             tempFiles.add(tempFile);
