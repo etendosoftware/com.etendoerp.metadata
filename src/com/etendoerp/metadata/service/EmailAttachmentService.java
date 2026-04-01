@@ -35,11 +35,7 @@ import org.openbravo.model.ad.ui.Tab;
  *
  * GET /meta/email/attachments?recordId=xxx&tabId=xxx
  */
-public class EmailAttachmentService extends MetadataService {
-
-    private static final String KEY_SUCCESS     = "success";
-    private static final String KEY_MESSAGE     = "message";
-    private static final String KEY_ATTACHMENTS = "attachments";
+public class EmailAttachmentService extends EmailBaseService {
 
     /**
      * Creates a new EmailAttachmentService for the given request/response pair.
@@ -62,7 +58,7 @@ public class EmailAttachmentService extends MetadataService {
                 OBContext.restorePreviousMode();
             }
         } catch (Exception ex) {
-            handleError(result, ex);
+            handleServiceError(result, ex, "Failed to load attachments.");
         }
     }
 
@@ -71,23 +67,19 @@ public class EmailAttachmentService extends MetadataService {
         String tabId    = getRequest().getParameter("tabId");
 
         if (recordId == null || tabId == null) {
-            result.put(KEY_SUCCESS, false);
-            result.put(KEY_MESSAGE, "Missing recordId or tabId parameter.");
-            write(result);
+            respond(result, false, "Missing recordId or tabId parameter.");
             return;
         }
 
         Tab tab = OBDal.getInstance().get(Tab.class, tabId);
         if (tab == null || tab.getTable() == null) {
-            result.put(KEY_SUCCESS, false);
-            result.put(KEY_MESSAGE, "Tab not found.");
-            write(result);
+            respond(result, false, "Tab not found.");
             return;
         }
 
         JSONArray attachments = queryAttachments(tab.getTable().getId(), recordId);
-        result.put(KEY_SUCCESS,     true);
-        result.put(KEY_ATTACHMENTS, attachments);
+        result.put(KEY_SUCCESS,    true);
+        result.put("attachments",  attachments);
         write(result);
     }
 
@@ -115,16 +107,5 @@ public class EmailAttachmentService extends MetadataService {
             logger.warn("Could not load record attachments: {}", ex.getMessage());
         }
         return attachments;
-    }
-
-    private void handleError(JSONObject result, Exception ex) throws IOException {
-        logger.error("Error in EmailAttachmentService: {}", ex.getMessage(), ex);
-        try {
-            result.put(KEY_SUCCESS, false);
-            result.put(KEY_MESSAGE, ex.getMessage() != null ? ex.getMessage() : "Failed to load attachments.");
-            write(result);
-        } catch (Exception ignored) {
-            getResponse().getWriter().write("{\"success\":false,\"message\":\"Failed to load attachments.\"}");
-        }
     }
 }

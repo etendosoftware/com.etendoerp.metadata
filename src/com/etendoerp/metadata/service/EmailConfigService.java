@@ -26,18 +26,14 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONObject;
-import org.hibernate.criterion.Restrictions;
 import org.openbravo.base.model.ModelProvider;
 import org.openbravo.base.structure.BaseOBObject;
 import org.openbravo.dal.core.OBContext;
-import org.openbravo.dal.service.OBCriteria;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.database.ConnectionProvider;
-import org.openbravo.email.EmailUtils;
 import org.openbravo.erpCommon.utility.reporting.TemplateData;
 import org.openbravo.erpCommon.utility.reporting.TemplateInfo;
 import org.openbravo.model.ad.ui.Tab;
-import org.openbravo.model.common.enterprise.EmailServerConfiguration;
 import org.openbravo.model.common.enterprise.Organization;
 import org.openbravo.service.db.DalConnectionProvider;
 
@@ -46,7 +42,7 @@ import org.openbravo.service.db.DalConnectionProvider;
  *
  * GET /meta/email/config?recordId=xxx&tabId=xxx
  */
-public class EmailConfigService extends MetadataService {
+public class EmailConfigService extends EmailBaseService {
 
     private static final String SUBJECT          = "subject";
     private static final String USER_CONTACT     = "userContact";
@@ -77,7 +73,7 @@ public class EmailConfigService extends MetadataService {
                 OBContext.restorePreviousMode();
             }
         } catch (Exception ex) {
-            handleError(result, ex);
+            handleServiceError(result, ex, "Failed to load email configuration.");
         }
     }
 
@@ -126,7 +122,7 @@ public class EmailConfigService extends MetadataService {
     private void populateEmailConfig(JSONObject result, Tab tab, BaseOBObject dataRecord,
             Organization org, String senderAddress, String recordId) throws Exception {
 
-        result.put("success", true);
+        result.put(KEY_SUCCESS,      true);
         result.put("to",             getRecipientEmail(dataRecord));
         result.put("toName",         getRecipientName(dataRecord));
         result.put("bcc",            getCurrentUserEmail());
@@ -135,12 +131,12 @@ public class EmailConfigService extends MetadataService {
         result.put("senderAddress",  senderAddress);
         result.put("reportFileName", getReportFileName(tab, dataRecord));
 
-        String subject  = getRecordSubject(tab, dataRecord);
-        String body     = "";
+        String subject   = getRecordSubject(tab, dataRecord);
+        String body      = "";
         String docTypeId = getDocumentTypeId(dataRecord);
 
         if (docTypeId != null) {
-            ConnectionProvider conn    = DalConnectionProvider.getReadOnlyConnectionProvider();
+            ConnectionProvider conn     = DalConnectionProvider.getReadOnlyConnectionProvider();
             TemplateData[] templateData = getTemplateData(docTypeId, org);
             result.put("templates", getTemplatesJson(templateData));
             JSONObject emailDef = loadEmailDefinition(conn, docTypeId, org, templateData);
@@ -155,45 +151,6 @@ public class EmailConfigService extends MetadataService {
         result.put(SUBJECT, subject);
         result.put(BODY,    body);
         result.put("recordAttachments", queryRecordAttachments(tab.getTable().getId(), recordId));
-    }
-
-    // ── Validation helpers ──
-
-    private Organization resolveOrganization(BaseOBObject dataRecord) {
-        Organization org = OBContext.getOBContext().getCurrentOrganization();
-        try {
-            Object orgObj = dataRecord.get("organization");
-            if (orgObj instanceof Organization) {
-                org = (Organization) orgObj;
-            }
-        } catch (Exception ex) {
-            logger.debug("Could not retrieve organization from record: {}", ex.getMessage());
-        }
-        return org;
-    }
-
-    private String resolveSenderAddress(Organization org) {
-        EmailServerConfiguration emailConfig = getSmtpConfig(org);
-        if (emailConfig == null || emailConfig.getSmtpServerSenderAddress() == null) {
-            return "";
-        }
-        return emailConfig.getSmtpServerSenderAddress().trim();
-    }
-
-    private Object getDocumentStatus(BaseOBObject dataRecord) {
-        Object status = readProperty(dataRecord, "documentStatus");
-        if (status == null) {
-            status = readProperty(dataRecord, "docstatus");
-        }
-        return status;
-    }
-
-    private Object readProperty(BaseOBObject dataRecord, String property) {
-        try {
-            return dataRecord.get(property);
-        } catch (Exception ex) {
-            return null;
-        }
     }
 
     // ── Attachment query against c_file ──
@@ -225,41 +182,18 @@ public class EmailConfigService extends MetadataService {
         return attachments;
     }
 
-    // ── SMTP config ──
-
-    private EmailServerConfiguration getSmtpConfig(Organization org) {
-        EmailServerConfiguration config = EmailUtils.getEmailConfiguration(org);
-        if (config == null) {
-            config = EmailUtils.getEmailConfiguration(OBContext.getOBContext().getCurrentOrganization());
-        }
-        if (config == null) {
-            config = findAnySmtpConfig();
-        }
-        return config;
-    }
-
-    private EmailServerConfiguration findAnySmtpConfig() {
-        try {
-            OBCriteria<EmailServerConfiguration> crit =
-                    OBDal.getInstance().createCriteria(EmailServerConfiguration.class);
-            crit.add(Restrictions.isNotNull("smtpServerSenderAddress"));
-            crit.setMaxResults(1);
-            return (EmailServerConfiguration) crit.uniqueResult();
-        } catch (Exception ex) {
-            return null;
-        }
-    }
-
     // ── Field helpers ──
 
     private String getRecipientEmail(BaseOBObject dataRecord) {
         String emailValue = getPropertyString(dataRecord, USER_CONTACT, EMAIL_PROP);
-        return emailValue.isEmpty() ? getPropertyString(dataRecord, BUSINESS_PARTNER, EMAIL_PROP) : emailValue;
+        return emailValue.isEmpty()
+                ? getPropertyString(dataRecord, BUSINESS_PARTNER, EMAIL_PROP) : emailValue;
     }
 
     private String getRecipientName(BaseOBObject dataRecord) {
         String nameValue = getPropertyString(dataRecord, USER_CONTACT, NAME);
-        return nameValue.isEmpty() ? getPropertyString(dataRecord, BUSINESS_PARTNER, NAME) : nameValue;
+        return nameValue.isEmpty()
+                ? getPropertyString(dataRecord, BUSINESS_PARTNER, NAME) : nameValue;
     }
 
     private String getSalesRepEmail(BaseOBObject dataRecord) {
@@ -363,25 +297,6 @@ public class EmailConfigService extends MetadataService {
             }
         } catch (Exception ex) { /* ignore */ }
         return "";
-    }
-
-    private void respond(JSONObject result, boolean success, String message) throws Exception {
-        result.put("success", success);
-        if (message != null) {
-            result.put("message", message);
-        }
-        write(result);
-    }
-
-    private void handleError(JSONObject result, Exception ex) throws IOException {
-        logger.error("Error in EmailConfigService: {}", ex.getMessage(), ex);
-        try {
-            respond(result, false,
-                    ex.getMessage() != null ? ex.getMessage() : "Failed to load email configuration.");
-        } catch (Exception ignored) {
-            getResponse().getWriter().write(
-                    "{\"success\":false,\"message\":\"Failed to load email configuration.\"}");
-        }
     }
 
     private String safeStr(Object value) {

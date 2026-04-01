@@ -24,15 +24,11 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.codehaus.jettison.json.JSONObject;
-import org.hibernate.criterion.Restrictions;
 import org.openbravo.base.model.ModelProvider;
 import org.openbravo.base.structure.BaseOBObject;
 import org.openbravo.dal.core.OBContext;
-import org.openbravo.dal.service.OBCriteria;
 import org.openbravo.dal.service.OBDal;
-import org.openbravo.email.EmailUtils;
 import org.openbravo.model.ad.ui.Tab;
-import org.openbravo.model.common.enterprise.EmailServerConfiguration;
 import org.openbravo.model.common.enterprise.Organization;
 
 /**
@@ -40,7 +36,7 @@ import org.openbravo.model.common.enterprise.Organization;
  *
  * GET /meta/email?recordId=xxx&tabId=xxx
  */
-public class EmailService extends MetadataService {
+public class EmailService extends EmailBaseService {
 
     /**
      * Creates a new EmailService for the given request/response pair.
@@ -63,7 +59,7 @@ public class EmailService extends MetadataService {
                 OBContext.restorePreviousMode();
             }
         } catch (Exception ex) {
-            handleError(result, ex);
+            handleServiceError(result, ex, "Failed to validate email configuration.");
         }
     }
 
@@ -106,84 +102,5 @@ public class EmailService extends MetadataService {
         }
 
         respond(result, true, null);
-    }
-
-    private Organization resolveOrganization(BaseOBObject dataRecord) {
-        Organization org = OBContext.getOBContext().getCurrentOrganization();
-        try {
-            Object orgObj = dataRecord.get("organization");
-            if (orgObj instanceof Organization) {
-                org = (Organization) orgObj;
-            }
-        } catch (Exception ex) {
-            logger.debug("Could not retrieve organization from record: {}", ex.getMessage());
-        }
-        return org;
-    }
-
-    private String resolveSenderAddress(Organization org) {
-        EmailServerConfiguration emailConfig = getSmtpConfig(org);
-        if (emailConfig == null || emailConfig.getSmtpServerSenderAddress() == null) {
-            return "";
-        }
-        return emailConfig.getSmtpServerSenderAddress().trim();
-    }
-
-    private Object getDocumentStatus(BaseOBObject dataRecord) {
-        Object status = readProperty(dataRecord, "documentStatus");
-        if (status == null) {
-            status = readProperty(dataRecord, "docstatus");
-        }
-        return status;
-    }
-
-    private Object readProperty(BaseOBObject dataRecord, String property) {
-        try {
-            return dataRecord.get(property);
-        } catch (Exception ex) {
-            return null;
-        }
-    }
-
-    private EmailServerConfiguration getSmtpConfig(Organization org) {
-        EmailServerConfiguration config = EmailUtils.getEmailConfiguration(org);
-        if (config == null) {
-            config = EmailUtils.getEmailConfiguration(OBContext.getOBContext().getCurrentOrganization());
-        }
-        if (config == null) {
-            config = findAnySmtpConfig();
-        }
-        return config;
-    }
-
-    private EmailServerConfiguration findAnySmtpConfig() {
-        try {
-            OBCriteria<EmailServerConfiguration> crit =
-                    OBDal.getInstance().createCriteria(EmailServerConfiguration.class);
-            crit.add(Restrictions.isNotNull("smtpServerSenderAddress"));
-            crit.setMaxResults(1);
-            return (EmailServerConfiguration) crit.uniqueResult();
-        } catch (Exception ex) {
-            return null;
-        }
-    }
-
-    private void respond(JSONObject result, boolean success, String message) throws Exception {
-        result.put("success", success);
-        if (message != null) {
-            result.put("message", message);
-        }
-        write(result);
-    }
-
-    private void handleError(JSONObject result, Exception ex) throws IOException {
-        logger.error("Error in EmailService: {}", ex.getMessage(), ex);
-        try {
-            respond(result, false,
-                    ex.getMessage() != null ? ex.getMessage() : "Failed to validate email configuration.");
-        } catch (Exception ignored) {
-            getResponse().getWriter().write(
-                    "{\"success\":false,\"message\":\"Failed to validate email configuration.\"}");
-        }
     }
 }
