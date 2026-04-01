@@ -57,11 +57,44 @@ public class EmailConfigServiceTest extends BaseMetadataServiceTest {
 
         emailConfigService.process();
         String responseContent = responseWriter.toString();
-        
+
         try {
             JSONObject jsonResponse = new JSONObject(responseContent);
             assertFalse("Success should be false for missing parameters", jsonResponse.getBoolean("success"));
             assertTrue("Should have error message", jsonResponse.has("message"));
+        } catch (Exception e) {
+            fail("Response should be valid JSON: " + e.getMessage());
+        }
+    }
+
+    @Test
+    public void testProcessTabNotFound() throws IOException, javax.servlet.ServletException {
+        when(mockRequest.getParameter("recordId")).thenReturn("some-record-id");
+        when(mockRequest.getParameter("tabId")).thenReturn("non-existent-tab-id");
+
+        emailConfigService.process();
+        String responseContent = responseWriter.toString();
+
+        try {
+            JSONObject jsonResponse = new JSONObject(responseContent);
+            assertFalse("Success should be false for non-existent tab", jsonResponse.getBoolean("success"));
+            assertEquals("Tab not found.", jsonResponse.getString("message"));
+        } catch (Exception e) {
+            fail("Response should be valid JSON: " + e.getMessage());
+        }
+    }
+
+    @Test
+    public void testProcessMissingTabIdOnly() throws IOException, javax.servlet.ServletException {
+        when(mockRequest.getParameter("recordId")).thenReturn("some-record-id");
+        when(mockRequest.getParameter("tabId")).thenReturn(null);
+
+        emailConfigService.process();
+        String responseContent = responseWriter.toString();
+
+        try {
+            JSONObject jsonResponse = new JSONObject(responseContent);
+            assertFalse(jsonResponse.getBoolean("success"));
         } catch (Exception e) {
             fail("Response should be valid JSON: " + e.getMessage());
         }

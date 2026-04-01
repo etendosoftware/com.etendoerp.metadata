@@ -1,0 +1,294 @@
+/*
+ *************************************************************************
+ * The contents of this file are subject to the Etendo License
+ * (the "License"), you may not use this file except in compliance
+ * with the License.
+ * You may obtain a copy of the License at
+ * https://github.com/etendosoftware/etendo_core/blob/main/legal/Etendo_license.txt
+ * Software distributed under the License is distributed on an
+ * "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
+ * implied. See the License for the specific language governing rights
+ * and limitations under the License.
+ * All portions are Copyright (C) 2021-2026 FUTIT SERVICES, S.L
+ * All Rights Reserved.
+ * Contributor(s): Futit Services S.L.
+ *************************************************************************
+ */
+
+package com.etendoerp.metadata.service;
+
+import static org.junit.Assert.*;
+import static org.mockito.Mockito.*;
+
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import org.codehaus.jettison.json.JSONObject;
+import org.junit.Before;
+import org.junit.Test;
+import org.openbravo.base.exception.OBException;
+import org.openbravo.base.structure.BaseOBObject;
+import org.openbravo.model.ad.ui.Tab;
+import org.openbravo.model.common.enterprise.Organization;
+
+import com.etendoerp.metadata.MetadataTestConstants;
+
+/**
+ * Tests for {@link EmailBaseService} utility methods via a concrete stub subclass.
+ */
+public class EmailBaseServiceTest extends BaseMetadataServiceTest {
+
+    /** Minimal concrete subclass that exposes protected helpers for direct testing. */
+    private static class StubEmailService extends EmailBaseService {
+
+        StubEmailService(HttpServletRequest req, HttpServletResponse res) {
+            super(req, res);
+        }
+
+        @Override
+        protected void executeEmailAction(JSONObject result) throws Exception {
+            // no-op for lifecycle tests
+        }
+
+        @Override
+        protected String getFallbackErrorMessage() {
+            return "Stub fallback error";
+        }
+
+        // Bridge methods to reach protected API from the same package
+        Object callReadProperty(BaseOBObject record, String prop) {
+            return readProperty(record, prop);
+        }
+
+        Object callGetDocumentStatus(BaseOBObject record) {
+            return getDocumentStatus(record);
+        }
+
+        void callRespond(JSONObject result, boolean success, String message) throws Exception {
+            respond(result, success, message);
+        }
+
+        void callHandleServiceError(JSONObject result, Exception ex, String fallback) throws IOException {
+            handleServiceError(result, ex, fallback);
+        }
+
+        org.openbravo.model.common.enterprise.Organization callResolveOrganization(BaseOBObject record) {
+            return resolveOrganization(record);
+        }
+
+        String callResolveSenderAddress(org.openbravo.model.common.enterprise.Organization org) {
+            return resolveSenderAddress(org);
+        }
+    }
+
+    private StubEmailService service;
+
+    @Override
+    protected String getServicePath() {
+        return MetadataTestConstants.EMAIL_PATH;
+    }
+
+    @Before
+    public void setUpStub() {
+        service = new StubEmailService(mockRequest, mockResponse);
+    }
+
+    // ── readProperty ──────────────────────────────────────────────────────────
+
+    @Test
+    public void testReadProperty_returnsValue() {
+        BaseOBObject record = mock(BaseOBObject.class);
+        when(record.get("documentStatus")).thenReturn("CO");
+        assertEquals("CO", service.callReadProperty(record, "documentStatus"));
+    }
+
+    @Test
+    public void testReadProperty_returnsNullOnException() {
+        BaseOBObject record = mock(BaseOBObject.class);
+        when(record.get("missing")).thenThrow(new RuntimeException("no such property"));
+        assertNull(service.callReadProperty(record, "missing"));
+    }
+
+    // ── getDocumentStatus ─────────────────────────────────────────────────────
+
+    @Test
+    public void testGetDocumentStatus_fromDocumentStatus() {
+        BaseOBObject record = mock(BaseOBObject.class);
+        when(record.get("documentStatus")).thenReturn("CO");
+        when(record.get("docstatus")).thenReturn(null);
+        assertEquals("CO", service.callGetDocumentStatus(record));
+    }
+
+    @Test
+    public void testGetDocumentStatus_fallsBackToDocstatus() {
+        BaseOBObject record = mock(BaseOBObject.class);
+        when(record.get("documentStatus")).thenReturn(null);
+        when(record.get("docstatus")).thenReturn("CL");
+        assertEquals("CL", service.callGetDocumentStatus(record));
+    }
+
+    @Test
+    public void testGetDocumentStatus_returnsNullWhenNeitherExists() {
+        BaseOBObject record = mock(BaseOBObject.class);
+        when(record.get("documentStatus")).thenReturn(null);
+        when(record.get("docstatus")).thenReturn(null);
+        assertNull(service.callGetDocumentStatus(record));
+    }
+
+    // ── respond ───────────────────────────────────────────────────────────────
+
+    @Test
+    public void testRespond_writesSuccessTrue() throws Exception {
+        JSONObject result = new JSONObject();
+        service.callRespond(result, true, null);
+        String output = responseWriter.toString();
+        assertTrue("Should contain success:true", output.contains("true"));
+    }
+
+    @Test
+    public void testRespond_writesSuccessFalseWithMessage() throws Exception {
+        JSONObject result = new JSONObject();
+        service.callRespond(result, false, "something went wrong");
+        String output = responseWriter.toString();
+        assertTrue(output.contains("false"));
+        assertTrue(output.contains("something went wrong"));
+    }
+
+    // ── handleServiceError ────────────────────────────────────────────────────
+
+    @Test
+    public void testHandleServiceError_OBExceptionExposesMessage() throws IOException {
+        JSONObject result = new JSONObject();
+        service.callHandleServiceError(result, new OBException("Known error"), "Fallback");
+        String output = responseWriter.toString();
+        assertTrue("OBException message should be visible", output.contains("Known error"));
+        assertFalse("Internal name should not be visible", output.contains("Fallback"));
+    }
+
+    @Test
+    public void testHandleServiceError_genericExceptionUsesFallback() throws IOException {
+        JSONObject result = new JSONObject();
+        service.callHandleServiceError(result, new RuntimeException("internal detail"), "Fallback message");
+        String output = responseWriter.toString();
+        assertTrue("Fallback message should appear", output.contains("Fallback message"));
+        assertFalse("Internal detail should NOT appear", output.contains("internal detail"));
+    }
+
+    @Test
+    public void testHandleServiceError_writerThrows_propagatesIOException()
+            throws IOException, ServletException {
+        // EmailService's executeEmailAction calls validateEmailRequest → respond → write → getWriter
+        when(mockResponse.getWriter()).thenThrow(new IOException("Writer unavailable"));
+        when(mockRequest.getParameter("recordId")).thenReturn(null);
+        when(mockRequest.getParameter("tabId")).thenReturn(null);
+
+        EmailService emailService = new EmailService(mockRequest, mockResponse);
+        try {
+            emailService.process();
+            fail("Expected IOException to propagate");
+        } catch (IOException e) {
+            assertEquals("Writer unavailable", e.getMessage());
+        }
+    }
+
+    // ── process / template method lifecycle ──────────────────────────────────
+
+    @Test
+    public void testProcess_completesWithoutError() throws IOException, ServletException {
+        // StubEmailService.executeEmailAction is a no-op; process() should complete cleanly
+        service.process();
+        // no exception means the OBContext lifecycle (setAdminMode / restorePreviousMode) ran OK
+    }
+
+    // ── ValidationContext ─────────────────────────────────────────────────────
+
+    @Test
+    public void testValidationContext_allGetters() {
+        Tab tab           = mock(Tab.class);
+        BaseOBObject rec  = mock(BaseOBObject.class);
+        Organization org  = mock(Organization.class);
+
+        EmailBaseService.ValidationContext ctx =
+                new EmailBaseService.ValidationContext(tab, rec, org, "sender@test.com", "rec-123");
+
+        assertSame("tab",     tab,  ctx.getTab());
+        assertSame("record",  rec,  ctx.getDataRecord());
+        assertSame("org",     org,  ctx.getOrg());
+        assertEquals("senderAddress", "sender@test.com", ctx.getSenderAddress());
+        assertEquals("recordId",      "rec-123",          ctx.getRecordId());
+    }
+
+    // ── process with unhandled exception in executeEmailAction ────────────────
+
+    @Test
+    public void testProcess_executeActionThrows_writesErrorResponse()
+            throws IOException, ServletException {
+        StringWriter sw = new StringWriter();
+        when(mockResponse.getWriter()).thenReturn(new PrintWriter(sw));
+
+        StubEmailService throwing = new StubEmailService(mockRequest, mockResponse) {
+            @Override
+            protected void executeEmailAction(JSONObject result) throws Exception {
+                throw new OBException("Action failed");
+            }
+        };
+
+        throwing.process();
+        String output = sw.toString();
+        assertTrue("Error response should contain false", output.contains("false"));
+        assertTrue("OBException message should be visible", output.contains("Action failed"));
+    }
+
+    // ── resolveOrganization ───────────────────────────────────────────────────
+
+    @Test
+    public void testResolveOrganization_usesOrgFromRecord() {
+        BaseOBObject record = mock(BaseOBObject.class);
+        Organization mockOrg = mock(Organization.class);
+        when(record.get("organization")).thenReturn(mockOrg);
+
+        Organization result = service.callResolveOrganization(record);
+        assertSame("Should return org from record", mockOrg, result);
+    }
+
+    @Test
+    public void testResolveOrganization_fallsBackWhenValueIsNull() {
+        BaseOBObject record = mock(BaseOBObject.class);
+        when(record.get("organization")).thenReturn(null);
+
+        Organization result = service.callResolveOrganization(record);
+        assertNotNull("Should fall back to context org when record org is null", result);
+    }
+
+    @Test
+    public void testResolveOrganization_fallsBackWhenValueIsNotOrgInstance() {
+        BaseOBObject record = mock(BaseOBObject.class);
+        when(record.get("organization")).thenReturn("notAnOrg");
+
+        Organization result = service.callResolveOrganization(record);
+        assertNotNull("Should fall back to context org when value is not Organization", result);
+    }
+
+    @Test
+    public void testResolveOrganization_fallsBackOnException() {
+        BaseOBObject record = mock(BaseOBObject.class);
+        when(record.get("organization")).thenThrow(new RuntimeException("no org property"));
+
+        Organization result = service.callResolveOrganization(record);
+        assertNotNull("Should fall back to context org on exception", result);
+    }
+
+    // ── resolveSenderAddress ──────────────────────────────────────────────────
+
+    @Test
+    public void testResolveSenderAddress_doesNotThrow() {
+        Organization mockOrg = mock(Organization.class);
+        String result = service.callResolveSenderAddress(mockOrg);
+        assertNotNull("resolveSenderAddress should return non-null string", result);
+    }
+}
