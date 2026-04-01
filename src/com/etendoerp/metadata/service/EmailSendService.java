@@ -58,6 +58,7 @@ public class EmailSendService extends MetadataService {
     private static final String MESSAGE = "message";
     private static final String RECORD_ID = "recordId";
     private static final String TAB_ID = "tabId";
+    private static final String SUBJECT = "subject";
     private static final String ATTACH_PATH_PROP = "attach.path";
 
     /**
@@ -115,18 +116,24 @@ public class EmailSendService extends MetadataService {
     }
 
     private void populateParamsFromRequest(Map<String, String> params, List<String> recordAttachmentIds) {
-        String[] fieldNames = { RECORD_ID, TAB_ID, "to", "subject", "notes", "archive", "cc", "bcc", "replyTo", "templateId" };
+        String[] fieldNames = { RECORD_ID, TAB_ID, "to", SUBJECT, "notes", "archive", "cc", "bcc", "replyTo", "templateId" };
         for (String field : fieldNames) {
             if (isNullOrEmpty(params.get(field))) {
                 String value = getRequest().getParameter(field);
                 if (value != null) params.put(field, value);
             }
         }
+        extractAttachmentIdsFromRequest(recordAttachmentIds);
+    }
+
+    private void extractAttachmentIdsFromRequest(List<String> recordAttachmentIds) {
         if (recordAttachmentIds.isEmpty()) {
             String[] rawIds = getRequest().getParameterValues("recordAttachmentId");
             if (rawIds != null) {
                 for (String id : rawIds) {
-                    if (id != null && !id.trim().isEmpty()) recordAttachmentIds.add(id.trim());
+                    if (id != null && !id.trim().isEmpty()) {
+                        recordAttachmentIds.add(id.trim());
+                    }
                 }
             }
         }
@@ -134,7 +141,7 @@ public class EmailSendService extends MetadataService {
 
     private boolean validateParams(JSONObject result, Map<String, String> params) throws IOException {
         if (isNullOrEmpty(params.get(RECORD_ID)) || isNullOrEmpty(params.get(TAB_ID))
-                || isNullOrEmpty(params.get("to")) || isNullOrEmpty(params.get("subject"))) {
+                || isNullOrEmpty(params.get("to")) || isNullOrEmpty(params.get(SUBJECT))) {
             handleErrorResponse(result, "Missing required parameters: recordId, tabId, to, subject.");
             return false;
         }
@@ -188,7 +195,7 @@ public class EmailSendService extends MetadataService {
                 .setRecipientCC(params.getOrDefault("cc", ""))
                 .setRecipientBCC(params.getOrDefault("bcc", ""))
                 .setReplyTo(params.getOrDefault("replyTo", ""))
-                .setSubject(params.get("subject"))
+                .setSubject(params.get(SUBJECT))
                 .setContent(params.getOrDefault("notes", ""))
                 .setContentType("text/plain; charset=utf-8")
                 .setAttachments(allAttachments)
