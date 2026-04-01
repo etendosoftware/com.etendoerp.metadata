@@ -45,7 +45,6 @@ public class EmailConfigService extends MetadataService {
     private static final String EMAIL = "email";
     private static final String BUSINESS_PARTNER = "businessPartner";
     private static final String DOCUMENT_NO = "documentNo";
-    private static final String ORGANIZATION = "organization";
     private static final String BODY = "body";
 
     /**
@@ -149,9 +148,12 @@ public class EmailConfigService extends MetadataService {
         String email = "";
         if (dataRecord.getEntity().hasProperty(USER_CONTACT)) {
             try {
-                BaseOBObject contact = (BaseOBObject) dataRecord.get(USER_CONTACT);
-                if (contact != null && contact.getEntity().hasProperty(EMAIL)) {
-                    email = safeString(contact.get(EMAIL));
+                Object contactObj = dataRecord.get(USER_CONTACT);
+                if (contactObj instanceof BaseOBObject) {
+                    BaseOBObject contact = (BaseOBObject) contactObj;
+                    if (contact.getEntity().hasProperty(EMAIL)) {
+                        email = safeString(contact.get(EMAIL));
+                    }
                 }
             } catch (Exception e) { 
                 logger.debug("Could not retrieve email from userContact: " + e.getMessage());
@@ -160,9 +162,12 @@ public class EmailConfigService extends MetadataService {
 
         if (email.isEmpty() && dataRecord.getEntity().hasProperty(BUSINESS_PARTNER)) {
             try {
-                BaseOBObject bp = (BaseOBObject) dataRecord.get(BUSINESS_PARTNER);
-                if (bp != null && bp.getEntity().hasProperty(EMAIL)) {
-                    email = safeString(bp.get(EMAIL));
+                Object bpObj = dataRecord.get(BUSINESS_PARTNER);
+                if (bpObj instanceof BaseOBObject) {
+                    BaseOBObject bp = (BaseOBObject) bpObj;
+                    if (bp.getEntity().hasProperty(EMAIL)) {
+                        email = safeString(bp.get(EMAIL));
+                    }
                 }
             } catch (Exception e) { 
                  logger.debug("Could not retrieve email from businessPartner: " + e.getMessage());
@@ -176,9 +181,12 @@ public class EmailConfigService extends MetadataService {
         String name = "";
         if (dataRecord.getEntity().hasProperty(USER_CONTACT)) {
             try {
-                BaseOBObject contact = (BaseOBObject) dataRecord.get(USER_CONTACT);
-                if (contact != null && contact.getEntity().hasProperty("name")) {
-                    name = safeString(contact.get("name"));
+                Object contactObj = dataRecord.get(USER_CONTACT);
+                if (contactObj instanceof BaseOBObject) {
+                    BaseOBObject contact = (BaseOBObject) contactObj;
+                    if (contact.getEntity().hasProperty("name")) {
+                        name = safeString(contact.get("name"));
+                    }
                 }
             } catch (Exception e) { 
                 logger.debug("Could not retrieve name from userContact: " + e.getMessage());
@@ -187,9 +195,12 @@ public class EmailConfigService extends MetadataService {
 
         if (name.isEmpty() && dataRecord.getEntity().hasProperty(BUSINESS_PARTNER)) {
             try {
-                BaseOBObject bp = (BaseOBObject) dataRecord.get(BUSINESS_PARTNER);
-                if (bp != null && bp.getEntity().hasProperty("name")) {
-                    name = safeString(bp.get("name"));
+                Object bpObj = dataRecord.get(BUSINESS_PARTNER);
+                if (bpObj instanceof BaseOBObject) {
+                    BaseOBObject bp = (BaseOBObject) bpObj;
+                    if (bp.getEntity().hasProperty("name")) {
+                        name = safeString(bp.get("name"));
+                    }
                 }
             } catch (Exception e) { 
                 logger.debug("Could not retrieve name from businessPartner: " + e.getMessage());
@@ -232,9 +243,12 @@ public class EmailConfigService extends MetadataService {
         if (dataRecord == null) return "";
         if (dataRecord.getEntity().hasProperty("salesRepresentative")) {
             try {
-                BaseOBObject salesRep = (BaseOBObject) dataRecord.get("salesRepresentative");
-                if (salesRep != null && salesRep.getEntity().hasProperty(EMAIL)) {
-                    return safeString(salesRep.get(EMAIL));
+                Object salesRepObj = dataRecord.get("salesRepresentative");
+                if (salesRepObj instanceof BaseOBObject) {
+                    BaseOBObject salesRep = (BaseOBObject) salesRepObj;
+                    if (salesRep.getEntity().hasProperty(EMAIL)) {
+                        return safeString(salesRep.get(EMAIL));
+                    }
                 }
             } catch (Exception e) { 
                 logger.debug("Could not retrieve email from salesRepresentative: " + e.getMessage());
@@ -268,16 +282,16 @@ public class EmailConfigService extends MetadataService {
         }
     }
 
-    private String getDocumentTypeId(BaseOBObject dataRecord) {
         if (dataRecord == null || !dataRecord.getEntity().hasProperty("documentType")) return null;
         try {
-            BaseOBObject docType = (BaseOBObject) dataRecord.get("documentType");
-            if (docType != null) return docType.getId().toString();
+            Object docTypeObj = dataRecord.get("documentType");
+            if (docTypeObj instanceof BaseOBObject) {
+                BaseOBObject docType = (BaseOBObject) docTypeObj;
+                return docType.getId().toString();
+            }
         } catch (Exception e) { 
             logger.debug("Could not retrieve documentType: " + e.getMessage());
         }
-        return null;
-    }
 
     private TemplateData[] getTemplateData(String docTypeId, Organization org) {
         try {
