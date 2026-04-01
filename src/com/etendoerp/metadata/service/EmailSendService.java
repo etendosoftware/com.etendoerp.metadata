@@ -155,10 +155,9 @@ public class EmailSendService extends MetadataService {
         if (!Files.exists(rootTmp)) {
             Files.createDirectories(rootTmp);
             // Restrict root temp immediately
-            File file = rootTmp.toFile();
-            file.setReadable(true, true);
-            file.setWritable(true, true);
-            file.setExecutable(true, true);
+            if (!restrictPermissions(rootTmp.toFile())) {
+                logger.warn("Could not fully restrict permissions on root temp directory: {}", rootTmp);
+            }
         }
 
         // On POSIX systems, we use 700 (rwx------) attributes during creation for atomic security.
@@ -171,12 +170,21 @@ public class EmailSendService extends MetadataService {
             return Files.createTempDirectory(rootTmp, "email_", attrs);
         } catch (UnsupportedOperationException e) {
             Path tempDir = Files.createTempDirectory(rootTmp, "email_");
-            File file = tempDir.toFile();
-            if (!file.setReadable(true, true) || !file.setWritable(true, true) || !file.setExecutable(true, true)) {
+            if (!restrictPermissions(tempDir.toFile())) {
                 logger.warn("Could not fully restrict permissions on temporary directory: {}", tempDir);
             }
             return tempDir;
         }
+    }
+
+    private boolean restrictPermissions(File file) {
+        boolean success = file.setReadable(false, false);
+        success &= file.setWritable(false, false);
+        success &= file.setExecutable(false, false);
+        success &= file.setReadable(true, true);
+        success &= file.setWritable(true, true);
+        success &= file.setExecutable(true, true);
+        return success;
     }
 
     @Override
