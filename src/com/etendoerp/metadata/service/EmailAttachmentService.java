@@ -37,6 +37,16 @@ import org.openbravo.model.ad.ui.Tab;
  */
 public class EmailAttachmentService extends MetadataService {
 
+    private static final String KEY_SUCCESS     = "success";
+    private static final String KEY_MESSAGE     = "message";
+    private static final String KEY_ATTACHMENTS = "attachments";
+
+    /**
+     * Creates a new EmailAttachmentService for the given request/response pair.
+     *
+     * @param request  the incoming HTTP request
+     * @param response the HTTP response to write to
+     */
     public EmailAttachmentService(HttpServletRequest request, HttpServletResponse response) {
         super(request, response);
     }
@@ -47,62 +57,74 @@ public class EmailAttachmentService extends MetadataService {
         try {
             OBContext.setAdminMode(true);
             try {
-                String recordId = getRequest().getParameter("recordId");
-                String tabId    = getRequest().getParameter("tabId");
-
-                if (recordId == null || tabId == null) {
-                    result.put("success", false);
-                    result.put("message", "Missing recordId or tabId parameter.");
-                    write(result);
-                    return;
-                }
-
-                Tab tab = OBDal.getInstance().get(Tab.class, tabId);
-                if (tab == null || tab.getTable() == null) {
-                    result.put("success", false);
-                    result.put("message", "Tab not found.");
-                    write(result);
-                    return;
-                }
-
-                String tableId      = tab.getTable().getId();
-                String normalizedId = recordId.replace("-", "").toUpperCase();
-                JSONArray attachments = new JSONArray();
-
-                @SuppressWarnings("unchecked")
-                List<Object[]> rows = OBDal.getInstance().getSession()
-                    .createNativeQuery(
-                        "SELECT c_file_id, name FROM c_file " +
-                        "WHERE ad_table_id = :tId " +
-                        "AND REPLACE(UPPER(ad_record_id), '-', '') = :rId " +
-                        "AND isactive = 'Y' ORDER BY name")
-                    .setParameter("tId", tableId)
-                    .setParameter("rId", normalizedId)
-                    .list();
-
-                for (Object[] row : rows) {
-                    JSONObject att = new JSONObject();
-                    att.put("id",   row[0]);
-                    att.put("name", row[1]);
-                    attachments.put(att);
-                }
-
-                result.put("success", true);
-                result.put("attachments", attachments);
-                write(result);
-
+                executeAttachmentLookup(result);
             } finally {
                 OBContext.restorePreviousMode();
             }
-        } catch (Exception e) {
-            logger.error("Error in EmailAttachmentService: {}", e.getMessage(), e);
-            try {
-                result.put("success", false);
-                result.put("message", e.getMessage() != null ? e.getMessage() : "Failed to load attachments.");
-                write(result);
-            } catch (Exception ignored) {
-                getResponse().getWriter().write("{\"success\":false,\"message\":\"Failed to load attachments.\"}");
+        } catch (Exception ex) {
+            handleError(result, ex);
+        }
+    }
+
+    private void executeAttachmentLookup(JSONObject result) throws Exception {
+        String recordId = getRequest().getParameter("recordId");
+        String tabId    = getRequest().getParameter("tabId");
+
+        if (recordId == null || tabId == null) {
+            result.put(KEY_SUCCESS, false);
+            result.put(KEY_MESSAGE, "Missing recordId or tabId parameter.");
+            write(result);
+            return;
+        }
+
+        Tab tab = OBDal.getInstance().get(Tab.class, tabId);
+        if (tab == null || tab.getTable() == null) {
+            result.put(KEY_SUCCESS, false);
+            result.put(KEY_MESSAGE, "Tab not found.");
+            write(result);
+            return;
+        }
+
+        JSONArray attachments = queryAttachments(tab.getTable().getId(), recordId);
+        result.put(KEY_SUCCESS,     true);
+        result.put(KEY_ATTACHMENTS, attachments);
+        write(result);
+    }
+
+    private JSONArray queryAttachments(String tableId, String recordId) {
+        JSONArray attachments = new JSONArray();
+        try {
+            String normalizedId = recordId.replace("-", "").toUpperCase();
+            @SuppressWarnings("unchecked")
+            List<Object[]> rows = OBDal.getInstance().getSession()
+                .createNativeQuery(
+                    "SELECT c_file_id, name FROM c_file " +
+                    "WHERE ad_table_id = :tId " +
+                    "AND REPLACE(UPPER(ad_record_id), '-', '') = :rId " +
+                    "AND isactive = 'Y' ORDER BY name")
+                .setParameter("tId", tableId)
+                .setParameter("rId", normalizedId)
+                .list();
+            for (Object[] row : rows) {
+                JSONObject att = new JSONObject();
+                att.put("id",   row[0]);
+                att.put("name", row[1]);
+                attachments.put(att);
             }
+        } catch (Exception ex) {
+            logger.warn("Could not load record attachments: {}", ex.getMessage());
+        }
+        return attachments;
+    }
+
+    private void handleError(JSONObject result, Exception ex) throws IOException {
+        logger.error("Error in EmailAttachmentService: {}", ex.getMessage(), ex);
+        try {
+            result.put(KEY_SUCCESS, false);
+            result.put(KEY_MESSAGE, ex.getMessage() != null ? ex.getMessage() : "Failed to load attachments.");
+            write(result);
+        } catch (Exception ignored) {
+            getResponse().getWriter().write("{\"success\":false,\"message\":\"Failed to load attachments.\"}");
         }
     }
 }
