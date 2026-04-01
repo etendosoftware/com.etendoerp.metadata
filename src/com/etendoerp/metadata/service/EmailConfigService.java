@@ -95,7 +95,8 @@ public class EmailConfigService extends MetadataService {
         
         result.put(SUBJECT, subject);
         result.put(BODY, body);
-        result.put("recordAttachments", getRecordAttachments(tab.getTable().getId(), dataRecord.getId().toString()));
+        String recordId = dataRecord != null ? dataRecord.getId().toString() : null;
+        result.put("recordAttachments", getRecordAttachments(tab.getTable().getId(), recordId));
     }
 
     private String getRecipientEmail(BaseOBObject dataRecord) {

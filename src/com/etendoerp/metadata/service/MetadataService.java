@@ -161,7 +161,7 @@ public abstract class MetadataService {
         try (Writer writer = response.getWriter()) {
             writer.write(data.toString());
         } catch (IOException e) {
-            logger.warn("Error writing response: {}", e.getMessage());
+            logger.warn("Error writing response: ", e);
             throw e;
         }
     }
@@ -171,7 +171,7 @@ public abstract class MetadataService {
             result.put(SUCCESS, false);
             result.put(MESSAGE, message);
         } catch (JSONException e) {
-            logger.error("Error populating error response: {}", e.getMessage());
+            logger.error("Error populating error response: ", e);
         }
     }
 
@@ -181,14 +181,14 @@ public abstract class MetadataService {
             result.put(SUCCESS, false);
             result.put(MESSAGE, e.getMessage() != null ? e.getMessage() : "An unexpected error occurred.");
         } catch (JSONException jsonEx) {
-            logger.error("Fatal error populating JSON error: {}", jsonEx.getMessage());
+            logger.error("Fatal error populating JSON error: ", jsonEx);
             try {
                 HttpServletResponse response = getResponse();
                 if (response != null && !response.isCommitted()) {
                     response.getWriter().write("{\"success\":false,\"message\":\"" + e.getMessage() + "\"}");
                 }
             } catch (IOException ioEx) {
-                logger.error("Fatal error writing fallback response: {}", ioEx.getMessage());
+                logger.error("Fatal error writing fallback response: ", ioEx);
             }
         }
     }
