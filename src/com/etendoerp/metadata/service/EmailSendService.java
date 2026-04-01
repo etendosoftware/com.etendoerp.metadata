@@ -31,12 +31,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.fileupload.disk.DiskFileItemFactory;
 import org.apache.commons.fileupload.servlet.ServletFileUpload;
+import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.base.session.OBPropertiesProvider;
 import org.openbravo.base.structure.BaseOBObject;
@@ -127,7 +129,7 @@ public class EmailSendService extends MetadataService {
     }
 
     @Override
-    protected void execute(JSONObject result) throws Exception {
+    protected void execute(JSONObject result) throws ServletException, IOException, JSONException {
         // Not used as EmailSendService overrides process() for custom cleanup
     }
 

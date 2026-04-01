@@ -19,9 +19,11 @@ package com.etendoerp.metadata.service;
 
 import java.io.IOException;
 
+import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.model.ad.ui.Tab;
 import org.openbravo.model.common.enterprise.EmailServerConfiguration;
@@ -43,7 +45,7 @@ public class EmailService extends MetadataService {
     }
 
     @Override
-    protected void execute(JSONObject result) throws Exception {
+    protected void execute(JSONObject result) throws ServletException, IOException, JSONException {
         String recordId = getRequestedRecordId(result);
         if (recordId == null) return;
         

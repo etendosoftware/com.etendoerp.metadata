@@ -30,6 +30,7 @@ import org.apache.http.entity.ContentType;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.codehaus.jettison.json.JSONArray;
+import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.hibernate.criterion.Order;
 import org.hibernate.criterion.Restrictions;
@@ -78,6 +79,7 @@ public abstract class MetadataService {
 
     /**
      * Template method for processing metadata services.
+     * @throws IOException if an I/O error occurs.
      */
     public void process() throws IOException {
         JSONObject result = new JSONObject();
@@ -96,10 +98,17 @@ public abstract class MetadataService {
     /**
      * Core logic to be implemented by subclasses.
      * @param result The JSONObject to be populated with the result.
-     * @throws Exception if an error occurs.
+     * @throws ServletException if a servlet-specific error occurs.
+     * @throws IOException if an I/O error occurs.
+     * @throws JSONException if a JSON-related error occurs.
      */
-    protected abstract void execute(JSONObject result) throws Exception;
+    protected abstract void execute(JSONObject result) throws ServletException, IOException, JSONException;
 
+    /**
+     * Writes the given JSONObject to the response.
+     * @param data The JSONObject to write.
+     * @throws IOException if an I/O error occurs.
+     */
     protected void write(JSONObject data) throws IOException {
         HttpServletResponse response = getResponse();
         response.setContentType(ContentType.APPLICATION_JSON.getMimeType());
@@ -118,7 +127,7 @@ public abstract class MetadataService {
             result.put(SUCCESS, false);
             result.put(MESSAGE, message);
             write(result);
-        } catch (Exception e) {
+        } catch (JSONException e) {
             logger.error("Error writing error response: " + e.getMessage(), e);
         }
     }
@@ -129,7 +138,7 @@ public abstract class MetadataService {
             result.put(SUCCESS, false);
             result.put(MESSAGE, e.getMessage() != null ? e.getMessage() : "An unexpected error occurred.");
             write(result);
-        } catch (Exception jsonEx) {
+        } catch (JSONException jsonEx) {
             try {
                 getResponse().getWriter().write("{\"success\":false,\"message\":\"" + e.getMessage() + "\"}");
             } catch (IOException ioEx) {

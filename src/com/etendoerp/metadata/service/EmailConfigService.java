@@ -17,12 +17,15 @@
 
 package com.etendoerp.metadata.service;
 
+import java.io.IOException;
+
+import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.codehaus.jettison.json.JSONArray;
+import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
-import org.openbravo.dal.core.OBContext;
 import org.openbravo.database.ConnectionProvider;
 import org.openbravo.erpCommon.utility.reporting.TemplateData;
 import org.openbravo.erpCommon.utility.reporting.TemplateInfo;
@@ -55,7 +58,7 @@ public class EmailConfigService extends MetadataService {
     }
 
     @Override
-    protected void execute(JSONObject result) throws Exception {
+    protected void execute(JSONObject result) throws ServletException, IOException, JSONException {
         String recordId = getRequestedRecordId(result);
         if (recordId == null) return;
         
@@ -83,7 +86,7 @@ public class EmailConfigService extends MetadataService {
         write(result);
     }
 
-    private void populateEmailConfig(JSONObject result, Tab tab, BaseOBObject dataRecord, Organization org, String senderAddress) throws Exception {
+    private void populateEmailConfig(JSONObject result, Tab tab, BaseOBObject dataRecord, Organization org, String senderAddress) throws JSONException, IOException {
         result.put(SUCCESS, true);
         result.put("to", getRecipientEmail(dataRecord));
         result.put("toName", getRecipientName(dataRecord));
@@ -135,10 +138,10 @@ public class EmailConfigService extends MetadataService {
         return name;
     }
 
-    private String getPropertyString(BaseOBObject record, String property, String subProperty) {
-        if (record.getEntity().hasProperty(property)) {
+    private String getPropertyString(BaseOBObject sourceRecord, String property, String subProperty) {
+        if (sourceRecord.getEntity().hasProperty(property)) {
             try {
-                Object obj = record.get(property);
+                Object obj = sourceRecord.get(property);
                 if (obj instanceof BaseOBObject) {
                     BaseOBObject bob = (BaseOBObject) obj;
                     if (bob.getEntity().hasProperty(subProperty)) {
@@ -154,7 +157,7 @@ public class EmailConfigService extends MetadataService {
 
     private String getCurrentUserEmail() {
         try {
-            return safeString(OBContext.getOBContext().getUser().getEmail());
+            return safeString(org.openbravo.dal.core.OBContext.getOBContext().getUser().getEmail());
         } catch (Exception e) {
             logger.debug("Could not retrieve current user email: " + e.getMessage());
             return "";
@@ -163,7 +166,7 @@ public class EmailConfigService extends MetadataService {
 
     private String getCurrentUserName() {
         try {
-            return safeString(OBContext.getOBContext().getUser().getName());
+            return safeString(org.openbravo.dal.core.OBContext.getOBContext().getUser().getName());
         } catch (Exception e) {
             logger.debug("Could not retrieve current user name: " + e.getMessage());
             return "";
@@ -224,7 +227,7 @@ public class EmailConfigService extends MetadataService {
         }
     }
 
-    private JSONArray getTemplatesJson(TemplateData[] templateData) throws Exception {
+    private JSONArray getTemplatesJson(TemplateData[] templateData) throws JSONException {
         JSONArray templates = new JSONArray();
         for (TemplateData tpl : templateData) {
             JSONObject tplJson = new JSONObject();
@@ -238,7 +241,7 @@ public class EmailConfigService extends MetadataService {
     private JSONObject loadEmailDefinition(ConnectionProvider conn, String docTypeId, Organization org, TemplateData[] templateData) {
         if (templateData.length == 0) return null;
         try {
-            String lang = OBContext.getOBContext().getLanguage().getLanguage();
+            String lang = org.openbravo.dal.core.OBContext.getOBContext().getLanguage().getLanguage();
             TemplateInfo tplInfo = new TemplateInfo(conn, docTypeId, org.getId(), lang, templateData[0].id);
             TemplateInfo.EmailDefinition emailDef = tplInfo.get_DefaultEmailDefinition();
             if (emailDef != null) {
