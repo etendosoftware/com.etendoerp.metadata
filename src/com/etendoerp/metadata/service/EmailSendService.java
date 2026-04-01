@@ -136,16 +136,26 @@ public class EmailSendService extends MetadataService {
     }
 
     private Path createSecureTempDir() throws IOException {
-        // Create a temporary directory in the system's temp location with POSIX 700 permissions (rwx------)
-        // for secure multi-tenant isolation on Unix-like systems.
+        // Create a temporary directory in the system's temp location with restricted permissions.
+        // On POSIX systems, we use 700 (rwx------) attributes during creation for atomic security.
+        // On other systems, we immediately restrict access to the owner only.
+        Path tempDir;
         try {
             FileAttribute<Set<PosixFilePermission>> attrs = PosixFilePermissions.asFileAttribute(
                 PosixFilePermissions.fromString("rwx------")
             );
-            return Files.createTempDirectory("etendo_email_attachments_", attrs);
+            tempDir = Files.createTempDirectory("etendo_email_attachments_", attrs);
         } catch (UnsupportedOperationException e) {
-            return Files.createTempDirectory("etendo_email_attachments_");
+            tempDir = Files.createTempDirectory("etendo_email_attachments_");
+            File file = tempDir.toFile();
+            file.setReadable(false, false);
+            file.setWritable(false, false);
+            file.setExecutable(false, false);
+            file.setReadable(true, true);
+            file.setWritable(true, true);
+            file.setExecutable(true, true);
         }
+        return tempDir;
     }
 
     @Override
