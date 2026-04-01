@@ -27,6 +27,8 @@ import javax.servlet.http.HttpServletResponse;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONObject;
 import org.hibernate.criterion.Restrictions;
+import org.openbravo.base.exception.OBException;
+import org.openbravo.base.model.Entity;
 import org.openbravo.base.model.ModelProvider;
 import org.openbravo.base.structure.BaseOBObject;
 import org.openbravo.dal.core.OBContext;
@@ -116,9 +118,13 @@ public abstract class EmailBaseService extends MetadataService {
             return null;
         }
 
-        String entityName = ModelProvider.getInstance()
-                .getEntityByTableName(tab.getTable().getDBTableName()).getName();
-        BaseOBObject dataRecord = OBDal.getInstance().get(entityName, recordId);
+        Entity entity = ModelProvider.getInstance()
+                .getEntityByTableName(tab.getTable().getDBTableName());
+        if (entity == null) {
+            respond(result, false, "Entity mapping not found for table: " + tab.getTable().getDBTableName());
+            return null;
+        }
+        BaseOBObject dataRecord = OBDal.getInstance().get(entity.getName(), recordId);
         if (dataRecord == null) {
             respond(result, false, "Record not found.");
             return null;
@@ -300,9 +306,10 @@ public abstract class EmailBaseService extends MetadataService {
     protected void handleServiceError(JSONObject result, Exception ex, String fallbackMessage)
             throws IOException {
         logger.error("Error in {}: {}", getClass().getSimpleName(), ex.getMessage(), ex);
+        String clientMessage = (ex instanceof OBException && ex.getMessage() != null)
+                ? ex.getMessage() : fallbackMessage;
         try {
-            respond(result, false,
-                    ex.getMessage() != null ? ex.getMessage() : fallbackMessage);
+            respond(result, false, clientMessage);
         } catch (Exception ignored) {
             getResponse().getWriter()
                     .write("{\"success\":false,\"message\":\"" + fallbackMessage + "\"}");
