@@ -25,6 +25,10 @@ import java.io.IOException;
 import org.codehaus.jettison.json.JSONObject;
 import org.junit.Before;
 import org.junit.Test;
+import org.openbravo.base.model.Entity;
+import org.openbravo.base.structure.BaseOBObject;
+import org.openbravo.model.ad.ui.Tab;
+import org.openbravo.model.common.enterprise.Organization;
 
 import com.etendoerp.metadata.MetadataTestConstants;
 
@@ -103,5 +107,76 @@ public class EmailConfigServiceTest extends BaseMetadataServiceTest {
         } catch (Exception e) {
             fail(INVALID_JSON_MSG + e.getMessage());
         }
+    }
+
+    /**
+     * Tests populateEmailConfig directly using fully mocked dependencies.
+     * Entity reports no properties, so all field helpers short-circuit to empty strings
+     * and docTypeId resolves to null, exercising the else-branch for templates.
+     */
+    @Test
+    public void testPopulateEmailConfig_withMockedRecord() throws Exception {
+        Entity mockEntity = mock(Entity.class);
+        when(mockEntity.hasProperty(any(String.class))).thenReturn(false);
+
+        BaseOBObject mockRecord = mock(BaseOBObject.class);
+        when(mockRecord.getEntity()).thenReturn(mockEntity);
+
+        org.openbravo.model.ad.ui.Table mockTable = mock(org.openbravo.model.ad.ui.Table.class);
+        when(mockTable.getId()).thenReturn("100");
+        when(mockTable.getName()).thenReturn("TestTable");
+
+        Tab mockTab = mock(Tab.class);
+        when(mockTab.getTable()).thenReturn(mockTable);
+
+        Organization mockOrg = mock(Organization.class);
+
+        EmailBaseService.ValidationContext ctx =
+                new EmailBaseService.ValidationContext(mockTab, mockRecord, mockOrg, "sender@test.com", "rec-123");
+
+        JSONObject result = new JSONObject();
+        emailConfigService.populateEmailConfig(result, ctx);
+
+        assertTrue("Success should be true", result.getBoolean(KEY_SUCCESS));
+        assertEquals("to should be empty when no BP email property", "", result.getString("to"));
+        assertEquals("toName should be empty when no name property", "", result.getString("toName"));
+        assertEquals("replyTo should be empty when no sales rep property", "", result.getString("replyTo"));
+        assertEquals("senderAddress should match ctx value", "sender@test.com", result.getString("senderAddress"));
+        assertNotNull("templates should be present", result.get("templates"));
+        assertNotNull("recordAttachments should be present", result.get("recordAttachments"));
+    }
+
+    /**
+     * Tests populateEmailConfig when the record has a documentType property that
+     * returns null (not a BaseOBObject), so getDocumentTypeId returns null and
+     * the null docTypeId branch is followed.
+     */
+    @Test
+    public void testPopulateEmailConfig_docTypePropertyPresent_returnsNonBob() throws Exception {
+        Entity mockEntity = mock(Entity.class);
+        when(mockEntity.hasProperty(any(String.class))).thenReturn(true);
+        when(mockEntity.hasProperty("documentType")).thenReturn(true);
+
+        BaseOBObject mockRecord = mock(BaseOBObject.class);
+        when(mockRecord.getEntity()).thenReturn(mockEntity);
+        when(mockRecord.get("documentType")).thenReturn("notABaseOBObject");
+
+        org.openbravo.model.ad.ui.Table mockTable = mock(org.openbravo.model.ad.ui.Table.class);
+        when(mockTable.getId()).thenReturn("200");
+        when(mockTable.getName()).thenReturn("InvoiceTable");
+
+        Tab mockTab = mock(Tab.class);
+        when(mockTab.getTable()).thenReturn(mockTable);
+
+        Organization mockOrg = mock(Organization.class);
+
+        EmailBaseService.ValidationContext ctx =
+                new EmailBaseService.ValidationContext(mockTab, mockRecord, mockOrg, "addr@test.com", "inv-001");
+
+        JSONObject result = new JSONObject();
+        emailConfigService.populateEmailConfig(result, ctx);
+
+        assertTrue("Success should be true", result.getBoolean(KEY_SUCCESS));
+        assertNotNull("templates key should be present", result.get("templates"));
     }
 }

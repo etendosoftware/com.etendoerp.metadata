@@ -25,6 +25,7 @@ import java.io.IOException;
 import org.codehaus.jettison.json.JSONObject;
 import org.junit.Before;
 import org.junit.Test;
+import org.openbravo.model.ad.ui.Tab;
 
 import com.etendoerp.metadata.MetadataTestConstants;
 
@@ -168,5 +169,21 @@ public class EmailSendServiceTest extends BaseMetadataServiceTest {
         } catch (Exception e) {
             fail(INVALID_JSON_MSG + e.getMessage());
         }
+    }
+
+    @Test
+    public void testResolveRecord_nullTable_returnsNull() {
+        Tab mockTab = mock(Tab.class);
+        when(mockTab.getTable()).thenReturn(null);
+        assertNull("Should return null when tab has no table", emailSendService.resolveRecord(mockTab, "some-id"));
+    }
+
+    @Test
+    public void testResolveRecord_noEntityMapping_returnsNull() {
+        org.openbravo.model.ad.ui.Table mockTable = mock(org.openbravo.model.ad.ui.Table.class);
+        when(mockTable.getDBTableName()).thenReturn("non_existent_table_xyz_abc");
+        Tab mockTab = mock(Tab.class);
+        when(mockTab.getTable()).thenReturn(mockTable);
+        assertNull("Should return null when entity mapping does not exist", emailSendService.resolveRecord(mockTab, "some-id"));
     }
 }

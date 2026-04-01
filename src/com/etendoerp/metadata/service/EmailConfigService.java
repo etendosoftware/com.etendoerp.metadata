@@ -69,7 +69,7 @@ public class EmailConfigService extends EmailBaseService {
         return "Failed to load email configuration.";
     }
 
-    private void populateEmailConfig(JSONObject result, ValidationContext ctx) throws Exception {
+    protected void populateEmailConfig(JSONObject result, ValidationContext ctx) throws Exception {
         Tab tab             = ctx.getTab();
         BaseOBObject dataRecord = ctx.getDataRecord();
         Organization org    = ctx.getOrg();

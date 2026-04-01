@@ -146,7 +146,7 @@ public class EmailSendService extends EmailBaseService {
 
     // ── Record resolution ──────────────────────────────────────────────────────
 
-    private BaseOBObject resolveRecord(Tab tab, String recordId) {
+    protected BaseOBObject resolveRecord(Tab tab, String recordId) {
         if (tab.getTable() == null) return null;
         Entity entity = ModelProvider.getInstance()
                 .getEntityByTableName(tab.getTable().getDBTableName());
