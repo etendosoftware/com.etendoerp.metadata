@@ -28,12 +28,14 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONObject;
 import org.junit.Before;
 import org.junit.Test;
 import org.openbravo.base.exception.OBException;
 import org.openbravo.base.structure.BaseOBObject;
 import org.openbravo.model.ad.ui.Tab;
+import org.openbravo.model.common.enterprise.EmailServerConfiguration;
 import org.openbravo.model.common.enterprise.Organization;
 
 import com.etendoerp.metadata.MetadataTestConstants;
@@ -43,11 +45,28 @@ import com.etendoerp.metadata.MetadataTestConstants;
  */
 public class EmailBaseServiceTest extends BaseMetadataServiceTest {
 
+    private static final String PROP_DOC_STATUS   = "documentStatus";
+    private static final String PROP_DOCSTATUS    = "docstatus";
+    private static final String PROP_ORGANIZATION = "organization";
+
     /** Minimal concrete subclass that exposes protected helpers for direct testing. */
     private static class StubEmailService extends EmailBaseService {
 
+        private boolean overrideSmtp;
+        private EmailServerConfiguration smtpOverride;
+
         StubEmailService(HttpServletRequest req, HttpServletResponse res) {
             super(req, res);
+        }
+
+        void setSmtpConfigOverride(EmailServerConfiguration config) {
+            this.overrideSmtp = true;
+            this.smtpOverride = config;
+        }
+
+        @Override
+        protected EmailServerConfiguration getSmtpConfig(Organization org) {
+            return overrideSmtp ? smtpOverride : super.getSmtpConfig(org);
         }
 
         @Override
@@ -61,12 +80,12 @@ public class EmailBaseServiceTest extends BaseMetadataServiceTest {
         }
 
         // Bridge methods to reach protected API from the same package
-        Object callReadProperty(BaseOBObject record, String prop) {
-            return readProperty(record, prop);
+        Object callReadProperty(BaseOBObject dataRecord, String prop) {
+            return readProperty(dataRecord, prop);
         }
 
-        Object callGetDocumentStatus(BaseOBObject record) {
-            return getDocumentStatus(record);
+        Object callGetDocumentStatus(BaseOBObject dataRecord) {
+            return getDocumentStatus(dataRecord);
         }
 
         void callRespond(JSONObject result, boolean success, String message) throws Exception {
@@ -77,12 +96,16 @@ public class EmailBaseServiceTest extends BaseMetadataServiceTest {
             handleServiceError(result, ex, fallback);
         }
 
-        org.openbravo.model.common.enterprise.Organization callResolveOrganization(BaseOBObject record) {
-            return resolveOrganization(record);
+        org.openbravo.model.common.enterprise.Organization callResolveOrganization(BaseOBObject dataRecord) {
+            return resolveOrganization(dataRecord);
         }
 
         String callResolveSenderAddress(org.openbravo.model.common.enterprise.Organization org) {
             return resolveSenderAddress(org);
+        }
+
+        JSONArray callQueryAttachments(String tableId, String recordId) {
+            return queryAttachments(tableId, recordId);
         }
     }
 
@@ -102,42 +125,42 @@ public class EmailBaseServiceTest extends BaseMetadataServiceTest {
 
     @Test
     public void testReadProperty_returnsValue() {
-        BaseOBObject record = mock(BaseOBObject.class);
-        when(record.get("documentStatus")).thenReturn("CO");
-        assertEquals("CO", service.callReadProperty(record, "documentStatus"));
+        BaseOBObject dataRecord = mock(BaseOBObject.class);
+        when(dataRecord.get(PROP_DOC_STATUS)).thenReturn("CO");
+        assertEquals("CO", service.callReadProperty(dataRecord, PROP_DOC_STATUS));
     }
 
     @Test
     public void testReadProperty_returnsNullOnException() {
-        BaseOBObject record = mock(BaseOBObject.class);
-        when(record.get("missing")).thenThrow(new RuntimeException("no such property"));
-        assertNull(service.callReadProperty(record, "missing"));
+        BaseOBObject dataRecord = mock(BaseOBObject.class);
+        when(dataRecord.get("missing")).thenThrow(new RuntimeException("no such property"));
+        assertNull(service.callReadProperty(dataRecord, "missing"));
     }
 
     // ── getDocumentStatus ─────────────────────────────────────────────────────
 
     @Test
     public void testGetDocumentStatus_fromDocumentStatus() {
-        BaseOBObject record = mock(BaseOBObject.class);
-        when(record.get("documentStatus")).thenReturn("CO");
-        when(record.get("docstatus")).thenReturn(null);
-        assertEquals("CO", service.callGetDocumentStatus(record));
+        BaseOBObject dataRecord = mock(BaseOBObject.class);
+        when(dataRecord.get(PROP_DOC_STATUS)).thenReturn("CO");
+        when(dataRecord.get(PROP_DOCSTATUS)).thenReturn(null);
+        assertEquals("CO", service.callGetDocumentStatus(dataRecord));
     }
 
     @Test
     public void testGetDocumentStatus_fallsBackToDocstatus() {
-        BaseOBObject record = mock(BaseOBObject.class);
-        when(record.get("documentStatus")).thenReturn(null);
-        when(record.get("docstatus")).thenReturn("CL");
-        assertEquals("CL", service.callGetDocumentStatus(record));
+        BaseOBObject dataRecord = mock(BaseOBObject.class);
+        when(dataRecord.get(PROP_DOC_STATUS)).thenReturn(null);
+        when(dataRecord.get(PROP_DOCSTATUS)).thenReturn("CL");
+        assertEquals("CL", service.callGetDocumentStatus(dataRecord));
     }
 
     @Test
     public void testGetDocumentStatus_returnsNullWhenNeitherExists() {
-        BaseOBObject record = mock(BaseOBObject.class);
-        when(record.get("documentStatus")).thenReturn(null);
-        when(record.get("docstatus")).thenReturn(null);
-        assertNull(service.callGetDocumentStatus(record));
+        BaseOBObject dataRecord = mock(BaseOBObject.class);
+        when(dataRecord.get(PROP_DOC_STATUS)).thenReturn(null);
+        when(dataRecord.get(PROP_DOCSTATUS)).thenReturn(null);
+        assertNull(service.callGetDocumentStatus(dataRecord));
     }
 
     // ── respond ───────────────────────────────────────────────────────────────
@@ -182,7 +205,6 @@ public class EmailBaseServiceTest extends BaseMetadataServiceTest {
     @Test
     public void testHandleServiceError_writerThrows_propagatesIOException()
             throws IOException, ServletException {
-        // EmailService's executeEmailAction calls validateEmailRequest → respond → write → getWriter
         when(mockResponse.getWriter()).thenThrow(new IOException("Writer unavailable"));
         when(mockRequest.getParameter("recordId")).thenReturn(null);
         when(mockRequest.getParameter("tabId")).thenReturn(null);
@@ -200,9 +222,7 @@ public class EmailBaseServiceTest extends BaseMetadataServiceTest {
 
     @Test
     public void testProcess_completesWithoutError() throws IOException, ServletException {
-        // StubEmailService.executeEmailAction is a no-op; process() should complete cleanly
         service.process();
-        // no exception means the OBContext lifecycle (setAdminMode / restorePreviousMode) ran OK
     }
 
     // ── ValidationContext ─────────────────────────────────────────────────────
@@ -248,47 +268,78 @@ public class EmailBaseServiceTest extends BaseMetadataServiceTest {
 
     @Test
     public void testResolveOrganization_usesOrgFromRecord() {
-        BaseOBObject record = mock(BaseOBObject.class);
+        BaseOBObject dataRecord = mock(BaseOBObject.class);
         Organization mockOrg = mock(Organization.class);
-        when(record.get("organization")).thenReturn(mockOrg);
+        when(dataRecord.get(PROP_ORGANIZATION)).thenReturn(mockOrg);
 
-        Organization result = service.callResolveOrganization(record);
+        Organization result = service.callResolveOrganization(dataRecord);
         assertSame("Should return org from record", mockOrg, result);
     }
 
     @Test
     public void testResolveOrganization_fallsBackWhenValueIsNull() {
-        BaseOBObject record = mock(BaseOBObject.class);
-        when(record.get("organization")).thenReturn(null);
+        BaseOBObject dataRecord = mock(BaseOBObject.class);
+        when(dataRecord.get(PROP_ORGANIZATION)).thenReturn(null);
 
-        Organization result = service.callResolveOrganization(record);
+        Organization result = service.callResolveOrganization(dataRecord);
         assertNotNull("Should fall back to context org when record org is null", result);
     }
 
     @Test
     public void testResolveOrganization_fallsBackWhenValueIsNotOrgInstance() {
-        BaseOBObject record = mock(BaseOBObject.class);
-        when(record.get("organization")).thenReturn("notAnOrg");
+        BaseOBObject dataRecord = mock(BaseOBObject.class);
+        when(dataRecord.get(PROP_ORGANIZATION)).thenReturn("notAnOrg");
 
-        Organization result = service.callResolveOrganization(record);
+        Organization result = service.callResolveOrganization(dataRecord);
         assertNotNull("Should fall back to context org when value is not Organization", result);
     }
 
     @Test
     public void testResolveOrganization_fallsBackOnException() {
-        BaseOBObject record = mock(BaseOBObject.class);
-        when(record.get("organization")).thenThrow(new RuntimeException("no org property"));
+        BaseOBObject dataRecord = mock(BaseOBObject.class);
+        when(dataRecord.get(PROP_ORGANIZATION)).thenThrow(new RuntimeException("no org property"));
 
-        Organization result = service.callResolveOrganization(record);
+        Organization result = service.callResolveOrganization(dataRecord);
         assertNotNull("Should fall back to context org on exception", result);
     }
 
     // ── resolveSenderAddress ──────────────────────────────────────────────────
 
     @Test
-    public void testResolveSenderAddress_doesNotThrow() {
-        Organization mockOrg = mock(Organization.class);
-        String result = service.callResolveSenderAddress(mockOrg);
-        assertNotNull("resolveSenderAddress should return non-null string", result);
+    public void testResolveSenderAddress_returnsEmptyWhenConfigIsNull() {
+        service.setSmtpConfigOverride(null);
+        assertEquals("", service.callResolveSenderAddress(mock(Organization.class)));
+    }
+
+    @Test
+    public void testResolveSenderAddress_returnsEmptyWhenSenderAddressIsNull() {
+        EmailServerConfiguration config = mock(EmailServerConfiguration.class);
+        when(config.getSmtpServerSenderAddress()).thenReturn(null);
+        service.setSmtpConfigOverride(config);
+        assertEquals("", service.callResolveSenderAddress(mock(Organization.class)));
+    }
+
+    @Test
+    public void testResolveSenderAddress_returnsTrimmedAddress() {
+        EmailServerConfiguration config = mock(EmailServerConfiguration.class);
+        when(config.getSmtpServerSenderAddress()).thenReturn("  sender@example.com  ");
+        service.setSmtpConfigOverride(config);
+        assertEquals("sender@example.com", service.callResolveSenderAddress(mock(Organization.class)));
+    }
+
+    // ── queryAttachments ──────────────────────────────────────────────────────
+
+    @Test
+    public void testQueryAttachments_nullTableId_returnsEmptyArray() {
+        JSONArray result = service.callQueryAttachments(null, "some-record-id");
+        assertNotNull("Result should not be null", result);
+        assertEquals("Should return empty array for null tableId", 0, result.length());
+    }
+
+    @Test
+    public void testQueryAttachments_nullRecordId_returnsEmptyArray() {
+        JSONArray result = service.callQueryAttachments("some-table-id", null);
+        assertNotNull("Result should not be null", result);
+        assertEquals("Should return empty array for null recordId", 0, result.length());
     }
 }

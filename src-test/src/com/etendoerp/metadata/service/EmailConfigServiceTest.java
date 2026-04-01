@@ -33,6 +33,11 @@ import com.etendoerp.metadata.MetadataTestConstants;
  */
 public class EmailConfigServiceTest extends BaseMetadataServiceTest {
 
+    private static final String PARAM_RECORD_ID  = "recordId";
+    private static final String PARAM_TAB_ID     = "tabId";
+    private static final String KEY_SUCCESS      = "success";
+    private static final String INVALID_JSON_MSG = "Response should be valid JSON: ";
+
     private EmailConfigService emailConfigService;
 
     @Override
@@ -52,51 +57,51 @@ public class EmailConfigServiceTest extends BaseMetadataServiceTest {
 
     @Test
     public void testProcessMissingParameters() throws IOException, javax.servlet.ServletException {
-        when(mockRequest.getParameter("recordId")).thenReturn(null);
-        when(mockRequest.getParameter("tabId")).thenReturn(null);
+        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(null);
+        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(null);
 
         emailConfigService.process();
         String responseContent = responseWriter.toString();
 
         try {
             JSONObject jsonResponse = new JSONObject(responseContent);
-            assertFalse("Success should be false for missing parameters", jsonResponse.getBoolean("success"));
+            assertFalse("Success should be false for missing parameters", jsonResponse.getBoolean(KEY_SUCCESS));
             assertTrue("Should have error message", jsonResponse.has("message"));
         } catch (Exception e) {
-            fail("Response should be valid JSON: " + e.getMessage());
+            fail(INVALID_JSON_MSG + e.getMessage());
         }
     }
 
     @Test
     public void testProcessTabNotFound() throws IOException, javax.servlet.ServletException {
-        when(mockRequest.getParameter("recordId")).thenReturn("some-record-id");
-        when(mockRequest.getParameter("tabId")).thenReturn("non-existent-tab-id");
+        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn("some-record-id");
+        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn("non-existent-tab-id");
 
         emailConfigService.process();
         String responseContent = responseWriter.toString();
 
         try {
             JSONObject jsonResponse = new JSONObject(responseContent);
-            assertFalse("Success should be false for non-existent tab", jsonResponse.getBoolean("success"));
+            assertFalse("Success should be false for non-existent tab", jsonResponse.getBoolean(KEY_SUCCESS));
             assertEquals("Tab not found.", jsonResponse.getString("message"));
         } catch (Exception e) {
-            fail("Response should be valid JSON: " + e.getMessage());
+            fail(INVALID_JSON_MSG + e.getMessage());
         }
     }
 
     @Test
     public void testProcessMissingTabIdOnly() throws IOException, javax.servlet.ServletException {
-        when(mockRequest.getParameter("recordId")).thenReturn("some-record-id");
-        when(mockRequest.getParameter("tabId")).thenReturn(null);
+        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn("some-record-id");
+        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(null);
 
         emailConfigService.process();
         String responseContent = responseWriter.toString();
 
         try {
             JSONObject jsonResponse = new JSONObject(responseContent);
-            assertFalse(jsonResponse.getBoolean("success"));
+            assertFalse(jsonResponse.getBoolean(KEY_SUCCESS));
         } catch (Exception e) {
-            fail("Response should be valid JSON: " + e.getMessage());
+            fail(INVALID_JSON_MSG + e.getMessage());
         }
     }
 }

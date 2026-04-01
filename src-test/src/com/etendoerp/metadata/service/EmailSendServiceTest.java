@@ -33,6 +33,14 @@ import com.etendoerp.metadata.MetadataTestConstants;
  */
 public class EmailSendServiceTest extends BaseMetadataServiceTest {
 
+    private static final String PARAM_RECORD_ID  = "recordId";
+    private static final String PARAM_TAB_ID     = "tabId";
+    private static final String PARAM_SUBJECT    = "subject";
+    private static final String KEY_SUCCESS      = "success";
+    private static final String KEY_MESSAGE      = "message";
+    private static final String SAMPLE_RECORD    = "some-record";
+    private static final String INVALID_JSON_MSG = "Response should be valid JSON: ";
+
     private EmailSendService emailSendService;
 
     @Override
@@ -52,97 +60,113 @@ public class EmailSendServiceTest extends BaseMetadataServiceTest {
 
     @Test
     public void testProcessMissingParameters() throws IOException, javax.servlet.ServletException {
-        when(mockRequest.getParameter("recordId")).thenReturn(null);
-        when(mockRequest.getParameter("tabId")).thenReturn(null);
+        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(null);
+        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(null);
 
         emailSendService.process();
         String responseContent = responseWriter.toString();
 
         try {
             JSONObject jsonResponse = new JSONObject(responseContent);
-            assertFalse("Success should be false for missing parameters", jsonResponse.getBoolean("success"));
-            assertTrue("Should have error message", jsonResponse.has("message"));
+            assertFalse("Success should be false for missing parameters", jsonResponse.getBoolean(KEY_SUCCESS));
+            assertTrue("Should have error message", jsonResponse.has(KEY_MESSAGE));
         } catch (Exception e) {
-            fail("Response should be valid JSON: " + e.getMessage());
+            fail(INVALID_JSON_MSG + e.getMessage());
         }
     }
 
     @Test
     public void testProcessMissingToField() throws IOException, javax.servlet.ServletException {
-        when(mockRequest.getParameter("recordId")).thenReturn("some-record");
-        when(mockRequest.getParameter("tabId")).thenReturn("some-tab");
+        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(SAMPLE_RECORD);
+        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn("some-tab");
         when(mockRequest.getParameter("to")).thenReturn(null);
-        when(mockRequest.getParameter("subject")).thenReturn("Test Subject");
+        when(mockRequest.getParameter(PARAM_SUBJECT)).thenReturn("Test Subject");
 
         emailSendService.process();
         String responseContent = responseWriter.toString();
 
         try {
             JSONObject jsonResponse = new JSONObject(responseContent);
-            assertFalse("Success should be false when to is missing", jsonResponse.getBoolean("success"));
-            assertTrue("Should have error message", jsonResponse.has("message"));
+            assertFalse("Success should be false when to is missing", jsonResponse.getBoolean(KEY_SUCCESS));
+            assertTrue("Should have error message", jsonResponse.has(KEY_MESSAGE));
         } catch (Exception e) {
-            fail("Response should be valid JSON: " + e.getMessage());
+            fail(INVALID_JSON_MSG + e.getMessage());
         }
     }
 
     @Test
     public void testProcessTabNotFound() throws IOException, javax.servlet.ServletException {
-        when(mockRequest.getParameter("recordId")).thenReturn("some-record");
-        when(mockRequest.getParameter("tabId")).thenReturn("non-existent-tab");
+        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(SAMPLE_RECORD);
+        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn("non-existent-tab");
         when(mockRequest.getParameter("to")).thenReturn("dest@example.com");
-        when(mockRequest.getParameter("subject")).thenReturn("Test Subject");
+        when(mockRequest.getParameter(PARAM_SUBJECT)).thenReturn("Test Subject");
 
         emailSendService.process();
         String responseContent = responseWriter.toString();
 
         try {
             JSONObject jsonResponse = new JSONObject(responseContent);
-            assertFalse("Success should be false for non-existent tab", jsonResponse.getBoolean("success"));
-            assertEquals("Tab not found.", jsonResponse.getString("message"));
+            assertFalse("Success should be false for non-existent tab", jsonResponse.getBoolean(KEY_SUCCESS));
+            assertEquals("Tab not found.", jsonResponse.getString(KEY_MESSAGE));
         } catch (Exception e) {
-            fail("Response should be valid JSON: " + e.getMessage());
+            fail(INVALID_JSON_MSG + e.getMessage());
         }
     }
 
     @Test
     public void testProcessMissingSubjectField() throws IOException, javax.servlet.ServletException {
-        when(mockRequest.getParameter("recordId")).thenReturn("some-record");
-        when(mockRequest.getParameter("tabId")).thenReturn("some-tab");
+        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(SAMPLE_RECORD);
+        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn("some-tab");
         when(mockRequest.getParameter("to")).thenReturn("dest@example.com");
-        when(mockRequest.getParameter("subject")).thenReturn(null);
+        when(mockRequest.getParameter(PARAM_SUBJECT)).thenReturn(null);
 
         emailSendService.process();
         String responseContent = responseWriter.toString();
 
         try {
             JSONObject jsonResponse = new JSONObject(responseContent);
-            assertFalse("Success should be false when subject is missing", jsonResponse.getBoolean("success"));
+            assertFalse("Success should be false when subject is missing", jsonResponse.getBoolean(KEY_SUCCESS));
         } catch (Exception e) {
-            fail("Response should be valid JSON: " + e.getMessage());
+            fail(INVALID_JSON_MSG + e.getMessage());
         }
     }
 
     @Test
     public void testProcessMultipartRequest_parsesAndValidatesParams()
             throws IOException, javax.servlet.ServletException {
-        // multipart content type triggers createSecureTempDir + extractMultipartParams;
-        // the mock request cannot supply a real multipart body, so parsing is caught
-        // internally and continues to validateParams, which returns an error response.
         when(mockRequest.getContentType()).thenReturn("multipart/form-data; boundary=----xyz");
-        when(mockRequest.getParameter("recordId")).thenReturn(null);
-        when(mockRequest.getParameter("tabId")).thenReturn(null);
+        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(null);
+        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(null);
         when(mockRequest.getParameter("to")).thenReturn(null);
-        when(mockRequest.getParameter("subject")).thenReturn(null);
+        when(mockRequest.getParameter(PARAM_SUBJECT)).thenReturn(null);
 
         emailSendService.process();
         String responseContent = responseWriter.toString();
 
         try {
             JSONObject jsonResponse = new JSONObject(responseContent);
-            assertFalse("Success should be false when required params are missing", jsonResponse.getBoolean("success"));
+            assertFalse("Success should be false when required params are missing", jsonResponse.getBoolean(KEY_SUCCESS));
         } catch (Exception e) {
-            fail("Response should be valid JSON: " + e.getMessage());
+            fail(INVALID_JSON_MSG + e.getMessage());
+        }
+    }
+
+    @Test
+    public void testProcessWithRecordAttachmentIds_missingRequiredParams()
+            throws IOException, javax.servlet.ServletException {
+        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(null);
+        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(null);
+        when(mockRequest.getParameterValues("recordAttachmentId"))
+                .thenReturn(new String[]{"att-001", " att-002 ", null, ""});
+
+        emailSendService.process();
+        String responseContent = responseWriter.toString();
+
+        try {
+            JSONObject jsonResponse = new JSONObject(responseContent);
+            assertFalse("Success should be false when required params are missing", jsonResponse.getBoolean(KEY_SUCCESS));
+        } catch (Exception e) {
+            fail(INVALID_JSON_MSG + e.getMessage());
         }
     }
 }

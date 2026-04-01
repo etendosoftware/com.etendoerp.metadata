@@ -35,6 +35,11 @@ import com.etendoerp.metadata.MetadataTestConstants;
  */
 public class EmailAttachmentServiceTest extends BaseMetadataServiceTest {
 
+    private static final String PARAM_RECORD_ID  = "recordId";
+    private static final String PARAM_TAB_ID     = "tabId";
+    private static final String KEY_SUCCESS      = "success";
+    private static final String INVALID_JSON_MSG = "Response should be valid JSON: ";
+
     private EmailAttachmentService emailAttachmentService;
 
     @Override
@@ -54,51 +59,51 @@ public class EmailAttachmentServiceTest extends BaseMetadataServiceTest {
 
     @Test
     public void testProcessMissingParameters() throws IOException, ServletException {
-        when(mockRequest.getParameter("recordId")).thenReturn(null);
-        when(mockRequest.getParameter("tabId")).thenReturn(null);
+        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(null);
+        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(null);
 
         emailAttachmentService.process();
         String output = responseWriter.toString();
 
         try {
             JSONObject json = new JSONObject(output);
-            assertFalse("Success should be false for missing parameters", json.getBoolean("success"));
+            assertFalse("Success should be false for missing parameters", json.getBoolean(KEY_SUCCESS));
             assertTrue("Should contain error message", json.has("message"));
         } catch (Exception e) {
-            fail("Response should be valid JSON: " + e.getMessage());
+            fail(INVALID_JSON_MSG + e.getMessage());
         }
     }
 
     @Test
     public void testProcessTabNotFound() throws IOException, ServletException {
-        when(mockRequest.getParameter("recordId")).thenReturn("some-record-id");
-        when(mockRequest.getParameter("tabId")).thenReturn("non-existent-tab-id");
+        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn("some-record-id");
+        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn("non-existent-tab-id");
 
         emailAttachmentService.process();
         String output = responseWriter.toString();
 
         try {
             JSONObject json = new JSONObject(output);
-            assertFalse("Success should be false for non-existent tab", json.getBoolean("success"));
+            assertFalse("Success should be false for non-existent tab", json.getBoolean(KEY_SUCCESS));
             assertEquals("Tab not found.", json.getString("message"));
         } catch (Exception e) {
-            fail("Response should be valid JSON: " + e.getMessage());
+            fail(INVALID_JSON_MSG + e.getMessage());
         }
     }
 
     @Test
     public void testProcessMissingRecordIdOnly() throws IOException, ServletException {
-        when(mockRequest.getParameter("recordId")).thenReturn(null);
-        when(mockRequest.getParameter("tabId")).thenReturn("some-tab-id");
+        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(null);
+        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn("some-tab-id");
 
         emailAttachmentService.process();
         String output = responseWriter.toString();
 
         try {
             JSONObject json = new JSONObject(output);
-            assertFalse(json.getBoolean("success"));
+            assertFalse(json.getBoolean(KEY_SUCCESS));
         } catch (Exception e) {
-            fail("Response should be valid JSON: " + e.getMessage());
+            fail(INVALID_JSON_MSG + e.getMessage());
         }
     }
 }
