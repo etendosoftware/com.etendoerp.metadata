@@ -318,7 +318,7 @@ public abstract class EmailBaseService extends MetadataService {
 
     // ── Private SMTP helpers ──────────────────────────────────────────────────
 
-    private EmailServerConfiguration getSmtpConfig(Organization org) {
+    protected EmailServerConfiguration getSmtpConfig(Organization org) {
         EmailServerConfiguration config = EmailUtils.getEmailConfiguration(org);
         if (config == null) {
             config = EmailUtils.getEmailConfiguration(OBContext.getOBContext().getCurrentOrganization());

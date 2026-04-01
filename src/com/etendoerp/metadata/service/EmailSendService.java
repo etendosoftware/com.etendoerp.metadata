@@ -39,8 +39,9 @@ import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.fileupload.disk.DiskFileItemFactory;
 import org.apache.commons.fileupload.servlet.ServletFileUpload;
 import org.apache.commons.lang3.StringUtils;
-import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
+import org.openbravo.base.model.Entity;
+import org.openbravo.base.model.ModelProvider;
 import org.openbravo.base.session.OBPropertiesProvider;
 import org.openbravo.base.structure.BaseOBObject;
 import org.openbravo.dal.core.OBContext;
@@ -48,36 +49,39 @@ import org.openbravo.dal.service.OBDal;
 import org.openbravo.erpCommon.utility.poc.EmailInfo;
 import org.openbravo.erpCommon.utility.poc.EmailManager;
 import org.openbravo.model.ad.ui.Tab;
-import org.openbravo.model.ad.utility.Attachment;
 import org.openbravo.model.common.enterprise.EmailServerConfiguration;
 import org.openbravo.model.common.enterprise.Organization;
 
 /**
  * Sends an email for an Order or Invoice record using EmailManager.
  */
-public class EmailSendService extends MetadataService {
+public class EmailSendService extends EmailBaseService {
 
     private static final String ATTACH_PATH_PROP = "attach.path";
-    private static final String SUBJECT = "subject";
-    private static final String NOTES = "notes";
-    private static final String TO = "to";
-    private static final String CC = "cc";
-    private static final String BCC = "bcc";
-    private static final String REPLY_TO = "replyTo";
-    private static final String ARCHIVE = "archive";
-    private static final String TEMPLATE_ID = "templateId";
-    private static final String RECORD_ID_PARAM = "recordId";
-    private static final String TAB_ID_PARAM = "tabId";
+    private static final String SUBJECT          = "subject";
+    private static final String NOTES            = "notes";
+    private static final String TO               = "to";
+    private static final String CC               = "cc";
+    private static final String BCC              = "bcc";
+    private static final String REPLY_TO         = "replyTo";
+    private static final String ARCHIVE          = "archive";
+    private static final String TEMPLATE_ID      = "templateId";
+    private static final String RECORD_ID_PARAM  = "recordId";
+    private static final String TAB_ID_PARAM     = "tabId";
 
     /**
-     * Constructor for EmailSendService.
-     * @param request The HttpServletRequest object.
-     * @param response The HttpServletResponse object.
+     * Creates a new EmailSendService for the given request/response pair.
+     *
+     * @param request  the incoming HTTP request
+     * @param response the HTTP response to write to
      */
     public EmailSendService(HttpServletRequest request, HttpServletResponse response) {
         super(request, response);
     }
 
+    /**
+     * Overrides the base template method to add temp-file cleanup in the finally block.
+     */
     @Override
     public void process() throws IOException, ServletException {
         JSONObject result = new JSONObject();
@@ -95,102 +99,101 @@ public class EmailSendService extends MetadataService {
             populateParamsFromRequest(params, recordAttachmentIds);
 
             if (!validateParams(result, params)) {
-                write(result);
                 return;
             }
 
             Tab tab = OBDal.getInstance().get(Tab.class, params.get(TAB_ID_PARAM));
             if (tab == null) {
-                handleErrorResponse(result, "Tab not found.");
-                write(result);
+                respond(result, false, "Tab not found.");
                 return;
             }
 
-            BaseOBObject dataRecord = getRecord(tab, params.get(RECORD_ID_PARAM));
+            BaseOBObject dataRecord = resolveRecord(tab, params.get(RECORD_ID_PARAM));
             if (dataRecord == null) {
-                handleErrorResponse(result, "Record not found.");
-                write(result);
+                respond(result, false, "Record not found.");
                 return;
             }
 
-            Organization org = getRecordOrganization(dataRecord);
-            EmailServerConfiguration emailConfig = getEmailConfiguration(org);
+            Organization org = resolveOrganization(dataRecord);
+            EmailServerConfiguration emailConfig = getSmtpConfig(org);
 
             if (emailConfig == null || StringUtils.isBlank(emailConfig.getSmtpServerSenderAddress())) {
-                handleErrorResponse(result, "No sender defined. Please check Email Server configuration in Client settings.");
-                write(result);
+                respond(result, false, "No sender defined. Please check Email Server configuration in Client settings.");
                 return;
             }
 
             sendEmail(params, recordAttachmentIds, tempFiles, emailConfig);
-            result.put(SUCCESS, true);
+            result.put(KEY_SUCCESS, true);
             write(result);
 
         } catch (Exception e) {
-            handleProcessError(this.getClass().getSimpleName(), result, e);
-            write(result);
+            handleServiceError(result, e, getFallbackErrorMessage());
         } finally {
             OBContext.restorePreviousMode();
             cleanupTempFiles(tempFiles, tempDir);
         }
     }
 
+    @Override
+    protected void executeEmailAction(JSONObject result) throws Exception {
+        // Not used — process() is overridden directly for temp-file cleanup.
+    }
+
+    @Override
+    protected String getFallbackErrorMessage() {
+        return "Failed to send email.";
+    }
+
+    // ── Record resolution ──────────────────────────────────────────────────────
+
+    private BaseOBObject resolveRecord(Tab tab, String recordId) {
+        if (tab.getTable() == null) return null;
+        Entity entity = ModelProvider.getInstance()
+                .getEntityByTableName(tab.getTable().getDBTableName());
+        if (entity == null) return null;
+        return OBDal.getInstance().get(entity.getName(), recordId);
+    }
+
+    // ── Temp directory ─────────────────────────────────────────────────────────
+
     private Path createSecureTempDir() throws IOException {
-        // DEEP SECURITY ANALYSIS:
-        // System temp directories (like /tmp) are "publicly writable," which triggers SonarQube's 
-        // Security Hotspot alarms. To fully mitigate the risk of Information Disclosure or 
-        // Symlink Attacks, we must AVOID world-writable shared spaces.
-        
-        // 1. Prioritize application-private storage (attach.path)
-        String attachPathStr = OBPropertiesProvider.getInstance().getOpenbravoProperties().getProperty(ATTACH_PATH_PROP);
-        Path rootTmp;
-        if (attachPathStr != null) {
-            rootTmp = new File(attachPathStr, "tmp").toPath();
-        } else {
-            // 2. Fallback to a private subdirectory in the user's home (e.g. ~/.etendo/tmp)
-            // which is NOT world-writable like /tmp.
-            rootTmp = new File(System.getProperty("user.home"), ".etendo/tmp").toPath();
-        }
+        String attachPathStr = OBPropertiesProvider.getInstance()
+                .getOpenbravoProperties().getProperty(ATTACH_PATH_PROP);
+        Path rootTmp = attachPathStr != null
+                ? new File(attachPathStr, "tmp").toPath()
+                : new File(System.getProperty("user.home"), ".etendo/tmp").toPath();
 
         if (!Files.exists(rootTmp)) {
             Files.createDirectories(rootTmp);
-            // Restrict root temp immediately
             if (!restrictPermissions(rootTmp.toFile())) {
                 logger.warn("Could not fully restrict permissions on root temp directory: {}", rootTmp);
             }
         }
 
-        // On POSIX systems, we use 700 (rwx------) attributes during creation for atomic security.
-        // On other systems, we immediately restrict access to the owner only.
         FileAttribute<Set<PosixFilePermission>> attrs = PosixFilePermissions.asFileAttribute(
-            PosixFilePermissions.fromString("rwx------")
-        );
-
+                PosixFilePermissions.fromString("rwx------"));
         try {
             return Files.createTempDirectory(rootTmp, "email_", attrs);
         } catch (UnsupportedOperationException e) {
-            Path tempDir = Files.createTempDirectory(rootTmp, "email_");
-            if (!restrictPermissions(tempDir.toFile())) {
-                logger.warn("Could not fully restrict permissions on temporary directory: {}", tempDir);
+            Path dir = Files.createTempDirectory(rootTmp, "email_");
+            if (!restrictPermissions(dir.toFile())) {
+                logger.warn("Could not fully restrict permissions on temporary directory: {}", dir);
             }
-            return tempDir;
+            return dir;
         }
     }
 
     private boolean restrictPermissions(File file) {
-        boolean success = file.setReadable(false, false);
-        success &= file.setWritable(false, false);
-        success &= file.setExecutable(false, false);
-        success &= file.setReadable(true, true);
-        success &= file.setWritable(true, true);
-        success &= file.setExecutable(true, true);
-        return success;
+        boolean ok = file.setReadable(false, false);
+        ok &= file.setWritable(false, false);
+        ok &= file.setExecutable(false, false);
+        ok &= file.setReadable(true, true);
+        ok &= file.setWritable(true, true);
+        ok &= file.setExecutable(true, true);
+        return ok;
     }
 
-    @Override
-    protected void execute(JSONObject result) throws ServletException, IOException, JSONException {
-        // Not used as EmailSendService overrides process() for custom cleanup
-    }
+    // ── Parameter handling ─────────────────────────────────────────────────────
 
     private void populateParamsFromRequest(Map<String, String> params, List<String> recordAttachmentIds) {
         String[] fieldNames = { RECORD_ID_PARAM, TAB_ID_PARAM, TO, SUBJECT, NOTES, ARCHIVE, CC, BCC, REPLY_TO, TEMPLATE_ID };
@@ -216,16 +219,19 @@ public class EmailSendService extends MetadataService {
         }
     }
 
-    private boolean validateParams(JSONObject result, Map<String, String> params) throws IOException {
+    private boolean validateParams(JSONObject result, Map<String, String> params) throws Exception {
         if (isNullOrEmpty(params.get(RECORD_ID_PARAM)) || isNullOrEmpty(params.get(TAB_ID_PARAM))
                 || isNullOrEmpty(params.get(TO)) || isNullOrEmpty(params.get(SUBJECT))) {
-            handleErrorResponse(result, "Missing required parameters: recordId, tabId, to, subject.");
+            respond(result, false, "Missing required parameters: recordId, tabId, to, subject.");
             return false;
         }
         return true;
     }
 
-    private void sendEmail(Map<String, String> params, List<String> recordAttachmentIds, List<File> tempFiles, EmailServerConfiguration emailConfig) throws Exception {
+    // ── Email sending ──────────────────────────────────────────────────────────
+
+    private void sendEmail(Map<String, String> params, List<String> recordAttachmentIds,
+            List<File> tempFiles, EmailServerConfiguration emailConfig) throws Exception {
         List<File> allAttachments = new ArrayList<>(tempFiles);
         allAttachments.addAll(getFilesFromAttachments(recordAttachmentIds));
 
@@ -244,17 +250,23 @@ public class EmailSendService extends MetadataService {
         EmailManager.sendEmail(emailConfig, email);
     }
 
+    @SuppressWarnings("unchecked")
     private List<File> getFilesFromAttachments(List<String> recordAttachmentIds) {
         List<File> recordFiles = new ArrayList<>();
         if (recordAttachmentIds.isEmpty()) return recordFiles;
         try {
-            String attachPath = OBPropertiesProvider.getInstance().getOpenbravoProperties().getProperty(ATTACH_PATH_PROP);
+            String attachPath = OBPropertiesProvider.getInstance()
+                    .getOpenbravoProperties().getProperty(ATTACH_PATH_PROP);
             if (attachPath == null) return recordFiles;
 
             for (String attId : recordAttachmentIds) {
-                Attachment att = OBDal.getInstance().get(Attachment.class, attId);
-                if (att != null && att.getPath() != null && att.getName() != null) {
-                    File attFile = new File(attachPath + File.separator + att.getPath() + File.separator + att.getName());
+                Object[] row = (Object[]) OBDal.getInstance().getSession()
+                        .createNativeQuery(
+                                "SELECT path, name FROM c_file WHERE c_file_id = :id AND isactive = 'Y'")
+                        .setParameter("id", attId)
+                        .uniqueResult();
+                if (row != null && row[0] != null && row[1] != null) {
+                    File attFile = new File(attachPath + File.separator + row[0] + File.separator + row[1]);
                     if (attFile.exists() && attFile.isFile()) {
                         recordFiles.add(attFile);
                     }
@@ -265,6 +277,8 @@ public class EmailSendService extends MetadataService {
         }
         return recordFiles;
     }
+
+    // ── Cleanup ────────────────────────────────────────────────────────────────
 
     private void cleanupTempFiles(List<File> tempFiles, Path tempDir) {
         for (File f : tempFiles) {
@@ -283,12 +297,15 @@ public class EmailSendService extends MetadataService {
         }
     }
 
+    // ── Multipart parsing ──────────────────────────────────────────────────────
+
     private boolean isMultipartRequest() {
         String ct = getRequest().getContentType();
         return ct != null && ct.toLowerCase().startsWith("multipart/");
     }
 
-    private void extractMultipartParams(Map<String, String> params, List<String> recordAttachmentIds, List<File> tempFiles, Path tempDir) {
+    private void extractMultipartParams(Map<String, String> params, List<String> recordAttachmentIds,
+            List<File> tempFiles, Path tempDir) {
         try {
             DiskFileItemFactory factory = new DiskFileItemFactory();
             ServletFileUpload upload = new ServletFileUpload(factory);
@@ -307,7 +324,8 @@ public class EmailSendService extends MetadataService {
         }
     }
 
-    private void processFormField(FileItem item, Map<String, String> params, List<String> recordAttachmentIds) throws Exception {
+    private void processFormField(FileItem item, Map<String, String> params,
+            List<String> recordAttachmentIds) throws Exception {
         if ("recordAttachmentId".equals(item.getFieldName())) {
             String val = item.getString("UTF-8");
             if (val != null && !val.trim().isEmpty()) recordAttachmentIds.add(val.trim());
@@ -318,7 +336,8 @@ public class EmailSendService extends MetadataService {
 
     private void processUploadedFile(FileItem item, List<File> tempFiles, Path tempDir) throws Exception {
         String fileName = item.getName();
-        if (item.getFieldName() != null && item.getFieldName().startsWith("attachment") && fileName != null && !fileName.trim().isEmpty()) {
+        if (item.getFieldName() != null && item.getFieldName().startsWith("attachment")
+                && fileName != null && !fileName.trim().isEmpty()) {
             Path tempPath = Files.createTempFile(tempDir, "attach_", "_" + fileName);
             File tempFile = tempPath.toFile();
             tempFile.deleteOnExit();
