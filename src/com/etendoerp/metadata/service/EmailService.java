@@ -9,7 +9,7 @@
  * "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
  * implied. See the License for the specific language governing rights
  * and limitations under the License.
- * All portions are Copyright (C) 2021-2024 FUTIT SERVICES, S.L
+ * All portions are Copyright (C) 2021-2026 FUTIT SERVICES, S.L
  * All Rights Reserved.
  * Contributor(s): Futit Services S.L.
  *************************************************************************
@@ -25,10 +25,6 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
-import org.openbravo.model.ad.ui.Tab;
-import org.openbravo.model.common.enterprise.EmailServerConfiguration;
-import org.openbravo.model.common.enterprise.Organization;
-import org.openbravo.base.structure.BaseOBObject;
 
 /**
  * Service to validate email configuration and record status before sending.
@@ -46,30 +42,7 @@ public class EmailService extends MetadataService {
 
     @Override
     protected void execute(JSONObject result) throws ServletException, IOException, JSONException {
-        String recordId = getRequestedRecordId(result);
-        if (recordId == null) return;
-        
-        Tab tab = getRequestedTab(result);
-        if (tab == null) return;
-
-        BaseOBObject dataRecord = getRecord(tab, recordId);
-        Organization org = getRecordOrganization(dataRecord);
-        EmailServerConfiguration emailConfig = getEmailConfiguration(org);
-        
-        String senderAddress = (emailConfig != null && emailConfig.getSmtpServerSenderAddress() != null)
-                ? emailConfig.getSmtpServerSenderAddress().trim() : "";
-
-        if (senderAddress.isEmpty()) {
-            handleErrorResponse(result, "No sender defined. Please check Email Server configuration in Client settings.");
-            return;
-        }
-
-        if (dataRecord != null && !checkDocumentStatus(dataRecord)) {
-            handleErrorResponse(result, "Only completed or closed documents can be sent via email.");
-            return;
-        }
-
+        if (validateAndGetContext(result) == null) return;
         result.put(SUCCESS, true);
-        write(result);
     }
 }

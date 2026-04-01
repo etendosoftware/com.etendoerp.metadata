@@ -9,7 +9,7 @@
  * "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
  * implied. See the License for the specific language governing rights
  * and limitations under the License.
- * All portions are Copyright (C) 2021-2024 FUTIT SERVICES, S.L
+ * All portions are Copyright (C) 2021-2026 FUTIT SERVICES, S.L
  * All Rights Reserved.
  * Contributor(s): Futit Services S.L.
  *************************************************************************
@@ -30,7 +30,6 @@ import org.openbravo.database.ConnectionProvider;
 import org.openbravo.erpCommon.utility.reporting.TemplateData;
 import org.openbravo.erpCommon.utility.reporting.TemplateInfo;
 import org.openbravo.model.ad.ui.Tab;
-import org.openbravo.model.common.enterprise.EmailServerConfiguration;
 import org.openbravo.model.common.enterprise.Organization;
 import org.openbravo.base.structure.BaseOBObject;
 import org.openbravo.service.db.DalConnectionProvider;
@@ -59,31 +58,10 @@ public class EmailConfigService extends MetadataService {
 
     @Override
     protected void execute(JSONObject result) throws ServletException, IOException, JSONException {
-        String recordId = getRequestedRecordId(result);
-        if (recordId == null) return;
-        
-        Tab tab = getRequestedTab(result);
-        if (tab == null) return;
+        MetadataContext ctx = validateAndGetContext(result);
+        if (ctx == null) return;
 
-        BaseOBObject dataRecord = getRecord(tab, recordId);
-        Organization org = getRecordOrganization(dataRecord);
-        EmailServerConfiguration emailServerConfig = getEmailConfiguration(org);
-        
-        String senderAddress = (emailServerConfig != null && emailServerConfig.getSmtpServerSenderAddress() != null)
-                ? emailServerConfig.getSmtpServerSenderAddress().trim() : "";
-        
-        if (senderAddress.isEmpty()) {
-            handleErrorResponse(result, "No sender defined. Please check Email Server configuration in Client settings.");
-            return;
-        }
-
-        if (dataRecord != null && !checkDocumentStatus(dataRecord)) {
-            handleErrorResponse(result, "Only completed or closed documents can be sent via email.");
-            return;
-        }
-
-        populateEmailConfig(result, tab, dataRecord, org, senderAddress);
-        write(result);
+        populateEmailConfig(result, ctx.getTab(), ctx.getDataRecord(), ctx.getOrg(), ctx.getSenderAddress());
     }
 
     private void populateEmailConfig(JSONObject result, Tab tab, BaseOBObject dataRecord, Organization org, String senderAddress) throws JSONException, IOException {
@@ -117,7 +95,7 @@ public class EmailConfigService extends MetadataService {
         
         result.put(SUBJECT, subject);
         result.put(BODY, body);
-        result.put("recordAttachments", getRecordAttachments(tab.getTable().getId(), dataRecord != null ? dataRecord.getId().toString() : null));
+        result.put("recordAttachments", getRecordAttachments(tab.getTable().getId(), dataRecord.getId().toString()));
     }
 
     private String getRecipientEmail(BaseOBObject dataRecord) {
@@ -149,7 +127,7 @@ public class EmailConfigService extends MetadataService {
                     }
                 }
             } catch (Exception e) {
-                logger.debug("Could not retrieve " + subProperty + " from " + property + ": " + e.getMessage());
+                logger.debug("Could not retrieve {} from {}: {}", subProperty, property, e.getMessage());
             }
         }
         return "";
@@ -159,7 +137,7 @@ public class EmailConfigService extends MetadataService {
         try {
             return safeString(org.openbravo.dal.core.OBContext.getOBContext().getUser().getEmail());
         } catch (Exception e) {
-            logger.debug("Could not retrieve current user email: " + e.getMessage());
+            logger.debug("Could not retrieve current user email: {}", e.getMessage());
             return "";
         }
     }
@@ -168,7 +146,7 @@ public class EmailConfigService extends MetadataService {
         try {
             return safeString(org.openbravo.dal.core.OBContext.getOBContext().getUser().getName());
         } catch (Exception e) {
-            logger.debug("Could not retrieve current user name: " + e.getMessage());
+            logger.debug("Could not retrieve current user name: {}", e.getMessage());
             return "";
         }
     }
@@ -185,7 +163,7 @@ public class EmailConfigService extends MetadataService {
                     ? safeString(dataRecord.get(DOCUMENT_NO)) : "";
             return (windowName + " " + documentNoResource).trim();
         } catch (Exception e) {
-            logger.debug("Could not determine record subject: " + e.getMessage());
+            logger.debug("Could not determine record subject: {}", e.getMessage());
             return "";
         }
     }
@@ -198,7 +176,7 @@ public class EmailConfigService extends MetadataService {
                     ? safeString(dataRecord.get(DOCUMENT_NO)) : "";
             return "Report" + entitySimpleName + "_" + documentNoResource + ".pdf";
         } catch (Exception e) {
-            logger.debug("Could not determine report file name: " + e.getMessage());
+            logger.debug("Could not determine report file name: {}", e.getMessage());
             return "";
         }
     }
@@ -212,7 +190,7 @@ public class EmailConfigService extends MetadataService {
                 return docType.getId().toString();
             }
         } catch (Exception e) { 
-            logger.debug("Could not retrieve documentType: " + e.getMessage());
+            logger.debug("Could not retrieve documentType: {}", e.getMessage());
         }
         return null;
     }
@@ -222,7 +200,7 @@ public class EmailConfigService extends MetadataService {
             ConnectionProvider conn = DalConnectionProvider.getReadOnlyConnectionProvider();
             return TemplateData.getDocumentTemplates(conn, docTypeId, org.getId());
         } catch (Exception e) {
-            logger.warn("Could not load templates for docType " + docTypeId + ": " + e.getMessage());
+            logger.warn("Could not load templates for docType {}: {}", docTypeId, e.getMessage());
             return new TemplateData[0];
         }
     }
@@ -253,7 +231,7 @@ public class EmailConfigService extends MetadataService {
                 return res;
             }
         } catch (Exception e) {
-            logger.warn("Could not load email definition: " + e.getMessage());
+            logger.warn("Could not load email definition: {}", e.getMessage());
         }
         return null;
     }

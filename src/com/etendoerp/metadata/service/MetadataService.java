@@ -9,7 +9,7 @@
  * "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
  * implied. See the License for the specific language governing rights
  * and limitations under the License.
- * All portions are Copyright (C) 2021-2024 FUTIT SERVICES, S.L
+ * All portions are Copyright (C) 2021-2026 FUTIT SERVICES, S.L
  * All Rights Reserved.
  * Contributor(s): Futit Services S.L.
  *************************************************************************
@@ -80,8 +80,9 @@ public abstract class MetadataService {
     /**
      * Template method for processing metadata services.
      * @throws IOException if an I/O error occurs.
+     * @throws ServletException if a servlet-specific error occurs.
      */
-    public void process() throws IOException {
+    public void process() throws IOException, ServletException {
         JSONObject result = new JSONObject();
         try {
             OBContext.setAdminMode(true);
@@ -93,6 +94,7 @@ public abstract class MetadataService {
         } catch (Exception e) {
             handleProcessError(this.getClass().getSimpleName(), result, e);
         }
+        write(result);
     }
 
     /**
@@ -105,19 +107,61 @@ public abstract class MetadataService {
     protected abstract void execute(JSONObject result) throws ServletException, IOException, JSONException;
 
     /**
+     * Validates and retrieves the context for metadata services.
+     * @param result The JSONObject to store error messages if validation fails.
+     * @return The MetadataContext if validation succeeds, null otherwise.
+     * @throws IOException if an I/O error occurs.
+     * @throws JSONException if a JSON error occurs.
+     */
+    protected MetadataContext validateAndGetContext(JSONObject result) throws IOException, JSONException {
+        String recordId = getRequestedRecordId(result);
+        if (recordId == null) return null;
+        
+        Tab tab = getRequestedTab(result);
+        if (tab == null) return null;
+
+        BaseOBObject dataRecord = getRecord(tab, recordId);
+        if (dataRecord == null) {
+            handleErrorResponse(result, "Record not found.");
+            return null;
+        }
+
+        Organization org = getRecordOrganization(dataRecord);
+        EmailServerConfiguration emailConfig = getEmailConfiguration(org);
+        
+        String senderAddress = (emailConfig != null && emailConfig.getSmtpServerSenderAddress() != null)
+                ? emailConfig.getSmtpServerSenderAddress().trim() : "";
+
+        if (senderAddress.isEmpty()) {
+            handleErrorResponse(result, "No sender defined. Please check Email Server configuration in Client settings.");
+            return null;
+        }
+
+        if (!checkDocumentStatus(dataRecord)) {
+            handleErrorResponse(result, "Only completed or closed documents can be sent via email.");
+            return null;
+        }
+
+        return new MetadataContext(tab, dataRecord, org, emailConfig, senderAddress);
+    }
+
+    /**
      * Writes the given JSONObject to the response.
      * @param data The JSONObject to write.
      * @throws IOException if an I/O error occurs.
      */
     protected void write(JSONObject data) throws IOException {
         HttpServletResponse response = getResponse();
+        if (response == null || response.isCommitted()) {
+            return;
+        }
         response.setContentType(ContentType.APPLICATION_JSON.getMimeType());
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
 
         try (Writer writer = response.getWriter()) {
             writer.write(data.toString());
         } catch (IOException e) {
-            logger.warn(e.getMessage(), e);
+            logger.warn("Error writing response: {}", e.getMessage());
             throw e;
         }
     }
@@ -126,23 +170,25 @@ public abstract class MetadataService {
         try {
             result.put(SUCCESS, false);
             result.put(MESSAGE, message);
-            write(result);
         } catch (JSONException e) {
-            logger.error("Error writing error response: " + e.getMessage(), e);
+            logger.error("Error populating error response: {}", e.getMessage());
         }
     }
 
     protected void handleProcessError(String serviceName, JSONObject result, Exception e) throws IOException {
-        logger.error("Error in " + serviceName + ": " + e.getMessage(), e);
+        logger.error("Error in {}: ", serviceName, e);
         try {
             result.put(SUCCESS, false);
             result.put(MESSAGE, e.getMessage() != null ? e.getMessage() : "An unexpected error occurred.");
-            write(result);
         } catch (JSONException jsonEx) {
+            logger.error("Fatal error populating JSON error: {}", jsonEx.getMessage());
             try {
-                getResponse().getWriter().write("{\"success\":false,\"message\":\"" + e.getMessage() + "\"}");
+                HttpServletResponse response = getResponse();
+                if (response != null && !response.isCommitted()) {
+                    response.getWriter().write("{\"success\":false,\"message\":\"" + e.getMessage() + "\"}");
+                }
             } catch (IOException ioEx) {
-                logger.error("Fatal error writing response: " + ioEx.getMessage(), ioEx);
+                logger.error("Fatal error writing fallback response: {}", ioEx.getMessage());
             }
         }
     }
@@ -194,7 +240,7 @@ public abstract class MetadataService {
                     org = (Organization) orgObj;
                 }
             } catch (Exception e) {
-                logger.debug("Could not retrieve organization from record, using session organization: " + e.getMessage());
+                logger.debug("Could not retrieve organization from record: {}", e.getMessage());
             }
         }
         return org;
@@ -212,7 +258,7 @@ public abstract class MetadataService {
                 crit.setMaxResults(1);
                 config = (EmailServerConfiguration) crit.uniqueResult();
             } catch (Exception e) {
-                logger.debug("Could not find any fallback Email Server Configuration: " + e.getMessage());
+                logger.debug("Could not find any fallback Email Server Configuration: {}", e.getMessage());
             }
         }
         return config;
@@ -238,7 +284,7 @@ public abstract class MetadataService {
                 recordAttachments.put(att);
             }
         } catch (Exception e) {
-            logger.warn("Could not load record attachments using DAL: " + e.getMessage());
+            logger.warn("Could not load record attachments: {}", e.getMessage());
         }
         return recordAttachments;
     }
@@ -261,5 +307,31 @@ public abstract class MetadataService {
             return "";
         }
         return value.toString().trim();
+    }
+
+    /**
+     * DTO to store the context of a metadata request.
+     */
+    protected static class MetadataContext {
+        private final Tab tab;
+        private final BaseOBObject dataRecord;
+        private final Organization org;
+        private final EmailServerConfiguration emailConfig;
+        private final String senderAddress;
+
+        public MetadataContext(Tab tab, BaseOBObject dataRecord, Organization org,
+                               EmailServerConfiguration emailConfig, String senderAddress) {
+            this.tab = tab;
+            this.dataRecord = dataRecord;
+            this.org = org;
+            this.emailConfig = emailConfig;
+            this.senderAddress = senderAddress;
+        }
+
+        public Tab getTab() { return tab; }
+        public BaseOBObject getDataRecord() { return dataRecord; }
+        public Organization getOrg() { return org; }
+        public EmailServerConfiguration getEmailConfig() { return emailConfig; }
+        public String getSenderAddress() { return senderAddress; }
     }
 }

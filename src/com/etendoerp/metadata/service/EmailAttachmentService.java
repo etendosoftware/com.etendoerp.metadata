@@ -9,7 +9,7 @@
  * "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
  * implied. See the License for the specific language governing rights
  * and limitations under the License.
- * All portions are Copyright (C) 2021-2024 FUTIT SERVICES, S.L
+ * All portions are Copyright (C) 2021-2026 FUTIT SERVICES, S.L
  * All Rights Reserved.
  * Contributor(s): Futit Services S.L.
  *************************************************************************
@@ -48,12 +48,11 @@ public class EmailAttachmentService extends MetadataService {
         if (recordId == null) return;
         
         Tab tab = getRequestedTab(result);
-        if (tab == null) return;
+        if (tab == null || tab.getTable() == null) return;
 
         JSONArray attachments = getRecordAttachments(tab.getTable().getId(), recordId);
 
         result.put(SUCCESS, true);
         result.put("attachments", attachments);
-        write(result);
     }
 }

@@ -9,7 +9,7 @@
  * "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
  * implied. See the License for the specific language governing rights
  * and limitations under the License.
- * All portions are Copyright (C) 2021-2024 FUTIT SERVICES, S.L
+ * All portions are Copyright (C) 2021-2026 FUTIT SERVICES, S.L
  * All Rights Reserved.
  * Contributor(s): Futit Services S.L.
  *************************************************************************
@@ -38,6 +38,7 @@ import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.fileupload.disk.DiskFileItemFactory;
 import org.apache.commons.fileupload.servlet.ServletFileUpload;
+import org.apache.commons.lang3.StringUtils;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.base.session.OBPropertiesProvider;
@@ -60,6 +61,13 @@ public class EmailSendService extends MetadataService {
     private static final String SUBJECT = "subject";
     private static final String NOTES = "notes";
     private static final String TO = "to";
+    private static final String CC = "cc";
+    private static final String BCC = "bcc";
+    private static final String REPLY_TO = "replyTo";
+    private static final String ARCHIVE = "archive";
+    private static final String TEMPLATE_ID = "templateId";
+    private static final String RECORD_ID_PARAM = "recordId";
+    private static final String TAB_ID_PARAM = "tabId";
 
     /**
      * Constructor for EmailSendService.
@@ -71,7 +79,7 @@ public class EmailSendService extends MetadataService {
     }
 
     @Override
-    public void process() throws IOException {
+    public void process() throws IOException, ServletException {
         JSONObject result = new JSONObject();
         List<File> tempFiles = new ArrayList<>();
         Path tempDir = null;
@@ -87,21 +95,30 @@ public class EmailSendService extends MetadataService {
             populateParamsFromRequest(params, recordAttachmentIds);
 
             if (!validateParams(result, params)) {
+                write(result);
                 return;
             }
 
-            Tab tab = OBDal.getInstance().get(Tab.class, params.get(TAB_ID));
+            Tab tab = OBDal.getInstance().get(Tab.class, params.get(TAB_ID_PARAM));
             if (tab == null) {
                 handleErrorResponse(result, "Tab not found.");
+                write(result);
                 return;
             }
 
-            BaseOBObject dataRecord = getRecord(tab, params.get(RECORD_ID));
+            BaseOBObject dataRecord = getRecord(tab, params.get(RECORD_ID_PARAM));
+            if (dataRecord == null) {
+                handleErrorResponse(result, "Record not found.");
+                write(result);
+                return;
+            }
+
             Organization org = getRecordOrganization(dataRecord);
             EmailServerConfiguration emailConfig = getEmailConfiguration(org);
 
-            if (emailConfig == null || emailConfig.getSmtpServerSenderAddress() == null || emailConfig.getSmtpServerSenderAddress().trim().isEmpty()) {
+            if (emailConfig == null || StringUtils.isBlank(emailConfig.getSmtpServerSenderAddress())) {
                 handleErrorResponse(result, "No sender defined. Please check Email Server configuration in Client settings.");
+                write(result);
                 return;
             }
 
@@ -110,7 +127,8 @@ public class EmailSendService extends MetadataService {
             write(result);
 
         } catch (Exception e) {
-            handleProcessError("EmailSendService", result, e);
+            handleProcessError(this.getClass().getSimpleName(), result, e);
+            write(result);
         } finally {
             OBContext.restorePreviousMode();
             cleanupTempFiles(tempFiles, tempDir);
@@ -134,7 +152,7 @@ public class EmailSendService extends MetadataService {
     }
 
     private void populateParamsFromRequest(Map<String, String> params, List<String> recordAttachmentIds) {
-        String[] fieldNames = { RECORD_ID, TAB_ID, TO, SUBJECT, NOTES, "archive", "cc", "bcc", "replyTo", "templateId" };
+        String[] fieldNames = { RECORD_ID_PARAM, TAB_ID_PARAM, TO, SUBJECT, NOTES, ARCHIVE, CC, BCC, REPLY_TO, TEMPLATE_ID };
         for (String field : fieldNames) {
             if (isNullOrEmpty(params.get(field))) {
                 String value = getRequest().getParameter(field);
@@ -158,7 +176,7 @@ public class EmailSendService extends MetadataService {
     }
 
     private boolean validateParams(JSONObject result, Map<String, String> params) throws IOException {
-        if (isNullOrEmpty(params.get(RECORD_ID)) || isNullOrEmpty(params.get(TAB_ID))
+        if (isNullOrEmpty(params.get(RECORD_ID_PARAM)) || isNullOrEmpty(params.get(TAB_ID_PARAM))
                 || isNullOrEmpty(params.get(TO)) || isNullOrEmpty(params.get(SUBJECT))) {
             handleErrorResponse(result, "Missing required parameters: recordId, tabId, to, subject.");
             return false;
@@ -172,9 +190,9 @@ public class EmailSendService extends MetadataService {
 
         EmailInfo email = new EmailInfo.Builder()
                 .setRecipientTO(params.get(TO))
-                .setRecipientCC(params.getOrDefault("cc", ""))
-                .setRecipientBCC(params.getOrDefault("bcc", ""))
-                .setReplyTo(params.getOrDefault("replyTo", ""))
+                .setRecipientCC(params.getOrDefault(CC, ""))
+                .setRecipientBCC(params.getOrDefault(BCC, ""))
+                .setReplyTo(params.getOrDefault(REPLY_TO, ""))
                 .setSubject(params.get(SUBJECT))
                 .setContent(params.getOrDefault(NOTES, ""))
                 .setContentType("text/plain; charset=utf-8")
@@ -202,7 +220,7 @@ public class EmailSendService extends MetadataService {
                 }
             }
         } catch (Exception e) {
-            logger.warn("Could not load record attachments: " + e.getMessage());
+            logger.warn("Could not load record attachments: {}", e.getMessage());
         }
         return recordFiles;
     }
@@ -212,14 +230,14 @@ public class EmailSendService extends MetadataService {
             try {
                 Files.delete(f.toPath());
             } catch (Exception e) {
-                logger.debug("Could not delete temp file: " + f.getAbsolutePath());
+                logger.debug("Could not delete temp file: {}", f.getAbsolutePath());
             }
         }
         if (tempDir != null) {
             try {
                 Files.delete(tempDir);
             } catch (Exception e) {
-                logger.debug("Could not delete temp directory: " + tempDir.toAbsolutePath());
+                logger.debug("Could not delete temp directory: {}", tempDir.toAbsolutePath());
             }
         }
     }
@@ -244,7 +262,7 @@ public class EmailSendService extends MetadataService {
                 }
             }
         } catch (Exception e) {
-            logger.error("[EmailSend] Could not parse multipart request: " + e.getMessage(), e);
+            logger.error("[EmailSend] Could not parse multipart request: {}", e.getMessage());
         }
     }
 
