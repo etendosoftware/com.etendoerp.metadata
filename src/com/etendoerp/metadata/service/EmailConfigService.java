@@ -26,6 +26,7 @@ import javax.servlet.http.HttpServletResponse;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
+import org.openbravo.dal.core.OBContext;
 import org.openbravo.database.ConnectionProvider;
 import org.openbravo.erpCommon.utility.reporting.TemplateData;
 import org.openbravo.erpCommon.utility.reporting.TemplateInfo;
@@ -218,11 +219,11 @@ public class EmailConfigService extends MetadataService {
         return templates;
     }
 
-    private JSONObject loadEmailDefinition(ConnectionProvider conn, String docTypeId, Organization org, TemplateData[] templateData) {
+    private JSONObject loadEmailDefinition(ConnectionProvider conn, String docTypeId, Organization organization, TemplateData[] templateData) {
         if (templateData.length == 0) return null;
         try {
-            String lang = org.openbravo.dal.core.OBContext.getOBContext().getLanguage().getLanguage();
-            TemplateInfo tplInfo = new TemplateInfo(conn, docTypeId, org.getId(), lang, templateData[0].id);
+            String lang = OBContext.getOBContext().getLanguage().getLanguage();
+            TemplateInfo tplInfo = new TemplateInfo(conn, docTypeId, organization.getId(), lang, templateData[0].id);
             TemplateInfo.EmailDefinition emailDef = tplInfo.get_DefaultEmailDefinition();
             if (emailDef != null) {
                 JSONObject res = new JSONObject();

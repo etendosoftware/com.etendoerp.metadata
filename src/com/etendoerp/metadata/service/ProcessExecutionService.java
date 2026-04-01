@@ -62,21 +62,20 @@ public class ProcessExecutionService extends MetadataService {
     }
 
     @Override
-    public void process() throws IOException, ServletException {
+    protected void execute(JSONObject result) throws ServletException, IOException, JSONException {
         String method = getRequest().getMethod();
 
         if ("POST".equalsIgnoreCase(method)) {
-            handleExecute();
+            handleExecute(result);
         } else if ("GET".equalsIgnoreCase(method)) {
-            handleStatus();
+            handleStatus(result);
         } else {
             throw new NotFoundException("Process execution endpoint not found");
         }
     }
 
-    private void handleExecute() throws IOException {
+    private void handleExecute(JSONObject result) throws IOException {
         try {
-            OBContext.setAdminMode(true);
             JsonNode root = mapper.readTree(getRequest().getInputStream());
             
             String processId = root.has("processId") ? root.get("processId").asText() : null;
@@ -100,21 +99,17 @@ public class ProcessExecutionService extends MetadataService {
 
             ProcessInstance pInstance = ProcessExecutionUtils.callProcessAsync(process, recordId, parameters);
             
-            JSONObject result = new JSONObject();
             result.put("pInstanceId", pInstance.getId());
             result.put("status", "STARTED");
             write(result);
 
         } catch (JSONException e) {
             throw new InternalServerException("Error building response", e);
-        } finally {
-            OBContext.restorePreviousMode();
         }
     }
 
-    private void handleStatus() throws IOException {
+    private void handleStatus(JSONObject result) throws IOException {
         try {
-            OBContext.setAdminMode(true);
             String pathInfo = getRequest().getPathInfo();
             if (pathInfo == null || !pathInfo.contains("/status/")) {
                 throw new NotFoundException("Invalid status path");
@@ -131,7 +126,6 @@ public class ProcessExecutionService extends MetadataService {
             // Refresh to get latest status from DB
             OBDal.getInstance().getSession().refresh(pInstance);
 
-            JSONObject result = new JSONObject();
             result.put("pInstanceId", pInstance.getId());
             result.put("result", pInstance.getResult()); // 1 = Success, 0 = Error/Processing
             
@@ -150,8 +144,6 @@ public class ProcessExecutionService extends MetadataService {
 
         } catch (JSONException e) {
             throw new InternalServerException("Error building response", e);
-        } finally {
-            OBContext.restorePreviousMode();
         }
     }
 }

@@ -19,10 +19,13 @@ package com.etendoerp.metadata.service;
 
 import java.io.IOException;
 
+import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.codehaus.jettison.json.JSONException;
+import org.codehaus.jettison.json.JSONObject;
+
 import org.openbravo.dal.core.OBContext;
 
 import com.etendoerp.metadata.builders.LabelsBuilder;
@@ -34,14 +37,7 @@ public class LabelsService extends MetadataService {
     }
 
     @Override
-    public void process() throws IOException {
-        try {
-            OBContext.setAdminMode(true);
-            write(new LabelsBuilder().toJSON());
-        } catch (JSONException e) {
-            throw new InternalServerException(e.getMessage());
-        } finally {
-            OBContext.restorePreviousMode();
-        }
+    protected void execute(JSONObject result) throws ServletException, IOException, JSONException {
+        write(new LabelsBuilder().toJSON());
     }
 }

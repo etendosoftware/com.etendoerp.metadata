@@ -23,6 +23,7 @@ import static com.etendoerp.metadata.utils.Utils.getHttpStatusFor;
 import java.io.IOException;
 import java.util.Map;
 
+import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
@@ -57,7 +58,7 @@ public class LocationMetadataService extends MetadataService {
     }
 
     @Override
-    public void process() throws IOException {
+    protected void execute(JSONObject result) throws ServletException, IOException, JSONException {
         try {
             String pathInfo = getRequest().getPathInfo();
             // Clean the path like ServiceFactory does
@@ -82,8 +83,6 @@ public class LocationMetadataService extends MetadataService {
      */
     private void handleCreateLocation() throws IOException {
         try {
-            OBContext.setAdminMode(true);
-
             String requestBody = readRequestBody(getRequest());
             JSONObject jsonRequest = new JSONObject(requestBody);
 
@@ -107,8 +106,6 @@ public class LocationMetadataService extends MetadataService {
         } catch (Exception e) {
             logger.error("Unexpected error creating location", e);
             throw new OBException("Unexpected error: " + e.getMessage(), e);
-        } finally {
-            OBContext.restorePreviousMode();
         }
     }
 

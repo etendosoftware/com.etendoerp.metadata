@@ -21,8 +21,13 @@ import com.etendoerp.metadata.builders.WindowBuilder;
 import org.openbravo.base.exception.OBException;
 import org.openbravo.dal.core.OBContext;
 
+import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+
+import org.codehaus.jettison.json.JSONException;
+import org.codehaus.jettison.json.JSONObject;
+
 import java.io.IOException;
 
 /**
@@ -48,7 +53,7 @@ public class WindowService extends MetadataService {
      * @throws OBException if the window identifier is missing or invalid
      */
     @Override
-    public void process() throws IOException {
+    protected void execute(JSONObject result) throws ServletException, IOException, JSONException {
         String path = getRequest().getPathInfo();
         String windowId = extractWindowId(path);
 
@@ -56,12 +61,7 @@ public class WindowService extends MetadataService {
             throw new OBException("Invalid window id in URL: " + path);
         }
 
-        try {
-            OBContext.setAdminMode(true);
-            write(new WindowBuilder(windowId).toJSON());
-        } finally {
-            OBContext.restorePreviousMode();
-        }
+        write(new WindowBuilder(windowId).toJSON());
     }
 
 

@@ -20,8 +20,10 @@ package com.etendoerp.metadata.service;
 import com.etendoerp.metadata.builders.ToolbarBuilder;
 import com.etendoerp.metadata.exceptions.InternalServerException;
 import org.codehaus.jettison.json.JSONException;
+import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.dal.core.OBContext;
 
+import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -49,15 +51,8 @@ public class ToolbarService extends MetadataService {
    *
    * @throws IOException
    */
-  @Override
-  public void process() throws IOException {
-    try {
-      OBContext.setAdminMode(true);
-      write(new ToolbarBuilder().toJSON());
-    } catch (JSONException e) {
-      throw new InternalServerException(e.getMessage());
-    } finally {
-      OBContext.restorePreviousMode();
+    @Override
+    protected void execute(JSONObject result) throws ServletException, IOException, JSONException {
+        write(new ToolbarBuilder().toJSON());
     }
-  }
 }

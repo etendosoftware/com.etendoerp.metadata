@@ -21,9 +21,11 @@ import static com.etendoerp.metadata.utils.Constants.TAB_ID;
 
 import java.io.IOException;
 
+import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.base.exception.OBException;
 import org.openbravo.base.secureApp.VariablesSecureApp;
@@ -49,11 +51,10 @@ public class MessageService extends MetadataService {
     }
 
     @Override
-    public void process() throws IOException {
+    protected void execute(JSONObject result) throws ServletException, IOException, JSONException {
         final HttpServletRequest req = getRequest();
         final HttpServletResponse res = getResponse();
         final VariablesSecureApp vars = new RequestVariables(req);
-        final JSONObject jsonResponse = new JSONObject();
 
         final String tabId = req.getParameter(TAB_ID);
         final OBError error = vars.getMessage(tabId);
@@ -62,11 +63,11 @@ public class MessageService extends MetadataService {
             vars.removeMessage(tabId);
 
             if (error != null) {
-                jsonResponse.put("message", error.getMessage());
-                jsonResponse.put("type", error.getType());
-                jsonResponse.put("title", error.getTitle());
+                result.put("message", error.getMessage());
+                result.put("type", error.getType());
+                result.put("title", error.getTitle());
             } else {
-                jsonResponse.put("message", "");
+                result.put("message", "");
             }
 
             setCORSHeaders(req, res);
@@ -74,6 +75,6 @@ public class MessageService extends MetadataService {
             throw new OBException("Error while processing message", e);
         }
 
-        write(jsonResponse);
+        write(result);
     }
 }

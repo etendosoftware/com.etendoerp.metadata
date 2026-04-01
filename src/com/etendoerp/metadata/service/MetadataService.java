@@ -77,11 +77,6 @@ public abstract class MetadataService {
         return responseThreadLocal.get();
     }
 
-    /**
-     * Template method for processing metadata services.
-     * @throws IOException if an I/O error occurs.
-     * @throws ServletException if a servlet-specific error occurs.
-     */
     public void process() throws IOException, ServletException {
         JSONObject result = new JSONObject();
         try {
@@ -92,7 +87,10 @@ public abstract class MetadataService {
                 OBContext.restorePreviousMode();
             }
         } catch (Exception e) {
-            handleProcessError(this.getClass().getSimpleName(), result, e);
+            if (e instanceof IOException) throw (IOException) e;
+            if (e instanceof ServletException) throw (ServletException) e;
+            if (e instanceof RuntimeException) throw (RuntimeException) e;
+            throw new RuntimeException(e.getMessage(), e);
         }
     }
 
@@ -103,7 +101,8 @@ public abstract class MetadataService {
      * @throws IOException if an I/O error occurs.
      * @throws JSONException if a JSON-related error occurs.
      */
-    protected abstract void execute(JSONObject result) throws ServletException, IOException, JSONException;
+    protected void execute(JSONObject result) throws ServletException, IOException, JSONException {
+    }
 
     /**
      * Validates and retrieves the context for metadata services.

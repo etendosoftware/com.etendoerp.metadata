@@ -23,6 +23,9 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 
+import org.codehaus.jettison.json.JSONException;
+import org.codehaus.jettison.json.JSONObject;
+
 import com.etendoerp.metadata.exceptions.InternalServerException;
 import com.etendoerp.metadata.exceptions.NotFoundException;
 import com.etendoerp.metadata.utils.LegacyPaths;
@@ -72,7 +75,7 @@ public class ServiceFactory {
         return new MetadataService(req, res) {
 
             @Override
-            public void process() throws ServletException, IOException {
+            protected void execute(JSONObject result) throws ServletException, IOException, JSONException {
                 try {
                     handleLegacySession(req, path);
                     forwardRequest(req, res, path);
