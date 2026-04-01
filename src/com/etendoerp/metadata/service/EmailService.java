@@ -23,7 +23,6 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.codehaus.jettison.json.JSONObject;
-import org.openbravo.dal.core.OBContext;
 import org.openbravo.model.ad.ui.Tab;
 import org.openbravo.model.common.enterprise.EmailServerConfiguration;
 import org.openbravo.model.common.enterprise.Organization;
@@ -44,42 +43,31 @@ public class EmailService extends MetadataService {
     }
 
     @Override
-    public void process() throws IOException {
-        JSONObject result = new JSONObject();
-        try {
-            OBContext.setAdminMode(true);
-            try {
-                String recordId = getRequestedRecordId(result);
-                if (recordId == null) return;
-                
-                Tab tab = getRequestedTab(result);
-                if (tab == null) return;
+    protected void execute(JSONObject result) throws Exception {
+        String recordId = getRequestedRecordId(result);
+        if (recordId == null) return;
+        
+        Tab tab = getRequestedTab(result);
+        if (tab == null) return;
 
-                BaseOBObject dataRecord = getRecord(tab, recordId);
-                Organization org = getRecordOrganization(dataRecord);
-                EmailServerConfiguration emailConfig = getEmailConfiguration(org);
-                
-                String senderAddress = (emailConfig != null && emailConfig.getSmtpServerSenderAddress() != null)
-                        ? emailConfig.getSmtpServerSenderAddress().trim() : "";
+        BaseOBObject dataRecord = getRecord(tab, recordId);
+        Organization org = getRecordOrganization(dataRecord);
+        EmailServerConfiguration emailConfig = getEmailConfiguration(org);
+        
+        String senderAddress = (emailConfig != null && emailConfig.getSmtpServerSenderAddress() != null)
+                ? emailConfig.getSmtpServerSenderAddress().trim() : "";
 
-                if (senderAddress.isEmpty()) {
-                    handleErrorResponse(result, "No sender defined. Please check Email Server configuration in Client settings.");
-                    return;
-                }
-
-                if (dataRecord != null && !checkDocumentStatus(dataRecord)) {
-                    handleErrorResponse(result, "Only completed or closed documents can be sent via email.");
-                    return;
-                }
-
-                result.put(SUCCESS, true);
-                write(result);
-
-            } finally {
-                OBContext.restorePreviousMode();
-            }
-        } catch (Exception e) {
-            handleProcessError("EmailService", result, e);
+        if (senderAddress.isEmpty()) {
+            handleErrorResponse(result, "No sender defined. Please check Email Server configuration in Client settings.");
+            return;
         }
+
+        if (dataRecord != null && !checkDocumentStatus(dataRecord)) {
+            handleErrorResponse(result, "Only completed or closed documents can be sent via email.");
+            return;
+        }
+
+        result.put(SUCCESS, true);
+        write(result);
     }
 }

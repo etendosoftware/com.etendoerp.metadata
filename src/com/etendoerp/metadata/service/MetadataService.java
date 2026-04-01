@@ -76,6 +76,30 @@ public abstract class MetadataService {
         return responseThreadLocal.get();
     }
 
+    /**
+     * Template method for processing metadata services.
+     */
+    public void process() throws IOException {
+        JSONObject result = new JSONObject();
+        try {
+            OBContext.setAdminMode(true);
+            try {
+                execute(result);
+            } finally {
+                OBContext.restorePreviousMode();
+            }
+        } catch (Exception e) {
+            handleProcessError(this.getClass().getSimpleName(), result, e);
+        }
+    }
+
+    /**
+     * Core logic to be implemented by subclasses.
+     * @param result The JSONObject to be populated with the result.
+     * @throws Exception if an error occurs.
+     */
+    protected abstract void execute(JSONObject result) throws Exception;
+
     protected void write(JSONObject data) throws IOException {
         HttpServletResponse response = getResponse();
         response.setContentType(ContentType.APPLICATION_JSON.getMimeType());
@@ -179,7 +203,7 @@ public abstract class MetadataService {
                 crit.setMaxResults(1);
                 config = (EmailServerConfiguration) crit.uniqueResult();
             } catch (Exception e) {
-                logger.debug("Could find any fallback Email Server Configuration: " + e.getMessage());
+                logger.debug("Could not find any fallback Email Server Configuration: " + e.getMessage());
             }
         }
         return config;
@@ -229,12 +253,4 @@ public abstract class MetadataService {
         }
         return value.toString().trim();
     }
-
-    /**
-     * Main processing method to be implemented by subclasses.
-     *
-     * @throws IOException      if an I/O error occurs
-     * @throws ServletException if a servlet-specific error occurs
-     */
-    public abstract void process() throws IOException, ServletException;
 }

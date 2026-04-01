@@ -21,11 +21,15 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileAttribute;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -51,6 +55,9 @@ import org.openbravo.model.common.enterprise.Organization;
 public class EmailSendService extends MetadataService {
 
     private static final String ATTACH_PATH_PROP = "attach.path";
+    private static final String SUBJECT = "subject";
+    private static final String NOTES = "notes";
+    private static final String TO = "to";
 
     /**
      * Constructor for EmailSendService.
@@ -72,7 +79,7 @@ public class EmailSendService extends MetadataService {
             List<String> recordAttachmentIds = new ArrayList<>();
 
             if (isMultipartRequest()) {
-                tempDir = Files.createTempDirectory("etendo_email_attachments_");
+                tempDir = createSecureTempDir();
                 extractMultipartParams(params, recordAttachmentIds, tempFiles, tempDir);
             }
             populateParamsFromRequest(params, recordAttachmentIds);
@@ -108,8 +115,24 @@ public class EmailSendService extends MetadataService {
         }
     }
 
+    private Path createSecureTempDir() throws IOException {
+        try {
+            FileAttribute<Set<PosixFilePermission>> attrs = PosixFilePermissions.asFileAttribute(
+                PosixFilePermissions.fromString("rwx------")
+            );
+            return Files.createTempDirectory("etendo_email_attachments_", attrs);
+        } catch (UnsupportedOperationException e) {
+            return Files.createTempDirectory("etendo_email_attachments_");
+        }
+    }
+
+    @Override
+    protected void execute(JSONObject result) throws Exception {
+        // Not used as EmailSendService overrides process() for custom cleanup
+    }
+
     private void populateParamsFromRequest(Map<String, String> params, List<String> recordAttachmentIds) {
-        String[] fieldNames = { RECORD_ID, TAB_ID, "to", "subject", "notes", "archive", "cc", "bcc", "replyTo", "templateId" };
+        String[] fieldNames = { RECORD_ID, TAB_ID, TO, SUBJECT, NOTES, "archive", "cc", "bcc", "replyTo", "templateId" };
         for (String field : fieldNames) {
             if (isNullOrEmpty(params.get(field))) {
                 String value = getRequest().getParameter(field);
@@ -134,7 +157,7 @@ public class EmailSendService extends MetadataService {
 
     private boolean validateParams(JSONObject result, Map<String, String> params) throws IOException {
         if (isNullOrEmpty(params.get(RECORD_ID)) || isNullOrEmpty(params.get(TAB_ID))
-                || isNullOrEmpty(params.get("to")) || isNullOrEmpty(params.get("subject"))) {
+                || isNullOrEmpty(params.get(TO)) || isNullOrEmpty(params.get(SUBJECT))) {
             handleErrorResponse(result, "Missing required parameters: recordId, tabId, to, subject.");
             return false;
         }
@@ -146,12 +169,12 @@ public class EmailSendService extends MetadataService {
         allAttachments.addAll(getFilesFromAttachments(recordAttachmentIds));
 
         EmailInfo email = new EmailInfo.Builder()
-                .setRecipientTO(params.get("to"))
+                .setRecipientTO(params.get(TO))
                 .setRecipientCC(params.getOrDefault("cc", ""))
                 .setRecipientBCC(params.getOrDefault("bcc", ""))
                 .setReplyTo(params.getOrDefault("replyTo", ""))
-                .setSubject(params.get("subject"))
-                .setContent(params.getOrDefault("notes", ""))
+                .setSubject(params.get(SUBJECT))
+                .setContent(params.getOrDefault(NOTES, ""))
                 .setContentType("text/plain; charset=utf-8")
                 .setAttachments(allAttachments)
                 .setSentDate(new Date())

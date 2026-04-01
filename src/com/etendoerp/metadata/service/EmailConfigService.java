@@ -17,8 +17,6 @@
 
 package com.etendoerp.metadata.service;
 
-import java.io.IOException;
-
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
@@ -45,6 +43,7 @@ public class EmailConfigService extends MetadataService {
     private static final String BUSINESS_PARTNER = "businessPartner";
     private static final String DOCUMENT_NO = "documentNo";
     private static final String BODY = "body";
+    private static final String NAME = "name";
 
     /**
      * Constructor for EmailConfigService.
@@ -56,43 +55,32 @@ public class EmailConfigService extends MetadataService {
     }
 
     @Override
-    public void process() throws IOException {
-        JSONObject result = new JSONObject();
-        try {
-            OBContext.setAdminMode(true);
-            try {
-                String recordId = getRequestedRecordId(result);
-                if (recordId == null) return;
-                
-                Tab tab = getRequestedTab(result);
-                if (tab == null) return;
+    protected void execute(JSONObject result) throws Exception {
+        String recordId = getRequestedRecordId(result);
+        if (recordId == null) return;
+        
+        Tab tab = getRequestedTab(result);
+        if (tab == null) return;
 
-                BaseOBObject dataRecord = getRecord(tab, recordId);
-                Organization org = getRecordOrganization(dataRecord);
-                EmailServerConfiguration emailServerConfig = getEmailConfiguration(org);
-                
-                String senderAddress = (emailServerConfig != null && emailServerConfig.getSmtpServerSenderAddress() != null)
-                        ? emailServerConfig.getSmtpServerSenderAddress().trim() : "";
-                
-                if (senderAddress.isEmpty()) {
-                    handleErrorResponse(result, "No sender defined. Please check Email Server configuration in Client settings.");
-                    return;
-                }
-
-                if (dataRecord != null && !checkDocumentStatus(dataRecord)) {
-                    handleErrorResponse(result, "Only completed or closed documents can be sent via email.");
-                    return;
-                }
-
-                populateEmailConfig(result, tab, dataRecord, org, senderAddress);
-                write(result);
-
-            } finally {
-                OBContext.restorePreviousMode();
-            }
-        } catch (Exception e) {
-            handleProcessError("EmailConfigService", result, e);
+        BaseOBObject dataRecord = getRecord(tab, recordId);
+        Organization org = getRecordOrganization(dataRecord);
+        EmailServerConfiguration emailServerConfig = getEmailConfiguration(org);
+        
+        String senderAddress = (emailServerConfig != null && emailServerConfig.getSmtpServerSenderAddress() != null)
+                ? emailServerConfig.getSmtpServerSenderAddress().trim() : "";
+        
+        if (senderAddress.isEmpty()) {
+            handleErrorResponse(result, "No sender defined. Please check Email Server configuration in Client settings.");
+            return;
         }
+
+        if (dataRecord != null && !checkDocumentStatus(dataRecord)) {
+            handleErrorResponse(result, "Only completed or closed documents can be sent via email.");
+            return;
+        }
+
+        populateEmailConfig(result, tab, dataRecord, org, senderAddress);
+        write(result);
     }
 
     private void populateEmailConfig(JSONObject result, Tab tab, BaseOBObject dataRecord, Organization org, String senderAddress) throws Exception {
@@ -131,68 +119,37 @@ public class EmailConfigService extends MetadataService {
 
     private String getRecipientEmail(BaseOBObject dataRecord) {
         if (dataRecord == null) return "";
-        String email = "";
-        if (dataRecord.getEntity().hasProperty(USER_CONTACT)) {
-            try {
-                Object contactObj = dataRecord.get(USER_CONTACT);
-                if (contactObj instanceof BaseOBObject) {
-                    BaseOBObject contact = (BaseOBObject) contactObj;
-                    if (contact.getEntity().hasProperty(EMAIL)) {
-                        email = safeString(contact.get(EMAIL));
-                    }
-                }
-            } catch (Exception e) { 
-                logger.debug("Could not retrieve email from userContact: " + e.getMessage());
-            }
-        }
-
-        if (email.isEmpty() && dataRecord.getEntity().hasProperty(BUSINESS_PARTNER)) {
-            try {
-                Object bpObj = dataRecord.get(BUSINESS_PARTNER);
-                if (bpObj instanceof BaseOBObject) {
-                    BaseOBObject bp = (BaseOBObject) bpObj;
-                    if (bp.getEntity().hasProperty(EMAIL)) {
-                        email = safeString(bp.get(EMAIL));
-                    }
-                }
-            } catch (Exception e) { 
-                 logger.debug("Could not retrieve email from businessPartner: " + e.getMessage());
-            }
+        String email = getPropertyString(dataRecord, USER_CONTACT, EMAIL);
+        if (email.isEmpty()) {
+            email = getPropertyString(dataRecord, BUSINESS_PARTNER, EMAIL);
         }
         return email;
     }
 
     private String getRecipientName(BaseOBObject dataRecord) {
         if (dataRecord == null) return "";
-        String name = "";
-        if (dataRecord.getEntity().hasProperty(USER_CONTACT)) {
-            try {
-                Object contactObj = dataRecord.get(USER_CONTACT);
-                if (contactObj instanceof BaseOBObject) {
-                    BaseOBObject contact = (BaseOBObject) contactObj;
-                    if (contact.getEntity().hasProperty("name")) {
-                        name = safeString(contact.get("name"));
-                    }
-                }
-            } catch (Exception e) { 
-                logger.debug("Could not retrieve name from userContact: " + e.getMessage());
-            }
-        }
-
-        if (name.isEmpty() && dataRecord.getEntity().hasProperty(BUSINESS_PARTNER)) {
-            try {
-                Object bpObj = dataRecord.get(BUSINESS_PARTNER);
-                if (bpObj instanceof BaseOBObject) {
-                    BaseOBObject bp = (BaseOBObject) bpObj;
-                    if (bp.getEntity().hasProperty("name")) {
-                        name = safeString(bp.get("name"));
-                    }
-                }
-            } catch (Exception e) { 
-                logger.debug("Could not retrieve name from businessPartner: " + e.getMessage());
-            }
+        String name = getPropertyString(dataRecord, USER_CONTACT, NAME);
+        if (name.isEmpty()) {
+            name = getPropertyString(dataRecord, BUSINESS_PARTNER, NAME);
         }
         return name;
+    }
+
+    private String getPropertyString(BaseOBObject record, String property, String subProperty) {
+        if (record.getEntity().hasProperty(property)) {
+            try {
+                Object obj = record.get(property);
+                if (obj instanceof BaseOBObject) {
+                    BaseOBObject bob = (BaseOBObject) obj;
+                    if (bob.getEntity().hasProperty(subProperty)) {
+                        return safeString(bob.get(subProperty));
+                    }
+                }
+            } catch (Exception e) {
+                logger.debug("Could not retrieve " + subProperty + " from " + property + ": " + e.getMessage());
+            }
+        }
+        return "";
     }
 
     private String getCurrentUserEmail() {
@@ -215,20 +172,7 @@ public class EmailConfigService extends MetadataService {
 
     private String getSalesRepEmail(BaseOBObject dataRecord) {
         if (dataRecord == null) return "";
-        if (dataRecord.getEntity().hasProperty("salesRepresentative")) {
-            try {
-                Object salesRepObj = dataRecord.get("salesRepresentative");
-                if (salesRepObj instanceof BaseOBObject) {
-                    BaseOBObject salesRep = (BaseOBObject) salesRepObj;
-                    if (salesRep.getEntity().hasProperty(EMAIL)) {
-                        return safeString(salesRep.get(EMAIL));
-                    }
-                }
-            } catch (Exception e) { 
-                logger.debug("Could not retrieve email from salesRepresentative: " + e.getMessage());
-            }
-        }
-        return "";
+        return getPropertyString(dataRecord, "salesRepresentative", EMAIL);
     }
 
     private String getRecordSubject(Tab tab, BaseOBObject dataRecord) {

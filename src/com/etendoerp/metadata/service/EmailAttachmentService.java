@@ -17,14 +17,11 @@
 
 package com.etendoerp.metadata.service;
 
-import java.io.IOException;
-
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONObject;
-import org.openbravo.dal.core.OBContext;
 import org.openbravo.model.ad.ui.Tab;
 
 /**
@@ -42,28 +39,17 @@ public class EmailAttachmentService extends MetadataService {
     }
 
     @Override
-    public void process() throws IOException {
-        JSONObject result = new JSONObject();
-        try {
-            OBContext.setAdminMode(true);
-            try {
-                String recordId = getRequestedRecordId(result);
-                if (recordId == null) return;
-                
-                Tab tab = getRequestedTab(result);
-                if (tab == null) return;
+    protected void execute(JSONObject result) throws Exception {
+        String recordId = getRequestedRecordId(result);
+        if (recordId == null) return;
+        
+        Tab tab = getRequestedTab(result);
+        if (tab == null) return;
 
-                JSONArray attachments = getRecordAttachments(tab.getTable().getId(), recordId);
+        JSONArray attachments = getRecordAttachments(tab.getTable().getId(), recordId);
 
-                result.put(SUCCESS, true);
-                result.put("attachments", attachments);
-                write(result);
-
-            } finally {
-                OBContext.restorePreviousMode();
-            }
-        } catch (Exception e) {
-            handleProcessError("EmailAttachmentService", result, e);
-        }
+        result.put(SUCCESS, true);
+        result.put("attachments", attachments);
+        write(result);
     }
 }
