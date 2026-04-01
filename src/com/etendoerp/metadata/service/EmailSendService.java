@@ -136,17 +136,44 @@ public class EmailSendService extends MetadataService {
     }
 
     private Path createSecureTempDir() throws IOException {
-        // Create a temporary directory in the system's temp location with restricted permissions.
+        // SECURITY ANALYSIS:
+        // By default, system temp directories (like /tmp) are world-writable, which poses risks 
+        // of information disclosure and symlink attacks.
+        // We prefer using the application's own restricted storage (attach.path) for better isolation.
+        
+        Path parentDir = null;
+        try {
+            String attachPath = OBPropertiesProvider.getInstance().getOpenbravoProperties().getProperty(ATTACH_PATH_PROP);
+            if (attachPath != null) {
+                Path baseTmp = new File(attachPath, "tmp").toPath();
+                if (!Files.exists(baseTmp)) {
+                    Files.createDirectories(baseTmp);
+                }
+                parentDir = baseTmp;
+            }
+        } catch (Exception e) {
+            logger.debug("Could not use attach.path for temp directory: ", e);
+        }
+
         // On POSIX systems, we use 700 (rwx------) attributes during creation for atomic security.
         // On other systems, we immediately restrict access to the owner only.
         Path tempDir;
+        FileAttribute<Set<PosixFilePermission>> attrs = PosixFilePermissions.asFileAttribute(
+            PosixFilePermissions.fromString("rwx------")
+        );
+        
         try {
-            FileAttribute<Set<PosixFilePermission>> attrs = PosixFilePermissions.asFileAttribute(
-                PosixFilePermissions.fromString("rwx------")
-            );
-            tempDir = Files.createTempDirectory("etendo_email_attachments_", attrs);
+            if (parentDir != null) {
+                tempDir = Files.createTempDirectory(parentDir, "etendo_email_", attrs);
+            } else {
+                tempDir = Files.createTempDirectory("etendo_email_attachments_", attrs);
+            }
         } catch (UnsupportedOperationException e) {
-            tempDir = Files.createTempDirectory("etendo_email_attachments_");
+            if (parentDir != null) {
+                tempDir = Files.createTempDirectory(parentDir, "etendo_email_");
+            } else {
+                tempDir = Files.createTempDirectory("etendo_email_attachments_");
+            }
             File file = tempDir.toFile();
             boolean success = file.setReadable(false, false);
             success &= file.setWritable(false, false);
