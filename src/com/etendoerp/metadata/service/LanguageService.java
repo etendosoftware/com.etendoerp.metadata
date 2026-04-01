@@ -19,12 +19,8 @@ package com.etendoerp.metadata.service;
 
 import java.io.IOException;
 
-import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-
-import org.codehaus.jettison.json.JSONException;
-import org.codehaus.jettison.json.JSONObject;
 
 import org.openbravo.dal.core.OBContext;
 
@@ -39,7 +35,12 @@ public class LanguageService extends MetadataService {
     }
 
     @Override
-    protected void execute(JSONObject result) throws ServletException, IOException, JSONException {
-        write(new LanguageBuilder().toJSON());
+    public void process() throws IOException {
+        try {
+            OBContext.setAdminMode(true);
+            write(new LanguageBuilder().toJSON());
+        } finally {
+            OBContext.restorePreviousMode();
+        }
     }
 }

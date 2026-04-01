@@ -20,13 +20,10 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
-
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.erpCommon.businessUtility.Preferences;
 import org.openbravo.model.ad.domain.Preference;
@@ -49,8 +46,10 @@ public class PreferencesService extends MetadataService {
     }
 
     @Override
-    protected void execute(JSONObject result) throws ServletException, IOException, JSONException {
+    public void process() throws IOException {
+        OBContext.setAdminMode();
         try {
+            final JSONObject result = new JSONObject();
             final JSONObject preferences = new JSONObject();
 
             final List<Preference> allPrefs = Preferences.getAllPreferences(
@@ -70,6 +69,8 @@ public class PreferencesService extends MetadataService {
         } catch (Exception e) {
             logger.error("Error retrieving preferences: {}", e.getMessage(), e);
             throw new IOException("Error retrieving preferences", e);
+        } finally {
+            OBContext.restorePreviousMode();
         }
     }
 

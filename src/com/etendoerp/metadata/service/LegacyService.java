@@ -1,14 +1,8 @@
 package com.etendoerp.metadata.service;
 
-import java.io.IOException;
-
-import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
 import javax.servlet.http.HttpServletResponse;
-
-import org.codehaus.jettison.json.JSONException;
-import org.codehaus.jettison.json.JSONObject;
 
 import com.etendoerp.metadata.exceptions.InternalServerException;
 import com.etendoerp.metadata.http.LegacyProcessServlet;
@@ -38,15 +32,20 @@ public class LegacyService extends MetadataService {
     }
 
     @Override
-    protected void execute(JSONObject result) throws ServletException, IOException, JSONException {
-        HttpServletRequest request = getRequest();
-        HttpServletResponse response = getResponse();
-        String pathInfo = request.getPathInfo();
-        HttpServletRequestWrapper wrappedRequest = getHttpServletRequestWrapper(pathInfo, request);
+    public void process() {
+        try {
+            HttpServletRequest request = getRequest();
+            HttpServletResponse response = getResponse();
+            String pathInfo = request.getPathInfo();
+            HttpServletRequestWrapper wrappedRequest = getHttpServletRequestWrapper(pathInfo, request);
 
-        LegacyProcessServlet legacyServlet = new LegacyProcessServlet();
+            LegacyProcessServlet legacyServlet = new LegacyProcessServlet();
 
-        legacyServlet.service(wrappedRequest, response);
+            legacyServlet.service(wrappedRequest, response);
+
+        } catch (Exception e) {
+            throw new InternalServerException("Failed to process legacy request: " + e.getMessage());
+        }
     }
 
     private HttpServletRequestWrapper getHttpServletRequestWrapper(String pathInfo, HttpServletRequest request) {

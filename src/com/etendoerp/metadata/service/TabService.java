@@ -2,12 +2,8 @@ package com.etendoerp.metadata.service;
 
 import java.io.IOException;
 
-import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-
-import org.codehaus.jettison.json.JSONException;
-import org.codehaus.jettison.json.JSONObject;
 
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
@@ -25,21 +21,26 @@ public class TabService extends MetadataService {
     }
 
     @Override
-    protected void execute(JSONObject result) throws ServletException, IOException, JSONException {
-        String pathInfo = getRequest().getPathInfo();
-        String tabId = extractTabId(pathInfo);
+    public void process() throws IOException {
+        try {
+            OBContext.setAdminMode(true);
+            String pathInfo = getRequest().getPathInfo();
+            String tabId = extractTabId(pathInfo);
 
-        if (tabId == null || tabId.isEmpty()) {
-            throw new NotFoundException("Invalid tab path: " + pathInfo);
+            if (tabId == null || tabId.isEmpty()) {
+                throw new NotFoundException("Invalid tab path: " + pathInfo);
+            }
+
+            Tab tab = OBDal.getInstance().get(Tab.class, tabId);
+
+            if (tab == null) {
+                throw new NotFoundException("Tab not found: " + tabId);
+            }
+
+            write(new TabBuilder(tab, null, false).toJSON());
+        } finally {
+            OBContext.restorePreviousMode();
         }
-
-        Tab tab = OBDal.getInstance().get(Tab.class, tabId);
-
-        if (tab == null) {
-            throw new NotFoundException("Tab not found: " + tabId);
-        }
-
-        write(new TabBuilder(tab, null, false).toJSON());
     }
 
     /**

@@ -19,13 +19,11 @@ package com.etendoerp.metadata.service;
 
 import java.io.IOException;
 
-import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import com.etendoerp.metadata.utils.ProcessUtils;
 import org.codehaus.jettison.json.JSONException;
-import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.model.ad.ui.Process;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
@@ -53,19 +51,29 @@ public class ReportAndProcessService extends MetadataService {
     }
 
     @Override
-    protected void execute(JSONObject result) throws ServletException, IOException, JSONException {
-        // Extract process ID from path
-        String pathInfo = getRequest().getPathInfo();
-        String processId = ProcessUtils.extractProcessId(pathInfo, "report-and-process");
+    public void process() throws IOException {
+        try {
+            OBContext.setAdminMode(true);
 
-        // Fetch process definition from database
-        Process process = OBDal.getInstance().get(Process.class, processId);
+            // Extract process ID from path
+            String pathInfo = getRequest().getPathInfo();
+            String processId = ProcessUtils.extractProcessId(pathInfo, "report-and-process");
 
-        if (process == null) {
-            throw new NotFoundException("Report and Process not found with id: " + processId);
+            // Fetch process definition from database
+            Process process = OBDal.getInstance().get(Process.class, processId);
+
+            if (process == null) {
+                throw new NotFoundException("Report and Process not found with id: " + processId);
+            }
+
+            // Build and return JSON response
+            write(new ReportAndProcessBuilder(process).toJSON());
+
+        } catch (JSONException e) {
+            logger.error("Error building process metadata JSON: " + e.getMessage(), e);
+            throw new InternalServerException("Failed to build process metadata: " + e.getMessage(), e);
+        } finally {
+            OBContext.restorePreviousMode();
         }
-
-        // Build and return JSON response
-        write(new ReportAndProcessBuilder(process).toJSON());
     }
 }
