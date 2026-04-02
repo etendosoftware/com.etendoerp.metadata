@@ -21,13 +21,20 @@ import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
 
 import java.io.IOException;
+import java.util.List;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
 import org.codehaus.jettison.json.JSONObject;
 import org.junit.Before;
 import org.junit.Test;
 import org.openbravo.base.model.Entity;
+import org.openbravo.base.model.ModelProvider;
 import org.openbravo.base.structure.BaseOBObject;
+import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.ui.Tab;
+import org.openbravo.model.common.enterprise.EmailServerConfiguration;
 import org.openbravo.model.common.enterprise.Organization;
 
 import com.etendoerp.metadata.MetadataTestConstants;
@@ -37,10 +44,33 @@ import com.etendoerp.metadata.MetadataTestConstants;
  */
 public class EmailConfigServiceTest extends BaseMetadataServiceTest {
 
-    private static final String PARAM_RECORD_ID  = "recordId";
-    private static final String PARAM_TAB_ID     = "tabId";
-    private static final String KEY_SUCCESS      = "success";
-    private static final String INVALID_JSON_MSG = "Response should be valid JSON: ";
+    private static final String PARAM_RECORD_ID   = "recordId";
+    private static final String PARAM_TAB_ID      = "tabId";
+    private static final String KEY_SUCCESS       = "success";
+    private static final String INVALID_JSON_MSG  = "Response should be valid JSON: ";
+    private static final String PROP_EMAIL        = "email";
+    private static final String PROP_NAME         = "name";
+    private static final String PROP_DOC_TYPE     = "documentType";
+    private static final String JSON_TO_NAME      = "toName";
+    private static final String JSON_TEMPLATES    = "templates";
+    private static final String SENDER_ADDR       = "sender@test.com";
+    private static final String MSG_SUCCESS_TRUE  = "Success should be true";
+
+    /** Subclass that overrides SMTP lookup so we can test the full executeEmailAction path. */
+    private static class TestableEmailConfigService extends EmailConfigService {
+        private final EmailServerConfiguration smtpConfig;
+
+        TestableEmailConfigService(HttpServletRequest req, HttpServletResponse res,
+                EmailServerConfiguration config) {
+            super(req, res);
+            this.smtpConfig = config;
+        }
+
+        @Override
+        protected EmailServerConfiguration getSmtpConfig(Organization org) {
+            return smtpConfig;
+        }
+    }
 
     private EmailConfigService emailConfigService;
 
@@ -129,17 +159,17 @@ public class EmailConfigServiceTest extends BaseMetadataServiceTest {
         Organization mockOrg = mock(Organization.class);
 
         EmailBaseService.ValidationContext ctx =
-                new EmailBaseService.ValidationContext(mockTab, mockRecord, mockOrg, "sender@test.com", "rec-123");
+                new EmailBaseService.ValidationContext(mockTab, mockRecord, mockOrg, SENDER_ADDR, "rec-123");
 
         JSONObject result = new JSONObject();
         emailConfigService.populateEmailConfig(result, ctx);
 
-        assertTrue("Success should be true", result.getBoolean(KEY_SUCCESS));
+        assertTrue(MSG_SUCCESS_TRUE, result.getBoolean(KEY_SUCCESS));
         assertEquals("to should be empty when no BP email property", "", result.getString("to"));
-        assertEquals("toName should be empty when no name property", "", result.getString("toName"));
+        assertEquals("toName should be empty when no name property", "", result.getString(JSON_TO_NAME));
         assertEquals("replyTo should be empty when no sales rep property", "", result.getString("replyTo"));
-        assertEquals("senderAddress should match ctx value", "sender@test.com", result.getString("senderAddress"));
-        assertNotNull("templates should be present", result.get("templates"));
+        assertEquals("senderAddress should match ctx value", SENDER_ADDR, result.getString("senderAddress"));
+        assertNotNull("templates should be present", result.get(JSON_TEMPLATES));
         assertNotNull("recordAttachments should be present", result.get("recordAttachments"));
     }
 
@@ -152,11 +182,11 @@ public class EmailConfigServiceTest extends BaseMetadataServiceTest {
     public void testPopulateEmailConfig_docTypePropertyPresent_returnsNonBob() throws Exception {
         Entity mockEntity = mock(Entity.class);
         when(mockEntity.hasProperty(any(String.class))).thenReturn(true);
-        when(mockEntity.hasProperty("documentType")).thenReturn(true);
+        when(mockEntity.hasProperty(PROP_DOC_TYPE)).thenReturn(true);
 
         BaseOBObject mockRecord = mock(BaseOBObject.class);
         when(mockRecord.getEntity()).thenReturn(mockEntity);
-        when(mockRecord.get("documentType")).thenReturn("notABaseOBObject");
+        when(mockRecord.get(PROP_DOC_TYPE)).thenReturn("notABaseOBObject");
 
         Tab mockTab = mock(Tab.class, RETURNS_DEEP_STUBS);
         when(mockTab.getTable().getId()).thenReturn("200");
@@ -170,8 +200,8 @@ public class EmailConfigServiceTest extends BaseMetadataServiceTest {
         JSONObject result = new JSONObject();
         emailConfigService.populateEmailConfig(result, ctx);
 
-        assertTrue("Success should be true", result.getBoolean(KEY_SUCCESS));
-        assertNotNull("templates key should be present", result.get("templates"));
+        assertTrue(MSG_SUCCESS_TRUE, result.getBoolean(KEY_SUCCESS));
+        assertNotNull("templates key should be present", result.get(JSON_TEMPLATES));
     }
 
     /**
@@ -186,21 +216,21 @@ public class EmailConfigServiceTest extends BaseMetadataServiceTest {
         when(mockDocType.getId()).thenReturn("doc-type-id-test");
 
         Entity bpEntity = mock(Entity.class);
-        when(bpEntity.hasProperty("email")).thenReturn(true);
-        when(bpEntity.hasProperty("name")).thenReturn(true);
+        when(bpEntity.hasProperty(PROP_EMAIL)).thenReturn(true);
+        when(bpEntity.hasProperty(PROP_NAME)).thenReturn(true);
         BaseOBObject mockBp = mock(BaseOBObject.class);
         when(mockBp.getEntity()).thenReturn(bpEntity);
-        when(mockBp.get("email")).thenReturn("partner@test.com");
-        when(mockBp.get("name")).thenReturn("Test Partner");
+        when(mockBp.get(PROP_EMAIL)).thenReturn("partner@test.com");
+        when(mockBp.get(PROP_NAME)).thenReturn("Test Partner");
 
         Entity mockEntity = mock(Entity.class);
         when(mockEntity.hasProperty(any(String.class))).thenReturn(false);
-        when(mockEntity.hasProperty("documentType")).thenReturn(true);
+        when(mockEntity.hasProperty(PROP_DOC_TYPE)).thenReturn(true);
         when(mockEntity.hasProperty("businessPartner")).thenReturn(true);
 
         BaseOBObject mockRecord = mock(BaseOBObject.class);
         when(mockRecord.getEntity()).thenReturn(mockEntity);
-        when(mockRecord.get("documentType")).thenReturn(mockDocType);
+        when(mockRecord.get(PROP_DOC_TYPE)).thenReturn(mockDocType);
         when(mockRecord.get("businessPartner")).thenReturn(mockBp);
 
         Tab mockTab = mock(Tab.class, RETURNS_DEEP_STUBS);
@@ -216,9 +246,103 @@ public class EmailConfigServiceTest extends BaseMetadataServiceTest {
         JSONObject result = new JSONObject();
         emailConfigService.populateEmailConfig(result, ctx);
 
-        assertTrue("Success should be true", result.getBoolean(KEY_SUCCESS));
+        assertTrue(MSG_SUCCESS_TRUE, result.getBoolean(KEY_SUCCESS));
         assertEquals("to should come from BP email", "partner@test.com", result.getString("to"));
-        assertEquals("toName should come from BP name", "Test Partner", result.getString("toName"));
-        assertNotNull("templates should be present", result.get("templates"));
+        assertEquals("toName should come from BP name", "Test Partner", result.getString(JSON_TO_NAME));
+        assertNotNull("templates should be present", result.get(JSON_TEMPLATES));
+    }
+
+    /**
+     * Tests populateEmailConfig when userContact has an email — covers the first branch
+     * of getRecipientEmail/getRecipientName (returns non-empty from userContact).
+     * Also exercises the documentNo property path in getRecordSubject/getReportFileName.
+     */
+    @Test
+    public void testPopulateEmailConfig_withUserContactEmail() throws Exception {
+        Entity ucEntity = mock(Entity.class);
+        when(ucEntity.hasProperty(PROP_EMAIL)).thenReturn(true);
+        when(ucEntity.hasProperty(PROP_NAME)).thenReturn(true);
+        BaseOBObject mockUc = mock(BaseOBObject.class);
+        when(mockUc.getEntity()).thenReturn(ucEntity);
+        when(mockUc.get(PROP_EMAIL)).thenReturn("uc@test.com");
+        when(mockUc.get(PROP_NAME)).thenReturn("UC Name");
+
+        Entity mockEntity = mock(Entity.class);
+        when(mockEntity.hasProperty(any(String.class))).thenReturn(false);
+        when(mockEntity.hasProperty("userContact")).thenReturn(true);
+        when(mockEntity.hasProperty("documentNo")).thenReturn(true);
+
+        BaseOBObject mockRecord = mock(BaseOBObject.class);
+        when(mockRecord.getEntity()).thenReturn(mockEntity);
+        when(mockRecord.get("userContact")).thenReturn(mockUc);
+        when(mockRecord.get("documentNo")).thenReturn("DOC-001");
+
+        Tab mockTab = mock(Tab.class, RETURNS_DEEP_STUBS);
+        when(mockTab.getTable().getId()).thenReturn("500");
+        when(mockTab.getTable().getName()).thenReturn("TestTable");
+
+        Organization mockOrg = mock(Organization.class);
+
+        EmailBaseService.ValidationContext ctx =
+                new EmailBaseService.ValidationContext(mockTab, mockRecord, mockOrg, "from@test.com", "rec-001");
+
+        JSONObject result = new JSONObject();
+        emailConfigService.populateEmailConfig(result, ctx);
+
+        assertTrue(MSG_SUCCESS_TRUE, result.getBoolean(KEY_SUCCESS));
+        assertEquals("to should come from userContact email", "uc@test.com", result.getString("to"));
+        assertEquals("toName should come from userContact name", "UC Name", result.getString(JSON_TO_NAME));
+        assertTrue("reportFileName should contain documentNo",
+                result.getString("reportFileName").contains("DOC-001"));
+    }
+
+    /**
+     * Tests the full executeEmailAction flow using a subclass that overrides SMTP lookup,
+     * with a real Tab and real record from the database. Covers lines 61-64 in
+     * executeEmailAction (including the write(result) call).
+     */
+    @Test
+    public void testExecuteEmailAction_withValidSmtpAndRealData()
+            throws IOException, javax.servlet.ServletException {
+        @SuppressWarnings("unchecked")
+        List<Tab> tabs = OBDal.getInstance().createCriteria(Tab.class).setMaxResults(1).list();
+        if (tabs.isEmpty()) {
+            return;
+        }
+        Tab tab = tabs.get(0);
+        if (tab.getTable() == null) {
+            return;
+        }
+        Entity entity = ModelProvider.getInstance()
+                .getEntityByTableName(tab.getTable().getDBTableName());
+        if (entity == null) {
+            return;
+        }
+        @SuppressWarnings("unchecked")
+        List<BaseOBObject> records = OBDal.getInstance().getSession()
+                .createQuery("from " + entity.getName())
+                .setMaxResults(1).list();
+        if (records.isEmpty()) {
+            return;
+        }
+
+        EmailServerConfiguration mockSmtp = mock(EmailServerConfiguration.class);
+        when(mockSmtp.getSmtpServerSenderAddress()).thenReturn(SENDER_ADDR);
+
+        TestableEmailConfigService testService =
+                new TestableEmailConfigService(mockRequest, mockResponse, mockSmtp);
+
+        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(records.get(0).getId().toString());
+        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(tab.getId());
+
+        testService.process();
+        String responseContent = responseWriter.toString();
+
+        try {
+            JSONObject jsonResponse = new JSONObject(responseContent);
+            assertNotNull("Response should be valid JSON", jsonResponse);
+        } catch (Exception e) {
+            fail(INVALID_JSON_MSG + e.getMessage());
+        }
     }
 }

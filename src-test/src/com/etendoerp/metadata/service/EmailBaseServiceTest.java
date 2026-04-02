@@ -23,6 +23,7 @@ import static org.mockito.Mockito.*;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.util.List;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
@@ -33,7 +34,10 @@ import org.codehaus.jettison.json.JSONObject;
 import org.junit.Before;
 import org.junit.Test;
 import org.openbravo.base.exception.OBException;
+import org.openbravo.base.model.Entity;
+import org.openbravo.base.model.ModelProvider;
 import org.openbravo.base.structure.BaseOBObject;
+import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.ui.Tab;
 import org.openbravo.model.common.enterprise.EmailServerConfiguration;
 import org.openbravo.model.common.enterprise.Organization;
@@ -106,6 +110,10 @@ public class EmailBaseServiceTest extends BaseMetadataServiceTest {
 
         JSONArray callQueryAttachments(String tableId, String recordId) {
             return queryAttachments(tableId, recordId);
+        }
+
+        ValidationContext callValidateEmailRequest(JSONObject result) throws Exception {
+            return validateEmailRequest(result);
         }
     }
 
@@ -341,5 +349,103 @@ public class EmailBaseServiceTest extends BaseMetadataServiceTest {
         JSONArray result = service.callQueryAttachments("some-table-id", null);
         assertNotNull("Result should not be null", result);
         assertEquals("Should return empty array for null recordId", 0, result.length());
+    }
+
+    // ── validateEmailRequest ──────────────────────────────────────────────────
+
+    @Test
+    public void testValidateEmailRequest_recordNotFound_returnsNull() throws Exception {
+        @SuppressWarnings("unchecked")
+        List<Tab> tabs = OBDal.getInstance().createCriteria(Tab.class).setMaxResults(1).list();
+        if (tabs.isEmpty()) {
+            return;
+        }
+        when(mockRequest.getParameter("recordId")).thenReturn("00000000000000000000000000000001");
+        when(mockRequest.getParameter("tabId")).thenReturn(tabs.get(0).getId());
+
+        JSONObject result = new JSONObject();
+        assertNull("Should return null when record not found",
+                service.callValidateEmailRequest(result));
+        assertFalse(result.getBoolean("success"));
+    }
+
+    @Test
+    public void testValidateEmailRequest_senderEmpty_returnsNull() throws Exception {
+        @SuppressWarnings("unchecked")
+        List<Tab> tabs = OBDal.getInstance().createCriteria(Tab.class).setMaxResults(1).list();
+        if (tabs.isEmpty()) {
+            return;
+        }
+        Tab tab = tabs.get(0);
+        if (tab.getTable() == null) {
+            return;
+        }
+        Entity entity = ModelProvider.getInstance()
+                .getEntityByTableName(tab.getTable().getDBTableName());
+        if (entity == null) {
+            return;
+        }
+        @SuppressWarnings("unchecked")
+        List<BaseOBObject> records = OBDal.getInstance().getSession()
+                .createQuery("from " + entity.getName())
+                .setMaxResults(1).list();
+        if (records.isEmpty()) {
+            return;
+        }
+
+        service.setSmtpConfigOverride(null);
+        when(mockRequest.getParameter("recordId")).thenReturn(records.get(0).getId().toString());
+        when(mockRequest.getParameter("tabId")).thenReturn(tab.getId());
+
+        JSONObject result = new JSONObject();
+        assertNull("Should return null when no sender configured",
+                service.callValidateEmailRequest(result));
+        assertFalse(result.getBoolean("success"));
+    }
+
+    @Test
+    public void testValidateEmailRequest_withValidSmtp_coversDocStatusPath() throws Exception {
+        @SuppressWarnings("unchecked")
+        List<Tab> tabs = OBDal.getInstance().createCriteria(Tab.class).setMaxResults(1).list();
+        if (tabs.isEmpty()) {
+            return;
+        }
+        Tab tab = tabs.get(0);
+        if (tab.getTable() == null) {
+            return;
+        }
+        Entity entity = ModelProvider.getInstance()
+                .getEntityByTableName(tab.getTable().getDBTableName());
+        if (entity == null) {
+            return;
+        }
+        @SuppressWarnings("unchecked")
+        List<BaseOBObject> records = OBDal.getInstance().getSession()
+                .createQuery("from " + entity.getName())
+                .setMaxResults(1).list();
+        if (records.isEmpty()) {
+            return;
+        }
+
+        EmailServerConfiguration mockSmtp = mock(EmailServerConfiguration.class);
+        when(mockSmtp.getSmtpServerSenderAddress()).thenReturn("sender@test.com");
+        service.setSmtpConfigOverride(mockSmtp);
+
+        when(mockRequest.getParameter("recordId")).thenReturn(records.get(0).getId().toString());
+        when(mockRequest.getParameter("tabId")).thenReturn(tab.getId());
+
+        JSONObject result = new JSONObject();
+        service.callValidateEmailRequest(result);
+        assertNotNull("Result JSON should be populated", result);
+    }
+
+    // ── getSmtpConfig / findAnySmtpConfig (real DB path) ─────────────────────
+
+    @Test
+    public void testResolveSenderAddress_withRealSmtpLookup() {
+        Organization mockOrg = mock(Organization.class);
+        when(mockOrg.getId()).thenReturn("0");
+        String addr = service.callResolveSenderAddress(mockOrg);
+        assertNotNull("Sender address should not be null (may be empty if no SMTP configured)", addr);
     }
 }

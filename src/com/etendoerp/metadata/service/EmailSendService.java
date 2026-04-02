@@ -183,7 +183,7 @@ public class EmailSendService extends EmailBaseService {
         }
     }
 
-    private boolean restrictPermissions(File file) {
+    protected boolean restrictPermissions(File file) {
         boolean ok = file.setReadable(false, false);
         ok &= file.setWritable(false, false);
         ok &= file.setExecutable(false, false);
@@ -251,7 +251,7 @@ public class EmailSendService extends EmailBaseService {
     }
 
     @SuppressWarnings("unchecked")
-    private List<File> getFilesFromAttachments(List<String> recordAttachmentIds) {
+    protected List<File> getFilesFromAttachments(List<String> recordAttachmentIds) {
         List<File> recordFiles = new ArrayList<>();
         if (recordAttachmentIds.isEmpty()) return recordFiles;
         try {
@@ -324,7 +324,7 @@ public class EmailSendService extends EmailBaseService {
         }
     }
 
-    private void processFormField(FileItem item, Map<String, String> params,
+    protected void processFormField(FileItem item, Map<String, String> params,
             List<String> recordAttachmentIds) throws Exception {
         if ("recordAttachmentId".equals(item.getFieldName())) {
             String val = item.getString("UTF-8");
@@ -334,7 +334,7 @@ public class EmailSendService extends EmailBaseService {
         }
     }
 
-    private void processUploadedFile(FileItem item, List<File> tempFiles, Path tempDir) throws Exception {
+    protected void processUploadedFile(FileItem item, List<File> tempFiles, Path tempDir) throws Exception {
         String fileName = item.getName();
         if (item.getFieldName() != null && item.getFieldName().startsWith("attachment")
                 && fileName != null && !fileName.trim().isEmpty()) {

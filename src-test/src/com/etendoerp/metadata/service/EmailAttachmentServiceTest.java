@@ -21,12 +21,15 @@ import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
 
 import java.io.IOException;
+import java.util.List;
 
 import javax.servlet.ServletException;
 
 import org.codehaus.jettison.json.JSONObject;
 import org.junit.Before;
 import org.junit.Test;
+import org.openbravo.dal.service.OBDal;
+import org.openbravo.model.ad.ui.Tab;
 
 import com.etendoerp.metadata.MetadataTestConstants;
 
@@ -102,6 +105,28 @@ public class EmailAttachmentServiceTest extends BaseMetadataServiceTest {
         try {
             JSONObject json = new JSONObject(output);
             assertFalse(json.getBoolean(KEY_SUCCESS));
+        } catch (Exception e) {
+            fail(INVALID_JSON_MSG + e.getMessage());
+        }
+    }
+
+    @Test
+    public void testProcessWithRealTab_returnsAttachments() throws IOException, ServletException {
+        @SuppressWarnings("unchecked")
+        List<Tab> tabs = OBDal.getInstance().createCriteria(Tab.class).setMaxResults(1).list();
+        if (tabs.isEmpty()) {
+            return;
+        }
+        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn("some-record-id");
+        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(tabs.get(0).getId());
+
+        emailAttachmentService.process();
+        String output = responseWriter.toString();
+
+        try {
+            JSONObject json = new JSONObject(output);
+            assertTrue("Success should be true when tab exists", json.getBoolean(KEY_SUCCESS));
+            assertTrue("Should have attachments key", json.has("attachments"));
         } catch (Exception e) {
             fail(INVALID_JSON_MSG + e.getMessage());
         }
