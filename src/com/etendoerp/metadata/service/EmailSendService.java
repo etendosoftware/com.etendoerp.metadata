@@ -230,7 +230,7 @@ public class EmailSendService extends EmailBaseService {
 
     // ── Email sending ──────────────────────────────────────────────────────────
 
-    private void sendEmail(Map<String, String> params, List<String> recordAttachmentIds,
+    protected void sendEmail(Map<String, String> params, List<String> recordAttachmentIds,
             List<File> tempFiles, EmailServerConfiguration emailConfig) throws Exception {
         List<File> allAttachments = new ArrayList<>(tempFiles);
         allAttachments.addAll(getFilesFromAttachments(recordAttachmentIds));

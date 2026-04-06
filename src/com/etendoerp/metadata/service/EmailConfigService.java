@@ -173,7 +173,7 @@ public class EmailConfigService extends EmailBaseService {
         }
     }
 
-    private JSONArray getTemplatesJson(TemplateData[] templateData) throws Exception {
+    protected JSONArray getTemplatesJson(TemplateData[] templateData) throws Exception {
         JSONArray templates = new JSONArray();
         for (TemplateData tpl : templateData) {
             JSONObject tplJson = new JSONObject();
@@ -184,7 +184,7 @@ public class EmailConfigService extends EmailBaseService {
         return templates;
     }
 
-    private JSONObject loadEmailDefinition(ConnectionProvider conn, String docTypeId,
+    protected JSONObject loadEmailDefinition(ConnectionProvider conn, String docTypeId,
             Organization org, TemplateData[] templateData) {
         if (templateData.length == 0) return null;
         try {
