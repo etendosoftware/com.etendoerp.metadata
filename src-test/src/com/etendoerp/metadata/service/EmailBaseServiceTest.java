@@ -52,6 +52,9 @@ public class EmailBaseServiceTest extends BaseMetadataServiceTest {
     private static final String PROP_DOC_STATUS   = "documentStatus";
     private static final String PROP_DOCSTATUS    = "docstatus";
     private static final String PROP_ORGANIZATION = "organization";
+    private static final String PARAM_RECORD_ID   = "recordId";
+    private static final String PARAM_TAB_ID      = "tabId";
+    private static final String SENDER_TEST_EMAIL = "sender@test.com";
 
     /** Minimal concrete subclass that exposes protected helpers for direct testing. */
     private static class StubEmailService extends EmailBaseService {
@@ -214,8 +217,8 @@ public class EmailBaseServiceTest extends BaseMetadataServiceTest {
     public void testHandleServiceError_writerThrows_propagatesIOException()
             throws IOException, ServletException {
         when(mockResponse.getWriter()).thenThrow(new IOException("Writer unavailable"));
-        when(mockRequest.getParameter("recordId")).thenReturn(null);
-        when(mockRequest.getParameter("tabId")).thenReturn(null);
+        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(null);
+        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(null);
 
         EmailService emailService = new EmailService(mockRequest, mockResponse);
         try {
@@ -242,13 +245,13 @@ public class EmailBaseServiceTest extends BaseMetadataServiceTest {
         Organization org  = mock(Organization.class);
 
         EmailBaseService.ValidationContext ctx =
-                new EmailBaseService.ValidationContext(tab, rec, org, "sender@test.com", "rec-123");
+                new EmailBaseService.ValidationContext(tab, rec, org, SENDER_TEST_EMAIL, "rec-123");
 
         assertSame("tab",     tab,  ctx.getTab());
         assertSame("record",  rec,  ctx.getDataRecord());
         assertSame("org",     org,  ctx.getOrg());
-        assertEquals("senderAddress", "sender@test.com", ctx.getSenderAddress());
-        assertEquals("recordId",      "rec-123",          ctx.getRecordId());
+        assertEquals("senderAddress", SENDER_TEST_EMAIL, ctx.getSenderAddress());
+        assertEquals(PARAM_RECORD_ID,  "rec-123",         ctx.getRecordId());
     }
 
     // ── process with unhandled exception in executeEmailAction ────────────────
@@ -360,8 +363,8 @@ public class EmailBaseServiceTest extends BaseMetadataServiceTest {
         if (tabs.isEmpty()) {
             return;
         }
-        when(mockRequest.getParameter("recordId")).thenReturn("00000000000000000000000000000001");
-        when(mockRequest.getParameter("tabId")).thenReturn(tabs.get(0).getId());
+        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn("00000000000000000000000000000001");
+        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(tabs.get(0).getId());
 
         JSONObject result = new JSONObject();
         assertNull("Should return null when record not found",
@@ -394,8 +397,8 @@ public class EmailBaseServiceTest extends BaseMetadataServiceTest {
         }
 
         service.setSmtpConfigOverride(null);
-        when(mockRequest.getParameter("recordId")).thenReturn(records.get(0).getId().toString());
-        when(mockRequest.getParameter("tabId")).thenReturn(tab.getId());
+        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(records.get(0).getId().toString());
+        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(tab.getId());
 
         JSONObject result = new JSONObject();
         assertNull("Should return null when no sender configured",
@@ -428,11 +431,11 @@ public class EmailBaseServiceTest extends BaseMetadataServiceTest {
         }
 
         EmailServerConfiguration mockSmtp = mock(EmailServerConfiguration.class);
-        when(mockSmtp.getSmtpServerSenderAddress()).thenReturn("sender@test.com");
+        when(mockSmtp.getSmtpServerSenderAddress()).thenReturn(SENDER_TEST_EMAIL);
         service.setSmtpConfigOverride(mockSmtp);
 
-        when(mockRequest.getParameter("recordId")).thenReturn(records.get(0).getId().toString());
-        when(mockRequest.getParameter("tabId")).thenReturn(tab.getId());
+        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(records.get(0).getId().toString());
+        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(tab.getId());
 
         JSONObject result = new JSONObject();
         service.callValidateEmailRequest(result);

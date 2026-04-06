@@ -262,7 +262,7 @@ public class EmailSendServiceTest extends BaseMetadataServiceTest {
             assertEquals("Temp file should be added", 1, tempFiles.size());
         } finally {
             for (File f : tempFiles) {
-                try { Files.deleteIfExists(f.toPath()); } catch (Exception ignored) {}
+                try { Files.deleteIfExists(f.toPath()); } catch (Exception ignored) { /* cleanup failure should not fail the test */ }
             }
             Files.deleteIfExists(tempDir);
         }
