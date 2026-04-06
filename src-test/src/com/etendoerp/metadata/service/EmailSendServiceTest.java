@@ -39,6 +39,7 @@ import java.util.Set;
 
 import org.apache.commons.fileupload.FileItem;
 import org.codehaus.jettison.json.JSONObject;
+import org.openbravo.model.ad.ui.Tab;
 import org.junit.Before;
 import org.junit.Test;
 

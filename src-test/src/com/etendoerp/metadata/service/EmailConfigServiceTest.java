@@ -86,7 +86,7 @@ public class EmailConfigServiceTest extends BaseMetadataServiceTest {
     }
 
     @Test
-    public void testProcessMissingParameters() throws IOException, javax.servlet.ServletException {
+    public void testProcessMissingParameters() throws Exception {
         when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(null);
         when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(null);
 
@@ -98,7 +98,7 @@ public class EmailConfigServiceTest extends BaseMetadataServiceTest {
     }
 
     @Test
-    public void testProcessTabNotFound() throws IOException, javax.servlet.ServletException {
+    public void testProcessTabNotFound() throws Exception {
         when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn("some-record-id");
         when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn("non-existent-tab-id");
 
@@ -110,7 +110,7 @@ public class EmailConfigServiceTest extends BaseMetadataServiceTest {
     }
 
     @Test
-    public void testProcessMissingTabIdOnly() throws IOException, javax.servlet.ServletException {
+    public void testProcessMissingTabIdOnly() throws Exception {
         when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn("some-record-id");
         when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(null);
 
