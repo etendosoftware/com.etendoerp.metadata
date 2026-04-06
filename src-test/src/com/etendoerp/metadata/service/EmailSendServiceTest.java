@@ -27,11 +27,15 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileAttribute;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.commons.fileupload.FileItem;
 import org.codehaus.jettison.json.JSONObject;
@@ -211,7 +215,9 @@ public class EmailSendServiceTest extends BaseMetadataServiceTest {
 
     @Test
     public void testProcessUploadedFile_validAttachment_addsToTempFiles() throws Exception {
-        Path tempDir = Files.createTempDirectory("test_email_send_");
+        FileAttribute<Set<PosixFilePermission>> ownerOnly =
+                PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------"));
+        Path tempDir = Files.createTempDirectory("test_email_send_", ownerOnly);
         List<File> tempFiles = new ArrayList<>();
         try {
             FileItem mockItem = mock(FileItem.class);
@@ -231,7 +237,9 @@ public class EmailSendServiceTest extends BaseMetadataServiceTest {
 
     @Test
     public void testProcessUploadedFile_nonAttachmentField_notAdded() throws Exception {
-        Path tempDir = Files.createTempDirectory("test_email_send_");
+        FileAttribute<Set<PosixFilePermission>> ownerOnly =
+                PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------"));
+        Path tempDir = Files.createTempDirectory("test_email_send_", ownerOnly);
         try {
             FileItem mockItem = mock(FileItem.class);
             when(mockItem.getFieldName()).thenReturn("notes");
@@ -250,7 +258,9 @@ public class EmailSendServiceTest extends BaseMetadataServiceTest {
 
     @Test
     public void testRestrictPermissions_ownerOnly() throws Exception {
-        Path tmpFile = Files.createTempFile("test_restrict_", ".tmp");
+        FileAttribute<Set<PosixFilePermission>> ownerOnly =
+                PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------"));
+        Path tmpFile = Files.createTempFile("test_restrict_", ".tmp", ownerOnly);
         try {
             boolean result = emailSendService.restrictPermissions(tmpFile.toFile());
             assertNotNull("restrictPermissions should return a result", result);
