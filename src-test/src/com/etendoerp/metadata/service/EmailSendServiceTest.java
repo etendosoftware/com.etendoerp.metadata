@@ -97,6 +97,10 @@ public class EmailSendServiceTest extends BaseMetadataServiceTest {
     private static final String SAMPLE_SUBJECT            = "Test Subject";
     private static final String ENCODING_UTF8             = "UTF-8";
     private static final String FIELD_RECORD_ATTACHMENT   = "recordAttachmentId";
+    private static final String FIELD_ATTACHMENT_PREFIX   = "attachment1";
+    private static final String TEMP_DIR_PREFIX           = "test_email_send_";
+    private static final String POSIX_OWNER_RWX           = "rwx------";
+    private static final String DEST_EMAIL                = "dest@test.com";
 
     private EmailSendService emailSendService;
 
@@ -257,12 +261,12 @@ public class EmailSendServiceTest extends BaseMetadataServiceTest {
     @Test
     public void testProcessUploadedFile_validAttachment_addsToTempFiles() throws Exception {
         FileAttribute<Set<PosixFilePermission>> ownerOnly =
-                PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------"));
-        Path tempDir = Files.createTempDirectory("test_email_send_", ownerOnly);
+                PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString(POSIX_OWNER_RWX));
+        Path tempDir = Files.createTempDirectory(TEMP_DIR_PREFIX, ownerOnly);
         List<File> tempFiles = new ArrayList<>();
         try {
             FileItem mockItem = mock(FileItem.class);
-            when(mockItem.getFieldName()).thenReturn("attachment1");
+            when(mockItem.getFieldName()).thenReturn(FIELD_ATTACHMENT_PREFIX);
             when(mockItem.getName()).thenReturn("document.pdf");
 
             emailSendService.processUploadedFile(mockItem, tempFiles, tempDir);
@@ -279,8 +283,8 @@ public class EmailSendServiceTest extends BaseMetadataServiceTest {
     @Test
     public void testProcessUploadedFile_nonAttachmentField_notAdded() throws Exception {
         FileAttribute<Set<PosixFilePermission>> ownerOnly =
-                PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------"));
-        Path tempDir = Files.createTempDirectory("test_email_send_", ownerOnly);
+                PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString(POSIX_OWNER_RWX));
+        Path tempDir = Files.createTempDirectory(TEMP_DIR_PREFIX, ownerOnly);
         try {
             FileItem mockItem = mock(FileItem.class);
             when(mockItem.getFieldName()).thenReturn("notes");
@@ -335,7 +339,7 @@ public class EmailSendServiceTest extends BaseMetadataServiceTest {
         if (ctx == null) return;
         when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn("00000000000000000000000000000001");
         when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(ctx.tab.getId());
-        when(mockRequest.getParameter(PARAM_TO)).thenReturn("dest@test.com");
+        when(mockRequest.getParameter(PARAM_TO)).thenReturn(DEST_EMAIL);
         when(mockRequest.getParameter(PARAM_SUBJECT)).thenReturn(SAMPLE_SUBJECT);
 
         emailSendService.process();
@@ -351,7 +355,7 @@ public class EmailSendServiceTest extends BaseMetadataServiceTest {
 
         when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(ctx.dataRecord.getId().toString());
         when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(ctx.tab.getId());
-        when(mockRequest.getParameter(PARAM_TO)).thenReturn("dest@test.com");
+        when(mockRequest.getParameter(PARAM_TO)).thenReturn(DEST_EMAIL);
         when(mockRequest.getParameter(PARAM_SUBJECT)).thenReturn(SAMPLE_SUBJECT);
 
         emailSendService.process();
@@ -374,7 +378,7 @@ public class EmailSendServiceTest extends BaseMetadataServiceTest {
 
         when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(ctx.dataRecord.getId().toString());
         when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(ctx.tab.getId());
-        when(mockRequest.getParameter(PARAM_TO)).thenReturn("dest@test.com");
+        when(mockRequest.getParameter(PARAM_TO)).thenReturn(DEST_EMAIL);
         when(mockRequest.getParameter(PARAM_SUBJECT)).thenReturn(SAMPLE_SUBJECT);
 
         testService.process();
@@ -396,7 +400,7 @@ public class EmailSendServiceTest extends BaseMetadataServiceTest {
 
         when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(ctx.dataRecord.getId().toString());
         when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(ctx.tab.getId());
-        when(mockRequest.getParameter(PARAM_TO)).thenReturn("dest@test.com");
+        when(mockRequest.getParameter(PARAM_TO)).thenReturn(DEST_EMAIL);
         when(mockRequest.getParameter(PARAM_SUBJECT)).thenReturn(SAMPLE_SUBJECT);
 
         testService.process();
@@ -407,11 +411,11 @@ public class EmailSendServiceTest extends BaseMetadataServiceTest {
     @Test
     public void testProcessUploadedFile_nullFileName_notAdded() throws Exception {
         FileAttribute<Set<PosixFilePermission>> ownerOnly =
-                PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------"));
-        Path tempDir = Files.createTempDirectory("test_email_send_", ownerOnly);
+                PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString(POSIX_OWNER_RWX));
+        Path tempDir = Files.createTempDirectory(TEMP_DIR_PREFIX, ownerOnly);
         try {
             FileItem mockItem = mock(FileItem.class);
-            when(mockItem.getFieldName()).thenReturn("attachment1");
+            when(mockItem.getFieldName()).thenReturn(FIELD_ATTACHMENT_PREFIX);
             when(mockItem.getName()).thenReturn(null);
 
             List<File> tempFiles = new ArrayList<>();
@@ -426,11 +430,11 @@ public class EmailSendServiceTest extends BaseMetadataServiceTest {
     @Test
     public void testProcessUploadedFile_blankFileName_notAdded() throws Exception {
         FileAttribute<Set<PosixFilePermission>> ownerOnly =
-                PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------"));
-        Path tempDir = Files.createTempDirectory("test_email_send_", ownerOnly);
+                PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString(POSIX_OWNER_RWX));
+        Path tempDir = Files.createTempDirectory(TEMP_DIR_PREFIX, ownerOnly);
         try {
             FileItem mockItem = mock(FileItem.class);
-            when(mockItem.getFieldName()).thenReturn("attachment1");
+            when(mockItem.getFieldName()).thenReturn(FIELD_ATTACHMENT_PREFIX);
             when(mockItem.getName()).thenReturn("   ");
 
             List<File> tempFiles = new ArrayList<>();
