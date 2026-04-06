@@ -39,9 +39,15 @@ import java.util.Set;
 
 import org.apache.commons.fileupload.FileItem;
 import org.codehaus.jettison.json.JSONObject;
-import org.openbravo.model.ad.ui.Tab;
 import org.junit.Before;
 import org.junit.Test;
+import org.openbravo.base.exception.OBException;
+import org.openbravo.model.ad.ui.Tab;
+import org.openbravo.model.common.enterprise.EmailServerConfiguration;
+import org.openbravo.model.common.enterprise.Organization;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
 import com.etendoerp.metadata.MetadataTestConstants;
 
@@ -49,6 +55,40 @@ import com.etendoerp.metadata.MetadataTestConstants;
  * Test class for {@link EmailSendService}.
  */
 public class EmailSendServiceTest extends BaseMetadataServiceTest {
+
+    /**
+     * Subclass that bypasses SMTP lookup and actual email sending,
+     * allowing the full {@link EmailSendService#process()} path to be exercised.
+     */
+    private static class TestableEmailSendService extends EmailSendService {
+
+        private final EmailServerConfiguration smtpConfig;
+        private boolean throwOnSend;
+
+        TestableEmailSendService(HttpServletRequest req, HttpServletResponse res,
+                EmailServerConfiguration config) {
+            super(req, res);
+            this.smtpConfig   = config;
+            this.throwOnSend  = false;
+        }
+
+        void setThrowOnSend(boolean throwOnSend) {
+            this.throwOnSend = throwOnSend;
+        }
+
+        @Override
+        protected EmailServerConfiguration getSmtpConfig(Organization org) {
+            return smtpConfig;
+        }
+
+        @Override
+        protected void sendEmail(Map<String, String> params, List<String> recordAttachmentIds,
+                List<File> tempFiles, EmailServerConfiguration emailConfig) throws Exception {
+            if (throwOnSend) {
+                throw new OBException("Simulated SMTP failure");
+            }
+        }
+    }
 
     private static final String PARAM_SUBJECT             = "subject";
     private static final String PARAM_TO                  = "to";
@@ -317,5 +357,88 @@ public class EmailSendServiceTest extends BaseMetadataServiceTest {
         emailSendService.process();
         assertFalse("Success should be false when no SMTP sender is configured",
                 parseJsonResponse(responseWriter.toString()).getBoolean(KEY_SUCCESS));
+    }
+
+    // ── success and exception paths via TestableEmailSendService ─────────────
+
+    @Test
+    public void testProcess_successPath_withMockedSmtpAndSend() throws Exception {
+        TabRecordContext ctx = findFirstTabWithRecord();
+        if (ctx == null) return;
+
+        EmailServerConfiguration mockSmtp = mock(EmailServerConfiguration.class);
+        when(mockSmtp.getSmtpServerSenderAddress()).thenReturn("sender@test.com");
+
+        TestableEmailSendService testService =
+                new TestableEmailSendService(mockRequest, mockResponse, mockSmtp);
+
+        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(ctx.dataRecord.getId().toString());
+        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(ctx.tab.getId());
+        when(mockRequest.getParameter(PARAM_TO)).thenReturn("dest@test.com");
+        when(mockRequest.getParameter(PARAM_SUBJECT)).thenReturn(SAMPLE_SUBJECT);
+
+        testService.process();
+        assertTrue("Success should be true when email is sent",
+                parseJsonResponse(responseWriter.toString()).getBoolean(KEY_SUCCESS));
+    }
+
+    @Test
+    public void testProcess_sendEmailThrows_writesErrorResponse() throws Exception {
+        TabRecordContext ctx = findFirstTabWithRecord();
+        if (ctx == null) return;
+
+        EmailServerConfiguration mockSmtp = mock(EmailServerConfiguration.class);
+        when(mockSmtp.getSmtpServerSenderAddress()).thenReturn("sender@test.com");
+
+        TestableEmailSendService testService =
+                new TestableEmailSendService(mockRequest, mockResponse, mockSmtp);
+        testService.setThrowOnSend(true);
+
+        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(ctx.dataRecord.getId().toString());
+        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(ctx.tab.getId());
+        when(mockRequest.getParameter(PARAM_TO)).thenReturn("dest@test.com");
+        when(mockRequest.getParameter(PARAM_SUBJECT)).thenReturn(SAMPLE_SUBJECT);
+
+        testService.process();
+        assertFalse("Success should be false when sendEmail throws",
+                parseJsonResponse(responseWriter.toString()).getBoolean(KEY_SUCCESS));
+    }
+
+    @Test
+    public void testProcessUploadedFile_nullFileName_notAdded() throws Exception {
+        FileAttribute<Set<PosixFilePermission>> ownerOnly =
+                PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------"));
+        Path tempDir = Files.createTempDirectory("test_email_send_", ownerOnly);
+        try {
+            FileItem mockItem = mock(FileItem.class);
+            when(mockItem.getFieldName()).thenReturn("attachment1");
+            when(mockItem.getName()).thenReturn(null);
+
+            List<File> tempFiles = new ArrayList<>();
+            emailSendService.processUploadedFile(mockItem, tempFiles, tempDir);
+
+            assertTrue("Null file name should not add temp file", tempFiles.isEmpty());
+        } finally {
+            Files.deleteIfExists(tempDir);
+        }
+    }
+
+    @Test
+    public void testProcessUploadedFile_blankFileName_notAdded() throws Exception {
+        FileAttribute<Set<PosixFilePermission>> ownerOnly =
+                PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------"));
+        Path tempDir = Files.createTempDirectory("test_email_send_", ownerOnly);
+        try {
+            FileItem mockItem = mock(FileItem.class);
+            when(mockItem.getFieldName()).thenReturn("attachment1");
+            when(mockItem.getName()).thenReturn("   ");
+
+            List<File> tempFiles = new ArrayList<>();
+            emailSendService.processUploadedFile(mockItem, tempFiles, tempDir);
+
+            assertTrue("Blank file name should not add temp file", tempFiles.isEmpty());
+        } finally {
+            Files.deleteIfExists(tempDir);
+        }
     }
 }

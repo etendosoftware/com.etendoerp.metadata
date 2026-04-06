@@ -298,4 +298,34 @@ public class EmailConfigServiceTest extends BaseMetadataServiceTest {
         testService.process();
         assertNotNull("Response should be valid JSON", parseJsonResponse(responseWriter.toString()));
     }
+
+    /**
+     * Tests {@link EmailConfigService#loadEmailDefinition} when {@code templateData} is empty —
+     * verifies that the method returns {@code null} without throwing.
+     */
+    @Test
+    public void testLoadEmailDefinition_emptyTemplates_returnsNull() {
+        JSONObject result = emailConfigService.loadEmailDefinition(null, "any-doc-type",
+                mock(Organization.class), new org.openbravo.erpCommon.utility.reporting.TemplateData[0]);
+        assertNull("Should return null for empty template array", result);
+    }
+
+    /**
+     * Tests {@link EmailConfigService#getTemplatesJson} with a non-empty array —
+     * verifies that each template is serialized with 'id' and 'name'.
+     */
+    @Test
+    public void testGetTemplatesJson_withTemplates() throws Exception {
+        org.openbravo.erpCommon.utility.reporting.TemplateData tpl =
+                new org.openbravo.erpCommon.utility.reporting.TemplateData();
+        tpl.id   = "tpl-001";
+        tpl.name = "Invoice Template";
+
+        org.codehaus.jettison.json.JSONArray templates = emailConfigService.getTemplatesJson(
+                new org.openbravo.erpCommon.utility.reporting.TemplateData[]{ tpl });
+
+        assertEquals("Should have one template", 1, templates.length());
+        assertEquals("tpl-001", templates.getJSONObject(0).getString("id"));
+        assertEquals("Invoice Template", templates.getJSONObject(0).getString("name"));
+    }
 }
