@@ -46,6 +46,8 @@ import org.openbravo.model.ad.ui.Tab;
 import org.openbravo.model.common.enterprise.EmailServerConfiguration;
 import org.openbravo.model.common.enterprise.Organization;
 
+import javax.servlet.ReadListener;
+import javax.servlet.ServletInputStream;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
@@ -449,5 +451,59 @@ public class EmailSendServiceTest extends BaseMetadataServiceTest {
     @Test
     public void testGetFallbackErrorMessage_returnsExpected() {
         assertEquals("Failed to send email.", emailSendService.getFallbackErrorMessage());
+    }
+
+    // ── cleanupTempFiles (direct test via protected visibility) ─────────────────
+
+    @Test
+    public void testCleanupTempFiles_deletesFilesAndDir() throws Exception {
+        FileAttribute<Set<PosixFilePermission>> ownerOnly =
+                PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString(POSIX_OWNER_RWX));
+        Path tempDir = Files.createTempDirectory(TEMP_DIR_PREFIX, ownerOnly);
+        Path f1 = Files.createTempFile(tempDir, "cleanup1_", ".tmp");
+        Path f2 = Files.createTempFile(tempDir, "cleanup2_", ".tmp");
+
+        emailSendService.cleanupTempFiles(Arrays.asList(f1.toFile(), f2.toFile()), tempDir);
+
+        assertFalse("First temp file should be deleted", Files.exists(f1));
+        assertFalse("Second temp file should be deleted", Files.exists(f2));
+        assertFalse("Temp dir should be deleted", Files.exists(tempDir));
+    }
+
+    @Test
+    public void testCleanupTempFiles_nonExistentFile_doesNotThrow() {
+        File nonExistent = new File("/tmp/nonexistent_etp3511_" + System.nanoTime() + ".tmp");
+        // Should silently swallow the NoSuchFileException
+        emailSendService.cleanupTempFiles(Arrays.asList(nonExistent), null);
+    }
+
+    // ── extractMultipartParams via real multipart body ──────────────────────────
+
+    @Test
+    public void testProcess_realMultipartBody_parsesFormField() throws Exception {
+        String boundary = "testboundary3511";
+        String body = "--" + boundary + "\r\n"
+                + "Content-Disposition: form-data; name=\"" + PARAM_RECORD_ID + "\"\r\n\r\n"
+                + "some-rec-id\r\n"
+                + "--" + boundary + "--\r\n";
+        byte[] bytes = body.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+
+        when(mockRequest.getContentType())
+                .thenReturn("multipart/form-data; boundary=" + boundary);
+        when(mockRequest.getCharacterEncoding()).thenReturn(ENCODING_UTF8);
+        when(mockRequest.getContentLength()).thenReturn(bytes.length);
+        when(mockRequest.getInputStream()).thenReturn(new ServletInputStream() {
+            private int pos = 0;
+            @Override public int read() { return pos < bytes.length ? bytes[pos++] & 0xFF : -1; }
+            @Override public boolean isFinished() { return pos >= bytes.length; }
+            @Override public boolean isReady() { return true; }
+            @Override public void setReadListener(ReadListener l) { /* not used in tests */ }
+        });
+        // Remaining required params missing → validation fails after multipart parse
+        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(null);
+
+        emailSendService.process();
+        assertFalse("Validation should fail when required params are incomplete",
+                parseJsonResponse(responseWriter.toString()).getBoolean(KEY_SUCCESS));
     }
 }

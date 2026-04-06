@@ -280,7 +280,7 @@ public class EmailSendService extends EmailBaseService {
 
     // ── Cleanup ────────────────────────────────────────────────────────────────
 
-    private void cleanupTempFiles(List<File> tempFiles, Path tempDir) {
+    protected void cleanupTempFiles(List<File> tempFiles, Path tempDir) {
         for (File f : tempFiles) {
             try {
                 Files.delete(f.toPath());
