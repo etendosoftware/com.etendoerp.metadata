@@ -14,6 +14,7 @@ import java.math.BigDecimal;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
 
 import org.junit.Test;
 import org.mockito.MockedStatic;
@@ -75,6 +76,11 @@ public class CallAsyncProcessTest extends OBBaseTest {
         Warehouse warehouse = mock(Warehouse.class);
         OBContext obContext = mock(OBContext.class);
 
+        CallAsyncProcess callAsyncProcess = CallAsyncProcess.getInstance();
+        ExecutorService originalExecutor = callAsyncProcess.executorService;
+        ExecutorService mockExecutor = mock(ExecutorService.class);
+        callAsyncProcess.executorService = mockExecutor;
+
         try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
                 MockedStatic<OBProvider> obProviderStatic = mockStatic(OBProvider.class);
                 MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class)) {
@@ -119,7 +125,6 @@ public class CallAsyncProcessTest extends OBBaseTest {
             parameters.put(DECIMAL_PARAM, new BigDecimal("10.0"));
 
             // Execute
-            CallAsyncProcess callAsyncProcess = CallAsyncProcess.getInstance();
             ProcessInstance result = callAsyncProcess.callProcess(process, RECORD_ID, parameters, true);
 
             // Verify
@@ -143,6 +148,8 @@ public class CallAsyncProcessTest extends OBBaseTest {
             verify(obDal).flush();
 
             assertEquals(pInstance, result);
+        } finally {
+            callAsyncProcess.executorService = originalExecutor;
         }
     }
 
@@ -157,6 +164,11 @@ public class CallAsyncProcessTest extends OBBaseTest {
         Language language = mock(Language.class);
         Warehouse warehouse = mock(Warehouse.class);
         OBContext obContext = mock(OBContext.class);
+
+        CallAsyncProcess callAsyncProcess = CallAsyncProcess.getInstance();
+        ExecutorService originalExecutor = callAsyncProcess.executorService;
+        ExecutorService mockExecutor = mock(ExecutorService.class);
+        callAsyncProcess.executorService = mockExecutor;
 
         try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
                 MockedStatic<OBProvider> obProviderStatic = mockStatic(OBProvider.class);
@@ -192,12 +204,13 @@ public class CallAsyncProcessTest extends OBBaseTest {
             when(pInstance.getId()).thenReturn(PINSTANCE_ID);
 
             // Execute
-            CallAsyncProcess callAsyncProcess = CallAsyncProcess.getInstance();
             ProcessInstance result = callAsyncProcess.callProcess(process, null, null, true);
 
             // Verify
             verify(pInstance).setRecordID(ZERO_STRING);
             assertEquals(pInstance, result);
+        } finally {
+            callAsyncProcess.executorService = originalExecutor;
         }
     }
 }

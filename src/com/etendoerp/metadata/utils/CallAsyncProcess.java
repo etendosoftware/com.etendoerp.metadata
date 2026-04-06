@@ -47,7 +47,7 @@ public class CallAsyncProcess extends CallProcess {
   private static final Logger log = LogManager.getLogger(CallAsyncProcess.class);
   public static final String PROCESSING_MSG = "Processing in background...";
   private static CallAsyncProcess instance = new CallAsyncProcess();
-  private final ExecutorService executorService = Executors.newFixedThreadPool(10);
+  ExecutorService executorService = Executors.newFixedThreadPool(10);
 
   public static synchronized CallAsyncProcess getInstance() {
     return instance;
