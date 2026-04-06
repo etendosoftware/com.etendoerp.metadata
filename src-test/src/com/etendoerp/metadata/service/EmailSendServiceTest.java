@@ -445,4 +445,9 @@ public class EmailSendServiceTest extends BaseMetadataServiceTest {
             Files.deleteIfExists(tempDir);
         }
     }
+
+    @Test
+    public void testGetFallbackErrorMessage_returnsExpected() {
+        assertEquals("Failed to send email.", emailSendService.getFallbackErrorMessage());
+    }
 }

@@ -406,4 +406,40 @@ public class EmailBaseServiceTest extends BaseMetadataServiceTest {
         String addr = service.callResolveSenderAddress(mockOrg);
         assertNotNull("Sender address should not be null (may be empty if no SMTP configured)", addr);
     }
+
+    // ── validateEmailRequest: docStatus not CO/CL ─────────────────────────────
+
+    @Test
+    public void testValidateEmailRequest_docStatusDraft_returnsNull() throws Exception {
+        TabRecordContext ctx = findFirstTabWithRecord();
+        if (ctx == null) return;
+
+        EmailServerConfiguration mockSmtp = mock(EmailServerConfiguration.class);
+        when(mockSmtp.getSmtpServerSenderAddress()).thenReturn(SENDER_TEST_EMAIL);
+
+        // Override getDocumentStatus to simulate a document in Draft status
+        StubEmailService draftService = new StubEmailService(mockRequest, mockResponse) {
+            @Override
+            protected Object getDocumentStatus(BaseOBObject dataRecord) {
+                return "DR";
+            }
+        };
+        draftService.setSmtpConfigOverride(mockSmtp);
+
+        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(ctx.dataRecord.getId().toString());
+        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(ctx.tab.getId());
+
+        JSONObject result = new JSONObject();
+        assertNull("Should return null for non-complete document status",
+                draftService.callValidateEmailRequest(result));
+        assertFalse("Success should be false for draft document",
+                result.getBoolean(MetadataTestConstants.KEY_SUCCESS));
+    }
+
+    // ── getFallbackErrorMessage ───────────────────────────────────────────────
+
+    @Test
+    public void testGetFallbackErrorMessage_returnsExpected() {
+        assertEquals("Stub fallback error", service.getFallbackErrorMessage());
+    }
 }

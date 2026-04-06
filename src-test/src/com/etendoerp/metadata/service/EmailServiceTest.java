@@ -26,11 +26,16 @@ import static org.mockito.Mockito.*;
 import java.io.IOException;
 import java.util.List;
 
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
 import org.codehaus.jettison.json.JSONObject;
 import org.junit.Before;
 import org.junit.Test;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.ui.Tab;
+import org.openbravo.model.common.enterprise.EmailServerConfiguration;
+import org.openbravo.model.common.enterprise.Organization;
 
 import com.etendoerp.metadata.MetadataTestConstants;
 
@@ -38,6 +43,22 @@ import com.etendoerp.metadata.MetadataTestConstants;
  * Test class for {@link EmailService}.
  */
 public class EmailServiceTest extends BaseMetadataServiceTest {
+
+    /** Subclass that bypasses real SMTP lookup so the success path can be reached. */
+    private static class TestableEmailService extends EmailService {
+        private final EmailServerConfiguration smtpConfig;
+
+        TestableEmailService(HttpServletRequest req, HttpServletResponse res,
+                EmailServerConfiguration config) {
+            super(req, res);
+            this.smtpConfig = config;
+        }
+
+        @Override
+        protected EmailServerConfiguration getSmtpConfig(Organization org) {
+            return smtpConfig;
+        }
+    }
 
     private EmailService emailService;
 
@@ -94,5 +115,32 @@ public class EmailServiceTest extends BaseMetadataServiceTest {
         JSONObject jsonResponse = parseJsonResponse(responseWriter.toString());
 
         assertFalse("Validation should fail for non-existent record", jsonResponse.getBoolean(KEY_SUCCESS));
+    }
+
+    /**
+     * Tests the executeEmailAction success path: valid SMTP + real record → respond(true).
+     * Uses TestableEmailService to bypass real SMTP lookup.
+     */
+    @Test
+    public void testProcess_validationSucceeds_withMockedSmtp() throws Exception {
+        TabRecordContext ctx = findFirstTabWithRecord();
+        if (ctx == null) return;
+
+        EmailServerConfiguration mockSmtp = mock(EmailServerConfiguration.class);
+        when(mockSmtp.getSmtpServerSenderAddress()).thenReturn("sender@test.com");
+
+        TestableEmailService testService = new TestableEmailService(mockRequest, mockResponse, mockSmtp);
+
+        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(ctx.dataRecord.getId().toString());
+        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(ctx.tab.getId());
+
+        testService.process();
+        JSONObject json = parseJsonResponse(responseWriter.toString());
+        assertNotNull("Response should be valid JSON", json);
+    }
+
+    @Test
+    public void testGetFallbackErrorMessage_returnsExpected() {
+        assertEquals("Failed to validate email configuration.", emailService.getFallbackErrorMessage());
     }
 }

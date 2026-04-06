@@ -328,4 +328,38 @@ public class EmailConfigServiceTest extends BaseMetadataServiceTest {
         assertEquals("tpl-001", templates.getJSONObject(0).getString("id"));
         assertEquals("Invoice Template", templates.getJSONObject(0).getString("name"));
     }
+
+    /**
+     * Tests that when {@code tab.getWindow()} throws, {@code getRecordSubject} returns
+     * an empty string (exercises the catch branch in that private helper).
+     */
+    @Test
+    public void testPopulateEmailConfig_windowThrows_subjectFallsBackToEmpty() throws Exception {
+        Entity mockEntity = mock(Entity.class);
+        when(mockEntity.hasProperty(any(String.class))).thenReturn(false);
+
+        BaseOBObject mockRecord = mock(BaseOBObject.class);
+        when(mockRecord.getEntity()).thenReturn(mockEntity);
+
+        Tab mockTab = mock(Tab.class, RETURNS_DEEP_STUBS);
+        when(mockTab.getTable().getId()).thenReturn("600");
+        when(mockTab.getTable().getName()).thenReturn("TestTable");
+        when(mockTab.getWindow()).thenThrow(new RuntimeException("no window configured"));
+
+        Organization mockOrg = mock(Organization.class);
+
+        EmailBaseService.ValidationContext ctx =
+                new EmailBaseService.ValidationContext(mockTab, mockRecord, mockOrg, SENDER_ADDR, "rec-600");
+
+        JSONObject result = new JSONObject();
+        emailConfigService.populateEmailConfig(result, ctx);
+
+        assertTrue(MSG_SUCCESS_TRUE, result.getBoolean(KEY_SUCCESS));
+        assertEquals("subject should be empty when window lookup throws", "", result.getString("subject"));
+    }
+
+    @Test
+    public void testGetFallbackErrorMessage_returnsExpected() {
+        assertEquals("Failed to load email configuration.", emailConfigService.getFallbackErrorMessage());
+    }
 }

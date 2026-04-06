@@ -109,4 +109,9 @@ public class EmailAttachmentServiceTest extends BaseMetadataServiceTest {
         assertTrue("Success should be true when tab exists", json.getBoolean(KEY_SUCCESS));
         assertTrue("Should have attachments key", json.has("attachments"));
     }
+
+    @Test
+    public void testGetFallbackErrorMessage_returnsExpected() {
+        assertEquals("Failed to load attachments.", emailAttachmentService.getFallbackErrorMessage());
+    }
 }
