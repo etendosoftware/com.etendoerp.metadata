@@ -298,7 +298,7 @@ public class EmailSendServiceTest extends BaseMetadataServiceTest {
         TabRecordContext ctx = findFirstTabWithRecord();
         if (ctx == null) return;
 
-        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(ctx.record.getId().toString());
+        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(ctx.dataRecord.getId().toString());
         when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(ctx.tab.getId());
         when(mockRequest.getParameter(PARAM_TO)).thenReturn("dest@test.com");
         when(mockRequest.getParameter(PARAM_SUBJECT)).thenReturn(SAMPLE_SUBJECT);

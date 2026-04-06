@@ -292,7 +292,7 @@ public class EmailConfigServiceTest extends BaseMetadataServiceTest {
         TestableEmailConfigService testService =
                 new TestableEmailConfigService(mockRequest, mockResponse, mockSmtp);
 
-        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(ctx.record.getId().toString());
+        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(ctx.dataRecord.getId().toString());
         when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(ctx.tab.getId());
 
         testService.process();

@@ -371,7 +371,7 @@ public class EmailBaseServiceTest extends BaseMetadataServiceTest {
         if (ctx == null) return;
 
         service.setSmtpConfigOverride(null);
-        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(ctx.record.getId().toString());
+        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(ctx.dataRecord.getId().toString());
         when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(ctx.tab.getId());
 
         JSONObject result = new JSONObject();
@@ -389,7 +389,7 @@ public class EmailBaseServiceTest extends BaseMetadataServiceTest {
         when(mockSmtp.getSmtpServerSenderAddress()).thenReturn(SENDER_TEST_EMAIL);
         service.setSmtpConfigOverride(mockSmtp);
 
-        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(ctx.record.getId().toString());
+        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(ctx.dataRecord.getId().toString());
         when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(ctx.tab.getId());
 
         JSONObject result = new JSONObject();

@@ -122,12 +122,14 @@ public abstract class BaseMetadataServiceTest extends OBBaseTest {
      * Returned by {@link #findFirstTabWithRecord()}.
      */
     protected static class TabRecordContext {
+        /** The resolved {@link Tab} instance. */
         public final Tab tab;
-        public final BaseOBObject record;
+        /** The first {@link BaseOBObject} record found for the tab's entity. */
+        public final BaseOBObject dataRecord;
 
-        TabRecordContext(Tab tab, BaseOBObject record) {
-            this.tab    = tab;
-            this.record = record;
+        TabRecordContext(Tab tab, BaseOBObject dataRecord) {
+            this.tab        = tab;
+            this.dataRecord = dataRecord;
         }
     }
 
