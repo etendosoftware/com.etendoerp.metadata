@@ -566,6 +566,39 @@ class FieldBuilderTest {
     }
   }
 
+  @Test
+  void testGetHqlNameFallsBackWhenNotTableBased() throws Exception {
+    when(column.getTable()).thenReturn(table);
+    when(table.getDataOriginType()).thenReturn("HQL");
+    when(field.getName()).thenReturn("Test Field");
+
+    Method method = FieldBuilder.class.getDeclaredMethod("getHqlName", Field.class);
+    method.setAccessible(true);
+    String result = (String) method.invoke(null, field);
+
+    assertEquals("testField", result);
+  }
+
+  @Test
+  void testGetHqlNameFallsBackWhenHQLColumnNamesEmpty() throws Exception {
+    when(column.getTable()).thenReturn(table);
+    when(table.getDataOriginType()).thenReturn("Table");
+    when(table.getDBTableName()).thenReturn("test_table");
+    when(column.getDBColumnName()).thenReturn("test_column");
+    when(field.getName()).thenReturn("Test Field");
+
+    try (MockedStatic<DataSourceUtils> mockedDataSourceUtils = mockStatic(DataSourceUtils.class)) {
+      mockedDataSourceUtils.when(() -> DataSourceUtils.getHQLColumnName(true, "test_table", "test_column"))
+          .thenReturn(new String[0]);
+
+      Method method = FieldBuilder.class.getDeclaredMethod("getHqlName", Field.class);
+      method.setAccessible(true);
+      String result = (String) method.invoke(null, field);
+
+      assertEquals("testField", result);
+    }
+  }
+
   /**
    * Tests the private getHqlName method when an exception is thrown by
    * field.getColumn().

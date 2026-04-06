@@ -9,6 +9,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.openbravo.base.model.Entity;
+import org.openbravo.base.model.ModelProvider;
+import org.openbravo.base.model.Property;
 
 import javax.servlet.RequestDispatcher;
 import javax.servlet.ServletContext;
@@ -17,6 +20,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 import java.io.IOException;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -213,6 +217,90 @@ class ServiceFactoryTest {
     assertThrows(IOException.class, service::process);
   }
 
+
+  @Test
+  void handleLegacySessionSetsAttributeWhenAllParamsPresent() throws Exception {
+    HttpServletRequest req = mock(HttpServletRequest.class);
+    HttpServletResponse res = mock(HttpServletResponse.class);
+    HttpSession session = mock(HttpSession.class);
+    RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+    ServletContext context = mock(ServletContext.class);
+    Entity entity = mock(Entity.class);
+    Property idProp = mock(Property.class);
+    ModelProvider modelProvider = mock(ModelProvider.class);
+
+    when(req.getServletContext()).thenReturn(context);
+    when(context.getRequestDispatcher(LegacyPaths.USED_BY_LINK)).thenReturn(dispatcher);
+    when(req.getSession(true)).thenReturn(session);
+    when(req.getParameter("windowId")).thenReturn("143");
+    when(req.getParameter("entityName")).thenReturn("Order");
+    when(req.getParameter("recordId")).thenReturn("RECORD_1");
+    when(entity.getIdProperties()).thenReturn(List.of(idProp));
+    when(idProp.getColumnName()).thenReturn("C_Order_ID");
+
+    try (MockedStatic<ModelProvider> staticModelProvider = mockStatic(ModelProvider.class)) {
+      staticModelProvider.when(ModelProvider::getInstance).thenReturn(modelProvider);
+      when(modelProvider.getEntity("Order")).thenReturn(entity);
+
+      MetadataService service = invokeBuildLegacyForwardService(req, res, LegacyPaths.USED_BY_LINK);
+      service.process();
+
+      verify(session).setAttribute("143|C_Order_ID", "RECORD_1");
+      verify(dispatcher).forward(req, res);
+    }
+  }
+
+  @Test
+  void handleLegacySessionSkipsWhenEntityNotFound() throws Exception {
+    HttpServletRequest req = mock(HttpServletRequest.class);
+    HttpServletResponse res = mock(HttpServletResponse.class);
+    RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+    ServletContext context = mock(ServletContext.class);
+    ModelProvider modelProvider = mock(ModelProvider.class);
+
+    when(req.getServletContext()).thenReturn(context);
+    when(context.getRequestDispatcher(LegacyPaths.USED_BY_LINK)).thenReturn(dispatcher);
+    when(req.getParameter("windowId")).thenReturn("143");
+    when(req.getParameter("entityName")).thenReturn("Unknown");
+    when(req.getParameter("recordId")).thenReturn("RECORD_1");
+
+    try (MockedStatic<ModelProvider> staticModelProvider = mockStatic(ModelProvider.class)) {
+      staticModelProvider.when(ModelProvider::getInstance).thenReturn(modelProvider);
+      when(modelProvider.getEntity("Unknown")).thenReturn(null);
+
+      MetadataService service = invokeBuildLegacyForwardService(req, res, LegacyPaths.USED_BY_LINK);
+      service.process();
+
+      verify(dispatcher).forward(req, res);
+    }
+  }
+
+  @Test
+  void handleLegacySessionSkipsWhenMultipleIdProperties() throws Exception {
+    HttpServletRequest req = mock(HttpServletRequest.class);
+    HttpServletResponse res = mock(HttpServletResponse.class);
+    RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+    ServletContext context = mock(ServletContext.class);
+    Entity entity = mock(Entity.class);
+    ModelProvider modelProvider = mock(ModelProvider.class);
+
+    when(req.getServletContext()).thenReturn(context);
+    when(context.getRequestDispatcher(LegacyPaths.USED_BY_LINK)).thenReturn(dispatcher);
+    when(req.getParameter("windowId")).thenReturn("143");
+    when(req.getParameter("entityName")).thenReturn("Order");
+    when(req.getParameter("recordId")).thenReturn("RECORD_1");
+    when(entity.getIdProperties()).thenReturn(List.of(mock(Property.class), mock(Property.class)));
+
+    try (MockedStatic<ModelProvider> staticModelProvider = mockStatic(ModelProvider.class)) {
+      staticModelProvider.when(ModelProvider::getInstance).thenReturn(modelProvider);
+      when(modelProvider.getEntity("Order")).thenReturn(entity);
+
+      MetadataService service = invokeBuildLegacyForwardService(req, res, LegacyPaths.USED_BY_LINK);
+      service.process();
+
+      verify(dispatcher).forward(req, res);
+    }
+  }
 
   /** Helper to create a mock HttpServletRequest with the specified path info. */
   private HttpServletRequest mockRequestWithPath(String path) {
