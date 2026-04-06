@@ -211,7 +211,7 @@ public class EmailBaseServiceTest extends BaseMetadataServiceTest {
 
     @Test
     public void testHandleServiceError_writerThrows_propagatesIOException()
-            throws IOException, ServletException {
+            throws Exception {
         when(mockResponse.getWriter()).thenThrow(new IOException("Writer unavailable"));
         when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(null);
         when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(null);
@@ -228,7 +228,7 @@ public class EmailBaseServiceTest extends BaseMetadataServiceTest {
     // ── process / template method lifecycle ──────────────────────────────────
 
     @Test
-    public void testProcess_completesWithoutError() throws IOException, ServletException {
+    public void testProcess_completesWithoutError() throws Exception {
         service.process();
     }
 
@@ -254,7 +254,7 @@ public class EmailBaseServiceTest extends BaseMetadataServiceTest {
 
     @Test
     public void testProcess_executeActionThrows_writesErrorResponse()
-            throws IOException, ServletException {
+            throws Exception {
         StringWriter sw = new StringWriter();
         when(mockResponse.getWriter()).thenReturn(new PrintWriter(sw));
 

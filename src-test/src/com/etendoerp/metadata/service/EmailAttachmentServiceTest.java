@@ -59,7 +59,7 @@ public class EmailAttachmentServiceTest extends BaseMetadataServiceTest {
     }
 
     @Test
-    public void testProcessMissingParameters() throws IOException, ServletException {
+    public void testProcessMissingParameters() throws Exception {
         when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(null);
         when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(null);
 
@@ -71,7 +71,7 @@ public class EmailAttachmentServiceTest extends BaseMetadataServiceTest {
     }
 
     @Test
-    public void testProcessTabNotFound() throws IOException, ServletException {
+    public void testProcessTabNotFound() throws Exception {
         when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn("some-record-id");
         when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn("non-existent-tab-id");
 
@@ -83,7 +83,7 @@ public class EmailAttachmentServiceTest extends BaseMetadataServiceTest {
     }
 
     @Test
-    public void testProcessMissingRecordIdOnly() throws IOException, ServletException {
+    public void testProcessMissingRecordIdOnly() throws Exception {
         when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(null);
         when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn("some-tab-id");
 
@@ -94,7 +94,7 @@ public class EmailAttachmentServiceTest extends BaseMetadataServiceTest {
     }
 
     @Test
-    public void testProcessWithRealTab_returnsAttachments() throws IOException, ServletException {
+    public void testProcessWithRealTab_returnsAttachments() throws Exception {
         @SuppressWarnings("unchecked")
         List<Tab> tabs = OBDal.getInstance().createCriteria(Tab.class).setMaxResults(1).list();
         if (tabs.isEmpty()) {
