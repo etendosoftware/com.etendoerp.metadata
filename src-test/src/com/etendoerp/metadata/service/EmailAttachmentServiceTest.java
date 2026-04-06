@@ -17,6 +17,9 @@
 
 package com.etendoerp.metadata.service;
 
+import static com.etendoerp.metadata.MetadataTestConstants.KEY_SUCCESS;
+import static com.etendoerp.metadata.MetadataTestConstants.PARAM_RECORD_ID;
+import static com.etendoerp.metadata.MetadataTestConstants.PARAM_TAB_ID;
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
 
@@ -37,11 +40,6 @@ import com.etendoerp.metadata.MetadataTestConstants;
  * Tests for {@link EmailAttachmentService}.
  */
 public class EmailAttachmentServiceTest extends BaseMetadataServiceTest {
-
-    private static final String PARAM_RECORD_ID  = "recordId";
-    private static final String PARAM_TAB_ID     = "tabId";
-    private static final String KEY_SUCCESS      = "success";
-    private static final String INVALID_JSON_MSG = "Response should be valid JSON: ";
 
     private EmailAttachmentService emailAttachmentService;
 
@@ -66,15 +64,10 @@ public class EmailAttachmentServiceTest extends BaseMetadataServiceTest {
         when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(null);
 
         emailAttachmentService.process();
-        String output = responseWriter.toString();
+        JSONObject json = parseJsonResponse(responseWriter.toString());
 
-        try {
-            JSONObject json = new JSONObject(output);
-            assertFalse("Success should be false for missing parameters", json.getBoolean(KEY_SUCCESS));
-            assertTrue("Should contain error message", json.has("message"));
-        } catch (Exception e) {
-            fail(INVALID_JSON_MSG + e.getMessage());
-        }
+        assertFalse("Success should be false for missing parameters", json.getBoolean(KEY_SUCCESS));
+        assertTrue("Should contain error message", json.has("message"));
     }
 
     @Test
@@ -83,15 +76,10 @@ public class EmailAttachmentServiceTest extends BaseMetadataServiceTest {
         when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn("non-existent-tab-id");
 
         emailAttachmentService.process();
-        String output = responseWriter.toString();
+        JSONObject json = parseJsonResponse(responseWriter.toString());
 
-        try {
-            JSONObject json = new JSONObject(output);
-            assertFalse("Success should be false for non-existent tab", json.getBoolean(KEY_SUCCESS));
-            assertEquals("Tab not found.", json.getString("message"));
-        } catch (Exception e) {
-            fail(INVALID_JSON_MSG + e.getMessage());
-        }
+        assertFalse("Success should be false for non-existent tab", json.getBoolean(KEY_SUCCESS));
+        assertEquals("Tab not found.", json.getString("message"));
     }
 
     @Test
@@ -100,14 +88,9 @@ public class EmailAttachmentServiceTest extends BaseMetadataServiceTest {
         when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn("some-tab-id");
 
         emailAttachmentService.process();
-        String output = responseWriter.toString();
+        JSONObject json = parseJsonResponse(responseWriter.toString());
 
-        try {
-            JSONObject json = new JSONObject(output);
-            assertFalse(json.getBoolean(KEY_SUCCESS));
-        } catch (Exception e) {
-            fail(INVALID_JSON_MSG + e.getMessage());
-        }
+        assertFalse(json.getBoolean(KEY_SUCCESS));
     }
 
     @Test
@@ -121,14 +104,9 @@ public class EmailAttachmentServiceTest extends BaseMetadataServiceTest {
         when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(tabs.get(0).getId());
 
         emailAttachmentService.process();
-        String output = responseWriter.toString();
+        JSONObject json = parseJsonResponse(responseWriter.toString());
 
-        try {
-            JSONObject json = new JSONObject(output);
-            assertTrue("Success should be true when tab exists", json.getBoolean(KEY_SUCCESS));
-            assertTrue("Should have attachments key", json.has("attachments"));
-        } catch (Exception e) {
-            fail(INVALID_JSON_MSG + e.getMessage());
-        }
+        assertTrue("Success should be true when tab exists", json.getBoolean(KEY_SUCCESS));
+        assertTrue("Should have attachments key", json.has("attachments"));
     }
 }

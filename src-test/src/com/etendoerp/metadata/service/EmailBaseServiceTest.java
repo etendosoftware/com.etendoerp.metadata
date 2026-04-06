@@ -17,13 +17,14 @@
 
 package com.etendoerp.metadata.service;
 
+import static com.etendoerp.metadata.MetadataTestConstants.PARAM_RECORD_ID;
+import static com.etendoerp.metadata.MetadataTestConstants.PARAM_TAB_ID;
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
 
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.util.List;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
@@ -34,10 +35,7 @@ import org.codehaus.jettison.json.JSONObject;
 import org.junit.Before;
 import org.junit.Test;
 import org.openbravo.base.exception.OBException;
-import org.openbravo.base.model.Entity;
-import org.openbravo.base.model.ModelProvider;
 import org.openbravo.base.structure.BaseOBObject;
-import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.ui.Tab;
 import org.openbravo.model.common.enterprise.EmailServerConfiguration;
 import org.openbravo.model.common.enterprise.Organization;
@@ -52,8 +50,6 @@ public class EmailBaseServiceTest extends BaseMetadataServiceTest {
     private static final String PROP_DOC_STATUS   = "documentStatus";
     private static final String PROP_DOCSTATUS    = "docstatus";
     private static final String PROP_ORGANIZATION = "organization";
-    private static final String PARAM_RECORD_ID   = "recordId";
-    private static final String PARAM_TAB_ID      = "tabId";
     private static final String SENDER_TEST_EMAIL = "sender@test.com";
 
     /** Minimal concrete subclass that exposes protected helpers for direct testing. */
@@ -358,84 +354,43 @@ public class EmailBaseServiceTest extends BaseMetadataServiceTest {
 
     @Test
     public void testValidateEmailRequest_recordNotFound_returnsNull() throws Exception {
-        @SuppressWarnings("unchecked")
-        List<Tab> tabs = OBDal.getInstance().createCriteria(Tab.class).setMaxResults(1).list();
-        if (tabs.isEmpty()) {
-            return;
-        }
+        TabRecordContext ctx = findFirstTabWithRecord();
+        if (ctx == null) return;
         when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn("00000000000000000000000000000001");
-        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(tabs.get(0).getId());
+        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(ctx.tab.getId());
 
         JSONObject result = new JSONObject();
         assertNull("Should return null when record not found",
                 service.callValidateEmailRequest(result));
-        assertFalse(result.getBoolean("success"));
+        assertFalse(result.getBoolean(MetadataTestConstants.KEY_SUCCESS));
     }
 
     @Test
     public void testValidateEmailRequest_senderEmpty_returnsNull() throws Exception {
-        @SuppressWarnings("unchecked")
-        List<Tab> tabs = OBDal.getInstance().createCriteria(Tab.class).setMaxResults(1).list();
-        if (tabs.isEmpty()) {
-            return;
-        }
-        Tab tab = tabs.get(0);
-        if (tab.getTable() == null) {
-            return;
-        }
-        Entity entity = ModelProvider.getInstance()
-                .getEntityByTableName(tab.getTable().getDBTableName());
-        if (entity == null) {
-            return;
-        }
-        @SuppressWarnings("unchecked")
-        List<BaseOBObject> records = OBDal.getInstance().getSession()
-                .createQuery("from " + entity.getName())
-                .setMaxResults(1).list();
-        if (records.isEmpty()) {
-            return;
-        }
+        TabRecordContext ctx = findFirstTabWithRecord();
+        if (ctx == null) return;
 
         service.setSmtpConfigOverride(null);
-        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(records.get(0).getId().toString());
-        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(tab.getId());
+        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(ctx.record.getId().toString());
+        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(ctx.tab.getId());
 
         JSONObject result = new JSONObject();
         assertNull("Should return null when no sender configured",
                 service.callValidateEmailRequest(result));
-        assertFalse(result.getBoolean("success"));
+        assertFalse(result.getBoolean(MetadataTestConstants.KEY_SUCCESS));
     }
 
     @Test
     public void testValidateEmailRequest_withValidSmtp_coversDocStatusPath() throws Exception {
-        @SuppressWarnings("unchecked")
-        List<Tab> tabs = OBDal.getInstance().createCriteria(Tab.class).setMaxResults(1).list();
-        if (tabs.isEmpty()) {
-            return;
-        }
-        Tab tab = tabs.get(0);
-        if (tab.getTable() == null) {
-            return;
-        }
-        Entity entity = ModelProvider.getInstance()
-                .getEntityByTableName(tab.getTable().getDBTableName());
-        if (entity == null) {
-            return;
-        }
-        @SuppressWarnings("unchecked")
-        List<BaseOBObject> records = OBDal.getInstance().getSession()
-                .createQuery("from " + entity.getName())
-                .setMaxResults(1).list();
-        if (records.isEmpty()) {
-            return;
-        }
+        TabRecordContext ctx = findFirstTabWithRecord();
+        if (ctx == null) return;
 
         EmailServerConfiguration mockSmtp = mock(EmailServerConfiguration.class);
         when(mockSmtp.getSmtpServerSenderAddress()).thenReturn(SENDER_TEST_EMAIL);
         service.setSmtpConfigOverride(mockSmtp);
 
-        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(records.get(0).getId().toString());
-        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(tab.getId());
+        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(ctx.record.getId().toString());
+        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(ctx.tab.getId());
 
         JSONObject result = new JSONObject();
         service.callValidateEmailRequest(result);

@@ -17,11 +17,13 @@
 
 package com.etendoerp.metadata.service;
 
+import static com.etendoerp.metadata.MetadataTestConstants.KEY_SUCCESS;
+import static com.etendoerp.metadata.MetadataTestConstants.PARAM_RECORD_ID;
+import static com.etendoerp.metadata.MetadataTestConstants.PARAM_TAB_ID;
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
 
 import java.io.IOException;
-import java.util.List;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -30,9 +32,7 @@ import org.codehaus.jettison.json.JSONObject;
 import org.junit.Before;
 import org.junit.Test;
 import org.openbravo.base.model.Entity;
-import org.openbravo.base.model.ModelProvider;
 import org.openbravo.base.structure.BaseOBObject;
-import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.ui.Tab;
 import org.openbravo.model.common.enterprise.EmailServerConfiguration;
 import org.openbravo.model.common.enterprise.Organization;
@@ -44,10 +44,6 @@ import com.etendoerp.metadata.MetadataTestConstants;
  */
 public class EmailConfigServiceTest extends BaseMetadataServiceTest {
 
-    private static final String PARAM_RECORD_ID   = "recordId";
-    private static final String PARAM_TAB_ID      = "tabId";
-    private static final String KEY_SUCCESS       = "success";
-    private static final String INVALID_JSON_MSG  = "Response should be valid JSON: ";
     private static final String PROP_EMAIL        = "email";
     private static final String PROP_NAME         = "name";
     private static final String PROP_DOC_TYPE     = "documentType";
@@ -95,15 +91,10 @@ public class EmailConfigServiceTest extends BaseMetadataServiceTest {
         when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(null);
 
         emailConfigService.process();
-        String responseContent = responseWriter.toString();
+        JSONObject jsonResponse = parseJsonResponse(responseWriter.toString());
 
-        try {
-            JSONObject jsonResponse = new JSONObject(responseContent);
-            assertFalse("Success should be false for missing parameters", jsonResponse.getBoolean(KEY_SUCCESS));
-            assertTrue("Should have error message", jsonResponse.has("message"));
-        } catch (Exception e) {
-            fail(INVALID_JSON_MSG + e.getMessage());
-        }
+        assertFalse("Success should be false for missing parameters", jsonResponse.getBoolean(KEY_SUCCESS));
+        assertTrue("Should have error message", jsonResponse.has("message"));
     }
 
     @Test
@@ -112,15 +103,10 @@ public class EmailConfigServiceTest extends BaseMetadataServiceTest {
         when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn("non-existent-tab-id");
 
         emailConfigService.process();
-        String responseContent = responseWriter.toString();
+        JSONObject jsonResponse = parseJsonResponse(responseWriter.toString());
 
-        try {
-            JSONObject jsonResponse = new JSONObject(responseContent);
-            assertFalse("Success should be false for non-existent tab", jsonResponse.getBoolean(KEY_SUCCESS));
-            assertEquals("Tab not found.", jsonResponse.getString("message"));
-        } catch (Exception e) {
-            fail(INVALID_JSON_MSG + e.getMessage());
-        }
+        assertFalse("Success should be false for non-existent tab", jsonResponse.getBoolean(KEY_SUCCESS));
+        assertEquals("Tab not found.", jsonResponse.getString("message"));
     }
 
     @Test
@@ -129,14 +115,7 @@ public class EmailConfigServiceTest extends BaseMetadataServiceTest {
         when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(null);
 
         emailConfigService.process();
-        String responseContent = responseWriter.toString();
-
-        try {
-            JSONObject jsonResponse = new JSONObject(responseContent);
-            assertFalse(jsonResponse.getBoolean(KEY_SUCCESS));
-        } catch (Exception e) {
-            fail(INVALID_JSON_MSG + e.getMessage());
-        }
+        assertFalse(parseJsonResponse(responseWriter.toString()).getBoolean(KEY_SUCCESS));
     }
 
     /**
@@ -304,27 +283,8 @@ public class EmailConfigServiceTest extends BaseMetadataServiceTest {
     @Test
     public void testExecuteEmailAction_withValidSmtpAndRealData()
             throws IOException, javax.servlet.ServletException {
-        @SuppressWarnings("unchecked")
-        List<Tab> tabs = OBDal.getInstance().createCriteria(Tab.class).setMaxResults(1).list();
-        if (tabs.isEmpty()) {
-            return;
-        }
-        Tab tab = tabs.get(0);
-        if (tab.getTable() == null) {
-            return;
-        }
-        Entity entity = ModelProvider.getInstance()
-                .getEntityByTableName(tab.getTable().getDBTableName());
-        if (entity == null) {
-            return;
-        }
-        @SuppressWarnings("unchecked")
-        List<BaseOBObject> records = OBDal.getInstance().getSession()
-                .createQuery("from " + entity.getName())
-                .setMaxResults(1).list();
-        if (records.isEmpty()) {
-            return;
-        }
+        TabRecordContext ctx = findFirstTabWithRecord();
+        if (ctx == null) return;
 
         EmailServerConfiguration mockSmtp = mock(EmailServerConfiguration.class);
         when(mockSmtp.getSmtpServerSenderAddress()).thenReturn(SENDER_ADDR);
@@ -332,17 +292,10 @@ public class EmailConfigServiceTest extends BaseMetadataServiceTest {
         TestableEmailConfigService testService =
                 new TestableEmailConfigService(mockRequest, mockResponse, mockSmtp);
 
-        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(records.get(0).getId().toString());
-        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(tab.getId());
+        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(ctx.record.getId().toString());
+        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(ctx.tab.getId());
 
         testService.process();
-        String responseContent = responseWriter.toString();
-
-        try {
-            JSONObject jsonResponse = new JSONObject(responseContent);
-            assertNotNull("Response should be valid JSON", jsonResponse);
-        } catch (Exception e) {
-            fail(INVALID_JSON_MSG + e.getMessage());
-        }
+        assertNotNull("Response should be valid JSON", parseJsonResponse(responseWriter.toString()));
     }
 }
