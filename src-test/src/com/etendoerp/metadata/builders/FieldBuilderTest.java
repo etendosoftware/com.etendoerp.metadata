@@ -549,6 +549,7 @@ class FieldBuilderTest {
   @Test
   void testGetHqlNameSuccess() throws Exception {
     when(column.getTable()).thenReturn(table);
+    when(table.getDataOriginType()).thenReturn("Table");
     when(table.getDBTableName()).thenReturn("test_table");
     when(column.getDBColumnName()).thenReturn("test_column");
     when(field.getName()).thenReturn(TEST_FIELD);

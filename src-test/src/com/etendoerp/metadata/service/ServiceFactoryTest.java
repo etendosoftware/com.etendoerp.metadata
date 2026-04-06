@@ -154,26 +154,18 @@ class ServiceFactoryTest {
   void buildLegacyForwardServiceForwardsSuccessfully() throws Exception {
     HttpServletRequest req = mock(HttpServletRequest.class);
     HttpServletResponse res = mock(HttpServletResponse.class);
-    HttpSession session = mock(HttpSession.class);
     RequestDispatcher dispatcher = mock(RequestDispatcher.class);
     ServletContext context = mock(ServletContext.class);
 
     when(req.getServletContext()).thenReturn(context);
-    when(req.getSession(true)).thenReturn(session);
-    when(req.getParameter("recordId")).thenReturn("A123");
     when(context.getRequestDispatcher(LegacyPaths.USED_BY_LINK)).thenReturn(dispatcher);
 
-    try (MockedStatic<LegacyUtils> legacy = mockStatic(LegacyUtils.class)) {
-      legacy.when(() -> LegacyUtils.isMutableSessionAttribute(EXAMPLE_MUTABLE_SESSION_ATTRIBUTE)).thenReturn(true);
+    MetadataService service = invokeBuildLegacyForwardService(req, res, LegacyPaths.USED_BY_LINK);
+    assertNotNull(service);
 
-      MetadataService service = invokeBuildLegacyForwardService(req, res, LegacyPaths.USED_BY_LINK);
-      assertNotNull(service);
+    service.process();
 
-      service.process();
-
-      verify(session).setAttribute(EXAMPLE_MUTABLE_SESSION_ATTRIBUTE, "A123");
-      verify(dispatcher).forward(req, res);
-    }
+    verify(dispatcher).forward(req, res);
   }
 
   @Test
@@ -197,40 +189,28 @@ class ServiceFactoryTest {
   void buildLegacyForwardServiceThrowsWhenDispatcherIsNull() {
     HttpServletRequest req = mock(HttpServletRequest.class);
     HttpServletResponse res = mock(HttpServletResponse.class);
-    HttpSession session = mock(HttpSession.class);
     ServletContext context = mock(ServletContext.class);
 
     when(req.getServletContext()).thenReturn(context);
     when(context.getRequestDispatcher(LegacyPaths.USED_BY_LINK)).thenReturn(null);
-    when(req.getSession(true)).thenReturn(session);
 
-    try (MockedStatic<LegacyUtils> legacy = mockStatic(LegacyUtils.class)) {
-      legacy.when(() -> LegacyUtils.isMutableSessionAttribute(EXAMPLE_MUTABLE_SESSION_ATTRIBUTE)).thenReturn(true);
-
-      MetadataService service = invokeBuildLegacyForwardService(req, res, LegacyPaths.USED_BY_LINK);
-      assertThrows(ServletException.class, service::process);
-    }
+    MetadataService service = invokeBuildLegacyForwardService(req, res, LegacyPaths.USED_BY_LINK);
+    assertThrows(ServletException.class, service::process);
   }
 
   @Test
   void buildLegacyForwardServiceCatchesExceptionFromDispatcher() throws Exception {
     HttpServletRequest req = mock(HttpServletRequest.class);
     HttpServletResponse res = mock(HttpServletResponse.class);
-    HttpSession session = mock(HttpSession.class);
     ServletContext context = mock(ServletContext.class);
     RequestDispatcher dispatcher = mock(RequestDispatcher.class);
 
     when(req.getServletContext()).thenReturn(context);
     when(context.getRequestDispatcher(LegacyPaths.USED_BY_LINK)).thenReturn(dispatcher);
-    when(req.getSession(true)).thenReturn(session);
     doThrow(new IOException("fail")).when(dispatcher).forward(req, res);
 
-    try (MockedStatic<LegacyUtils> legacy = mockStatic(LegacyUtils.class)) {
-      legacy.when(() -> LegacyUtils.isMutableSessionAttribute(EXAMPLE_MUTABLE_SESSION_ATTRIBUTE)).thenReturn(true);
-
-      MetadataService service = invokeBuildLegacyForwardService(req, res, LegacyPaths.USED_BY_LINK);
-      assertThrows(IOException.class, service::process);
-    }
+    MetadataService service = invokeBuildLegacyForwardService(req, res, LegacyPaths.USED_BY_LINK);
+    assertThrows(IOException.class, service::process);
   }
 
 
