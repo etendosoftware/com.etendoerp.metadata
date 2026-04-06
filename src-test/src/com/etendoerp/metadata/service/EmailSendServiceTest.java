@@ -76,7 +76,7 @@ public class EmailSendServiceTest extends BaseMetadataServiceTest {
     }
 
     @Test
-    public void testProcessMissingParameters() throws IOException, javax.servlet.ServletException {
+    public void testProcessMissingParameters() throws Exception {
         when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(null);
         when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(null);
 
@@ -88,7 +88,7 @@ public class EmailSendServiceTest extends BaseMetadataServiceTest {
     }
 
     @Test
-    public void testProcessMissingToField() throws IOException, javax.servlet.ServletException {
+    public void testProcessMissingToField() throws Exception {
         when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(SAMPLE_RECORD);
         when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn("some-tab");
         when(mockRequest.getParameter(PARAM_TO)).thenReturn(null);
@@ -102,7 +102,7 @@ public class EmailSendServiceTest extends BaseMetadataServiceTest {
     }
 
     @Test
-    public void testProcessTabNotFound() throws IOException, javax.servlet.ServletException {
+    public void testProcessTabNotFound() throws Exception {
         when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(SAMPLE_RECORD);
         when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn("non-existent-tab");
         when(mockRequest.getParameter(PARAM_TO)).thenReturn("dest@example.com");
@@ -116,7 +116,7 @@ public class EmailSendServiceTest extends BaseMetadataServiceTest {
     }
 
     @Test
-    public void testProcessMissingSubjectField() throws IOException, javax.servlet.ServletException {
+    public void testProcessMissingSubjectField() throws Exception {
         when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(SAMPLE_RECORD);
         when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn("some-tab");
         when(mockRequest.getParameter(PARAM_TO)).thenReturn("dest@example.com");
@@ -129,7 +129,7 @@ public class EmailSendServiceTest extends BaseMetadataServiceTest {
 
     @Test
     public void testProcessMultipartRequest_parsesAndValidatesParams()
-            throws IOException, javax.servlet.ServletException {
+            throws Exception {
         when(mockRequest.getContentType()).thenReturn("multipart/form-data; boundary=----xyz");
         when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(null);
         when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(null);
@@ -143,7 +143,7 @@ public class EmailSendServiceTest extends BaseMetadataServiceTest {
 
     @Test
     public void testProcessWithRecordAttachmentIds_missingRequiredParams()
-            throws IOException, javax.servlet.ServletException {
+            throws Exception {
         when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(null);
         when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(null);
         when(mockRequest.getParameterValues(FIELD_RECORD_ATTACHMENT))
@@ -290,7 +290,7 @@ public class EmailSendServiceTest extends BaseMetadataServiceTest {
 
     @Test
     public void testProcess_recordNotFound_withRealTab()
-            throws IOException, javax.servlet.ServletException {
+            throws Exception {
         TabRecordContext ctx = findFirstTabWithRecord();
         if (ctx == null) return;
         when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn("00000000000000000000000000000001");
@@ -305,7 +305,7 @@ public class EmailSendServiceTest extends BaseMetadataServiceTest {
 
     @Test
     public void testProcess_senderNotConfigured_withRealTabAndRecord()
-            throws IOException, javax.servlet.ServletException {
+            throws Exception {
         TabRecordContext ctx = findFirstTabWithRecord();
         if (ctx == null) return;
 

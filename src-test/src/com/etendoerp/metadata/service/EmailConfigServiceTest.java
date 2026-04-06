@@ -282,7 +282,7 @@ public class EmailConfigServiceTest extends BaseMetadataServiceTest {
      */
     @Test
     public void testExecuteEmailAction_withValidSmtpAndRealData()
-            throws IOException, javax.servlet.ServletException {
+            throws Exception {
         TabRecordContext ctx = findFirstTabWithRecord();
         if (ctx == null) return;
 
