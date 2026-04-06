@@ -51,7 +51,7 @@ public class EmailConfigServiceTest extends BaseMetadataServiceTest {
     private static final String JSON_TEMPLATES    = "templates";
     private static final String SENDER_ADDR       = "sender@test.com";
     private static final String MSG_SUCCESS_TRUE  = "Success should be true";
-    private static final String TABLE_NAME_TEST   = TABLE_NAME_TEST;
+    private static final String TABLE_NAME_TEST   = "TestTable";
 
     /** Subclass that overrides SMTP lookup so we can test the full executeEmailAction path. */
     private static class TestableEmailConfigService extends EmailConfigService {
