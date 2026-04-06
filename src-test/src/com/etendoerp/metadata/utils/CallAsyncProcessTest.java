@@ -10,6 +10,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.lang.reflect.Field;
 import java.math.BigDecimal;
 import java.util.Date;
 import java.util.HashMap;
@@ -54,6 +55,8 @@ public class CallAsyncProcessTest extends OBBaseTest {
     private static final String VALUE_STRING = "Value";
     private static final String ZERO_STRING = "0";
 
+    private static final String EXECUTOR_FIELD = "executorService";
+
     private Process process;
     private ProcessInstance pInstance;
     private User user;
@@ -67,7 +70,7 @@ public class CallAsyncProcessTest extends OBBaseTest {
     private ExecutorService originalExecutor;
 
     @Before
-    public void setUpMocks() {
+    public void setUpMocks() throws Exception {
         process = mock(Process.class);
         pInstance = mock(ProcessInstance.class);
         user = mock(User.class);
@@ -79,13 +82,17 @@ public class CallAsyncProcessTest extends OBBaseTest {
         obContext = mock(OBContext.class);
 
         callAsyncProcess = CallAsyncProcess.getInstance();
-        originalExecutor = callAsyncProcess.executorService;
-        callAsyncProcess.executorService = mock(ExecutorService.class);
+        Field field = CallAsyncProcess.class.getDeclaredField(EXECUTOR_FIELD);
+        field.setAccessible(true);
+        originalExecutor = (ExecutorService) field.get(callAsyncProcess);
+        field.set(callAsyncProcess, mock(ExecutorService.class));
     }
 
     @After
-    public void tearDownMocks() {
-        callAsyncProcess.executorService = originalExecutor;
+    public void tearDownMocks() throws Exception {
+        Field field = CallAsyncProcess.class.getDeclaredField(EXECUTOR_FIELD);
+        field.setAccessible(true);
+        field.set(callAsyncProcess, originalExecutor);
     }
 
     private void setupStaticMocks(
