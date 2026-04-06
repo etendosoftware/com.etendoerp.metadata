@@ -51,6 +51,7 @@ public class EmailConfigServiceTest extends BaseMetadataServiceTest {
     private static final String JSON_TEMPLATES    = "templates";
     private static final String SENDER_ADDR       = "sender@test.com";
     private static final String MSG_SUCCESS_TRUE  = "Success should be true";
+    private static final String TABLE_NAME_TEST   = TABLE_NAME_TEST;
 
     /** Subclass that overrides SMTP lookup so we can test the full executeEmailAction path. */
     private static class TestableEmailConfigService extends EmailConfigService {
@@ -133,7 +134,7 @@ public class EmailConfigServiceTest extends BaseMetadataServiceTest {
 
         Tab mockTab = mock(Tab.class, RETURNS_DEEP_STUBS);
         when(mockTab.getTable().getId()).thenReturn("100");
-        when(mockTab.getTable().getName()).thenReturn("TestTable");
+        when(mockTab.getTable().getName()).thenReturn(TABLE_NAME_TEST);
 
         Organization mockOrg = mock(Organization.class);
 
@@ -258,7 +259,7 @@ public class EmailConfigServiceTest extends BaseMetadataServiceTest {
 
         Tab mockTab = mock(Tab.class, RETURNS_DEEP_STUBS);
         when(mockTab.getTable().getId()).thenReturn("500");
-        when(mockTab.getTable().getName()).thenReturn("TestTable");
+        when(mockTab.getTable().getName()).thenReturn(TABLE_NAME_TEST);
 
         Organization mockOrg = mock(Organization.class);
 
@@ -343,7 +344,7 @@ public class EmailConfigServiceTest extends BaseMetadataServiceTest {
 
         Tab mockTab = mock(Tab.class, RETURNS_DEEP_STUBS);
         when(mockTab.getTable().getId()).thenReturn("600");
-        when(mockTab.getTable().getName()).thenReturn("TestTable");
+        when(mockTab.getTable().getName()).thenReturn(TABLE_NAME_TEST);
         when(mockTab.getWindow()).thenThrow(new RuntimeException("no window configured"));
 
         Organization mockOrg = mock(Organization.class);
