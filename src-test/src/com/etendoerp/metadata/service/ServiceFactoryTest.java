@@ -40,6 +40,7 @@ class ServiceFactoryTest {
   private static final String PARAM_RECORD_ID = "recordId";
   private static final String ENTITY_ORDER = "Order";
   private static final String RECORD_ID_VALUE = "RECORD_1";
+  private static final String NON_USED_BY_LINK_PATH = "/some/legacy/path";
 
   @Mock
   private HttpServletRequest mockRequest;
@@ -314,11 +315,10 @@ class ServiceFactoryTest {
     RequestDispatcher dispatcher = mock(RequestDispatcher.class);
     ServletContext context = mock(ServletContext.class);
 
-    String legacyPath = "/some/legacy/path";
     when(req.getServletContext()).thenReturn(context);
-    when(context.getRequestDispatcher(legacyPath)).thenReturn(dispatcher);
+    when(context.getRequestDispatcher(NON_USED_BY_LINK_PATH)).thenReturn(dispatcher);
 
-    MetadataService service = invokeBuildLegacyForwardService(req, res, legacyPath);
+    MetadataService service = invokeBuildLegacyForwardService(req, res, NON_USED_BY_LINK_PATH);
     service.process();
 
     verify(dispatcher).forward(req, res);
