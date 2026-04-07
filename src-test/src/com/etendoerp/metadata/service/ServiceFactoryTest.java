@@ -109,6 +109,55 @@ class ServiceFactoryTest {
   }
 
   @Test
+  void getServiceReturnsPreferencesService() {
+    MetadataService service = ServiceFactory.getService(mockRequestWithPath("/com.etendoerp.metadata.meta/preferences"), mockResponse);
+    assertNotNull(service, SERVICE_NOT_NULL);
+    assertInstanceOf(PreferencesService.class, service);
+  }
+
+  @Test
+  void getServiceReturnsEmailSendService() {
+    MetadataService service = ServiceFactory.getService(mockRequestWithPath("/com.etendoerp.metadata.meta/email/send"), mockResponse);
+    assertNotNull(service, SERVICE_NOT_NULL);
+    assertInstanceOf(EmailSendService.class, service);
+  }
+
+  @Test
+  void getServiceReturnsEmailConfigService() {
+    MetadataService service = ServiceFactory.getService(mockRequestWithPath("/com.etendoerp.metadata.meta/email/config"), mockResponse);
+    assertNotNull(service, SERVICE_NOT_NULL);
+    assertInstanceOf(EmailConfigService.class, service);
+  }
+
+  @Test
+  void getServiceReturnsEmailAttachmentService() {
+    MetadataService service = ServiceFactory.getService(mockRequestWithPath("/com.etendoerp.metadata.meta/email/attachments"), mockResponse);
+    assertNotNull(service, SERVICE_NOT_NULL);
+    assertInstanceOf(EmailAttachmentService.class, service);
+  }
+
+  @Test
+  void getServiceReturnsEmailService() {
+    MetadataService service = ServiceFactory.getService(mockRequestWithPath("/com.etendoerp.metadata.meta/email/other"), mockResponse);
+    assertNotNull(service, SERVICE_NOT_NULL);
+    assertInstanceOf(EmailService.class, service);
+  }
+
+  @Test
+  void getServiceReturnsReportAndProcessService() {
+    MetadataService service = ServiceFactory.getService(mockRequestWithPath("/com.etendoerp.metadata.meta/report-and-process/123"), mockResponse);
+    assertNotNull(service, SERVICE_NOT_NULL);
+    assertInstanceOf(ReportAndProcessService.class, service);
+  }
+
+  @Test
+  void getServiceReturnsProcessExecutionService() {
+    MetadataService service = ServiceFactory.getService(mockRequestWithPath("/com.etendoerp.metadata.meta/process-execution"), mockResponse);
+    assertNotNull(service, SERVICE_NOT_NULL);
+    assertInstanceOf(ProcessExecutionService.class, service);
+  }
+
+  @Test
   void getServiceReturnsLegacyService() {
     MetadataService service = ServiceFactory.getService(mockRequestWithPath("/com.etendoerp.metadata.meta/legacy/test"), mockResponse);
     assertNotNull(service, SERVICE_NOT_NULL);
