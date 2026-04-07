@@ -720,6 +720,7 @@ public abstract class FieldBuilder extends Builder {
             addHqlName(field);
             addDisplayLogic(field);
             addIsAuditField(field);
+            addFieldGroupCollapsed(field);
         } catch (Exception e) {
             logger.warn("Error building basic JSON for field {}: {}", field.getId(), e.getMessage(), e);
         }
@@ -757,6 +758,21 @@ public abstract class FieldBuilder extends Builder {
     protected void addIsAuditField(Field field) throws JSONException {
         if (isAuditField(field)) {
             json.put("isAuditField", true);
+        }
+    }
+
+    /**
+     * Adds the fieldGroupCollapsed property to the field JSON when the field belongs
+     * to a FieldGroup. Reflects the FieldGroup's isCollapsed configuration so the
+     * frontend can initialize the section's expanded/collapsed state correctly.
+     *
+     * @param field The field being processed
+     * @throws JSONException if an error occurs while adding the property
+     */
+    protected void addFieldGroupCollapsed(Field field) throws JSONException {
+        org.openbravo.model.ad.ui.FieldGroup fg = field.getFieldGroup();
+        if (fg != null) {
+            json.put("fieldGroupCollapsed", Boolean.TRUE.equals(fg.isCollapsed()));
         }
     }
 
