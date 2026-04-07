@@ -81,6 +81,8 @@ class FieldBuilderWithColumnReferencedWindowTest {
     private static final String TABLE_ID = "table-id";
     private static final String SO_WINDOW_ID = "SO_WINDOW_ID";
     private static final String PO_WINDOW_ID = "PO_WINDOW_ID";
+    private static final String SO_TAB_ID = "SO_TAB_ID";
+    private static final String ENTITY_ORDER = "Order";
 
     @BeforeEach
     void setUp() {
@@ -112,7 +114,7 @@ class FieldBuilderWithColumnReferencedWindowTest {
 
         // Default resolution returns Sales Order window
         when(defaultReferencedTab.getWindow()).thenReturn(salesOrderWindow);
-        when(defaultReferencedTab.getId()).thenReturn("SO_TAB_ID");
+        when(defaultReferencedTab.getId()).thenReturn(SO_TAB_ID);
         
         // Resolved resolution returns Purchase Order window
         when(resolvedReferencedTab.getWindow()).thenReturn(purchaseOrderWindow);
@@ -137,7 +139,7 @@ class FieldBuilderWithColumnReferencedWindowTest {
             when(fieldProperty.getReferencedProperty()).thenReturn(referencedProperty);
             when(referencedProperty.getEntity()).thenReturn(referencedEntity);
             when(referencedEntity.getTableId()).thenReturn(TABLE_ID);
-            when(referencedEntity.getName()).thenReturn("Order");
+            when(referencedEntity.getName()).thenReturn(ENTITY_ORDER);
 
             mockedOBDal.when(OBDal::getInstance).thenReturn(obDal);
             when(obDal.get(Table.class, TABLE_ID)).thenReturn(table);
@@ -158,6 +160,52 @@ class FieldBuilderWithColumnReferencedWindowTest {
             JSONObject result = builder.toJSON();
 
             assertEquals(PO_WINDOW_ID, result.getString("referencedWindowId"));
+        }
+    }
+
+    @Test
+    void testFallsBackToUtilsTabWhenCriteriaFindsNoTab() throws JSONException {
+        when(currentWindow.isSalesTransaction()).thenReturn(true);
+        when(defaultReferencedTab.getWindow()).thenReturn(salesOrderWindow);
+        when(defaultReferencedTab.getId()).thenReturn(SO_TAB_ID);
+
+        try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
+             MockedStatic<KernelUtils> mockedKernelUtils = mockStatic(KernelUtils.class);
+             MockedStatic<DataSourceUtils> mockedDataSourceUtils = mockStatic(DataSourceUtils.class);
+             MockedStatic<OBDal> mockedOBDal = mockStatic(OBDal.class);
+             MockedStatic<Utils> mockedUtils = mockStatic(Utils.class);
+             MockedConstruction<DataToJsonConverter> ignored = mockConstruction(
+                     DataToJsonConverter.class,
+                     (mock, ctx) -> {
+                         when(mock.toJsonObject(any(Field.class), eq(DataResolvingMode.FULL_TRANSLATABLE)))
+                                 .thenReturn(new JSONObject().put("id", FIELD_ID));
+                         when(mock.toJsonObject(any(Column.class), eq(DataResolvingMode.FULL_TRANSLATABLE)))
+                                 .thenReturn(new JSONObject().put("id", COLUMN_ID));
+                     })) {
+
+            mockedOBContext.when(OBContext::getOBContext).thenReturn(obContext);
+            mockedKernelUtils.when(() -> KernelUtils.getProperty(field)).thenReturn(fieldProperty);
+            when(fieldProperty.getReferencedProperty()).thenReturn(referencedProperty);
+            when(referencedProperty.getEntity()).thenReturn(referencedEntity);
+            when(referencedEntity.getTableId()).thenReturn(TABLE_ID);
+            when(referencedEntity.getName()).thenReturn(ENTITY_ORDER);
+
+            mockedOBDal.when(OBDal::getInstance).thenReturn(obDal);
+            when(obDal.get(Table.class, TABLE_ID)).thenReturn(table);
+            when(obDal.createCriteria(Tab.class)).thenReturn(tabCriteria);
+            when(tabCriteria.createAlias(anyString(), anyString())).thenReturn(tabCriteria);
+            when(tabCriteria.add(any())).thenReturn(tabCriteria);
+            when(tabCriteria.setMaxResults(1)).thenReturn(tabCriteria);
+            when(tabCriteria.uniqueResult()).thenReturn(null); // sin tab → REFERENCED_WINDOW_ID queda null
+
+            mockedUtils.when(() -> Utils.getReferencedTab(any())).thenReturn(defaultReferencedTab);
+            mockedDataSourceUtils.when(() -> DataSourceUtils.getHQLColumnName(anyBoolean(), anyString(), anyString()))
+                    .thenReturn(new String[]{"order"});
+
+            FieldBuilderWithColumn builder = new FieldBuilderWithColumn(field, null);
+            JSONObject result = builder.toJSON();
+
+            assertEquals(SO_WINDOW_ID, result.getString("referencedWindowId"));
         }
     }
 }

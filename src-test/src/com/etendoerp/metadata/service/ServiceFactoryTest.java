@@ -307,6 +307,23 @@ class ServiceFactoryTest {
     }
   }
 
+  @Test
+  void buildLegacyForwardServiceSkipsSessionForNonUsedByLinkPath() throws Exception {
+    HttpServletRequest req = mock(HttpServletRequest.class);
+    HttpServletResponse res = mock(HttpServletResponse.class);
+    RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+    ServletContext context = mock(ServletContext.class);
+
+    String legacyPath = "/some/legacy/path";
+    when(req.getServletContext()).thenReturn(context);
+    when(context.getRequestDispatcher(legacyPath)).thenReturn(dispatcher);
+
+    MetadataService service = invokeBuildLegacyForwardService(req, res, legacyPath);
+    service.process();
+
+    verify(dispatcher).forward(req, res);
+  }
+
   /** Helper to create a mock HttpServletRequest with the specified path info. */
   private HttpServletRequest mockRequestWithPath(String path) {
     HttpServletRequest req = mock(HttpServletRequest.class);
