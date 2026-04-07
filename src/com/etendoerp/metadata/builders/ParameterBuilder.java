@@ -51,10 +51,6 @@ public class ParameterBuilder extends Builder {
             parameter.getReference().getId());
     }
 
-    private static boolean isButtonParameter(Parameter parameter) {
-        return parameter != null && parameter.getReference() != null &&
-               BUTTON_REFERENCE_ID.equals(parameter.getReference().getId());
-    }
 
     private static boolean isButtonListParameter(Parameter parameter) {
         return parameter != null && parameter.getReference() != null &&

@@ -80,13 +80,11 @@ public class ProcessParameterBuilder extends Builder {
         }
 
         // List reference
-        if (isListParameter(currentParameter) || isButtonListParameter(currentParameter) || isButtonParameter(currentParameter)) {
-            if (currentParameter.getReferenceSearchKey() != null) {
-                json.put(
-                        "refList",
-                        getListInfo(currentParameter.getReferenceSearchKey(), language)
-                );
-            }
+        if ((isListParameter(currentParameter) || isButtonListParameter(currentParameter) || isButtonParameter(currentParameter)) && currentParameter.getReferenceSearchKey() != null) {
+            json.put(
+                    "refList",
+                    getListInfo(currentParameter.getReferenceSearchKey(), language)
+            );
         }
 
         // Explicit legacy flags
