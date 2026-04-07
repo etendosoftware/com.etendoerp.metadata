@@ -35,6 +35,11 @@ class ServiceFactoryTest {
 
   private static final String EXAMPLE_MUTABLE_SESSION_ATTRIBUTE = "143|C_ORDER_ID";
   private static final String SERVICE_NOT_NULL = "Service should not be null";
+  private static final String PARAM_WINDOW_ID = "windowId";
+  private static final String PARAM_ENTITY_NAME = "entityName";
+  private static final String PARAM_RECORD_ID = "recordId";
+  private static final String ENTITY_ORDER = "Order";
+  private static final String RECORD_ID_VALUE = "RECORD_1";
 
   @Mock
   private HttpServletRequest mockRequest;
@@ -232,20 +237,20 @@ class ServiceFactoryTest {
     when(req.getServletContext()).thenReturn(context);
     when(context.getRequestDispatcher(LegacyPaths.USED_BY_LINK)).thenReturn(dispatcher);
     when(req.getSession(true)).thenReturn(session);
-    when(req.getParameter("windowId")).thenReturn("143");
-    when(req.getParameter("entityName")).thenReturn("Order");
-    when(req.getParameter("recordId")).thenReturn("RECORD_1");
+    when(req.getParameter(PARAM_WINDOW_ID)).thenReturn("143");
+    when(req.getParameter(PARAM_ENTITY_NAME)).thenReturn(ENTITY_ORDER);
+    when(req.getParameter(PARAM_RECORD_ID)).thenReturn(RECORD_ID_VALUE);
     when(entity.getIdProperties()).thenReturn(List.of(idProp));
     when(idProp.getColumnName()).thenReturn("C_Order_ID");
 
     try (MockedStatic<ModelProvider> staticModelProvider = mockStatic(ModelProvider.class)) {
       staticModelProvider.when(ModelProvider::getInstance).thenReturn(modelProvider);
-      when(modelProvider.getEntity("Order")).thenReturn(entity);
+      when(modelProvider.getEntity(ENTITY_ORDER)).thenReturn(entity);
 
       MetadataService service = invokeBuildLegacyForwardService(req, res, LegacyPaths.USED_BY_LINK);
       service.process();
 
-      verify(session).setAttribute("143|C_Order_ID", "RECORD_1");
+      verify(session).setAttribute("143|C_Order_ID", RECORD_ID_VALUE);
       verify(dispatcher).forward(req, res);
     }
   }
@@ -260,9 +265,9 @@ class ServiceFactoryTest {
 
     when(req.getServletContext()).thenReturn(context);
     when(context.getRequestDispatcher(LegacyPaths.USED_BY_LINK)).thenReturn(dispatcher);
-    when(req.getParameter("windowId")).thenReturn("143");
-    when(req.getParameter("entityName")).thenReturn("Unknown");
-    when(req.getParameter("recordId")).thenReturn("RECORD_1");
+    when(req.getParameter(PARAM_WINDOW_ID)).thenReturn("143");
+    when(req.getParameter(PARAM_ENTITY_NAME)).thenReturn("Unknown");
+    when(req.getParameter(PARAM_RECORD_ID)).thenReturn(RECORD_ID_VALUE);
 
     try (MockedStatic<ModelProvider> staticModelProvider = mockStatic(ModelProvider.class)) {
       staticModelProvider.when(ModelProvider::getInstance).thenReturn(modelProvider);
@@ -286,14 +291,14 @@ class ServiceFactoryTest {
 
     when(req.getServletContext()).thenReturn(context);
     when(context.getRequestDispatcher(LegacyPaths.USED_BY_LINK)).thenReturn(dispatcher);
-    when(req.getParameter("windowId")).thenReturn("143");
-    when(req.getParameter("entityName")).thenReturn("Order");
-    when(req.getParameter("recordId")).thenReturn("RECORD_1");
+    when(req.getParameter(PARAM_WINDOW_ID)).thenReturn("143");
+    when(req.getParameter(PARAM_ENTITY_NAME)).thenReturn(ENTITY_ORDER);
+    when(req.getParameter(PARAM_RECORD_ID)).thenReturn(RECORD_ID_VALUE);
     when(entity.getIdProperties()).thenReturn(List.of(mock(Property.class), mock(Property.class)));
 
     try (MockedStatic<ModelProvider> staticModelProvider = mockStatic(ModelProvider.class)) {
       staticModelProvider.when(ModelProvider::getInstance).thenReturn(modelProvider);
-      when(modelProvider.getEntity("Order")).thenReturn(entity);
+      when(modelProvider.getEntity(ENTITY_ORDER)).thenReturn(entity);
 
       MetadataService service = invokeBuildLegacyForwardService(req, res, LegacyPaths.USED_BY_LINK);
       service.process();
