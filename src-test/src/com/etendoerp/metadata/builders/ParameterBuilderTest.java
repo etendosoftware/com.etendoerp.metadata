@@ -573,5 +573,90 @@ class ParameterBuilderTest {
       assertFalse(result.has(REF_LIST));
       assertFalse(result.has(WINDOW));
     }
+  /**
+   * Tests the toJSON method includes reference list information for button references.
+   * 
+   * @throws Exception if JSON processing or list info retrieval fails
+   */
+  @Test
+  void toJSONWithButtonReferenceIncludesRefListInfo() throws Exception {
+    Reference mockReference = mock(Reference.class);
+    Reference mockReferenceSearchKey = mock(Reference.class);
+
+    when(mockParameter.getReadOnlyLogic()).thenReturn(null);
+    when(mockParameter.getReference()).thenReturn(mockReference);
+    when(mockParameter.getReferenceSearchKey()).thenReturn(mockReferenceSearchKey);
+    when(mockReference.getId()).thenReturn(Constants.BUTTON_REFERENCE_ID);
+
+    try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
+         MockedStatic<FieldBuilder> mockedFieldBuilder = mockStatic(FieldBuilder.class);
+         MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class,
+             (mock, context) -> {
+               JSONObject parameterJson = new JSONObject();
+               parameterJson.put("id", PARAMETER_ID);
+               when(mock.toJsonObject(any(), eq(DataResolvingMode.FULL_TRANSLATABLE))).thenReturn(parameterJson);
+             })) {
+
+      mockedOBContext.when(OBContext::getOBContext).thenReturn(mockContext);
+
+      JSONArray refListInfo = new JSONArray();
+      JSONObject listItem = new JSONObject();
+      listItem.put("value", "BUTTON_VAL");
+      listItem.put("label", "Button Label");
+      refListInfo.put(listItem);
+
+      mockedFieldBuilder.when(() -> FieldBuilder.getListInfo(mockReferenceSearchKey, mockLanguage))
+          .thenReturn(refListInfo);
+
+      ParameterBuilder parameterBuilder = new ParameterBuilder(mockParameter);
+      JSONObject result = parameterBuilder.toJSON();
+
+      assertNotNull(result);
+      assertTrue(result.has(REF_LIST));
+      JSONArray refList = result.getJSONArray(REF_LIST);
+      assertEquals(1, refList.length());
+    }
+  /**
+   * Tests the toJSON method includes reference list information for button list references.
+   * 
+   * @throws Exception if JSON processing or list info retrieval fails
+   */
+  @Test
+  void toJSONWithButtonListReferenceIncludesRefListInfo() throws Exception {
+    Reference mockReference = mock(Reference.class);
+    Reference mockReferenceSearchKey = mock(Reference.class);
+
+    when(mockParameter.getReadOnlyLogic()).thenReturn(null);
+    when(mockParameter.getReference()).thenReturn(mockReference);
+    when(mockParameter.getReferenceSearchKey()).thenReturn(mockReferenceSearchKey);
+    // Constant ID for Button List
+    when(mockReference.getId()).thenReturn(Constants.BUTTON_LIST_REFERENCE_ID);
+
+    try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
+         MockedStatic<FieldBuilder> mockedFieldBuilder = mockStatic(FieldBuilder.class);
+         MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class,
+             (mock, context) -> {
+               JSONObject parameterJson = new JSONObject();
+               parameterJson.put("id", PARAMETER_ID);
+               when(mock.toJsonObject(any(), eq(DataResolvingMode.FULL_TRANSLATABLE))).thenReturn(parameterJson);
+             })) {
+
+      mockedOBContext.when(OBContext::getOBContext).thenReturn(mockContext);
+
+      JSONArray refListInfo = new JSONArray();
+      JSONObject listItem = new JSONObject();
+      listItem.put("value", "LIST_VAL");
+      listItem.put("label", "List Label");
+      refListInfo.put(listItem);
+
+      mockedFieldBuilder.when(() -> FieldBuilder.getListInfo(mockReferenceSearchKey, mockLanguage))
+          .thenReturn(refListInfo);
+
+      ParameterBuilder parameterBuilder = new ParameterBuilder(mockParameter);
+      JSONObject result = parameterBuilder.toJSON();
+
+      assertNotNull(result);
+      assertTrue(result.has(REF_LIST));
+    }
   }
 }

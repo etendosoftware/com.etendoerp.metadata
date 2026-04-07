@@ -336,5 +336,33 @@ class ProcessParameterBuilderTest {
             assertTrue(result.getBoolean(IS_RANGE_STRING));
             assertEquals(SPECIFIC_PARAM_ID_STRING, result.getString(VALUE_FORMAT_STRING));
         }
+    /**
+     * Tests toJSON with a button reference parameter.
+     * Verifies that refList is added for button references.
+     */
+    @Test
+    void testToJSONWithButtonParameter() throws JSONException {
+        when(reference.getId()).thenReturn(Constants.BUTTON_REFERENCE_ID);
+        when(referenceSearchKey.getADListList()).thenReturn(Collections.emptyList());
+
+        JSONObject result = executeToJSON(null);
+
+        assertNotNull(result);
+        assertTrue(result.has(REF_LIST_STRING), "Result should contain refList for button reference");
+    }
+
+    /**
+     * Tests toJSON with a button list reference parameter.
+     * Verifies that refList is added for button list references.
+     */
+    @Test
+    void testToJSONWithButtonListParameter() throws JSONException {
+        when(reference.getId()).thenReturn(Constants.BUTTON_LIST_REFERENCE_ID);
+        when(referenceSearchKey.getADListList()).thenReturn(Collections.emptyList());
+
+        JSONObject result = executeToJSON(null);
+
+        assertNotNull(result);
+        assertTrue(result.has(REF_LIST_STRING), "Result should contain refList for button list reference");
     }
 }

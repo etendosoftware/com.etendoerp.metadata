@@ -63,7 +63,7 @@ public class ProcessParameterBuilder extends Builder {
 
     private static boolean isButtonListParameter(ProcessParameter parameter) {
         return parameter != null && parameter.getReference() != null &&
-               "FF80818132F94B500132F9575619000A".equals(parameter.getReference().getId());
+               BUTTON_LIST_REFERENCE_ID.equals(parameter.getReference().getId());
     }
 
     @Override
