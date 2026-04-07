@@ -143,4 +143,30 @@ public class EmailServiceTest extends BaseMetadataServiceTest {
     public void testGetFallbackErrorMessage_returnsExpected() {
         assertEquals("Failed to validate email configuration.", emailService.getFallbackErrorMessage());
     }
+
+    /**
+     * Covers lines 46-47 of EmailService.executeEmailAction (the respond-true path)
+     * by overriding validateEmailRequest to return a pre-built context, bypassing the DB.
+     */
+    @Test
+    public void testExecuteEmailAction_successPath_respondsTrue() throws Exception {
+        EmailService testService = new EmailService(mockRequest, mockResponse) {
+            @Override
+            protected ValidationContext validateEmailRequest(JSONObject result) {
+                return new ValidationContext(
+                        mock(Tab.class),
+                        mock(org.openbravo.base.structure.BaseOBObject.class),
+                        mock(Organization.class),
+                        "sender@test.com",
+                        "rec-1");
+            }
+        };
+
+        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn("rec-1");
+        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn("tab-1");
+
+        testService.process();
+        JSONObject json = parseJsonResponse(responseWriter.toString());
+        assertTrue("Success should be true when validation passes", json.getBoolean(KEY_SUCCESS));
+    }
 }

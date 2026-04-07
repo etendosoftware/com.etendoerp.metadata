@@ -363,4 +363,39 @@ public class EmailConfigServiceTest extends BaseMetadataServiceTest {
     public void testGetFallbackErrorMessage_returnsExpected() {
         assertEquals("Failed to load email configuration.", emailConfigService.getFallbackErrorMessage());
     }
+
+    /**
+     * Covers lines 63-64 of EmailConfigService.executeEmailAction (the populateEmailConfig +
+     * write path) by overriding validateEmailRequest to bypass the real DB lookup.
+     */
+    @Test
+    public void testExecuteEmailAction_successPath_withOverriddenValidation() throws Exception {
+        Tab mockTab = mock(Tab.class, RETURNS_DEEP_STUBS);
+        when(mockTab.getTable().getId()).thenReturn("259");
+        when(mockTab.getTable().getName()).thenReturn("C_Invoice");
+        when(mockTab.getWindow()).thenThrow(new RuntimeException("no window"));
+
+        BaseOBObject mockRecord = mock(BaseOBObject.class);
+        Entity mockEntity = mock(Entity.class);
+        when(mockRecord.getEntity()).thenReturn(mockEntity);
+        when(mockEntity.hasProperty(any(String.class))).thenReturn(false);
+        Organization mockOrg = mock(Organization.class);
+
+        final EmailBaseService.ValidationContext ctx =
+                new EmailBaseService.ValidationContext(mockTab, mockRecord, mockOrg, "s@t.com", "rec-1");
+
+        EmailConfigService testService = new EmailConfigService(mockRequest, mockResponse) {
+            @Override
+            protected ValidationContext validateEmailRequest(JSONObject result) {
+                return ctx;
+            }
+        };
+
+        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn("rec-1");
+        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn("tab-1");
+
+        testService.process();
+        JSONObject json = parseJsonResponse(responseWriter.toString());
+        assertNotNull("Response should be valid JSON", json);
+    }
 }

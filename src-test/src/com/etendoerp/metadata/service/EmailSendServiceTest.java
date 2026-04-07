@@ -42,6 +42,7 @@ import org.codehaus.jettison.json.JSONObject;
 import org.junit.Before;
 import org.junit.Test;
 import org.openbravo.base.exception.OBException;
+import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.ui.Tab;
 import org.openbravo.model.common.enterprise.EmailServerConfiguration;
 import org.openbravo.model.common.enterprise.Organization;
@@ -505,5 +506,63 @@ public class EmailSendServiceTest extends BaseMetadataServiceTest {
         emailSendService.process();
         assertFalse("Validation should fail when required params are incomplete",
                 parseJsonResponse(responseWriter.toString()).getBoolean(KEY_SUCCESS));
+    }
+
+    /**
+     * Covers lines 111-127 of EmailSendService.process() (the success path after param
+     * validation) without relying on real DB data. Uses MockedStatic for OBDal and
+     * overrides resolveRecord / getSmtpConfig / sendEmail.
+     */
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    @Test
+    public void testProcess_successPath_withoutDB() throws Exception {
+        // Required params
+        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn("rec-1");
+        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn("tab-1");
+        when(mockRequest.getParameter("to")).thenReturn("dest@test.com");
+        when(mockRequest.getParameter("subject")).thenReturn("Test Subject");
+        when(mockRequest.getParameter("notes")).thenReturn(null);
+        when(mockRequest.getParameter("archive")).thenReturn(null);
+        when(mockRequest.getParameter("cc")).thenReturn(null);
+        when(mockRequest.getParameter("bcc")).thenReturn(null);
+        when(mockRequest.getParameter("replyTo")).thenReturn(null);
+        when(mockRequest.getParameter("templateId")).thenReturn(null);
+        when(mockRequest.getParameterValues("recordAttachmentId")).thenReturn(null);
+        when(mockRequest.getContentType()).thenReturn("application/json");
+
+        Tab mockTab = mock(Tab.class);
+        org.openbravo.base.structure.BaseOBObject mockRecord = mock(org.openbravo.base.structure.BaseOBObject.class);
+        Organization mockOrg = mock(Organization.class);
+        when(mockRecord.get("organization")).thenReturn(mockOrg);
+
+        EmailServerConfiguration mockSmtp = mock(EmailServerConfiguration.class);
+        when(mockSmtp.getSmtpServerSenderAddress()).thenReturn("sender@test.com");
+
+        EmailSendService testService = new EmailSendService(mockRequest, mockResponse) {
+            @Override
+            protected org.openbravo.base.structure.BaseOBObject resolveRecord(Tab tab, String recordId) {
+                return mockRecord;
+            }
+            @Override
+            protected EmailServerConfiguration getSmtpConfig(Organization org) {
+                return mockSmtp;
+            }
+            @Override
+            protected void sendEmail(Map<String, String> params, List<String> recordAttachmentIds,
+                    List<File> tempFiles, EmailServerConfiguration emailConfig) {
+                // no-op — avoid real SMTP
+            }
+        };
+
+        try (org.mockito.MockedStatic<OBDal> obdal = mockStatic(OBDal.class)) {
+            OBDal mockDal = mock(OBDal.class);
+            obdal.when(OBDal::getInstance).thenReturn(mockDal);
+            when(mockDal.get(Tab.class, "tab-1")).thenReturn(mockTab);
+
+            testService.process();
+        }
+
+        JSONObject json = parseJsonResponse(responseWriter.toString());
+        assertTrue("Success should be true when all steps succeed", json.getBoolean(KEY_SUCCESS));
     }
 }

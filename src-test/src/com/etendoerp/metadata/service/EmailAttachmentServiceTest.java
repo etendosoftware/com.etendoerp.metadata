@@ -114,4 +114,38 @@ public class EmailAttachmentServiceTest extends BaseMetadataServiceTest {
     public void testGetFallbackErrorMessage_returnsExpected() {
         assertEquals("Failed to load attachments.", emailAttachmentService.getFallbackErrorMessage());
     }
+
+    /**
+     * Covers lines 61-64 of EmailAttachmentService.executeEmailAction (success path)
+     * by mocking OBDal.get() so the method proceeds past the tab lookup without a real DB.
+     */
+    @SuppressWarnings("rawtypes")
+    @Test
+    public void testExecuteEmailAction_successPath_withMockedTab() throws Exception {
+        // RETURNS_DEEP_STUBS so mockTab.getTable() is non-null and .getId() can be stubbed
+        Tab mockTab = mock(Tab.class, RETURNS_DEEP_STUBS);
+        when(mockTab.getTable().getId()).thenReturn("table-1");
+
+        when(mockRequest.getParameter("recordId")).thenReturn("rec-1");
+        when(mockRequest.getParameter("tabId")).thenReturn("tab-1");
+
+        try (org.mockito.MockedStatic<OBDal> obdal = mockStatic(OBDal.class)) {
+            OBDal mockDal = mock(OBDal.class);
+            obdal.when(OBDal::getInstance).thenReturn(mockDal);
+            when(mockDal.get(Tab.class, "tab-1")).thenReturn(mockTab);
+
+            org.hibernate.Session mockSession = mock(org.hibernate.Session.class);
+            org.hibernate.query.NativeQuery mockQuery = mock(org.hibernate.query.NativeQuery.class);
+            when(mockDal.getSession()).thenReturn(mockSession);
+            when(mockSession.createNativeQuery(anyString())).thenReturn(mockQuery);
+            when(mockQuery.setParameter(anyString(), any())).thenReturn(mockQuery);
+            when(mockQuery.list()).thenReturn(java.util.Collections.emptyList());
+
+            emailAttachmentService.process();
+        }
+
+        JSONObject json = parseJsonResponse(responseWriter.toString());
+        assertTrue("Success should be true when tab and record lookup succeed", json.getBoolean(KEY_SUCCESS));
+        assertTrue("Response should contain attachments key", json.has("attachments"));
+    }
 }

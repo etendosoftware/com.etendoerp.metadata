@@ -442,4 +442,28 @@ public class EmailBaseServiceTest extends BaseMetadataServiceTest {
     public void testGetFallbackErrorMessage_returnsExpected() {
         assertEquals("Stub fallback error", service.getFallbackErrorMessage());
     }
+
+    // ── queryAttachments: non-null params (covers lines 207-213) ─────────────
+
+    /**
+     * Calls queryAttachments with non-null params so the native SQL path executes.
+     * The query returns an empty result for any unknown table/record combination.
+     * This covers the try-block body (lines 207-213) without relying on real records.
+     */
+    @Test
+    public void testQueryAttachments_withNonNullParams_executesNativeQuery() {
+        JSONArray result = service.callQueryAttachments("0", "00000000000000000000000000000001");
+        assertNotNull("Result should not be null", result);
+        assertEquals("Should return empty array for unknown ids", 0, result.length());
+    }
+
+    /**
+     * Calls queryAttachments with a record ID that contains dashes — verifies the
+     * normalisation and the full try-block body run without error.
+     */
+    @Test
+    public void testQueryAttachments_withDashedRecordId_normalisesAndReturnsEmpty() {
+        JSONArray result = service.callQueryAttachments("259", "00000000-0000-0000-0000-000000000001");
+        assertNotNull("Result should not be null", result);
+    }
 }
