@@ -51,6 +51,7 @@ public class EmailBaseServiceTest extends BaseMetadataServiceTest {
     private static final String PROP_DOCSTATUS    = "docstatus";
     private static final String PROP_ORGANIZATION = "organization";
     private static final String SENDER_TEST_EMAIL = "sender@test.com";
+    private static final String MSG_RESULT_NOT_NULL = "Result should not be null";
 
     /** Minimal concrete subclass that exposes protected helpers for direct testing. */
     private static class StubEmailService extends EmailBaseService {
@@ -339,14 +340,14 @@ public class EmailBaseServiceTest extends BaseMetadataServiceTest {
     @Test
     public void testQueryAttachments_nullTableId_returnsEmptyArray() {
         JSONArray result = service.callQueryAttachments(null, "some-record-id");
-        assertNotNull("Result should not be null", result);
+        assertNotNull(MSG_RESULT_NOT_NULL, result);
         assertEquals("Should return empty array for null tableId", 0, result.length());
     }
 
     @Test
     public void testQueryAttachments_nullRecordId_returnsEmptyArray() {
         JSONArray result = service.callQueryAttachments("some-table-id", null);
-        assertNotNull("Result should not be null", result);
+        assertNotNull(MSG_RESULT_NOT_NULL, result);
         assertEquals("Should return empty array for null recordId", 0, result.length());
     }
 
@@ -453,7 +454,7 @@ public class EmailBaseServiceTest extends BaseMetadataServiceTest {
     @Test
     public void testQueryAttachments_withNonNullParams_executesNativeQuery() {
         JSONArray result = service.callQueryAttachments("0", "00000000000000000000000000000001");
-        assertNotNull("Result should not be null", result);
+        assertNotNull(MSG_RESULT_NOT_NULL, result);
         assertEquals("Should return empty array for unknown ids", 0, result.length());
     }
 
@@ -464,6 +465,6 @@ public class EmailBaseServiceTest extends BaseMetadataServiceTest {
     @Test
     public void testQueryAttachments_withDashedRecordId_normalisesAndReturnsEmpty() {
         JSONArray result = service.callQueryAttachments("259", "00000000-0000-0000-0000-000000000001");
-        assertNotNull("Result should not be null", result);
+        assertNotNull(MSG_RESULT_NOT_NULL, result);
     }
 }

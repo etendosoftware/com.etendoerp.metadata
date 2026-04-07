@@ -104,6 +104,7 @@ public class EmailSendServiceTest extends BaseMetadataServiceTest {
     private static final String TEMP_DIR_PREFIX           = "test_email_send_";
     private static final String POSIX_OWNER_RWX           = "rwx------";
     private static final String DEST_EMAIL                = "dest@test.com";
+    private static final String SENDER_TEST_EMAIL          = "sender@test.com";
 
     private EmailSendService emailSendService;
 
@@ -374,7 +375,7 @@ public class EmailSendServiceTest extends BaseMetadataServiceTest {
         if (ctx == null) return;
 
         EmailServerConfiguration mockSmtp = mock(EmailServerConfiguration.class);
-        when(mockSmtp.getSmtpServerSenderAddress()).thenReturn("sender@test.com");
+        when(mockSmtp.getSmtpServerSenderAddress()).thenReturn(SENDER_TEST_EMAIL);
 
         TestableEmailSendService testService =
                 new TestableEmailSendService(mockRequest, mockResponse, mockSmtp);
@@ -395,7 +396,7 @@ public class EmailSendServiceTest extends BaseMetadataServiceTest {
         if (ctx == null) return;
 
         EmailServerConfiguration mockSmtp = mock(EmailServerConfiguration.class);
-        when(mockSmtp.getSmtpServerSenderAddress()).thenReturn("sender@test.com");
+        when(mockSmtp.getSmtpServerSenderAddress()).thenReturn(SENDER_TEST_EMAIL);
 
         TestableEmailSendService testService =
                 new TestableEmailSendService(mockRequest, mockResponse, mockSmtp);
@@ -519,15 +520,15 @@ public class EmailSendServiceTest extends BaseMetadataServiceTest {
         // Required params
         when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn("rec-1");
         when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn("tab-1");
-        when(mockRequest.getParameter("to")).thenReturn("dest@test.com");
-        when(mockRequest.getParameter("subject")).thenReturn("Test Subject");
+        when(mockRequest.getParameter(PARAM_TO)).thenReturn(DEST_EMAIL);
+        when(mockRequest.getParameter(PARAM_SUBJECT)).thenReturn(SAMPLE_SUBJECT);
         when(mockRequest.getParameter("notes")).thenReturn(null);
         when(mockRequest.getParameter("archive")).thenReturn(null);
         when(mockRequest.getParameter("cc")).thenReturn(null);
         when(mockRequest.getParameter("bcc")).thenReturn(null);
         when(mockRequest.getParameter("replyTo")).thenReturn(null);
         when(mockRequest.getParameter("templateId")).thenReturn(null);
-        when(mockRequest.getParameterValues("recordAttachmentId")).thenReturn(null);
+        when(mockRequest.getParameterValues(FIELD_RECORD_ATTACHMENT)).thenReturn(null);
         when(mockRequest.getContentType()).thenReturn("application/json");
 
         Tab mockTab = mock(Tab.class);
@@ -536,7 +537,7 @@ public class EmailSendServiceTest extends BaseMetadataServiceTest {
         when(mockRecord.get("organization")).thenReturn(mockOrg);
 
         EmailServerConfiguration mockSmtp = mock(EmailServerConfiguration.class);
-        when(mockSmtp.getSmtpServerSenderAddress()).thenReturn("sender@test.com");
+        when(mockSmtp.getSmtpServerSenderAddress()).thenReturn(SENDER_TEST_EMAIL);
 
         EmailSendService testService = new EmailSendService(mockRequest, mockResponse) {
             @Override
