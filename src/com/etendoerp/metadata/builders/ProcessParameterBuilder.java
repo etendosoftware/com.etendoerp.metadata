@@ -56,6 +56,16 @@ public class ProcessParameterBuilder extends Builder {
                 && LIST_REFERENCE_ID.contains(parameter.getReference().getId());
     }
 
+    private static boolean isButtonParameter(ProcessParameter parameter) {
+        return parameter != null && parameter.getReference() != null &&
+               BUTTON_REFERENCE_ID.equals(parameter.getReference().getId());
+    }
+
+    private static boolean isButtonListParameter(ProcessParameter parameter) {
+        return parameter != null && parameter.getReference() != null &&
+               "FF80818132F94B500132F9575619000A".equals(parameter.getReference().getId());
+    }
+
     @Override
     public JSONObject toJSON() throws JSONException {
         ProcessParameter currentParameter = this.parameter;
@@ -70,11 +80,13 @@ public class ProcessParameterBuilder extends Builder {
         }
 
         // List reference
-        if (isListParameter(currentParameter)) {
-            json.put(
-                    "refList",
-                    getListInfo(currentParameter.getReferenceSearchKey(), language)
-            );
+        if (isListParameter(currentParameter) || isButtonListParameter(currentParameter) || isButtonParameter(currentParameter)) {
+            if (currentParameter.getReferenceSearchKey() != null) {
+                json.put(
+                        "refList",
+                        getListInfo(currentParameter.getReferenceSearchKey(), language)
+                );
+            }
         }
 
         // Explicit legacy flags
