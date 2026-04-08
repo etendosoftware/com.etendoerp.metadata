@@ -30,7 +30,12 @@ import java.math.BigDecimal;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
+import com.google.common.util.concurrent.MoreExecutors;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 import org.mockito.MockedStatic;
 import org.openbravo.base.provider.OBProvider;
@@ -66,6 +71,31 @@ public class CallAsyncProcessTest extends OBBaseTest {
     private static final String DECIMAL_PARAM = "DecimalParam";
     private static final String VALUE_STRING = "Value";
     private static final String ZERO_STRING = "0";
+
+    private ExecutorService originalExecutor;
+
+    /**
+     * Sets up the test environment.
+     * Uses a direct executor service to run background tasks synchronously in tests.
+     */
+    @Before
+    @Override
+    public void setUp() {
+        super.setUp();
+        originalExecutor = CallAsyncProcess.getInstance().getExecutorService();
+        CallAsyncProcess.getInstance().setExecutorService(MoreExecutors.newDirectExecutorService());
+    }
+
+    /**
+     * Cleans up the test environment.
+     * Restores the original executor service.
+     */
+    @After
+    public void tearDown() {
+        if (originalExecutor != null) {
+            CallAsyncProcess.getInstance().setExecutorService(originalExecutor);
+        }
+    }
 
     /**
      * Tests that getInstance returns the same instance.

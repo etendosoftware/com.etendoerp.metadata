@@ -23,6 +23,8 @@ import static com.etendoerp.metadata.MetadataTestConstants.READONLY_LOGIC;
 import static com.etendoerp.metadata.MetadataTestConstants.READ_ONLY_LOGIC_EXPRESSION;
 import static com.etendoerp.metadata.MetadataTestConstants.REF_LIST;
 import static com.etendoerp.metadata.MetadataTestConstants.SELECTOR;
+import static com.etendoerp.metadata.MetadataTestConstants.VALUE;
+import static com.etendoerp.metadata.MetadataTestConstants.LABEL;
 import static com.etendoerp.metadata.MetadataTestConstants.WINDOW;
 import static com.etendoerp.metadata.MetadataTestConstants.WINDOW_ID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -335,8 +337,8 @@ class ParameterBuilderTest {
       JSONArray refListInfo = new JSONArray();
       JSONObject listItem = new JSONObject();
       listItem.put("id", "list-item-1");
-      listItem.put("value", "VALUE1");
-      listItem.put("label", "List Item 1");
+      listItem.put(VALUE, "VALUE1");
+      listItem.put(LABEL, "List Item 1");
       refListInfo.put(listItem);
 
       mockedFieldBuilder.when(() -> FieldBuilder.getListInfo(mockReferenceSearchKey, mockLanguage))
@@ -351,8 +353,8 @@ class ParameterBuilderTest {
       assertEquals(1, refList.length());
       JSONObject item = refList.getJSONObject(0);
       assertEquals("list-item-1", item.getString("id"));
-      assertEquals("VALUE1", item.getString("value"));
-      assertEquals("List Item 1", item.getString("label"));
+      assertEquals("VALUE1", item.getString(VALUE));
+      assertEquals("List Item 1", item.getString(LABEL));
     }
   }
 
@@ -603,8 +605,8 @@ class ParameterBuilderTest {
 
       JSONArray refListInfo = new JSONArray();
       JSONObject listItem = new JSONObject();
-      listItem.put("value", "BUTTON_VAL");
-      listItem.put("label", "Button Label");
+      listItem.put(VALUE, "BUTTON_VAL");
+      listItem.put(LABEL, "Button Label");
       refListInfo.put(listItem);
 
       mockedFieldBuilder.when(() -> FieldBuilder.getListInfo(mockReferenceSearchKey, mockLanguage))
@@ -649,8 +651,8 @@ class ParameterBuilderTest {
 
       JSONArray refListInfo = new JSONArray();
       JSONObject listItem = new JSONObject();
-      listItem.put("value", "LIST_VAL");
-      listItem.put("label", "List Label");
+      listItem.put(VALUE, "LIST_VAL");
+      listItem.put(LABEL, "List Label");
       refListInfo.put(listItem);
 
       mockedFieldBuilder.when(() -> FieldBuilder.getListInfo(mockReferenceSearchKey, mockLanguage))

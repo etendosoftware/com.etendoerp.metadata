@@ -47,10 +47,29 @@ public class CallAsyncProcess extends CallProcess {
   private static final Logger log = LogManager.getLogger(CallAsyncProcess.class);
   public static final String PROCESSING_MSG = "Processing in background...";
   private static CallAsyncProcess instance = new CallAsyncProcess();
-  private final ExecutorService executorService = Executors.newFixedThreadPool(10);
+  private ExecutorService executorService = Executors.newFixedThreadPool(10);
 
   public static synchronized CallAsyncProcess getInstance() {
     return instance;
+  }
+
+  /**
+   * Sets the executor service to use for background processes.
+   * Internal use only, primarily for testing purposes.
+   *
+   * @param executorService the executor service to use
+   */
+  public void setExecutorService(ExecutorService executorService) {
+    this.executorService = executorService;
+  }
+
+  /**
+   * Returns the executor service used for background processes.
+   *
+   * @return the current executor service
+   */
+  public ExecutorService getExecutorService() {
+    return executorService;
   }
 
   @Override
