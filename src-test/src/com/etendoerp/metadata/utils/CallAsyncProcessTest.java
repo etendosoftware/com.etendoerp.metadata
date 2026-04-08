@@ -246,4 +246,79 @@ public class CallAsyncProcessTest extends OBBaseTest {
             assertEquals(pInstance, result);
         }
     }
+
+    /**
+     * Tests the full execution flow, including the background phase.
+     * Since we use a direct executor, the background phase runs synchronously.
+     */
+    @Test
+    public void testFullExecutionFlow() throws Exception {
+        Process process = mock(Process.class);
+        ProcessInstance pInstance = mock(ProcessInstance.class);
+        User user = mock(User.class);
+        Role role = mock(Role.class);
+        Client client = mock(Client.class);
+        Organization org = mock(Organization.class);
+        Language language = mock(Language.class);
+        Warehouse warehouse = mock(Warehouse.class);
+        OBContext obContext = mock(OBContext.class);
+
+        try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
+                MockedStatic<OBProvider> obProviderStatic = mockStatic(OBProvider.class);
+                MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class);
+                MockedStatic<OBPropertiesProvider> obPropsProviderStatic = mockStatic(OBPropertiesProvider.class)) {
+
+            // Mock OBContext
+            obContextStatic.when(OBContext::getOBContext).thenReturn(obContext);
+            when(obContext.getUser()).thenReturn(user);
+            when(obContext.getRole()).thenReturn(role);
+            when(obContext.getCurrentClient()).thenReturn(client);
+            when(obContext.getCurrentOrganization()).thenReturn(org);
+            when(obContext.getLanguage()).thenReturn(language);
+            when(obContext.getWarehouse()).thenReturn(warehouse);
+
+            when(user.getId()).thenReturn(USER_ID);
+            when(role.getId()).thenReturn(ROLE_ID);
+            when(client.getId()).thenReturn(CLIENT_ID);
+            when(org.getId()).thenReturn(ORG_ID);
+            when(language.getLanguage()).thenReturn(LANG_ID);
+            when(warehouse.getId()).thenReturn(WAREHOUSE_ID);
+
+            // Mock OBProvider
+            OBProvider obProvider = mock(OBProvider.class);
+            obProviderStatic.when(OBProvider::getInstance).thenReturn(obProvider);
+            when(obProvider.get(ProcessInstance.class)).thenReturn(pInstance);
+
+            // Mock OBDal
+            OBDal obDal = mock(OBDal.class);
+            obDalStatic.when(OBDal::getInstance).thenReturn(obDal);
+            when(obDal.get(ProcessInstance.class, PINSTANCE_ID)).thenReturn(pInstance);
+            when(obDal.get(Process.class, PROCESS_ID)).thenReturn(process);
+
+            // Mock Connection and Statement for executeProcedure
+            java.sql.Connection conn = mock(java.sql.Connection.class);
+            java.sql.PreparedStatement ps = mock(java.sql.PreparedStatement.class);
+            when(obDal.getConnection(false)).thenReturn(conn);
+            when(conn.prepareStatement(any())).thenReturn(ps);
+
+            // Mock OBProperties
+            OBPropertiesProvider obPropsProvider = mock(OBPropertiesProvider.class);
+            java.util.Properties obProps = new java.util.Properties();
+            obProps.setProperty("bbdd.rdbms", "POSTGRE");
+            obPropsProviderStatic.when(OBPropertiesProvider::getInstance).thenReturn(obPropsProvider);
+            when(obPropsProvider.getOpenbravoProperties()).thenReturn(obProps);
+
+            // Mock Process and Instance IDs
+            when(process.getId()).thenReturn(PROCESS_ID);
+            when(process.getProcedure()).thenReturn("test_procedure");
+            when(pInstance.getId()).thenReturn(PINSTANCE_ID);
+
+            // Execute
+            CallAsyncProcess.getInstance().callProcess(process, RECORD_ID, null, true);
+
+            // Verify background execution side effects
+            verify(ps).execute();
+            verify(obDal).commitAndClose();
+        }
+    }
 }
