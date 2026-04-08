@@ -39,6 +39,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.mockito.MockedStatic;
 import org.openbravo.base.provider.OBProvider;
+import org.openbravo.base.util.OBPropertiesProvider;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.access.Role;
@@ -57,6 +58,18 @@ import org.openbravo.test.base.OBBaseTest;
  */
 public class CallAsyncProcessTest extends OBBaseTest {
 
+    private static final String USER_ID = "USER_ID";
+    private static final String ROLE_ID = "ROLE_ID";
+    private static final String CLIENT_ID = "CLIENT_ID";
+    private static final String ORG_ID = "ORG_ID";
+    private static final String LANG_ID = "en_US";
+    private static final String WAREHOUSE_ID = "WAREHOUSE_ID";
+    private static final String PROCESS_ID = "PROCESS_ID";
+    private static final String PINSTANCE_ID = "PINSTANCE_ID";
+    private static final String RECORD_ID = "RECORD_ID";
+    private static final String STRING_PARAM = "StringParam";
+    private static final String DATE_PARAM = "DateParam";
+    private static final String DECIMAL_PARAM = "DecimalParam";
     private static final String VALUE_STRING = "Value";
     private static final String ZERO_STRING = "0";
 
