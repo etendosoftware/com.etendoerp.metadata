@@ -71,6 +71,8 @@ class ParameterBuilderTest {
   private Parameter mockParameter;
   private OBContext mockContext;
   private Language mockLanguage;
+  private Reference mockReference;
+  private Reference mockReferenceSearchKey;
 
   private static final String DISPLAY_LOGIC_EXPRESSION = "displayLogicExpression";
 
@@ -84,8 +86,64 @@ class ParameterBuilderTest {
     mockParameter = mock(Parameter.class);
     mockContext = mock(OBContext.class);
     mockLanguage = mock(Language.class);
+    mockReference = mock(Reference.class);
+    mockReferenceSearchKey = mock(Reference.class);
 
     when(mockContext.getLanguage()).thenReturn(mockLanguage);
+  }
+
+  /**
+   * Sets up basic reference mocks.
+   */
+  private void setupReference(String referenceId) {
+    if (referenceId != null) {
+      when(mockParameter.getReadOnlyLogic()).thenReturn(null);
+      when(mockParameter.getReference()).thenReturn(mockReference);
+      when(mockParameter.getReferenceSearchKey()).thenReturn(mockReferenceSearchKey);
+      when(mockParameter.getId()).thenReturn(PARAMETER_ID);
+      when(mockReference.getId()).thenReturn(referenceId);
+    }
+  }
+
+  /**
+   * Helper to execute a selector test.
+   */
+  private JSONObject executeSelectorTest(String referenceId, String datasource) throws Exception {
+    setupReference(referenceId);
+    try (MockedStatic<FieldBuilder> mockedFieldBuilder = mockStatic(FieldBuilder.class)) {
+      JSONObject selectorInfo = new JSONObject();
+      if (datasource != null) {
+        selectorInfo.put(DATASOURCE_NAME, datasource);
+      } else {
+        selectorInfo.put("referenceType", referenceId);
+      }
+      mockedFieldBuilder.when(() -> FieldBuilder.getSelectorInfo(PARAMETER_ID, mockReferenceSearchKey))
+          .thenReturn(selectorInfo);
+
+      return executeToJSON(null, null);
+    }
+  }
+
+  /**
+   * Helper to execute a list test.
+   */
+  private JSONObject executeListTest(String referenceId, String itemId, String value, String label) throws Exception {
+    setupReference(referenceId);
+    try (MockedStatic<FieldBuilder> mockedFieldBuilder = mockStatic(FieldBuilder.class)) {
+      JSONArray refListInfo = new JSONArray();
+      JSONObject listItem = new JSONObject();
+      if (itemId != null) {
+        listItem.put("id", itemId);
+      }
+      listItem.put(VALUE, value);
+      listItem.put(LABEL, label);
+      refListInfo.put(listItem);
+
+      mockedFieldBuilder.when(() -> FieldBuilder.getListInfo(mockReferenceSearchKey, mockLanguage))
+          .thenReturn(refListInfo);
+
+      return executeToJSON(null, null);
+    }
   }
 
   /**
@@ -202,28 +260,12 @@ class ParameterBuilderTest {
    */
   @Test
   void toJSONWithSelectorReferenceIncludesSelectorInfo() throws Exception {
-    Reference mockReference = mock(Reference.class);
-    Reference mockReferenceSearchKey = mock(Reference.class);
+    JSONObject result = executeSelectorTest("18", "TestDataSource");
 
-    when(mockParameter.getReadOnlyLogic()).thenReturn(null);
-    when(mockParameter.getReference()).thenReturn(mockReference);
-    when(mockParameter.getReferenceSearchKey()).thenReturn(mockReferenceSearchKey);
-    when(mockParameter.getId()).thenReturn(PARAMETER_ID);
-    when(mockReference.getId()).thenReturn("18");
-
-    try (MockedStatic<FieldBuilder> mockedFieldBuilder = mockStatic(FieldBuilder.class)) {
-      JSONObject selectorInfo = new JSONObject();
-      selectorInfo.put(DATASOURCE_NAME, "TestDataSource");
-      mockedFieldBuilder.when(() -> FieldBuilder.getSelectorInfo(PARAMETER_ID, mockReferenceSearchKey))
-          .thenReturn(selectorInfo);
-
-      JSONObject result = executeToJSON(null, null);
-
-      assertNotNull(result);
-      assertTrue(result.has(SELECTOR));
-      JSONObject selector = result.getJSONObject(SELECTOR);
-      assertEquals("TestDataSource", selector.getString(DATASOURCE_NAME));
-    }
+    assertNotNull(result);
+    assertTrue(result.has(SELECTOR));
+    JSONObject selector = result.getJSONObject(SELECTOR);
+    assertEquals("TestDataSource", selector.getString(DATASOURCE_NAME));
   }
 
   /**
@@ -272,36 +314,16 @@ class ParameterBuilderTest {
    */
   @Test
   void toJSONWithListReferenceIncludesRefListInfo() throws Exception {
-    Reference mockReference = mock(Reference.class);
-    Reference mockReferenceSearchKey = mock(Reference.class);
+    JSONObject result = executeListTest(Constants.LIST_REFERENCE_ID, "list-item-1", "VALUE1", "List Item 1");
 
-    when(mockParameter.getReadOnlyLogic()).thenReturn(null);
-    when(mockParameter.getReference()).thenReturn(mockReference);
-    when(mockParameter.getReferenceSearchKey()).thenReturn(mockReferenceSearchKey);
-    when(mockReference.getId()).thenReturn(Constants.LIST_REFERENCE_ID);
-
-    try (MockedStatic<FieldBuilder> mockedFieldBuilder = mockStatic(FieldBuilder.class)) {
-      JSONArray refListInfo = new JSONArray();
-      JSONObject listItem = new JSONObject();
-      listItem.put("id", "list-item-1");
-      listItem.put(VALUE, "VALUE1");
-      listItem.put(LABEL, "List Item 1");
-      refListInfo.put(listItem);
-
-      mockedFieldBuilder.when(() -> FieldBuilder.getListInfo(mockReferenceSearchKey, mockLanguage))
-          .thenReturn(refListInfo);
-
-      JSONObject result = executeToJSON(null, null);
-
-      assertNotNull(result);
-      assertTrue(result.has(REF_LIST));
-      JSONArray refList = result.getJSONArray(REF_LIST);
-      assertEquals(1, refList.length());
-      JSONObject item = refList.getJSONObject(0);
-      assertEquals("list-item-1", item.getString("id"));
-      assertEquals("VALUE1", item.getString(VALUE));
-      assertEquals("List Item 1", item.getString(LABEL));
-    }
+    assertNotNull(result);
+    assertTrue(result.has(REF_LIST));
+    JSONArray refList = result.getJSONArray(REF_LIST);
+    assertEquals(1, refList.length());
+    JSONObject item = refList.getJSONObject(0);
+    assertEquals("list-item-1", item.getString("id"));
+    assertEquals("VALUE1", item.getString(VALUE));
+    assertEquals("List Item 1", item.getString(LABEL));
   }
 
   /**
@@ -313,15 +335,10 @@ class ParameterBuilderTest {
    */
   @Test
   void toJSONWithWindowReferenceIncludesWindowInfo() throws Exception {
-    Reference mockReference = mock(Reference.class);
-    Reference mockReferenceSearchKey = mock(Reference.class);
     RefWindow mockRefWindow = mock(RefWindow.class);
     Window mockWindow = mock(Window.class);
 
-    when(mockParameter.getReadOnlyLogic()).thenReturn(null);
-    when(mockParameter.getReference()).thenReturn(mockReference);
-    when(mockParameter.getReferenceSearchKey()).thenReturn(mockReferenceSearchKey);
-    when(mockReference.getId()).thenReturn(Constants.WINDOW_REFERENCE_ID);
+    setupReference(Constants.WINDOW_REFERENCE_ID);
 
     List<RefWindow> refWindows = new ArrayList<>();
     refWindows.add(mockRefWindow);
@@ -359,28 +376,12 @@ class ParameterBuilderTest {
     String[] selectorReferenceIds = { "18", "19", "30", "95E2A8B50A254B2AAE6774B8C2F28120", "8C57A4A2E05F4261A1FADF47C30398AD" };
 
     for (String referenceId : selectorReferenceIds) {
-      Reference mockReference = mock(Reference.class);
-      Reference mockReferenceSearchKey = mock(Reference.class);
+      JSONObject result = executeSelectorTest(referenceId, null);
 
-      when(mockParameter.getReadOnlyLogic()).thenReturn(null);
-      when(mockParameter.getReference()).thenReturn(mockReference);
-      when(mockParameter.getReferenceSearchKey()).thenReturn(mockReferenceSearchKey);
-      when(mockParameter.getId()).thenReturn(PARAMETER_ID);
-      when(mockReference.getId()).thenReturn(referenceId);
-
-      try (MockedStatic<FieldBuilder> mockedFieldBuilder = mockStatic(FieldBuilder.class)) {
-        JSONObject selectorInfo = new JSONObject();
-        selectorInfo.put("referenceType", referenceId);
-        mockedFieldBuilder.when(() -> FieldBuilder.getSelectorInfo(PARAMETER_ID, mockReferenceSearchKey))
-            .thenReturn(selectorInfo);
-
-        JSONObject result = executeToJSON(null, null);
-
-        assertNotNull(result);
-        assertTrue(result.has(SELECTOR), "Selector should be present for reference ID: " + referenceId);
-        JSONObject selector = result.getJSONObject(SELECTOR);
-        assertEquals(referenceId, selector.getString("referenceType"));
-      }
+      assertNotNull(result);
+      assertTrue(result.has(SELECTOR), "Selector should be present for reference ID: " + referenceId);
+      JSONObject selector = result.getJSONObject(SELECTOR);
+      assertEquals(referenceId, selector.getString("referenceType"));
     }
   }
 
@@ -393,14 +394,8 @@ class ParameterBuilderTest {
    */
   @Test
   void toJSONWithComplexParameterIncludesAllFeatures() throws Exception {
-    Reference mockReference = mock(Reference.class);
-    Reference mockReferenceSearchKey = mock(Reference.class);
-
+    setupReference("18");
     when(mockParameter.getReadOnlyLogic()).thenReturn(READONLY_LOGIC);
-    when(mockParameter.getReference()).thenReturn(mockReference);
-    when(mockParameter.getReferenceSearchKey()).thenReturn(mockReferenceSearchKey);
-    when(mockParameter.getId()).thenReturn(PARAMETER_ID);
-    when(mockReference.getId()).thenReturn("18");
 
     try (MockedStatic<FieldBuilder> mockedFieldBuilder = mockStatic(FieldBuilder.class);
          MockedConstruction<DynamicExpressionParser> ignored = mockConstruction(DynamicExpressionParser.class,
@@ -474,31 +469,12 @@ class ParameterBuilderTest {
    */
   @Test
   void toJSONWithButtonReferenceIncludesRefListInfo() throws Exception {
-    Reference mockReference = mock(Reference.class);
-    Reference mockReferenceSearchKey = mock(Reference.class);
+    JSONObject result = executeListTest(Constants.BUTTON_REFERENCE_ID, null, "BUTTON_VAL", "Button Label");
 
-    when(mockParameter.getReadOnlyLogic()).thenReturn(null);
-    when(mockParameter.getReference()).thenReturn(mockReference);
-    when(mockParameter.getReferenceSearchKey()).thenReturn(mockReferenceSearchKey);
-    when(mockReference.getId()).thenReturn(Constants.BUTTON_REFERENCE_ID);
-
-    try (MockedStatic<FieldBuilder> mockedFieldBuilder = mockStatic(FieldBuilder.class)) {
-      JSONArray refListInfo = new JSONArray();
-      JSONObject listItem = new JSONObject();
-      listItem.put(VALUE, "BUTTON_VAL");
-      listItem.put(LABEL, "Button Label");
-      refListInfo.put(listItem);
-
-      mockedFieldBuilder.when(() -> FieldBuilder.getListInfo(mockReferenceSearchKey, mockLanguage))
-          .thenReturn(refListInfo);
-
-      JSONObject result = executeToJSON(null, null);
-
-      assertNotNull(result);
-      assertTrue(result.has(REF_LIST));
-      JSONArray refList = result.getJSONArray(REF_LIST);
-      assertEquals(1, refList.length());
-    }
+    assertNotNull(result);
+    assertTrue(result.has(REF_LIST));
+    JSONArray refList = result.getJSONArray(REF_LIST);
+    assertEquals(1, refList.length());
   }
 
   /**
@@ -508,29 +484,9 @@ class ParameterBuilderTest {
    */
   @Test
   void toJSONWithButtonListReferenceIncludesRefListInfo() throws Exception {
-    Reference mockReference = mock(Reference.class);
-    Reference mockReferenceSearchKey = mock(Reference.class);
+    JSONObject result = executeListTest(Constants.BUTTON_LIST_REFERENCE_ID, null, "LIST_VAL", "List Label");
 
-    when(mockParameter.getReadOnlyLogic()).thenReturn(null);
-    when(mockParameter.getReference()).thenReturn(mockReference);
-    when(mockParameter.getReferenceSearchKey()).thenReturn(mockReferenceSearchKey);
-    // Constant ID for Button List
-    when(mockReference.getId()).thenReturn(Constants.BUTTON_LIST_REFERENCE_ID);
-
-    try (MockedStatic<FieldBuilder> mockedFieldBuilder = mockStatic(FieldBuilder.class)) {
-      JSONArray refListInfo = new JSONArray();
-      JSONObject listItem = new JSONObject();
-      listItem.put(VALUE, "LIST_VAL");
-      listItem.put(LABEL, "List Label");
-      refListInfo.put(listItem);
-
-      mockedFieldBuilder.when(() -> FieldBuilder.getListInfo(mockReferenceSearchKey, mockLanguage))
-          .thenReturn(refListInfo);
-
-      JSONObject result = executeToJSON(null, null);
-
-      assertNotNull(result);
-      assertTrue(result.has(REF_LIST));
-    }
+    assertNotNull(result);
+    assertTrue(result.has(REF_LIST));
   }
 }
