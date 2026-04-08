@@ -89,19 +89,44 @@ class ParameterBuilderTest {
   }
 
   /**
-   * Tests that the ParameterBuilder constructor creates an instance successfully.
+   * Helper method to execute toJSON with proper static mocks and construction mocks.
+   * Centralizes the common mocking boilerplate to reduce code duplication.
+   *
+   * @param extraMocks additional mocking configuration to run within the mock context
+   * @param baseName optional name to include in the base JSONObject
+   * @return the resulting JSONObject from parameterBuilder.toJSON()
+   * @throws Exception if processing fails
    */
-  @Test
-  void constructorCreatesInstanceSuccessfully() {
+  private JSONObject executeToJSON(Runnable extraMocks, String baseName) throws Exception {
     try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
-         MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class)) {
+         MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class,
+             (mock, context) -> {
+               JSONObject parameterJson = new JSONObject();
+               parameterJson.put("id", PARAMETER_ID);
+               if (baseName != null) {
+                 parameterJson.put("name", baseName);
+               }
+               when(mock.toJsonObject(any(), eq(DataResolvingMode.FULL_TRANSLATABLE))).thenReturn(parameterJson);
+             })) {
 
       mockedOBContext.when(OBContext::getOBContext).thenReturn(mockContext);
 
-      ParameterBuilder parameterBuilder = new ParameterBuilder(mockParameter);
+      if (extraMocks != null) {
+        extraMocks.run();
+      }
 
-      assertNotNull(parameterBuilder);
+      ParameterBuilder parameterBuilder = new ParameterBuilder(mockParameter);
+      return parameterBuilder.toJSON();
     }
+  }
+
+  /**
+   * Tests that the ParameterBuilder constructor creates an instance successfully.
+   */
+  @Test
+  void constructorCreatesInstanceSuccessfully() throws Exception {
+    executeToJSON(null, null);
+    // If no exception, it was successfull
   }
 
   /**
@@ -116,28 +141,15 @@ class ParameterBuilderTest {
     when(mockParameter.getReadOnlyLogic()).thenReturn(null);
     when(mockParameter.getReference()).thenReturn(null);
 
-    try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
-         MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class,
-             (mock, context) -> {
-               JSONObject parameterJson = new JSONObject();
-               parameterJson.put("id", PARAMETER_ID);
-               parameterJson.put("name", "Test Parameter");
-               when(mock.toJsonObject(any(), eq(DataResolvingMode.FULL_TRANSLATABLE))).thenReturn(parameterJson);
-             })) {
+    JSONObject result = executeToJSON(null, "Test Parameter");
 
-      mockedOBContext.when(OBContext::getOBContext).thenReturn(mockContext);
-
-      ParameterBuilder parameterBuilder = new ParameterBuilder(mockParameter);
-      JSONObject result = parameterBuilder.toJSON();
-
-      assertNotNull(result);
-      assertEquals(PARAMETER_ID, result.getString("id"));
-      assertEquals("Test Parameter", result.getString("name"));
-      assertFalse(result.has(READ_ONLY_LOGIC_EXPRESSION));
-      assertFalse(result.has(SELECTOR));
-      assertFalse(result.has(REF_LIST));
-      assertFalse(result.has(WINDOW));
-    }
+    assertNotNull(result);
+    assertEquals(PARAMETER_ID, result.getString("id"));
+    assertEquals("Test Parameter", result.getString("name"));
+    assertFalse(result.has(READ_ONLY_LOGIC_EXPRESSION));
+    assertFalse(result.has(SELECTOR));
+    assertFalse(result.has(REF_LIST));
+    assertFalse(result.has(WINDOW));
   }
 
   /**
@@ -152,20 +164,10 @@ class ParameterBuilderTest {
     when(mockParameter.getReadOnlyLogic()).thenReturn(READONLY_LOGIC);
     when(mockParameter.getReference()).thenReturn(null);
 
-    try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
-         MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class,
-             (mock, context) -> {
-               JSONObject parameterJson = new JSONObject();
-               parameterJson.put("id", PARAMETER_ID);
-               when(mock.toJsonObject(any(), eq(DataResolvingMode.FULL_TRANSLATABLE))).thenReturn(parameterJson);
-             });
-         MockedConstruction<DynamicExpressionParser> ignored2 = mockConstruction(DynamicExpressionParser.class,
+    try (MockedConstruction<DynamicExpressionParser> ignored = mockConstruction(DynamicExpressionParser.class,
              (mock, context) -> when(mock.getJSExpression()).thenReturn(JS_EXPRESSION))) {
-
-      mockedOBContext.when(OBContext::getOBContext).thenReturn(mockContext);
-
-      ParameterBuilder parameterBuilder = new ParameterBuilder(mockParameter);
-      JSONObject result = parameterBuilder.toJSON();
+      
+      JSONObject result = executeToJSON(null, null);
 
       assertNotNull(result);
       assertTrue(result.has(READ_ONLY_LOGIC_EXPRESSION));
@@ -185,22 +187,10 @@ class ParameterBuilderTest {
     when(mockParameter.getReadOnlyLogic()).thenReturn("   ");
     when(mockParameter.getReference()).thenReturn(null);
 
-    try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
-         MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class,
-             (mock, context) -> {
-               JSONObject parameterJson = new JSONObject();
-               parameterJson.put("id", PARAMETER_ID);
-               when(mock.toJsonObject(any(), eq(DataResolvingMode.FULL_TRANSLATABLE))).thenReturn(parameterJson);
-             })) {
+    JSONObject result = executeToJSON(null, null);
 
-      mockedOBContext.when(OBContext::getOBContext).thenReturn(mockContext);
-
-      ParameterBuilder parameterBuilder = new ParameterBuilder(mockParameter);
-      JSONObject result = parameterBuilder.toJSON();
-
-      assertNotNull(result);
-      assertFalse(result.has(READ_ONLY_LOGIC_EXPRESSION));
-    }
+    assertNotNull(result);
+    assertFalse(result.has(READ_ONLY_LOGIC_EXPRESSION));
   }
 
   /**
@@ -221,24 +211,13 @@ class ParameterBuilderTest {
     when(mockParameter.getId()).thenReturn(PARAMETER_ID);
     when(mockReference.getId()).thenReturn("18");
 
-    try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
-         MockedStatic<FieldBuilder> mockedFieldBuilder = mockStatic(FieldBuilder.class);
-         MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class,
-             (mock, context) -> {
-               JSONObject parameterJson = new JSONObject();
-               parameterJson.put("id", PARAMETER_ID);
-               when(mock.toJsonObject(any(), eq(DataResolvingMode.FULL_TRANSLATABLE))).thenReturn(parameterJson);
-             })) {
-
-      mockedOBContext.when(OBContext::getOBContext).thenReturn(mockContext);
-
+    try (MockedStatic<FieldBuilder> mockedFieldBuilder = mockStatic(FieldBuilder.class)) {
       JSONObject selectorInfo = new JSONObject();
       selectorInfo.put(DATASOURCE_NAME, "TestDataSource");
       mockedFieldBuilder.when(() -> FieldBuilder.getSelectorInfo(PARAMETER_ID, mockReferenceSearchKey))
           .thenReturn(selectorInfo);
 
-      ParameterBuilder parameterBuilder = new ParameterBuilder(mockParameter);
-      JSONObject result = parameterBuilder.toJSON();
+      JSONObject result = executeToJSON(null, null);
 
       assertNotNull(result);
       assertTrue(result.has(SELECTOR));
@@ -259,20 +238,10 @@ class ParameterBuilderTest {
     when(mockParameter.getDisplayLogic()).thenReturn("P_Display_Logic");
     when(mockParameter.getReference()).thenReturn(null);
 
-    try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
-         MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class,
-             (mock, context) -> {
-               JSONObject parameterJson = new JSONObject();
-               parameterJson.put("id", PARAMETER_ID);
-               when(mock.toJsonObject(any(), eq(DataResolvingMode.FULL_TRANSLATABLE))).thenReturn(parameterJson);
-             });
-         MockedConstruction<DynamicExpressionParser> ignored2 = mockConstruction(DynamicExpressionParser.class,
+    try (MockedConstruction<DynamicExpressionParser> ignored = mockConstruction(DynamicExpressionParser.class,
              (mock, context) -> when(mock.getJSExpression()).thenReturn("parsedDisplayLogic"))) {
 
-      mockedOBContext.when(OBContext::getOBContext).thenReturn(mockContext);
-
-      ParameterBuilder parameterBuilder = new ParameterBuilder(mockParameter);
-      JSONObject result = parameterBuilder.toJSON();
+      JSONObject result = executeToJSON(null, null);
 
       assertNotNull(result);
       assertTrue(result.has(DISPLAY_LOGIC_EXPRESSION));
@@ -288,22 +257,10 @@ class ParameterBuilderTest {
     when(mockParameter.getDisplayLogic()).thenReturn("   ");
     when(mockParameter.getReference()).thenReturn(null);
 
-    try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
-         MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class,
-             (mock, context) -> {
-               JSONObject parameterJson = new JSONObject();
-               parameterJson.put("id", PARAMETER_ID);
-               when(mock.toJsonObject(any(), eq(DataResolvingMode.FULL_TRANSLATABLE))).thenReturn(parameterJson);
-             })) {
+    JSONObject result = executeToJSON(null, null);
 
-      mockedOBContext.when(OBContext::getOBContext).thenReturn(mockContext);
-
-      ParameterBuilder parameterBuilder = new ParameterBuilder(mockParameter);
-      JSONObject result = parameterBuilder.toJSON();
-
-      assertNotNull(result);
-      assertFalse(result.has(DISPLAY_LOGIC_EXPRESSION));
-    }
+    assertNotNull(result);
+    assertFalse(result.has(DISPLAY_LOGIC_EXPRESSION));
   }
 
   /**
@@ -323,17 +280,7 @@ class ParameterBuilderTest {
     when(mockParameter.getReferenceSearchKey()).thenReturn(mockReferenceSearchKey);
     when(mockReference.getId()).thenReturn(Constants.LIST_REFERENCE_ID);
 
-    try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
-         MockedStatic<FieldBuilder> mockedFieldBuilder = mockStatic(FieldBuilder.class);
-         MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class,
-             (mock, context) -> {
-               JSONObject parameterJson = new JSONObject();
-               parameterJson.put("id", PARAMETER_ID);
-               when(mock.toJsonObject(any(), eq(DataResolvingMode.FULL_TRANSLATABLE))).thenReturn(parameterJson);
-             })) {
-
-      mockedOBContext.when(OBContext::getOBContext).thenReturn(mockContext);
-
+    try (MockedStatic<FieldBuilder> mockedFieldBuilder = mockStatic(FieldBuilder.class)) {
       JSONArray refListInfo = new JSONArray();
       JSONObject listItem = new JSONObject();
       listItem.put("id", "list-item-1");
@@ -344,8 +291,7 @@ class ParameterBuilderTest {
       mockedFieldBuilder.when(() -> FieldBuilder.getListInfo(mockReferenceSearchKey, mockLanguage))
           .thenReturn(refListInfo);
 
-      ParameterBuilder parameterBuilder = new ParameterBuilder(mockParameter);
-      JSONObject result = parameterBuilder.toJSON();
+      JSONObject result = executeToJSON(null, null);
 
       assertNotNull(result);
       assertTrue(result.has(REF_LIST));
@@ -383,14 +329,7 @@ class ParameterBuilderTest {
     when(mockRefWindow.getWindow()).thenReturn(mockWindow);
     when(mockWindow.getId()).thenReturn(WINDOW_ID);
 
-    try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
-         MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class,
-             (mock, context) -> {
-               JSONObject parameterJson = new JSONObject();
-               parameterJson.put("id", PARAMETER_ID);
-               when(mock.toJsonObject(any(), eq(DataResolvingMode.FULL_TRANSLATABLE))).thenReturn(parameterJson);
-             });
-         MockedConstruction<WindowBuilder> ignored2 = mockConstruction(WindowBuilder.class,
+    try (MockedConstruction<WindowBuilder> ignored = mockConstruction(WindowBuilder.class,
              (mock, context) -> {
                JSONObject windowJson = new JSONObject();
                windowJson.put("id", WINDOW_ID);
@@ -398,10 +337,7 @@ class ParameterBuilderTest {
                when(mock.toJSON()).thenReturn(windowJson);
              })) {
 
-      mockedOBContext.when(OBContext::getOBContext).thenReturn(mockContext);
-
-      ParameterBuilder parameterBuilder = new ParameterBuilder(mockParameter);
-      JSONObject result = parameterBuilder.toJSON();
+      JSONObject result = executeToJSON(null, null);
 
       assertNotNull(result);
       assertTrue(result.has(WINDOW));
@@ -432,24 +368,13 @@ class ParameterBuilderTest {
       when(mockParameter.getId()).thenReturn(PARAMETER_ID);
       when(mockReference.getId()).thenReturn(referenceId);
 
-      try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
-           MockedStatic<FieldBuilder> mockedFieldBuilder = mockStatic(FieldBuilder.class);
-           MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class,
-               (mock, context) -> {
-                 JSONObject parameterJson = new JSONObject();
-                 parameterJson.put("id", PARAMETER_ID);
-                 when(mock.toJsonObject(any(), eq(DataResolvingMode.FULL_TRANSLATABLE))).thenReturn(parameterJson);
-               })) {
-
-        mockedOBContext.when(OBContext::getOBContext).thenReturn(mockContext);
-
+      try (MockedStatic<FieldBuilder> mockedFieldBuilder = mockStatic(FieldBuilder.class)) {
         JSONObject selectorInfo = new JSONObject();
         selectorInfo.put("referenceType", referenceId);
         mockedFieldBuilder.when(() -> FieldBuilder.getSelectorInfo(PARAMETER_ID, mockReferenceSearchKey))
             .thenReturn(selectorInfo);
 
-        ParameterBuilder parameterBuilder = new ParameterBuilder(mockParameter);
-        JSONObject result = parameterBuilder.toJSON();
+        JSONObject result = executeToJSON(null, null);
 
         assertNotNull(result);
         assertTrue(result.has(SELECTOR), "Selector should be present for reference ID: " + referenceId);
@@ -477,27 +402,16 @@ class ParameterBuilderTest {
     when(mockParameter.getId()).thenReturn(PARAMETER_ID);
     when(mockReference.getId()).thenReturn("18");
 
-    try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
-         MockedStatic<FieldBuilder> mockedFieldBuilder = mockStatic(FieldBuilder.class);
-         MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class,
-             (mock, context) -> {
-               JSONObject parameterJson = new JSONObject();
-               parameterJson.put("id", PARAMETER_ID);
-               parameterJson.put("name", "Complex Parameter");
-               when(mock.toJsonObject(any(), eq(DataResolvingMode.FULL_TRANSLATABLE))).thenReturn(parameterJson);
-             });
-         MockedConstruction<DynamicExpressionParser> ignored2 = mockConstruction(DynamicExpressionParser.class,
+    try (MockedStatic<FieldBuilder> mockedFieldBuilder = mockStatic(FieldBuilder.class);
+         MockedConstruction<DynamicExpressionParser> ignored = mockConstruction(DynamicExpressionParser.class,
              (mock, context) -> when(mock.getJSExpression()).thenReturn(JS_EXPRESSION))) {
-
-      mockedOBContext.when(OBContext::getOBContext).thenReturn(mockContext);
 
       JSONObject selectorInfo = new JSONObject();
       selectorInfo.put(DATASOURCE_NAME, "ComplexDataSource");
       mockedFieldBuilder.when(() -> FieldBuilder.getSelectorInfo(PARAMETER_ID, mockReferenceSearchKey))
           .thenReturn(selectorInfo);
 
-      ParameterBuilder parameterBuilder = new ParameterBuilder(mockParameter);
-      JSONObject result = parameterBuilder.toJSON();
+      JSONObject result = executeToJSON(null, "Complex Parameter");
 
       assertNotNull(result);
       assertEquals(PARAMETER_ID, result.getString("id"));
@@ -522,24 +436,12 @@ class ParameterBuilderTest {
     when(mockParameter.getReadOnlyLogic()).thenReturn(null);
     when(mockParameter.getReference()).thenReturn(null);
 
-    try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
-         MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class,
-             (mock, context) -> {
-               JSONObject parameterJson = new JSONObject();
-               parameterJson.put("id", PARAMETER_ID);
-               when(mock.toJsonObject(any(), eq(DataResolvingMode.FULL_TRANSLATABLE))).thenReturn(parameterJson);
-             })) {
+    JSONObject result = executeToJSON(null, null);
 
-      mockedOBContext.when(OBContext::getOBContext).thenReturn(mockContext);
-
-      ParameterBuilder parameterBuilder = new ParameterBuilder(mockParameter);
-      JSONObject result = parameterBuilder.toJSON();
-
-      assertNotNull(result);
-      assertFalse(result.has(SELECTOR));
-      assertFalse(result.has(REF_LIST));
-      assertFalse(result.has(WINDOW));
-    }
+    assertNotNull(result);
+    assertFalse(result.has(SELECTOR));
+    assertFalse(result.has(REF_LIST));
+    assertFalse(result.has(WINDOW));
   }
 
   /**
@@ -557,24 +459,12 @@ class ParameterBuilderTest {
     when(mockParameter.getReference()).thenReturn(mockReference);
     when(mockReference.getId()).thenReturn("UNKNOWN_REFERENCE_ID");
 
-    try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
-         MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class,
-             (mock, context) -> {
-               JSONObject parameterJson = new JSONObject();
-               parameterJson.put("id", PARAMETER_ID);
-               when(mock.toJsonObject(any(), eq(DataResolvingMode.FULL_TRANSLATABLE))).thenReturn(parameterJson);
-             })) {
+    JSONObject result = executeToJSON(null, null);
 
-      mockedOBContext.when(OBContext::getOBContext).thenReturn(mockContext);
-
-      ParameterBuilder parameterBuilder = new ParameterBuilder(mockParameter);
-      JSONObject result = parameterBuilder.toJSON();
-
-      assertNotNull(result);
-      assertFalse(result.has(SELECTOR));
-      assertFalse(result.has(REF_LIST));
-      assertFalse(result.has(WINDOW));
-    }
+    assertNotNull(result);
+    assertFalse(result.has(SELECTOR));
+    assertFalse(result.has(REF_LIST));
+    assertFalse(result.has(WINDOW));
   }
 
   /**
@@ -592,17 +482,7 @@ class ParameterBuilderTest {
     when(mockParameter.getReferenceSearchKey()).thenReturn(mockReferenceSearchKey);
     when(mockReference.getId()).thenReturn(Constants.BUTTON_REFERENCE_ID);
 
-    try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
-         MockedStatic<FieldBuilder> mockedFieldBuilder = mockStatic(FieldBuilder.class);
-         MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class,
-             (mock, context) -> {
-               JSONObject parameterJson = new JSONObject();
-               parameterJson.put("id", PARAMETER_ID);
-               when(mock.toJsonObject(any(), eq(DataResolvingMode.FULL_TRANSLATABLE))).thenReturn(parameterJson);
-             })) {
-
-      mockedOBContext.when(OBContext::getOBContext).thenReturn(mockContext);
-
+    try (MockedStatic<FieldBuilder> mockedFieldBuilder = mockStatic(FieldBuilder.class)) {
       JSONArray refListInfo = new JSONArray();
       JSONObject listItem = new JSONObject();
       listItem.put(VALUE, "BUTTON_VAL");
@@ -612,8 +492,7 @@ class ParameterBuilderTest {
       mockedFieldBuilder.when(() -> FieldBuilder.getListInfo(mockReferenceSearchKey, mockLanguage))
           .thenReturn(refListInfo);
 
-      ParameterBuilder parameterBuilder = new ParameterBuilder(mockParameter);
-      JSONObject result = parameterBuilder.toJSON();
+      JSONObject result = executeToJSON(null, null);
 
       assertNotNull(result);
       assertTrue(result.has(REF_LIST));
@@ -638,17 +517,7 @@ class ParameterBuilderTest {
     // Constant ID for Button List
     when(mockReference.getId()).thenReturn(Constants.BUTTON_LIST_REFERENCE_ID);
 
-    try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
-         MockedStatic<FieldBuilder> mockedFieldBuilder = mockStatic(FieldBuilder.class);
-         MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class,
-             (mock, context) -> {
-               JSONObject parameterJson = new JSONObject();
-               parameterJson.put("id", PARAMETER_ID);
-               when(mock.toJsonObject(any(), eq(DataResolvingMode.FULL_TRANSLATABLE))).thenReturn(parameterJson);
-             })) {
-
-      mockedOBContext.when(OBContext::getOBContext).thenReturn(mockContext);
-
+    try (MockedStatic<FieldBuilder> mockedFieldBuilder = mockStatic(FieldBuilder.class)) {
       JSONArray refListInfo = new JSONArray();
       JSONObject listItem = new JSONObject();
       listItem.put(VALUE, "LIST_VAL");
@@ -658,8 +527,7 @@ class ParameterBuilderTest {
       mockedFieldBuilder.when(() -> FieldBuilder.getListInfo(mockReferenceSearchKey, mockLanguage))
           .thenReturn(refListInfo);
 
-      ParameterBuilder parameterBuilder = new ParameterBuilder(mockParameter);
-      JSONObject result = parameterBuilder.toJSON();
+      JSONObject result = executeToJSON(null, null);
 
       assertNotNull(result);
       assertTrue(result.has(REF_LIST));
