@@ -573,6 +573,8 @@ class ParameterBuilderTest {
       assertFalse(result.has(REF_LIST));
       assertFalse(result.has(WINDOW));
     }
+  }
+
   /**
    * Tests the toJSON method includes reference list information for button references.
    * 
@@ -616,6 +618,8 @@ class ParameterBuilderTest {
       JSONArray refList = result.getJSONArray(REF_LIST);
       assertEquals(1, refList.length());
     }
+  }
+
   /**
    * Tests the toJSON method includes reference list information for button list references.
    * 
