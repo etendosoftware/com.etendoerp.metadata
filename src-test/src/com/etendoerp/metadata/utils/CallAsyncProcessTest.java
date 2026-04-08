@@ -80,7 +80,7 @@ public class CallAsyncProcessTest extends OBBaseTest {
      */
     @Before
     @Override
-    public void setUp() {
+    public void setUp() throws Exception {
         super.setUp();
         originalExecutor = CallAsyncProcess.getInstance().getExecutorService();
         CallAsyncProcess.getInstance().setExecutorService(MoreExecutors.newDirectExecutorService());
