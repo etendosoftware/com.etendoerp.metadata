@@ -24,8 +24,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.openbravo.base.exception.OBException;
 import org.openbravo.client.kernel.RequestContext;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpSession;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;

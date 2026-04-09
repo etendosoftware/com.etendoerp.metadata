@@ -22,8 +22,8 @@ import com.etendoerp.metadata.exceptions.InternalServerException;
 import org.codehaus.jettison.json.JSONException;
 import org.openbravo.dal.core.OBContext;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 
 /**

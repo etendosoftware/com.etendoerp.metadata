@@ -20,7 +20,7 @@ package com.etendoerp.metadata.data;
 import java.util.HashMap;
 import java.util.Map;
 
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 
 import org.openbravo.base.secureApp.VariablesSecureApp;
 
