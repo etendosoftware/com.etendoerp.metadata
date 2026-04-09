@@ -24,7 +24,7 @@ import static org.openbravo.model.ad.system.Language.PROPERTY_NAME;
 import java.util.List;
 
 import org.codehaus.jettison.json.JSONObject;
-import org.hibernate.criterion.Restrictions;
+import org.openbravo.dal.service.Restrictions;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.system.Language;
 import org.openbravo.service.json.DataResolvingMode;

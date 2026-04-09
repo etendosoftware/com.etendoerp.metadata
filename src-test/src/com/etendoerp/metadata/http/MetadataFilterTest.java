@@ -4,15 +4,15 @@ import org.junit.Before;
 import org.junit.Test;
 import org.openbravo.base.weld.test.WeldBaseTest;
 
-import javax.servlet.FilterChain;
-import javax.servlet.FilterConfig;
-import javax.servlet.ServletContext;
-import javax.servlet.ServletException;
-import javax.servlet.ServletOutputStream;
-import javax.servlet.ServletRequest;
-import javax.servlet.ServletResponse;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.FilterConfig;
+import jakarta.servlet.ServletContext;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.ServletOutputStream;
+import jakarta.servlet.ServletRequest;
+import jakarta.servlet.ServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.lang.reflect.Method;
@@ -347,8 +347,8 @@ public class MetadataFilterTest extends WeldBaseTest {
     when(request.getPathInfo()).thenReturn(path);
     when(request.getRequestURI()).thenReturn("/etendo/meta" + path);
     when(request.getMethod()).thenReturn("GET");
-    when(request.getSession()).thenReturn(mock(javax.servlet.http.HttpSession.class));
-    when(request.getSession(true)).thenReturn(mock(javax.servlet.http.HttpSession.class));
+    when(request.getSession()).thenReturn(mock(jakarta.servlet.http.HttpSession.class));
+    when(request.getSession(true)).thenReturn(mock(jakarta.servlet.http.HttpSession.class));
   }
 
   private FilterChain createExceptionChain(String message) {
