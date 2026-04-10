@@ -17,7 +17,7 @@
 
 package com.etendoerp.metadata.service;
 
-import com.etendoerp.metadata.data.EtmetaSavedView;
+import com.etendoerp.metadata.data.SavedView;
 import com.etendoerp.metadata.exceptions.MethodNotAllowedException;
 import com.etendoerp.metadata.exceptions.NotFoundException;
 import org.codehaus.jettison.json.JSONArray;
@@ -95,7 +95,7 @@ public class SavedViewService extends MetadataService {
     private void handleGet() throws Exception {
         String id = extractId();
         if (id != null) {
-            EtmetaSavedView view = OBDal.getInstance().get(EtmetaSavedView.class, id);
+            SavedView view = OBDal.getInstance().get(SavedView.class, id);
             if (view == null) {
                 throw new NotFoundException();
             }
@@ -105,18 +105,18 @@ public class SavedViewService extends MetadataService {
             String tabId = getRequest().getParameter("tab");
             String isdefaultStr = getRequest().getParameter(FIELD_ISDEFAULT);
 
-            OBCriteria<EtmetaSavedView> crit = OBDal.getInstance().createCriteria(EtmetaSavedView.class);
-            crit.add(Restrictions.eq(EtmetaSavedView.PROPERTY_USER + ".id", currentUserId));
+            OBCriteria<SavedView> crit = OBDal.getInstance().createCriteria(SavedView.class);
+            crit.add(Restrictions.eq(SavedView.PROPERTY_USER + ".id", currentUserId));
             if (tabId != null && !tabId.isEmpty()) {
-                crit.add(Restrictions.eq(EtmetaSavedView.PROPERTY_TAB + ".id", tabId));
+                crit.add(Restrictions.eq(SavedView.PROPERTY_TAB + ".id", tabId));
             }
             if (isdefaultStr != null && !isdefaultStr.isEmpty()) {
-                crit.add(Restrictions.eq(EtmetaSavedView.PROPERTY_ISDEFAULT, Boolean.parseBoolean(isdefaultStr)));
+                crit.add(Restrictions.eq(SavedView.PROPERTY_ISDEFAULT, Boolean.parseBoolean(isdefaultStr)));
             }
 
-            List<EtmetaSavedView> list = crit.list();
+            List<SavedView> list = crit.list();
             JSONArray data = new JSONArray();
-            for (EtmetaSavedView view : list) {
+            for (SavedView view : list) {
                 data.put(toJSON(view));
             }
             write(wrapList(data));
@@ -127,7 +127,7 @@ public class SavedViewService extends MetadataService {
         JSONObject body = readBody();
         OBContext ctx = OBContext.getOBContext();
 
-        EtmetaSavedView view = OBProvider.getInstance().get(EtmetaSavedView.class);
+        SavedView view = OBProvider.getInstance().get(SavedView.class);
         view.setClient(OBDal.getInstance().get(Client.class, ctx.getCurrentClient().getId()));
         view.setOrganization(OBDal.getInstance().get(Organization.class, ctx.getCurrentOrganization().getId()));
         view.setUser(OBDal.getInstance().get(User.class, ctx.getUser().getId()));
@@ -146,7 +146,7 @@ public class SavedViewService extends MetadataService {
             throw new NotFoundException();
         }
 
-        EtmetaSavedView view = OBDal.getInstance().get(EtmetaSavedView.class, id);
+        SavedView view = OBDal.getInstance().get(SavedView.class, id);
         if (view == null) {
             throw new NotFoundException();
         }
@@ -164,7 +164,7 @@ public class SavedViewService extends MetadataService {
             throw new NotFoundException();
         }
 
-        EtmetaSavedView view = OBDal.getInstance().get(EtmetaSavedView.class, id);
+        SavedView view = OBDal.getInstance().get(SavedView.class, id);
         if (view == null) {
             throw new NotFoundException();
         }
@@ -175,7 +175,7 @@ public class SavedViewService extends MetadataService {
         write(new JSONObject().put(FIELD_RESPONSE, new JSONObject().put(FIELD_STATUS, 0)));
     }
 
-    private void applyBody(EtmetaSavedView view, JSONObject body) throws Exception {
+    private void applyBody(SavedView view, JSONObject body) throws Exception {
         if (body.has("name")) {
             view.setName(body.getString("name"));
         }
@@ -195,7 +195,7 @@ public class SavedViewService extends MetadataService {
         }
     }
 
-    private JSONObject toJSON(EtmetaSavedView view) throws Exception {
+    private JSONObject toJSON(SavedView view) throws Exception {
         JSONObject json = new JSONObject()
             .put("id", view.getId())
             .put("name", view.getName())
