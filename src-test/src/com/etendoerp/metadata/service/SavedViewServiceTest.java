@@ -53,7 +53,7 @@ import org.openbravo.model.ad.system.Client;
 import org.openbravo.model.ad.ui.Tab;
 import org.openbravo.model.common.enterprise.Organization;
 
-import com.etendoerp.metadata.data.EtmetaSavedView;
+import com.etendoerp.metadata.data.SavedView;
 import com.etendoerp.metadata.exceptions.InternalServerException;
 import com.etendoerp.metadata.exceptions.MethodNotAllowedException;
 import com.etendoerp.metadata.exceptions.NotFoundException;
@@ -78,18 +78,19 @@ public class SavedViewServiceTest {
     private static final String PATH_WITH_META_PREFIX = "/com.etendoerp.metadata.meta/saved-views/" + VIEW_ID;
     private static final String RESPONSE_CONTAINS_VIEW_ID = "Response should contain view ID";
     private static final String ISDEFAULT_PARAM = "isdefault";
+    private static final String A_STATUS = "status='A'";
 
     @Mock private HttpServletRequest mockRequest;
     @Mock private HttpServletResponse mockResponse;
     @Mock private OBDal mockOBDal;
     @Mock private OBContext mockOBContext;
     @Mock private OBProvider mockOBProvider;
-    @Mock private EtmetaSavedView mockView;
+    @Mock private SavedView mockView;
     @Mock private Tab mockTab;
     @Mock private User mockUser;
     @Mock private Client mockClient;
     @Mock private Organization mockOrg;
-    @Mock private OBCriteria<EtmetaSavedView> mockCriteria;
+    @Mock private OBCriteria<SavedView> mockCriteria;
 
     private MockedStatic<OBDal> obDalMock;
     private MockedStatic<OBContext> obContextMock;
@@ -178,7 +179,7 @@ public class SavedViewServiceTest {
     @Test
     public void testProcessGetWithIdFound() throws IOException {
         when(mockRequest.getMethod()).thenReturn(GET);
-        when(mockOBDal.get(EtmetaSavedView.class, VIEW_ID)).thenReturn(mockView);
+        when(mockOBDal.get(SavedView.class, VIEW_ID)).thenReturn(mockView);
 
         service.process();
 
@@ -195,7 +196,7 @@ public class SavedViewServiceTest {
     @Test(expected = NotFoundException.class)
     public void testProcessGetWithIdNotFound() throws IOException {
         when(mockRequest.getMethod()).thenReturn(GET);
-        when(mockOBDal.get(EtmetaSavedView.class, VIEW_ID)).thenReturn(null);
+        when(mockOBDal.get(SavedView.class, VIEW_ID)).thenReturn(null);
 
         service.process();
     }
@@ -208,8 +209,8 @@ public class SavedViewServiceTest {
     @Test
     public void testProcessGetWithIdResponseContainsAllFields() throws IOException {
         when(mockRequest.getMethod()).thenReturn(GET);
-        when(mockOBDal.get(EtmetaSavedView.class, VIEW_ID)).thenReturn(mockView);
-        when(mockView.getFilterclause()).thenReturn("status='A'");
+        when(mockOBDal.get(SavedView.class, VIEW_ID)).thenReturn(mockView);
+        when(mockView.getFilterclause()).thenReturn(A_STATUS);
         when(mockView.getGridconfiguration()).thenReturn("{\"widths\":{}}");
 
         service.process();
@@ -217,7 +218,7 @@ public class SavedViewServiceTest {
         String response = responseWriter.toString();
         assertTrue(RESPONSE_CONTAINS_VIEW_ID, response.contains(VIEW_ID));
         assertTrue("Response should contain tab ID", response.contains(TAB_ID));
-        assertTrue("Response should contain filterclause value", response.contains("status='A'"));
+        assertTrue("Response should contain filterclause value", response.contains(A_STATUS));
     }
 
     // --- GET list ---
@@ -233,7 +234,7 @@ public class SavedViewServiceTest {
         when(mockRequest.getPathInfo()).thenReturn(SAVED_VIEW_BASE_PATH);
         when(mockRequest.getParameter("tab")).thenReturn(null);
         when(mockRequest.getParameter(ISDEFAULT_PARAM)).thenReturn(null);
-        when(mockOBDal.createCriteria(EtmetaSavedView.class)).thenReturn(mockCriteria);
+        when(mockOBDal.createCriteria(SavedView.class)).thenReturn(mockCriteria);
         when(mockCriteria.list()).thenReturn(Collections.emptyList());
 
         service.process();
@@ -254,7 +255,7 @@ public class SavedViewServiceTest {
         when(mockRequest.getPathInfo()).thenReturn(SAVED_VIEW_BASE_PATH);
         when(mockRequest.getParameter("tab")).thenReturn(TAB_ID);
         when(mockRequest.getParameter(ISDEFAULT_PARAM)).thenReturn(null);
-        when(mockOBDal.createCriteria(EtmetaSavedView.class)).thenReturn(mockCriteria);
+        when(mockOBDal.createCriteria(SavedView.class)).thenReturn(mockCriteria);
         when(mockCriteria.list()).thenReturn(Collections.singletonList(mockView));
 
         service.process();
@@ -275,7 +276,7 @@ public class SavedViewServiceTest {
         when(mockRequest.getPathInfo()).thenReturn(SAVED_VIEW_BASE_PATH);
         when(mockRequest.getParameter("tab")).thenReturn(null);
         when(mockRequest.getParameter(ISDEFAULT_PARAM)).thenReturn("true");
-        when(mockOBDal.createCriteria(EtmetaSavedView.class)).thenReturn(mockCriteria);
+        when(mockOBDal.createCriteria(SavedView.class)).thenReturn(mockCriteria);
         when(mockCriteria.list()).thenReturn(Collections.emptyList());
 
         service.process();
@@ -294,7 +295,7 @@ public class SavedViewServiceTest {
         when(mockRequest.getPathInfo()).thenReturn(SAVED_VIEW_BASE_PATH);
         when(mockRequest.getParameter("tab")).thenReturn(TAB_ID);
         when(mockRequest.getParameter(ISDEFAULT_PARAM)).thenReturn("false");
-        when(mockOBDal.createCriteria(EtmetaSavedView.class)).thenReturn(mockCriteria);
+        when(mockOBDal.createCriteria(SavedView.class)).thenReturn(mockCriteria);
         when(mockCriteria.list()).thenReturn(Collections.emptyList());
 
         service.process();
@@ -315,7 +316,7 @@ public class SavedViewServiceTest {
         when(mockRequest.getPathInfo()).thenReturn(SAVED_VIEW_BASE_PATH);
         when(mockRequest.getReader()).thenReturn(new BufferedReader(
             new StringReader("{\"name\":\"" + VIEW_NAME + "\",\"tab\":\"" + TAB_ID + "\",\"isdefault\":false}")));
-        when(mockOBProvider.get(EtmetaSavedView.class)).thenReturn(mockView);
+        when(mockOBProvider.get(SavedView.class)).thenReturn(mockView);
         when(mockOBDal.get(Tab.class, TAB_ID)).thenReturn(mockTab);
 
         service.process();
@@ -336,7 +337,7 @@ public class SavedViewServiceTest {
         when(mockRequest.getPathInfo()).thenReturn(SAVED_VIEW_BASE_PATH);
         when(mockRequest.getReader()).thenReturn(new BufferedReader(
             new StringReader("{\"name\":\"" + VIEW_NAME + "\"}")));
-        when(mockOBProvider.get(EtmetaSavedView.class)).thenReturn(mockView);
+        when(mockOBProvider.get(SavedView.class)).thenReturn(mockView);
 
         service.process();
 
@@ -354,7 +355,7 @@ public class SavedViewServiceTest {
         when(mockRequest.getPathInfo()).thenReturn(SAVED_VIEW_BASE_PATH);
         when(mockRequest.getReader()).thenReturn(new BufferedReader(
             new StringReader("{\"filterclause\":\"col=1\",\"gridconfiguration\":\"{\\\"cols\\\":[]}\"}") ));
-        when(mockOBProvider.get(EtmetaSavedView.class)).thenReturn(mockView);
+        when(mockOBProvider.get(SavedView.class)).thenReturn(mockView);
 
         service.process();
 
@@ -374,7 +375,7 @@ public class SavedViewServiceTest {
         when(mockRequest.getPathInfo()).thenReturn(SAVED_VIEW_BASE_PATH);
         when(mockRequest.getReader()).thenReturn(new BufferedReader(
             new StringReader("{\"filterclause\":\"null\",\"gridconfiguration\":\"null\"}")));
-        when(mockOBProvider.get(EtmetaSavedView.class)).thenReturn(mockView);
+        when(mockOBProvider.get(SavedView.class)).thenReturn(mockView);
 
         service.process();
 
@@ -405,7 +406,7 @@ public class SavedViewServiceTest {
     @Test(expected = NotFoundException.class)
     public void testProcessPutViewNotFoundThrowsNotFound() throws IOException {
         when(mockRequest.getMethod()).thenReturn(PUT);
-        when(mockOBDal.get(EtmetaSavedView.class, VIEW_ID)).thenReturn(null);
+        when(mockOBDal.get(SavedView.class, VIEW_ID)).thenReturn(null);
         when(mockRequest.getReader()).thenReturn(new BufferedReader(new StringReader("{\"name\":\"X\"}")));
 
         service.process();
@@ -419,7 +420,7 @@ public class SavedViewServiceTest {
     @Test
     public void testProcessPutSuccess() throws IOException {
         when(mockRequest.getMethod()).thenReturn(PUT);
-        when(mockOBDal.get(EtmetaSavedView.class, VIEW_ID)).thenReturn(mockView);
+        when(mockOBDal.get(SavedView.class, VIEW_ID)).thenReturn(mockView);
         when(mockRequest.getReader()).thenReturn(new BufferedReader(new StringReader("{\"name\":\"Updated\"}")));
 
         service.process();
@@ -452,7 +453,7 @@ public class SavedViewServiceTest {
     @Test(expected = NotFoundException.class)
     public void testProcessDeleteViewNotFoundThrowsNotFound() throws IOException {
         when(mockRequest.getMethod()).thenReturn(DELETE);
-        when(mockOBDal.get(EtmetaSavedView.class, VIEW_ID)).thenReturn(null);
+        when(mockOBDal.get(SavedView.class, VIEW_ID)).thenReturn(null);
 
         service.process();
     }
@@ -465,7 +466,7 @@ public class SavedViewServiceTest {
     @Test
     public void testProcessDeleteSuccess() throws IOException {
         when(mockRequest.getMethod()).thenReturn(DELETE);
-        when(mockOBDal.get(EtmetaSavedView.class, VIEW_ID)).thenReturn(mockView);
+        when(mockOBDal.get(SavedView.class, VIEW_ID)).thenReturn(mockView);
 
         service.process();
 
@@ -498,7 +499,7 @@ public class SavedViewServiceTest {
     @Test
     public void testProcessAdminModeSetAndRestored() throws IOException {
         when(mockRequest.getMethod()).thenReturn(GET);
-        when(mockOBDal.get(EtmetaSavedView.class, VIEW_ID)).thenReturn(mockView);
+        when(mockOBDal.get(SavedView.class, VIEW_ID)).thenReturn(mockView);
 
         service.process();
 
@@ -593,7 +594,7 @@ public class SavedViewServiceTest {
     @Test
     public void testToJsonNullFilterAndGridProducesNullValues() throws IOException {
         when(mockRequest.getMethod()).thenReturn(GET);
-        when(mockOBDal.get(EtmetaSavedView.class, VIEW_ID)).thenReturn(mockView);
+        when(mockOBDal.get(SavedView.class, VIEW_ID)).thenReturn(mockView);
         when(mockView.getFilterclause()).thenReturn(null);
         when(mockView.getGridconfiguration()).thenReturn(null);
 
@@ -612,14 +613,14 @@ public class SavedViewServiceTest {
     @Test
     public void testToJsonNonNullFilterIncludedInResponse() throws IOException {
         when(mockRequest.getMethod()).thenReturn(GET);
-        when(mockOBDal.get(EtmetaSavedView.class, VIEW_ID)).thenReturn(mockView);
-        when(mockView.getFilterclause()).thenReturn("status='A'");
+        when(mockOBDal.get(SavedView.class, VIEW_ID)).thenReturn(mockView);
+        when(mockView.getFilterclause()).thenReturn(A_STATUS);
         when(mockView.getGridconfiguration()).thenReturn("{\"widths\":{}}");
 
         service.process();
 
         assertTrue("Response should contain filterclause value",
-            responseWriter.toString().contains("status='A'"));
+            responseWriter.toString().contains(A_STATUS));
     }
 
     // --- Helpers ---
