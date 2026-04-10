@@ -73,6 +73,7 @@ public class Constants {
     public static final String DELETE = "DELETE";
     public static final String LOCATION_PATH = "/location/";
     public static final String TOOLBAR_PATH = "/toolbar";
+    public static final String SAVED_VIEW_PATH = "/saved-views";
     public static final String REPORT_AND_PROCESS_PATH = "/report-and-process/";
     public static final String PROCESS_PATH = "/process/";
     public static final String PROCESS_EXECUTION_PATH = "/process-execution";
