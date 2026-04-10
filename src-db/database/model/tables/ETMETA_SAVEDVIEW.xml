@@ -2,7 +2,7 @@
   <database name="TABLE ETMETA_SAVEDVIEW">
     <table name="ETMETA_SAVEDVIEW" primaryKey="ETMETA_SAVEDVIEW_PK">
       <column name="ETMETA_SAVEDVIEW_ID" primaryKey="true" required="true" type="VARCHAR" size="32" autoIncrement="false">
-        <default/>
+        <default><![CDATA[0]]></default>
         <onCreateDefault/>
       </column>
       <column name="AD_CLIENT_ID" primaryKey="false" required="true" type="VARCHAR" size="32" autoIncrement="false">
@@ -22,7 +22,7 @@
         <onCreateDefault/>
       </column>
       <column name="CREATEDBY" primaryKey="false" required="true" type="VARCHAR" size="32" autoIncrement="false">
-        <default/>
+        <default><![CDATA[0]]></default>
         <onCreateDefault/>
       </column>
       <column name="UPDATED" primaryKey="false" required="true" type="TIMESTAMP" size="7" autoIncrement="false">
@@ -30,18 +30,18 @@
         <onCreateDefault/>
       </column>
       <column name="UPDATEDBY" primaryKey="false" required="true" type="VARCHAR" size="32" autoIncrement="false">
+        <default><![CDATA[0]]></default>
+        <onCreateDefault/>
+      </column>
+      <column name="NAME" primaryKey="false" required="false" type="VARCHAR" size="100" autoIncrement="false">
         <default/>
         <onCreateDefault/>
       </column>
-      <column name="NAME" primaryKey="false" required="true" type="VARCHAR" size="100" autoIncrement="false">
+      <column name="AD_TAB_ID" primaryKey="false" required="false" type="VARCHAR" size="32" autoIncrement="false">
         <default/>
         <onCreateDefault/>
       </column>
-      <column name="AD_TAB_ID" primaryKey="false" required="true" type="VARCHAR" size="32" autoIncrement="false">
-        <default/>
-        <onCreateDefault/>
-      </column>
-      <column name="AD_USER_ID" primaryKey="false" required="true" type="VARCHAR" size="32" autoIncrement="false">
+      <column name="AD_USER_ID" primaryKey="false" required="false" type="VARCHAR" size="32" autoIncrement="false">
         <default/>
         <onCreateDefault/>
       </column>
