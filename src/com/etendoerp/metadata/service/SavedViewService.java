@@ -35,10 +35,10 @@ import org.openbravo.model.common.enterprise.Organization;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.BufferedReader;
-
-import static com.etendoerp.metadata.utils.Constants.SAVED_VIEW_PATH;
 import java.io.IOException;
 import java.util.List;
+
+import static com.etendoerp.metadata.utils.Constants.SAVED_VIEW_PATH;
 
 /**
  * Service for managing Saved Views.
@@ -47,6 +47,18 @@ import java.util.List;
  */
 public class SavedViewService extends MetadataService {
 
+    private static final String FIELD_ISDEFAULT = "isdefault";
+    private static final String FIELD_FILTERCLAUSE = "filterclause";
+    private static final String FIELD_GRIDCONFIGURATION = "gridconfiguration";
+    private static final String FIELD_STATUS = "status";
+    private static final String FIELD_RESPONSE = "response";
+
+    /**
+     * Constructs a new SavedViewService.
+     *
+     * @param request  the incoming HTTP request
+     * @param response the HTTP response to write to
+     */
     public SavedViewService(HttpServletRequest request, HttpServletResponse response) {
         super(request, response);
     }
@@ -71,9 +83,7 @@ public class SavedViewService extends MetadataService {
                 default:
                     throw new MethodNotAllowedException();
             }
-        } catch (IOException e) {
-            throw e;
-        } catch (RuntimeException e) {
+        } catch (IOException | RuntimeException e) {
             throw e;
         } catch (Exception e) {
             throw new IOException(e.getMessage(), e);
@@ -93,7 +103,7 @@ public class SavedViewService extends MetadataService {
         } else {
             String currentUserId = OBContext.getOBContext().getUser().getId();
             String tabId = getRequest().getParameter("tab");
-            String isdefaultStr = getRequest().getParameter("isdefault");
+            String isdefaultStr = getRequest().getParameter(FIELD_ISDEFAULT);
 
             OBCriteria<EtmetaSavedView> crit = OBDal.getInstance().createCriteria(EtmetaSavedView.class);
             crit.add(Restrictions.eq(EtmetaSavedView.PROPERTY_USER + ".id", currentUserId));
@@ -162,7 +172,7 @@ public class SavedViewService extends MetadataService {
         OBDal.getInstance().remove(view);
         OBDal.getInstance().flush();
 
-        write(new JSONObject().put("response", new JSONObject().put("status", 0)));
+        write(new JSONObject().put(FIELD_RESPONSE, new JSONObject().put(FIELD_STATUS, 0)));
     }
 
     private void applyBody(EtmetaSavedView view, JSONObject body) throws Exception {
@@ -172,15 +182,15 @@ public class SavedViewService extends MetadataService {
         if (body.has("tab")) {
             view.setTab(OBDal.getInstance().get(Tab.class, body.getString("tab")));
         }
-        if (body.has("isdefault")) {
-            view.setDefault(body.getBoolean("isdefault"));
+        if (body.has(FIELD_ISDEFAULT)) {
+            view.setDefault(body.getBoolean(FIELD_ISDEFAULT));
         }
-        if (body.has("filterclause")) {
-            String val = body.optString("filterclause", null);
+        if (body.has(FIELD_FILTERCLAUSE)) {
+            String val = body.optString(FIELD_FILTERCLAUSE, null);
             view.setFilterclause("null".equals(val) ? null : val);
         }
-        if (body.has("gridconfiguration")) {
-            String val = body.optString("gridconfiguration", null);
+        if (body.has(FIELD_GRIDCONFIGURATION)) {
+            String val = body.optString(FIELD_GRIDCONFIGURATION, null);
             view.setGridconfiguration("null".equals(val) ? null : val);
         }
     }
@@ -191,31 +201,26 @@ public class SavedViewService extends MetadataService {
             .put("name", view.getName())
             .put("tab", view.getTab().getId())
             .put("user", view.getUser().getId())
-            .put("isdefault", view.isDefault())
+            .put(FIELD_ISDEFAULT, view.isDefault())
             .put("active", view.isActive());
 
-        if (view.getFilterclause() != null) {
-            json.put("filterclause", view.getFilterclause());
-        } else {
-            json.put("filterclause", JSONObject.NULL);
-        }
-        if (view.getGridconfiguration() != null) {
-            json.put("gridconfiguration", view.getGridconfiguration());
-        } else {
-            json.put("gridconfiguration", JSONObject.NULL);
-        }
+        json.put(FIELD_FILTERCLAUSE,
+            view.getFilterclause() != null ? view.getFilterclause() : JSONObject.NULL);
+        json.put(FIELD_GRIDCONFIGURATION,
+            view.getGridconfiguration() != null ? view.getGridconfiguration() : JSONObject.NULL);
+
         return json;
     }
 
     private JSONObject wrapSingle(JSONObject data) throws Exception {
-        return new JSONObject().put("response",
-            new JSONObject().put("status", 0).put("data", data));
+        return new JSONObject().put(FIELD_RESPONSE,
+            new JSONObject().put(FIELD_STATUS, 0).put("data", data));
     }
 
     private JSONObject wrapList(JSONArray data) throws Exception {
-        return new JSONObject().put("response",
+        return new JSONObject().put(FIELD_RESPONSE,
             new JSONObject()
-                .put("status", 0)
+                .put(FIELD_STATUS, 0)
                 .put("data", data)
                 .put("startRow", 0)
                 .put("endRow", data.length() - 1)
@@ -227,10 +232,7 @@ public class SavedViewService extends MetadataService {
         if (pathInfo == null) {
             return null;
         }
-        // Apply same normalization as ServiceFactory to remove module prefix
         String normalized = pathInfo.replace("/com.etendoerp.metadata.meta", "");
-        // normalized: /saved-views or /saved-views/{id}
-        // Strip the /saved-views prefix to get the remainder
         String remainder = normalized.startsWith(SAVED_VIEW_PATH)
             ? normalized.substring(SAVED_VIEW_PATH.length())
             : normalized;

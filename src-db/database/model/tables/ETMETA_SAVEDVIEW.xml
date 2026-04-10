@@ -6,11 +6,11 @@
         <onCreateDefault/>
       </column>
       <column name="AD_CLIENT_ID" primaryKey="false" required="true" type="VARCHAR" size="32" autoIncrement="false">
-        <default/>
+        <default><![CDATA[0]]></default>
         <onCreateDefault/>
       </column>
       <column name="AD_ORG_ID" primaryKey="false" required="true" type="VARCHAR" size="32" autoIncrement="false">
-        <default/>
+        <default><![CDATA[0]]></default>
         <onCreateDefault/>
       </column>
       <column name="ISACTIVE" primaryKey="false" required="true" type="CHAR" size="1" autoIncrement="false">
@@ -57,6 +57,8 @@
         <default/>
         <onCreateDefault/>
       </column>
+      <check name="ETMETA_SAVEDVIEW_ISACTIVE_CHK"><![CDATA[ISACTIVE IN ('Y', 'N')]]></check>
+      <check name="ETMETA_SAVEDVIEW_ISDEFAULT_CHK"><![CDATA[ISDEFAULT IN ('Y', 'N')]]></check>
       <foreign-key foreignTable="AD_CLIENT" name="ETMETA_SAVEDVIEW_CLIENT">
         <reference local="AD_CLIENT_ID" foreign="AD_CLIENT_ID"/>
       </foreign-key>
