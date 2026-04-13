@@ -194,24 +194,8 @@ public class CallAsyncProcessTest extends OBBaseTest {
             OBProvider obProvider = mock(OBProvider.class);
             OBDal obDal = mock(OBDal.class);
 
+            setupStaticMocks(obContextStatic, obProviderStatic, obDalStatic, obProvider, obDal);
             when(obContext.getWarehouse()).thenReturn(null);
-
-            obContextStatic.when(OBContext::getOBContext).thenReturn(obContext);
-            when(obContext.getUser()).thenReturn(user);
-            when(obContext.getRole()).thenReturn(role);
-            when(obContext.getCurrentClient()).thenReturn(client);
-            when(obContext.getCurrentOrganization()).thenReturn(org);
-            when(obContext.getLanguage()).thenReturn(language);
-            when(user.getId()).thenReturn(USER_ID);
-            when(role.getId()).thenReturn(ROLE_ID);
-            when(client.getId()).thenReturn(CLIENT_ID);
-            when(org.getId()).thenReturn(ORG_ID);
-            when(language.getLanguage()).thenReturn(LANG_ID);
-            obProviderStatic.when(OBProvider::getInstance).thenReturn(obProvider);
-            when(obProvider.get(ProcessInstance.class)).thenReturn(pInstance);
-            obDalStatic.when(OBDal::getInstance).thenReturn(obDal);
-            when(process.getId()).thenReturn(PROCESS_ID);
-            when(pInstance.getId()).thenReturn(PINSTANCE_ID);
 
             ProcessInstance result = callAsyncProcess.callProcess(process, RECORD_ID, null, true);
 
@@ -220,19 +204,22 @@ public class CallAsyncProcessTest extends OBBaseTest {
         }
     }
 
-    @Test
-    public void testRunInBackgroundHappyPath() throws Exception {
+    private AtomicReference<Runnable> swapCapturingExecutor() throws Exception {
         AtomicReference<Runnable> capturedTask = new AtomicReference<>();
         ExecutorService capturingExecutor = mock(ExecutorService.class);
         doAnswer(inv -> {
             capturedTask.set(inv.getArgument(0, Runnable.class));
             return null;
         }).when(capturingExecutor).submit(any(Runnable.class));
-
         Field execField = CallAsyncProcess.class.getDeclaredField(EXECUTOR_FIELD);
         execField.setAccessible(true);
-        ExecutorService prevExecutor = (ExecutorService) execField.get(callAsyncProcess);
         execField.set(callAsyncProcess, capturingExecutor);
+        return capturedTask;
+    }
+
+    @Test
+    public void testRunInBackgroundHappyPath() throws Exception {
+        AtomicReference<Runnable> capturedTask = swapCapturingExecutor();
 
         try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
                 MockedStatic<OBProvider> obProviderStatic = mockStatic(OBProvider.class);
@@ -276,24 +263,12 @@ public class CallAsyncProcessTest extends OBBaseTest {
 
             verify(obDal).commitAndClose();
             verify(ps).execute();
-        } finally {
-            execField.set(callAsyncProcess, prevExecutor);
         }
     }
 
     @Test
     public void testRunInBackgroundWithProcessNotFound() throws Exception {
-        AtomicReference<Runnable> capturedTask = new AtomicReference<>();
-        ExecutorService capturingExecutor = mock(ExecutorService.class);
-        doAnswer(inv -> {
-            capturedTask.set(inv.getArgument(0, Runnable.class));
-            return null;
-        }).when(capturingExecutor).submit(any(Runnable.class));
-
-        Field execField = CallAsyncProcess.class.getDeclaredField(EXECUTOR_FIELD);
-        execField.setAccessible(true);
-        ExecutorService prevExecutor = (ExecutorService) execField.get(callAsyncProcess);
-        execField.set(callAsyncProcess, capturingExecutor);
+        AtomicReference<Runnable> capturedTask = swapCapturingExecutor();
 
         try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
                 MockedStatic<OBProvider> obProviderStatic = mockStatic(OBProvider.class);
@@ -323,8 +298,6 @@ public class CallAsyncProcessTest extends OBBaseTest {
 
             verify(obDal).rollbackAndClose();
             verify(obDal, never()).commitAndClose();
-        } finally {
-            execField.set(callAsyncProcess, prevExecutor);
         }
     }
 
