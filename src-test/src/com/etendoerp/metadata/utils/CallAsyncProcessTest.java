@@ -4,24 +4,34 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertSame;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.lang.reflect.Field;
 import java.math.BigDecimal;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicReference;
 
+import org.hibernate.Session;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.MockedStatic;
 import org.openbravo.base.provider.OBProvider;
+import org.openbravo.base.session.OBPropertiesProvider;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.access.Role;
@@ -172,6 +182,149 @@ public class CallAsyncProcessTest extends OBBaseTest {
             verify(obDal).flush();
 
             assertEquals(pInstance, result);
+        }
+    }
+
+    @Test
+    public void testCallProcessWithNullWarehouse() {
+        try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
+                MockedStatic<OBProvider> obProviderStatic = mockStatic(OBProvider.class);
+                MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class)) {
+
+            OBProvider obProvider = mock(OBProvider.class);
+            OBDal obDal = mock(OBDal.class);
+
+            when(obContext.getWarehouse()).thenReturn(null);
+
+            obContextStatic.when(OBContext::getOBContext).thenReturn(obContext);
+            when(obContext.getUser()).thenReturn(user);
+            when(obContext.getRole()).thenReturn(role);
+            when(obContext.getCurrentClient()).thenReturn(client);
+            when(obContext.getCurrentOrganization()).thenReturn(org);
+            when(obContext.getLanguage()).thenReturn(language);
+            when(user.getId()).thenReturn(USER_ID);
+            when(role.getId()).thenReturn(ROLE_ID);
+            when(client.getId()).thenReturn(CLIENT_ID);
+            when(org.getId()).thenReturn(ORG_ID);
+            when(language.getLanguage()).thenReturn(LANG_ID);
+            obProviderStatic.when(OBProvider::getInstance).thenReturn(obProvider);
+            when(obProvider.get(ProcessInstance.class)).thenReturn(pInstance);
+            obDalStatic.when(OBDal::getInstance).thenReturn(obDal);
+            when(process.getId()).thenReturn(PROCESS_ID);
+            when(pInstance.getId()).thenReturn(PINSTANCE_ID);
+
+            ProcessInstance result = callAsyncProcess.callProcess(process, RECORD_ID, null, true);
+
+            assertNotNull("Result should not be null", result);
+            assertEquals(pInstance, result);
+        }
+    }
+
+    @Test
+    public void testRunInBackgroundHappyPath() throws Exception {
+        AtomicReference<Runnable> capturedTask = new AtomicReference<>();
+        ExecutorService capturingExecutor = mock(ExecutorService.class);
+        doAnswer(inv -> {
+            capturedTask.set(inv.getArgument(0, Runnable.class));
+            return null;
+        }).when(capturingExecutor).submit(any(Runnable.class));
+
+        Field execField = CallAsyncProcess.class.getDeclaredField(EXECUTOR_FIELD);
+        execField.setAccessible(true);
+        ExecutorService prevExecutor = (ExecutorService) execField.get(callAsyncProcess);
+        execField.set(callAsyncProcess, capturingExecutor);
+
+        try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
+                MockedStatic<OBProvider> obProviderStatic = mockStatic(OBProvider.class);
+                MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class);
+                MockedStatic<OBPropertiesProvider> obPropStatic = mockStatic(OBPropertiesProvider.class)) {
+
+            OBProvider obProvider = mock(OBProvider.class);
+            OBDal obDal = mock(OBDal.class);
+            OBPropertiesProvider propsProvider = mock(OBPropertiesProvider.class);
+            Properties props = mock(Properties.class);
+            Connection conn = mock(Connection.class);
+            PreparedStatement ps = mock(PreparedStatement.class);
+            Session hibSession = mock(Session.class);
+
+            setupStaticMocks(obContextStatic, obProviderStatic, obDalStatic, obProvider, obDal);
+            obDalStatic.when(OBDal::getInstance).thenReturn(obDal);
+            obContextStatic.when(() -> OBContext.setAdminMode()).thenAnswer(inv -> null);
+            obContextStatic.when(OBContext::restorePreviousMode).thenAnswer(inv -> null);
+            obContextStatic.when(() -> OBContext.setOBContext(
+                    anyString(), anyString(), anyString(), anyString(), anyString(), anyString()))
+                    .thenAnswer(inv -> null);
+
+            when(obDal.get(ProcessInstance.class, PINSTANCE_ID)).thenReturn(pInstance);
+            when(obDal.get(Process.class, PROCESS_ID)).thenReturn(process);
+            when(obDal.getConnection(false)).thenReturn(conn);
+            when(obDal.getSession()).thenReturn(hibSession);
+            doNothing().when(obDal).commitAndClose();
+
+            when(process.getProcedure()).thenReturn("MY_PROC");
+            when(pInstance.getId()).thenReturn(PINSTANCE_ID);
+
+            obPropStatic.when(OBPropertiesProvider::getInstance).thenReturn(propsProvider);
+            when(propsProvider.getOpenbravoProperties()).thenReturn(props);
+            when(props.getProperty("bbdd.rdbms")).thenReturn("POSTGRE");
+            when(conn.prepareStatement(anyString())).thenReturn(ps);
+
+            callAsyncProcess.callProcess(process, RECORD_ID, null, null);
+
+            assertNotNull("Background task should have been captured", capturedTask.get());
+            capturedTask.get().run();
+
+            verify(obDal).commitAndClose();
+            verify(ps).execute();
+        } finally {
+            execField.set(callAsyncProcess, prevExecutor);
+        }
+    }
+
+    @Test
+    public void testRunInBackgroundWithProcessNotFound() throws Exception {
+        AtomicReference<Runnable> capturedTask = new AtomicReference<>();
+        ExecutorService capturingExecutor = mock(ExecutorService.class);
+        doAnswer(inv -> {
+            capturedTask.set(inv.getArgument(0, Runnable.class));
+            return null;
+        }).when(capturingExecutor).submit(any(Runnable.class));
+
+        Field execField = CallAsyncProcess.class.getDeclaredField(EXECUTOR_FIELD);
+        execField.setAccessible(true);
+        ExecutorService prevExecutor = (ExecutorService) execField.get(callAsyncProcess);
+        execField.set(callAsyncProcess, capturingExecutor);
+
+        try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
+                MockedStatic<OBProvider> obProviderStatic = mockStatic(OBProvider.class);
+                MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class)) {
+
+            OBProvider obProvider = mock(OBProvider.class);
+            OBDal obDal = mock(OBDal.class);
+
+            setupStaticMocks(obContextStatic, obProviderStatic, obDalStatic, obProvider, obDal);
+            obDalStatic.when(OBDal::getInstance).thenReturn(obDal);
+            obContextStatic.when(() -> OBContext.setAdminMode()).thenAnswer(inv -> null);
+            obContextStatic.when(OBContext::restorePreviousMode).thenAnswer(inv -> null);
+            obContextStatic.when(() -> OBContext.setOBContext(
+                    anyString(), anyString(), anyString(), anyString(), anyString(), anyString()))
+                    .thenAnswer(inv -> null);
+
+            // Both process and pInstance return null → OBException in runInBackground
+            when(obDal.get(ProcessInstance.class, PINSTANCE_ID)).thenReturn(null);
+            when(obDal.get(Process.class, PROCESS_ID)).thenReturn(null);
+            doNothing().when(obDal).rollbackAndClose();
+            doNothing().when(obDal).commitAndClose();
+
+            callAsyncProcess.callProcess(process, RECORD_ID, null, true);
+
+            assertNotNull("Background task should have been captured", capturedTask.get());
+            capturedTask.get().run();
+
+            verify(obDal).rollbackAndClose();
+            verify(obDal, never()).commitAndClose();
+        } finally {
+            execField.set(callAsyncProcess, prevExecutor);
         }
     }
 

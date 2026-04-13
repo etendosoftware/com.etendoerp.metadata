@@ -324,6 +324,71 @@ class ServiceFactoryTest {
     verify(dispatcher).forward(req, res);
   }
 
+  @Test
+  void handleLegacySessionSkipsWhenIdPropsIsNull() throws Exception {
+    HttpServletRequest req = mock(HttpServletRequest.class);
+    HttpServletResponse res = mock(HttpServletResponse.class);
+    RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+    ServletContext context = mock(ServletContext.class);
+    Entity entity = mock(Entity.class);
+    ModelProvider modelProvider = mock(ModelProvider.class);
+
+    when(req.getServletContext()).thenReturn(context);
+    when(context.getRequestDispatcher(LegacyPaths.USED_BY_LINK)).thenReturn(dispatcher);
+    when(req.getParameter(PARAM_WINDOW_ID)).thenReturn("143");
+    when(req.getParameter(PARAM_ENTITY_NAME)).thenReturn(ENTITY_ORDER);
+    when(req.getParameter(PARAM_RECORD_ID)).thenReturn(RECORD_ID_VALUE);
+    when(entity.getIdProperties()).thenReturn(null);
+
+    try (MockedStatic<ModelProvider> staticModelProvider = mockStatic(ModelProvider.class)) {
+      staticModelProvider.when(ModelProvider::getInstance).thenReturn(modelProvider);
+      when(modelProvider.getEntity(ENTITY_ORDER)).thenReturn(entity);
+
+      MetadataService service = invokeBuildLegacyForwardService(req, res, LegacyPaths.USED_BY_LINK);
+      service.process();
+
+      verify(dispatcher).forward(req, res);
+    }
+  }
+
+  @Test
+  void handleLegacySessionSkipsWhenWindowIdIsNull() throws Exception {
+    HttpServletRequest req = mock(HttpServletRequest.class);
+    HttpServletResponse res = mock(HttpServletResponse.class);
+    RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+    ServletContext context = mock(ServletContext.class);
+
+    when(req.getServletContext()).thenReturn(context);
+    when(context.getRequestDispatcher(LegacyPaths.USED_BY_LINK)).thenReturn(dispatcher);
+    when(req.getParameter(PARAM_WINDOW_ID)).thenReturn(null);
+    when(req.getParameter(PARAM_ENTITY_NAME)).thenReturn(ENTITY_ORDER);
+    when(req.getParameter(PARAM_RECORD_ID)).thenReturn(RECORD_ID_VALUE);
+
+    MetadataService service = invokeBuildLegacyForwardService(req, res, LegacyPaths.USED_BY_LINK);
+    service.process();
+
+    verify(dispatcher).forward(req, res);
+  }
+
+  @Test
+  void handleLegacySessionSkipsWhenRecordIdIsNull() throws Exception {
+    HttpServletRequest req = mock(HttpServletRequest.class);
+    HttpServletResponse res = mock(HttpServletResponse.class);
+    RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+    ServletContext context = mock(ServletContext.class);
+
+    when(req.getServletContext()).thenReturn(context);
+    when(context.getRequestDispatcher(LegacyPaths.USED_BY_LINK)).thenReturn(dispatcher);
+    when(req.getParameter(PARAM_WINDOW_ID)).thenReturn("143");
+    when(req.getParameter(PARAM_ENTITY_NAME)).thenReturn(ENTITY_ORDER);
+    when(req.getParameter(PARAM_RECORD_ID)).thenReturn(null);
+
+    MetadataService service = invokeBuildLegacyForwardService(req, res, LegacyPaths.USED_BY_LINK);
+    service.process();
+
+    verify(dispatcher).forward(req, res);
+  }
+
   /** Helper to create a mock HttpServletRequest with the specified path info. */
   private HttpServletRequest mockRequestWithPath(String path) {
     HttpServletRequest req = mock(HttpServletRequest.class);
