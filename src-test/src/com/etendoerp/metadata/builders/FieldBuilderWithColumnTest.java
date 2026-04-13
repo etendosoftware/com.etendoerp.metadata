@@ -376,7 +376,7 @@ class FieldBuilderWithColumnTest {
             mockedOBDal.when(OBDal::getInstance).thenReturn(obDal);
             when(obDal.get(eq(Table.class), anyString())).thenReturn(table);
             when(obDal.createCriteria(Tab.class)).thenReturn(criteria);
-            when(criteria.add(any(Criterion.class))).thenReturn(criteria);
+            when(criteria.add(any(Restriction.class))).thenReturn(criteria);
             when(criteria.setMaxResults(anyInt())).thenReturn(criteria);
             when(criteria.uniqueResult()).thenReturn(null);
 
@@ -609,7 +609,7 @@ class FieldBuilderWithColumnTest {
             mockedOBDal.when(OBDal::getInstance).thenReturn(obDal);
             when(obDal.get(eq(Table.class), any())).thenReturn(table);
             when(obDal.createCriteria(Tab.class)).thenReturn(criteria);
-            when(criteria.add(any(Criterion.class))).thenReturn(criteria);
+            when(criteria.add(any(Restriction.class))).thenReturn(criteria);
             when(criteria.setMaxResults(anyInt())).thenReturn(criteria);
             when(criteria.uniqueResult()).thenReturn(null);
 
