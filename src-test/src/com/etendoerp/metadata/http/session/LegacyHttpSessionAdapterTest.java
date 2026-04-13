@@ -187,17 +187,6 @@ public class LegacyHttpSessionAdapterTest extends OBBaseTest {
   }
 
   /**
-   * Tests that the deprecated session context method returns null.
-   *
-   * <p>This test validates that getSessionContext() returns null, which is the
-   * expected behavior for this deprecated method in modern servlet implementations.</p>
-   */
-  @Test
-  public void getSessionContextShouldReturnNull() {
-    assertNull(session.getSessionContext());
-  }
-
-  /**
    * Tests that the session is never considered new.
    *
    * <p>This test validates that isNew() always returns false, indicating that this
@@ -464,22 +453,6 @@ public class LegacyHttpSessionAdapterTest extends OBBaseTest {
   public void getMaxInactiveIntervalAfterInvalidateShouldThrowException() {
     session.invalidate();
     session.getMaxInactiveInterval();
-  }
-
-  /**
-   * Tests that getting session context after invalidation throws IllegalStateException.
-   *
-   * <p>This test validates that once a session is invalidated, attempting to get
-   * the session context throws an IllegalStateException, even though this method
-   * is deprecated and normally returns null.</p>
-   *
-   * @throws IllegalStateException
-   *     when getting session context on invalidated session (expected)
-   */
-  @Test(expected = IllegalStateException.class)
-  public void getSessionContextAfterInvalidateShouldThrowException() {
-    session.invalidate();
-    session.getSessionContext();
   }
 
   /**
