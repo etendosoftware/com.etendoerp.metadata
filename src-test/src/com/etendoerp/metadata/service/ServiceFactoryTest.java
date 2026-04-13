@@ -194,7 +194,7 @@ class ServiceFactoryTest {
     HttpSession session = mock(HttpSession.class);
 
     when(legacyReq.getSession(true)).thenReturn(session);
-    when(legacyReq.getParameter("recordId")).thenReturn("A123");
+    when(legacyReq.getParameter(PARAM_RECORD_ID)).thenReturn("A123");
 
     try (MockedStatic<LegacyUtils> legacy = mockStatic(LegacyUtils.class)) {
       legacy.when(() -> LegacyUtils.isMutableSessionAttribute(EXAMPLE_MUTABLE_SESSION_ATTRIBUTE)).thenReturn(false);
