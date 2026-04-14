@@ -69,6 +69,7 @@ import com.etendoerp.metadata.utils.Constants;
 import org.openbravo.userinterface.selector.Selector;
 import org.openbravo.userinterface.selector.SelectorField;
 
+import com.etendoerp.etendorx.utils.DataSourceUtils;
 import com.etendoerp.metadata.data.ReferenceSelectors;
 import com.etendoerp.metadata.utils.Constants;
 
@@ -552,16 +553,10 @@ class FieldBuilderTest {
     when(column.getDBColumnName()).thenReturn("test_column");
     when(field.getName()).thenReturn(TEST_FIELD);
 
-    try (MockedStatic<ModelProvider> mockedModelProvider = mockStatic(ModelProvider.class)) {
-      Entity entity = mock(Entity.class);
-      Property property = mock(Property.class);
-      DomainType domainType = mock(DomainType.class);
-
-      mockedModelProvider.when(ModelProvider::getInstance).thenReturn(modelProvider);
-      when(modelProvider.getEntityByTableName("test_table")).thenReturn(entity);
-      when(entity.getPropertyByColumnName("test_column", false)).thenReturn(property);
-      when(property.getName()).thenReturn("hqlColumnName");
-      when(property.getDomainType()).thenReturn(domainType);
+    try (MockedStatic<DataSourceUtils> mockedDataSourceUtils = mockStatic(DataSourceUtils.class)) {
+      mockedDataSourceUtils.when(
+              () -> DataSourceUtils.getHQLColumnName(true, "test_table", "test_column"))
+          .thenReturn(new String[]{"hqlColumnName", "String"});
 
       Method method = FieldBuilder.class.getDeclaredMethod("getHqlName", Field.class);
       method.setAccessible(true);
