@@ -686,12 +686,12 @@ public abstract class FieldBuilder extends Builder {
      * @param field The field to generate HQL name for
      * @return The HQL property name, or camelCased field name as fallback
      */
-    protected static String getHqlName(Field field) {
+    protected String getHqlName(Field field) {
         try {
             Column fieldColumn = field.getColumn();
             String dbTableName = fieldColumn.getTable().getDBTableName();
             String dbColumnName = fieldColumn.getDBColumnName();
-            String[] names = DataSourceUtils.getHQLColumnName(true, dbTableName, dbColumnName);
+            String[] names = resolveHQLColumnName(true, dbTableName, dbColumnName);
 
             if (names.length > 0) {
                 return names[0];
@@ -702,6 +702,21 @@ public abstract class FieldBuilder extends Builder {
 
         String name = field.getName().replaceAll("\\s+", "");
         return Character.toLowerCase(name.charAt(0)) + name.substring(1);
+    }
+
+    /**
+     * Resolves the HQL column name via DataSourceUtils.
+     * Extracted as a protected instance method so tests can override it via spy,
+     * avoiding the need to mock DataSourceUtils statically (which fails on some JVMs
+     * due to invokedynamic bytecode that cannot be retransformed).
+     *
+     * @param exceptionOnFail whether to throw an OBException when the entity/property is not found
+     * @param dbTableName     the database table name
+     * @param dbColumnName    the database column name
+     * @return array with [hqlPropertyName, typeName]
+     */
+    protected String[] resolveHQLColumnName(boolean exceptionOnFail, String dbTableName, String dbColumnName) {
+        return DataSourceUtils.getHQLColumnName(exceptionOnFail, dbTableName, dbColumnName);
     }
 
     /**

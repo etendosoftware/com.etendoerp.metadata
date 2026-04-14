@@ -17,6 +17,7 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 import java.lang.reflect.Method;
@@ -69,7 +70,7 @@ import com.etendoerp.metadata.utils.Constants;
 import org.openbravo.userinterface.selector.Selector;
 import org.openbravo.userinterface.selector.SelectorField;
 
-import com.etendoerp.etendorx.utils.DataSourceUtils;
+import org.openbravo.service.json.DataResolvingMode;
 import com.etendoerp.metadata.data.ReferenceSelectors;
 import com.etendoerp.metadata.utils.Constants;
 
@@ -553,14 +554,25 @@ class FieldBuilderTest {
     when(column.getDBColumnName()).thenReturn("test_column");
     when(field.getName()).thenReturn(TEST_FIELD);
 
-    try (MockedStatic<DataSourceUtils> mockedDataSourceUtils = mockStatic(DataSourceUtils.class)) {
-      mockedDataSourceUtils.when(
-              () -> DataSourceUtils.getHQLColumnName(true, "test_table", "test_column"))
-          .thenReturn(new String[]{"hqlColumnName", "String"});
+    OBContext mockContext = mock(OBContext.class);
+    Language mockLanguage = mock(Language.class);
+    when(mockContext.getLanguage()).thenReturn(mockLanguage);
+
+    try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
+         MockedConstruction<org.openbravo.service.json.DataToJsonConverter> ignored =
+             mockConstruction(org.openbravo.service.json.DataToJsonConverter.class,
+                 (m, ctx) -> when(m.toJsonObject(any(), any(DataResolvingMode.class)))
+                     .thenReturn(new org.codehaus.jettison.json.JSONObject()))) {
+
+      mockedOBContext.when(OBContext::getOBContext).thenReturn(mockContext);
+
+      FieldBuilderWithoutColumn fb = spy(new FieldBuilderWithoutColumn(field, null));
+      doReturn(new String[]{"hqlColumnName", "String"})
+          .when(fb).resolveHQLColumnName(true, "test_table", "test_column");
 
       Method method = FieldBuilder.class.getDeclaredMethod("getHqlName", Field.class);
       method.setAccessible(true);
-      String result = (String) method.invoke(null, field);
+      String result = (String) method.invoke(fb, field);
 
       assertEquals("hqlColumnName", result);
     }
@@ -576,13 +588,29 @@ class FieldBuilderTest {
   @Test
   void testGetHqlNameException() throws Exception {
     when(field.getName()).thenReturn(TEST_FIELD);
-    when(field.getColumn()).thenThrow(new RuntimeException("Test exception"));
 
-    Method method = FieldBuilder.class.getDeclaredMethod("getHqlName", Field.class);
-    method.setAccessible(true);
-    String result = (String) method.invoke(null, field);
+    OBContext mockContext = mock(OBContext.class);
+    Language mockLanguage = mock(Language.class);
+    when(mockContext.getLanguage()).thenReturn(mockLanguage);
 
-    assertEquals(TEST_FIELD, result);
+    try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
+         MockedConstruction<org.openbravo.service.json.DataToJsonConverter> ignored =
+             mockConstruction(org.openbravo.service.json.DataToJsonConverter.class,
+                 (m, ctx) -> when(m.toJsonObject(any(), any(DataResolvingMode.class)))
+                     .thenReturn(new org.codehaus.jettison.json.JSONObject()))) {
+
+      mockedOBContext.when(OBContext::getOBContext).thenReturn(mockContext);
+
+      when(field.getColumn()).thenThrow(new RuntimeException("Test exception"));
+
+      FieldBuilderWithoutColumn fb = new FieldBuilderWithoutColumn(field, null);
+
+      Method method = FieldBuilder.class.getDeclaredMethod("getHqlName", Field.class);
+      method.setAccessible(true);
+      String result = (String) method.invoke(fb, field);
+
+      assertEquals(TEST_FIELD, result);
+    }
   }
 
   /**
