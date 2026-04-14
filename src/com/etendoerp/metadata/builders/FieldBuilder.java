@@ -37,6 +37,7 @@ import org.openbravo.dal.core.DalUtil;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.data.FieldProvider;
+import org.openbravo.data.Sqlc;
 import org.openbravo.database.ConnectionProvider;
 import org.openbravo.erpCommon.utility.ComboTableData;
 import org.openbravo.erpCommon.utility.Utility;
@@ -57,7 +58,6 @@ import org.openbravo.service.json.JsonConstants;
 import org.openbravo.userinterface.selector.Selector;
 import org.openbravo.userinterface.selector.SelectorField;
 
-import com.etendoerp.etendorx.utils.DataSourceUtils;
 import com.etendoerp.metadata.data.ReferenceSelectors;
 import com.etendoerp.metadata.utils.Constants;
 import org.openbravo.model.ad.ui.Window;
@@ -671,7 +671,7 @@ public abstract class FieldBuilder extends Builder {
      * @return The standardized input name for the column
      */
     protected static String getInputName(Column column) {
-        return DataSourceUtils.getInpName(column);
+        return "inp" + Sqlc.TransformaNombreColumna(column.getDBColumnName());
     }
 
     /**
@@ -705,10 +705,9 @@ public abstract class FieldBuilder extends Builder {
     }
 
     /**
-     * Resolves the HQL column name via DataSourceUtils.
-     * Extracted as a protected instance method so tests can override it via spy,
-     * avoiding the need to mock DataSourceUtils statically (which fails on some JVMs
-     * due to invokedynamic bytecode that cannot be retransformed).
+     * Resolves the HQL column name from the DAL model metadata.
+     * Extracted as a protected instance method so tests can override it via spy
+     * without depending on external helper classes.
      *
      * @param exceptionOnFail whether to throw an OBException when the entity/property is not found
      * @param dbTableName     the database table name
@@ -716,7 +715,24 @@ public abstract class FieldBuilder extends Builder {
      * @return array with [hqlPropertyName, typeName]
      */
     protected String[] resolveHQLColumnName(boolean exceptionOnFail, String dbTableName, String dbColumnName) {
-        return DataSourceUtils.getHQLColumnName(exceptionOnFail, dbTableName, dbColumnName);
+        Entity entity = ModelProvider.getInstance().getEntityByTableName(dbTableName);
+        if (exceptionOnFail && entity == null) {
+            logger.error("Entity of {} not found.", dbTableName);
+            throw new OBException();
+        }
+
+        Property property = entity != null ? entity.getPropertyByColumnName(dbColumnName, false) : null;
+        if (exceptionOnFail && property == null) {
+            throw new OBException();
+        }
+
+        String hqlPropertyName = property != null ? property.getName() : "null";
+        String typeName = "String";
+        if (property != null && property.isPrimitive()) {
+            typeName = property.getPrimitiveType().getSimpleName();
+        }
+
+        return new String[] { hqlPropertyName, typeName };
     }
 
     /**
