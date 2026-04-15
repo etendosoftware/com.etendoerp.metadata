@@ -103,7 +103,14 @@ public class LegacyUtils {
     }
 
     /**
-     * Finds the Active Tab ID given a Window ID and Table ID.
+     * Finds the ID of the first active tab that belongs to the given window and table.
+     * The result is ordered by sequence number to ensure deterministic output when
+     * multiple tabs reference the same window and table combination.
+     *
+     * @param windowId the ID of the AD_Window to filter by
+     * @param tableId  the ID of the AD_Table to filter by
+     * @return the ID of the matching tab, or {@code null} if either parameter is blank
+     *         or no active tab is found for the given window and table
      */
     public static String findTabIdByWindowAndTable(String windowId, String tableId) {
         if (StringUtils.isEmpty(windowId) || StringUtils.isEmpty(tableId)) {

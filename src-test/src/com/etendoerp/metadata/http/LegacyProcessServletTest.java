@@ -66,6 +66,9 @@ public class LegacyProcessServletTest extends OBBaseTest {
     public static final String LOCATION = "location";
     private static final String USER_ID_KEY = "userId";
     private static final String CREATE_FROM_SESSION_KEY = "CREATEFROM|TABID";
+    private static final String COMMAND_KEY = "Command";
+    private static final String INP_WINDOW_ID_KEY = "inpWindowId";
+    private static final String INP_TABLE_ID_KEY = "inpTableId";
 
     @Mock
     private HttpServletRequest request;
@@ -217,7 +220,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
      */
     @Test
     public void servletShouldIdentifyLegacyFollowupRequest() throws Exception {
-        when(request.getParameter("Command")).thenReturn("BUTTON_TEST");
+        when(request.getParameter(COMMAND_KEY)).thenReturn("BUTTON_TEST");
         when(request.getSession(false)).thenReturn(session);
         when(session.getAttribute("LEGACY_TOKEN")).thenReturn("test-token");
         when(session.getAttribute("LEGACY_SERVLET_DIR")).thenReturn("/dir");
@@ -228,7 +231,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
             // Expected due to framework dependencies
         }
 
-        verify(request, atLeastOnce()).getParameter("Command");
+        verify(request, atLeastOnce()).getParameter(COMMAND_KEY);
     }
 
     /**
@@ -639,9 +642,9 @@ public class LegacyProcessServletTest extends OBBaseTest {
         String tableId = "319";
         String expectedTabId = "257";
 
-        when(request.getParameter("Command")).thenReturn("SAVE");
-        when(request.getParameter("inpWindowId")).thenReturn(windowId);
-        when(request.getParameter("inpTableId")).thenReturn(tableId);
+        when(request.getParameter(COMMAND_KEY)).thenReturn("SAVE");
+        when(request.getParameter(INP_WINDOW_ID_KEY)).thenReturn(windowId);
+        when(request.getParameter(INP_TABLE_ID_KEY)).thenReturn(tableId);
 
         try (MockedStatic<LegacyUtils> legacyUtils = mockStatic(LegacyUtils.class)) {
             legacyUtils.when(() -> LegacyUtils.isMutableSessionAttribute(CREATE_FROM_SESSION_KEY)).thenReturn(true);
@@ -666,7 +669,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
     @Test
     public void handleCreateFromSessionSkipsForNonSaveCommand() throws Exception {
         // GIVEN
-        when(request.getParameter("Command")).thenReturn("FIND_PO");
+        when(request.getParameter(COMMAND_KEY)).thenReturn("FIND_PO");
 
         invokeHandleCreateFromSession(request, LegacyPaths.CREATE_FROM_HTML, session);
 
@@ -677,9 +680,9 @@ public class LegacyProcessServletTest extends OBBaseTest {
     @Test
     public void handleCreateFromSessionSkipsWhenTabIdNotFound() throws Exception {
         // GIVEN
-        when(request.getParameter("Command")).thenReturn("SAVE");
-        when(request.getParameter("inpWindowId")).thenReturn("169");
-        when(request.getParameter("inpTableId")).thenReturn("999");
+        when(request.getParameter(COMMAND_KEY)).thenReturn("SAVE");
+        when(request.getParameter(INP_WINDOW_ID_KEY)).thenReturn("169");
+        when(request.getParameter(INP_TABLE_ID_KEY)).thenReturn("999");
 
         try (MockedStatic<LegacyUtils> legacyUtils = mockStatic(LegacyUtils.class)) {
             legacyUtils.when(() -> LegacyUtils.isMutableSessionAttribute(CREATE_FROM_SESSION_KEY)).thenReturn(true);
@@ -695,9 +698,9 @@ public class LegacyProcessServletTest extends OBBaseTest {
     @Test
     public void handleCreateFromSessionThrowsForForbiddenSessionKey() throws Exception {
         // GIVEN
-        when(request.getParameter("Command")).thenReturn("SAVE");
-        when(request.getParameter("inpWindowId")).thenReturn("169");
-        when(request.getParameter("inpTableId")).thenReturn("319");
+        when(request.getParameter(COMMAND_KEY)).thenReturn("SAVE");
+        when(request.getParameter(INP_WINDOW_ID_KEY)).thenReturn("169");
+        when(request.getParameter(INP_TABLE_ID_KEY)).thenReturn("319");
 
         try (MockedStatic<LegacyUtils> legacyUtils = mockStatic(LegacyUtils.class)) {
             legacyUtils.when(() -> LegacyUtils.isMutableSessionAttribute(CREATE_FROM_SESSION_KEY)).thenReturn(false);
