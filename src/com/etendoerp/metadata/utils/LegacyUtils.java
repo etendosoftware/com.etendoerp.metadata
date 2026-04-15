@@ -19,6 +19,11 @@ package com.etendoerp.metadata.utils;
 
 import org.openbravo.base.provider.OBProvider;
 import org.openbravo.model.ad.ui.Process;
+import org.openbravo.dal.service.OBDal;
+import org.openbravo.dal.service.OBQuery;
+import org.openbravo.model.ad.ui.Tab;
+import org.apache.commons.lang3.StringUtils;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -28,31 +33,31 @@ import java.util.Set;
 public class LegacyUtils {
 
     /**
-     * Set of process IDs that do not have an associated AD_Process_ID or EM_OBUIAPP_Process_ID,
+     * Set of process IDs that do not have an associated AD_Process_ID or
+     * EM_OBUIAPP_Process_ID,
      * and therefore must be treated in a special way by the system.
      */
     private static final Set<String> LEGACY_PROCESS_IDS = Set.of(
             "3663",
             "4242",
             "3670",
-            "4248"
-    );
+            "4248");
 
     /** Set of legacy paths used in the system. */
     private static final Set<String> LEGACY_PATHS = Set.of(
-            LegacyPaths.USED_BY_LINK
-    );
+            LegacyPaths.USED_BY_LINK);
 
     private static final Set<String> MUTABLE_SESSION_ATTRIBUTES = Set.of(
-            "143|C_ORDER_ID"
-    );
-
+            "143|C_ORDER_ID",
+            "CREATEFROM|TABID");
 
     /**
-     * Checks if the provided process ID belongs to the list of legacy-defined processes.
+     * Checks if the provided process ID belongs to the list of legacy-defined
+     * processes.
      *
      * @param processId The ID of the process definition to check
-     * @return true if the ID is part of the legacy process definitions; false otherwise
+     * @return true if the ID is part of the legacy process definitions; false
+     *         otherwise
      */
     public static boolean isLegacyProcess(String processId) {
         if (processId == null) {
@@ -95,5 +100,23 @@ public class LegacyUtils {
      */
     public static boolean isMutableSessionAttribute(String attribute) {
         return MUTABLE_SESSION_ATTRIBUTES.contains(attribute);
+    }
+
+    /**
+     * Finds the Active Tab ID given a Window ID and Table ID.
+     */
+    public static String findTabIdByWindowAndTable(String windowId, String tableId) {
+        if (StringUtils.isEmpty(windowId) || StringUtils.isEmpty(tableId)) {
+            return null;
+        }
+        OBQuery<Tab> query = OBDal.getInstance().createQuery(
+            Tab.class,
+            "where window.id = :windowId and table.id = :tableId and active = true order by sequenceNumber"
+        );
+        query.setNamedParameter("windowId", windowId);
+        query.setNamedParameter("tableId", tableId);
+        query.setMaxResult(1);
+        List<Tab> tabs = query.list();
+        return tabs.isEmpty() ? null : tabs.get(0).getId();
     }
 }
