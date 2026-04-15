@@ -871,27 +871,22 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
     }
 
     private static void handleCreateFromSession(HttpServletRequest req, String path, HttpSession session) {
-        if (!LegacyPaths.CREATE_FROM_HTML.equals(path)) {
-            return;
-        }
-        if (!"SAVE".equals(req.getParameter("Command"))) {
-            return;
-        }
+        if (LegacyPaths.CREATE_FROM_HTML.equals(path) && "SAVE".equals(req.getParameter("Command"))) {
+            String windowId = req.getParameter("inpWindowId");
+            String tableId = req.getParameter("inpTableId");
+            String sessionKey = "CREATEFROM|TABID";
 
-        String windowId = req.getParameter("inpWindowId");
-        String tableId = req.getParameter("inpTableId");
-        String sessionKey = "CREATEFROM|TABID";
+            if (!LegacyUtils.isMutableSessionAttribute(sessionKey)) {
+                throw new InternalServerException("Attempt to set forbidden session key: " + sessionKey);
+            }
 
-        if (!LegacyUtils.isMutableSessionAttribute(sessionKey)) {
-            throw new InternalServerException("Attempt to set forbidden session key: " + sessionKey);
-        }
-
-        String tabId = LegacyUtils.findTabIdByWindowAndTable(windowId, tableId);
-        if (tabId != null) {
-            session.setAttribute(sessionKey, tabId);
-        } else {
-            log.warn("Could not resolve tabId for windowId={}, tableId={}. " +
-                     "CreateFrom|tabId will not be set in session.", windowId, tableId);
+            String tabId = LegacyUtils.findTabIdByWindowAndTable(windowId, tableId);
+            if (tabId != null) {
+                session.setAttribute(sessionKey, tabId);
+            } else {
+                log.warn("Could not resolve tabId for windowId={}, tableId={}. " +
+                         "CreateFrom|tabId will not be set in session.", windowId, tableId);
+            }
         }
     }
 }
