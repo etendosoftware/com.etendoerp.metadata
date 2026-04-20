@@ -23,8 +23,8 @@ public class WidgetResolverRegistry {
         }
     }
 
-    /** Package-visible for unit tests to inject mocks without CDI. */
-    void register(WidgetDataResolver resolver) {
+    /** For unit tests to inject mocks without CDI. */
+    public void register(WidgetDataResolver resolver) {
         byType.put(resolver.getType(), resolver);
     }
 
