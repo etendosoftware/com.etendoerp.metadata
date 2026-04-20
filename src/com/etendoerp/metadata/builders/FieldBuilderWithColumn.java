@@ -393,26 +393,33 @@ public class FieldBuilderWithColumn extends FieldBuilder {
      * @throws JSONException if there's an error updating the JSON structure
      */
     private void addProcessInfo(Field field) throws JSONException {
-        String processId = field.getId();
-        boolean isLegacyProcess = LegacyUtils.isLegacyProcess(processId);
-        if (isProcessField(field) || isLegacyProcess) {
-            Process processAction = null;
-            if (isLegacyProcess) {
-                // Create a new Process instance to simulate a real process
-                processAction = LegacyUtils.getLegacyProcess(processId);
-            } else {
-                processAction = field.getColumn().getProcess();
-            }
-            org.openbravo.client.application.Process processDefinition = field.getColumn().getOBUIAPPProcess();
-
-            if (processDefinition != null) {
-                json.put(PROCESS_DEFINITION, Utils.getFieldProcess(field));
-            }
-
-            if (processAction != null) {
-                json.put(PROCESS_ACTION, ProcessActionBuilder.getFieldProcess(field, processAction));
-            }
+        boolean isLegacy = LegacyProcessResolver.isLegacy(field);
+        if (!isProcessField(field) && !isLegacy) {
+            return;
         }
+
+        org.openbravo.client.application.Process processDefinition = field.getColumn().getOBUIAPPProcess();
+        if (processDefinition != null) {
+            json.put(PROCESS_DEFINITION, Utils.getFieldProcess(field));
+        }
+
+        Process processAction = resolveProcessAction(field, isLegacy);
+        if (processAction != null) {
+            json.put(PROCESS_ACTION, ProcessActionBuilder.getFieldProcess(field, processAction));
+        }
+    }
+
+    private Process resolveProcessAction(Field field, boolean isLegacy) {
+        Process columnProcess = field.getColumn().getProcess();
+        if (columnProcess != null) {
+            return columnProcess;
+        }
+        if (isLegacy) {
+            // Posted and CreateFrom have no AD_Process linked; create a minimal stub so the
+            // builder can still serialize fieldId/columnId and attach the legacy params.
+            return LegacyUtils.getLegacyProcess(field.getId());
+        }
+        return null;
     }
 
     /**

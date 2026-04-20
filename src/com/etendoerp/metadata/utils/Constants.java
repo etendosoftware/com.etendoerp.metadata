@@ -95,4 +95,10 @@ public class Constants {
     // Color
     public static final String COLOR_REFERENCE_ID = "27";
     public static final String COLOR_FIELD_NAME = "colorFieldName";
+
+    // Legacy process action JSON keys
+    public static final String LEGACY_URL = "url";
+    public static final String LEGACY_COMMAND = "command";
+    public static final String LEGACY_KEY_COLUMN_NAME = "keyColumnName";
+    public static final String LEGACY_INP_KEY_COLUMN_ID = "inpkeyColumnId";
 }

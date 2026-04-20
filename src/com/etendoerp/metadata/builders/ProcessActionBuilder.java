@@ -72,6 +72,18 @@ public class ProcessActionBuilder extends Builder {
         processJson.put("reference", field.getColumn().getReference().getId());
         processJson.put("manualURL", Utility.getTabURL(field.getTab(), null, false));
 
+        LegacyProcessResolver.resolve(field).ifPresent(params -> {
+            try {
+                JSONObject legacyJson = params.toJson();
+                for (int i = 0; i < legacyJson.names().length(); i++) {
+                    String key = legacyJson.names().getString(i);
+                    processJson.put(key, legacyJson.get(key));
+                }
+            } catch (JSONException e) {
+                // Ignore: legacy params are best-effort enrichment
+            }
+        });
+
         return processJson;
     }
 
