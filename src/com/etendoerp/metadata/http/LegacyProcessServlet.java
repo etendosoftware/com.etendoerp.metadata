@@ -247,6 +247,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             try {
                 OBContext.setAdminMode(true);
                 SecureWebServicesUtils.fillSessionVariables(req);
+                readProperties(vars);
             } finally {
                 OBContext.restorePreviousMode();
             }
