@@ -1,0 +1,84 @@
+<?xml version="1.0"?>
+<database name="TABLE ETMETA_DASHBOARD_WIDGET">
+  <table name="ETMETA_DASHBOARD_WIDGET" primaryKey="ETMETA_DASHBOARD_WIDGET_KEY">
+    <column name="ETMETA_DASHBOARD_WIDGET_ID" primaryKey="true" required="true" type="VARCHAR" size="32" autoIncrement="false">
+      <default/><onCreateDefault/>
+    </column>
+    <column name="AD_CLIENT_ID" primaryKey="false" required="false" type="VARCHAR" size="32" autoIncrement="false">
+      <default/><onCreateDefault/>
+    </column>
+    <column name="AD_ORG_ID" primaryKey="false" required="false" type="VARCHAR" size="32" autoIncrement="false">
+      <default/><onCreateDefault/>
+    </column>
+    <column name="ISACTIVE" primaryKey="false" required="false" type="CHAR" size="1" autoIncrement="false">
+      <default><![CDATA[Y]]></default><onCreateDefault/>
+    </column>
+    <column name="CREATED" primaryKey="false" required="false" type="TIMESTAMP" size="7" autoIncrement="false">
+      <default><![CDATA[SYSDATE]]></default><onCreateDefault/>
+    </column>
+    <column name="CREATEDBY" primaryKey="false" required="false" type="VARCHAR" size="32" autoIncrement="false">
+      <default/><onCreateDefault/>
+    </column>
+    <column name="UPDATED" primaryKey="false" required="false" type="TIMESTAMP" size="7" autoIncrement="false">
+      <default><![CDATA[SYSDATE]]></default><onCreateDefault/>
+    </column>
+    <column name="UPDATEDBY" primaryKey="false" required="false" type="VARCHAR" size="32" autoIncrement="false">
+      <default/><onCreateDefault/>
+    </column>
+    <column name="ETMETA_WIDGET_CLASS_ID" primaryKey="false" required="true" type="VARCHAR" size="32" autoIncrement="false">
+      <default/><onCreateDefault/>
+    </column>
+    <column name="LAYER" primaryKey="false" required="true" type="VARCHAR" size="10" autoIncrement="false">
+      <default><![CDATA[SYSTEM]]></default><onCreateDefault/>
+    </column>
+    <column name="AD_USER_ID" primaryKey="false" required="false" type="VARCHAR" size="32" autoIncrement="false">
+      <default/><onCreateDefault/>
+    </column>
+    <column name="AD_ROLE_ID" primaryKey="false" required="false" type="VARCHAR" size="32" autoIncrement="false">
+      <default/><onCreateDefault/>
+    </column>
+    <column name="COL_POSITION" primaryKey="false" required="false" type="DECIMAL" autoIncrement="false">
+      <default><![CDATA[0]]></default><onCreateDefault/>
+    </column>
+    <column name="ROW_POSITION" primaryKey="false" required="false" type="DECIMAL" autoIncrement="false">
+      <default><![CDATA[0]]></default><onCreateDefault/>
+    </column>
+    <column name="WIDTH" primaryKey="false" required="false" type="DECIMAL" autoIncrement="false">
+      <default><![CDATA[2]]></default><onCreateDefault/>
+    </column>
+    <column name="HEIGHT" primaryKey="false" required="false" type="DECIMAL" autoIncrement="false">
+      <default><![CDATA[1]]></default><onCreateDefault/>
+    </column>
+    <column name="ISVISIBLE" primaryKey="false" required="false" type="CHAR" size="1" autoIncrement="false">
+      <default><![CDATA[Y]]></default><onCreateDefault/>
+    </column>
+    <column name="SEQNO" primaryKey="false" required="false" type="DECIMAL" autoIncrement="false">
+      <default><![CDATA[10]]></default><onCreateDefault/>
+    </column>
+    <column name="PARAMETERS_JSON" primaryKey="false" required="false" type="CLOB" size="4000" autoIncrement="false">
+      <default/><onCreateDefault/>
+    </column>
+    <foreign-key foreignTable="AD_CLIENT" name="ETMETA_DWG_AD_CLIENT">
+      <reference local="AD_CLIENT_ID" foreign="AD_CLIENT_ID"/>
+    </foreign-key>
+    <foreign-key foreignTable="AD_ORG" name="ETMETA_DWG_AD_ORG">
+      <reference local="AD_ORG_ID" foreign="AD_ORG_ID"/>
+    </foreign-key>
+    <foreign-key foreignTable="ETMETA_WIDGET_CLASS" name="ETMETA_DWG_WIDGET_CLASS">
+      <reference local="ETMETA_WIDGET_CLASS_ID" foreign="ETMETA_WIDGET_CLASS_ID"/>
+    </foreign-key>
+    <foreign-key foreignTable="AD_USER" name="ETMETA_DWG_AD_USER">
+      <reference local="AD_USER_ID" foreign="AD_USER_ID"/>
+    </foreign-key>
+    <foreign-key foreignTable="AD_ROLE" name="ETMETA_DWG_AD_ROLE">
+      <reference local="AD_ROLE_ID" foreign="AD_ROLE_ID"/>
+    </foreign-key>
+    <check name="ETMETA_DWG_LAYER_CHECK"><![CDATA[LAYER IN ('SYSTEM', 'CLIENT', 'USER')]]></check>
+    <check name="ETMETA_DWG_ISACTIVE_CHECK"><![CDATA[ISACTIVE IN ('Y', 'N')]]></check>
+    <check name="ETMETA_DWG_ISVISIBLE_CHECK"><![CDATA[ISVISIBLE IN ('Y', 'N')]]></check>
+    <index name="ETMETA_DWG_USER_CLASS" unique="false">
+      <index-column name="AD_USER_ID"/>
+      <index-column name="ETMETA_WIDGET_CLASS_ID"/>
+    </index>
+  </table>
+</database>
