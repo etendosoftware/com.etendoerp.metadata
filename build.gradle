@@ -14,6 +14,11 @@ sourceSets {
             srcDirs("etendo-resources")
         }
     }
+    test {
+        java {
+            srcDirs("src-test/src")
+        }
+    }
 }
 
 publishing {
@@ -48,8 +53,34 @@ repositories {
     }
 }
 
+tasks.named('test') {
+    useJUnitPlatform()
+}
+
+// Resolve the full compile classpath from the workspace classpath.jar manifest
+def classpathJar = file("${rootProject.projectDir}/build/lib/classpath.jar")
+def extraTestJars = []
+if (classpathJar.exists()) {
+    def mf = new java.util.jar.JarFile(classpathJar).manifest
+    def cp = mf.mainAttributes.getValue("Class-Path") ?: ""
+    cp.split("\\s+").each { entry ->
+        if (entry) {
+            def f = new File(entry.startsWith("file:") ? new URI(entry).path : entry)
+            if (f.exists()) extraTestJars << f
+        }
+    }
+}
+
 dependencies {
     implementation('com.etendoerp.platform:etendo-core:[26.1.0,26.2.0)')
     implementation('com.etendoerp:metadata.template:1.0.1')
     implementation('com.etendoerp:etendorx:4.0.3')
+    testImplementation(sourceSets.main.output)
+    testImplementation(files("${rootProject.projectDir}/build/classes"))
+    testImplementation(files("${rootProject.projectDir}/src-test/build/classes"))
+    testImplementation(files(extraTestJars))
+    testImplementation('org.junit.jupiter:junit-jupiter:5.10.0')
+    testImplementation('org.mockito:mockito-core:5.5.0')
+    testImplementation('org.mockito:mockito-junit-jupiter:5.5.0')
+    testRuntimeOnly('org.junit.platform:junit-platform-launcher')
 }
