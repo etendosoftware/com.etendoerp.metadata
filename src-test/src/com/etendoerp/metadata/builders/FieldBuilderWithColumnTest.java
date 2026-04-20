@@ -73,6 +73,7 @@ import org.openbravo.model.ad.datamodel.Table;
 import org.openbravo.model.ad.domain.Reference;
 import org.openbravo.model.ad.system.Language;
 import org.openbravo.model.ad.ui.Field;
+import org.openbravo.model.ad.ui.FieldGroup;
 import org.openbravo.model.ad.ui.Process;
 import org.openbravo.model.ad.ui.Tab;
 import org.openbravo.model.ad.ui.Window;
@@ -134,6 +135,7 @@ class FieldBuilderWithColumnTest {
     private static final String METH_ADD_LINK_ACCESSIBILITY = "addLinkAccessibilityInfo";
 
     private static final String IS_REFERENCE_WINDOW_STRING = "isReferencedWindowAccessible";
+    private static final String FIELD_GROUP_COLLAPSED = "fieldGroupCollapsed";
     private static final String PROP_REFERENCED_WINDOW_ID = "referencedWindowId";
 
     private FieldBuilderWithColumn fieldBuilder;
@@ -766,5 +768,38 @@ class FieldBuilderWithColumnTest {
         }
 
         FieldBuilderWithColumn.clearWindowAccessCache();
+    }
+
+    @Test
+    void testFieldGroupCollapsedTrueIsSerializedInJSON() throws JSONException {
+        FieldGroup fieldGroup = mock(FieldGroup.class);
+        when(fieldGroup.isCollapsed()).thenReturn(Boolean.TRUE);
+        when(field.getFieldGroup()).thenReturn(fieldGroup);
+
+        JSONObject result = executeToJSON(null);
+
+        assertTrue(result.has(FIELD_GROUP_COLLAPSED));
+        assertTrue(result.getBoolean(FIELD_GROUP_COLLAPSED));
+    }
+
+    @Test
+    void testFieldGroupCollapsedFalseIsSerializedInJSON() throws JSONException {
+        FieldGroup fieldGroup = mock(FieldGroup.class);
+        when(fieldGroup.isCollapsed()).thenReturn(Boolean.FALSE);
+        when(field.getFieldGroup()).thenReturn(fieldGroup);
+
+        JSONObject result = executeToJSON(null);
+
+        assertTrue(result.has(FIELD_GROUP_COLLAPSED));
+        assertFalse(result.getBoolean(FIELD_GROUP_COLLAPSED));
+    }
+
+    @Test
+    void testFieldGroupCollapsedKeyAbsentWhenNoFieldGroup() throws JSONException {
+        when(field.getFieldGroup()).thenReturn(null);
+
+        JSONObject result = executeToJSON(null);
+
+        assertFalse(result.has(FIELD_GROUP_COLLAPSED));
     }
 }
