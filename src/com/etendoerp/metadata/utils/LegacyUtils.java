@@ -35,8 +35,7 @@ public class LegacyUtils {
             "3663",
             "4242",
             "3670",
-            "4248",
-            "7C541AC0C767FDD7E040007F01016B4D"
+            "4248"
     );
 
     /** Set of legacy paths used in the system. */
