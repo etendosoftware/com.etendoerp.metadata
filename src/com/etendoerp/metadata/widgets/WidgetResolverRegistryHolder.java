@@ -17,7 +17,7 @@ import com.etendoerp.metadata.widgets.resolvers.URLResolver;
  * (e.g., from WidgetDataService which is constructed via ServiceFactory, not Weld).
  */
 public class WidgetResolverRegistryHolder {
-    private static final WidgetResolverRegistry instance;
+    private static WidgetResolverRegistry instance;
 
     static {
         instance = new WidgetResolverRegistry();
