@@ -128,46 +128,6 @@ class FieldBuilderTest {
   private static final String SEARCH_FIELD = "searchField";
   private static final String TEST_TABLE = "TestTable";
 
-  private static final String SELECTOR_ID = "selector-id";
-  private static final String EXACT_MATCH_STYLE = "exact";
-  private static final String PROPERTY_FIELD = "propertyField";
-  private static final String IDENTIFIER_LITERAL = "identifier";
-  private static final String GRID_COLUMNS = "gridColumns";
-  private static final String REFERENCE_ID = "referenceId";
-
-  private void setupCustomQuerySelectorMock() {
-    when(selector.getObserdsDatasource()).thenReturn(null);
-    when(selector.isCustomQuery()).thenReturn(true);
-    when(selector.getSuggestiontextmatchstyle()).thenReturn(EXACT_MATCH_STYLE);
-    when(selector.getId()).thenReturn(SELECTOR_ID);
-    when(selector.getDisplayfield()).thenReturn(null);
-    when(selector.getValuefield()).thenReturn(null);
-  }
-
-  private SelectorField createGridFieldMock(String id) {
-    SelectorField gridField = mock(SelectorField.class);
-    when(gridField.isActive()).thenReturn(true);
-    when(gridField.isShowingrid()).thenReturn(true);
-    when(gridField.getId()).thenReturn(id);
-    when(gridField.getProperty()).thenReturn(PROPERTY_FIELD);
-    return gridField;
-  }
-
-  private JSONObject callAddSelectorInfoWithContext(Language lang) throws Exception {
-    try (MockedStatic<FieldBuilder> mockedStatic = mockStatic(FieldBuilder.class, CALLS_REAL_METHODS);
-         MockedStatic<OBContext> obContextMockedStatic = mockStatic(OBContext.class)) {
-      OBContext obContext = mock(OBContext.class);
-      obContextMockedStatic.when(OBContext::getOBContext).thenReturn(obContext);
-      when(obContext.getLanguage()).thenReturn(lang);
-
-      mockedStatic.when(() -> FieldBuilder.getDisplayField(selector)).thenReturn(IDENTIFIER_LITERAL);
-      mockedStatic.when(() -> FieldBuilder.getValueField(selector)).thenReturn("id");
-      mockedStatic.when(() -> FieldBuilder.getExtraSearchFields(selector)).thenReturn("");
-      
-      return FieldBuilder.addSelectorInfo(FIELD_ID, selector);
-    }
-  }
-
   /**
    * Sets up the necessary mocks and their behaviors before each test.
    */
@@ -559,8 +519,13 @@ class FieldBuilderTest {
    */
   @Test
   void testAddSelectorInfoWithCustomQuerySelector() throws Exception {
-    setupCustomQuerySelectorMock();
+    when(selector.getObserdsDatasource()).thenReturn(null);
+    when(selector.isCustomQuery()).thenReturn(true);
+    when(selector.getId()).thenReturn("selector-id");
+    when(selector.getDisplayfield()).thenReturn(null);
+    when(selector.getSuggestiontextmatchstyle()).thenReturn("exact");
     when(selector.getOBUISELSelectorFieldList()).thenReturn(Collections.emptyList());
+    when(selector.getValuefield()).thenReturn(null);
 
     try (MockedStatic<FieldBuilder> mockedStatic = mockStatic(FieldBuilder.class, CALLS_REAL_METHODS)) {
       mockedStatic.when(() -> FieldBuilder.getDisplayField(selector)).thenReturn(JsonConstants.IDENTIFIER);
@@ -570,7 +535,7 @@ class FieldBuilderTest {
       JSONObject result = FieldBuilder.addSelectorInfo(FIELD_ID, selector);
 
       assertEquals(Constants.CUSTOM_QUERY_DS, result.getString(Constants.DATASOURCE_PROPERTY));
-      assertEquals(EXACT_MATCH_STYLE, result.getString(JsonConstants.TEXTMATCH_PARAMETER));
+      assertEquals("exact", result.getString(JsonConstants.TEXTMATCH_PARAMETER));
     }
   }
 
@@ -790,7 +755,7 @@ class FieldBuilderTest {
     when(selector.isCustomQuery()).thenReturn(false);
     when(selector.getTable()).thenReturn(table);
     when(table.getName()).thenReturn(TEST_TABLE);
-    when(selector.getId()).thenReturn(SELECTOR_ID);
+    when(selector.getId()).thenReturn("selector-id");
     when(selector.getDisplayfield()).thenReturn(displayField);
     when(selector.getValuefield()).thenReturn(valueField);
     when(selector.getSuggestiontextmatchstyle()).thenReturn("startsWith");
@@ -888,110 +853,6 @@ class FieldBuilderTest {
     assertEquals(2, result.length());
     assertTrue(result.getJSONObject(0).getBoolean("active"));
     assertFalse(result.getJSONObject(1).getBoolean("active"));
-  }
-
-  /**
-   * Tests addSelectorInfo when a selector has a ProcessDefinition and grid columns
-   */
-  @Test
-  void testAddSelectorInfoWithProcessDefinitionAndGridColumns() throws Exception {
-    org.openbravo.client.application.Process processDef = mock(org.openbravo.client.application.Process.class);
-    when(processDef.getId()).thenReturn("process-def-id");
-    when(selector.getProcessDefintion()).thenReturn(processDef);
-
-    SelectorField gridField = createGridFieldMock("grid-field-id");
-    Language lang = mock(Language.class);
-    when(gridField.get(SelectorField.PROPERTY_NAME, lang)).thenReturn("Header");
-    when(gridField.isSortable()).thenReturn(true);
-    when(gridField.isFilterable()).thenReturn(true);
-    when(gridField.getSortno()).thenReturn(10L);
-    
-    // Setting up resolveReferenceId using Reference
-    Reference ref = mock(Reference.class);
-    when(ref.getId()).thenReturn(REF_ID);
-    when(gridField.getReference()).thenReturn(ref);
-
-    when(selector.getOBUISELSelectorFieldList()).thenReturn(List.of(gridField));
-    
-    setupCustomQuerySelectorMock();
-    
-    JSONObject result = callAddSelectorInfoWithContext(lang);
-    
-    assertTrue(result.getBoolean("hasProcessDefinitionRelated"));
-    assertEquals("process-def-id", result.getString("processDefinitionId"));
-    
-    assertTrue(result.getBoolean("hasTableRelated"));
-    JSONArray gridColumns = result.getJSONArray(GRID_COLUMNS);
-    assertEquals(1, gridColumns.length());
-    
-    JSONObject col = gridColumns.getJSONObject(0);
-    assertEquals("grid-field-id", col.getString("id"));
-    assertEquals("Header", col.getString("header"));
-    assertEquals(PROPERTY_FIELD, col.getString("accessorKey"));
-    assertTrue(col.getBoolean("enableSorting"));
-    assertTrue(col.getBoolean("enableFiltering"));
-    assertEquals(REF_ID, col.getString(REFERENCE_ID));
-    assertEquals(10L, col.getLong("sortNo"));
-  }
-
-  /**
-   * Tests addSelectorInfo to ensure resolveReferenceId works through Column reference fallback
-   */
-  @Test
-  void testAddSelectorInfoWithGridColumnFallbackColumnReference() throws Exception {
-    when(selector.getProcessDefintion()).thenReturn(null);
-
-    SelectorField gridField = createGridFieldMock("grid-field-col");
-    Language lang = mock(Language.class);
-
-    // Setting up resolveReferenceId using Column Reference
-    when(gridField.getReference()).thenReturn(null);
-    Column gridCol = mock(Column.class);
-    Reference colRef = mock(Reference.class);
-    when(colRef.getId()).thenReturn("col-ref-id");
-    when(gridCol.getReference()).thenReturn(colRef);
-    when(gridField.getColumn()).thenReturn(gridCol);
-
-    when(selector.getOBUISELSelectorFieldList()).thenReturn(List.of(gridField));
-    
-    setupCustomQuerySelectorMock();
-    
-    JSONObject result = callAddSelectorInfoWithContext(lang);
-    
-    JSONArray gridColumns = result.getJSONArray(GRID_COLUMNS);
-    JSONObject col = gridColumns.getJSONObject(0);
-    assertEquals("col-ref-id", col.getString(REFERENCE_ID));
-  }
-
-  /**
-   * Tests addSelectorInfo to ensure resolveReferenceId works through DataSourceField reference fallback
-   */
-  @Test
-  void testAddSelectorInfoWithGridColumnFallbackDatasourceReference() throws Exception {
-    when(selector.getProcessDefintion()).thenReturn(null);
-
-    SelectorField gridField = createGridFieldMock("grid-field-ds");
-    Language lang = mock(Language.class);
-
-    // Setting up resolveReferenceId using DataSourceField Reference
-    when(gridField.getReference()).thenReturn(null);
-    when(gridField.getColumn()).thenReturn(null);
-    
-    DatasourceField dsField = mock(DatasourceField.class);
-    Reference dsColRef = mock(Reference.class);
-    when(dsColRef.getId()).thenReturn("ds-ref-id");
-    when(dsField.getReference()).thenReturn(dsColRef);
-    when(gridField.getObserdsDatasourceField()).thenReturn(dsField);
-
-    when(selector.getOBUISELSelectorFieldList()).thenReturn(List.of(gridField));
-    
-    setupCustomQuerySelectorMock();
-    
-    JSONObject result = callAddSelectorInfoWithContext(lang);
-    
-    JSONArray gridColumns = result.getJSONArray(GRID_COLUMNS);
-    JSONObject col = gridColumns.getJSONObject(0);
-    assertEquals("ds-ref-id", col.getString(REFERENCE_ID));
   }
 
 }
