@@ -20,13 +20,13 @@ public class WidgetClassesService extends MetadataService {
     private static final String CLASS_HQL =
         "select wc.id, wc.name, wc.type, wc.title, wc.description, " +
         "wc.defaultWidth, wc.defaultHeight, wc.refreshInterval " +
-        "from EtmetaWidgetClass wc where wc.isactive = 'Y' order by wc.name";
+        "from etmeta_Widget_Class wc where wc.active = true order by wc.name";
 
     private static final String PARAM_HQL =
         "select p.name, p.displayName, p.type, p.isRequired, p.isFixed, " +
         "p.defaultValue, p.listValues " +
-        "from EtmetaWidgetParam p where p.etmetaWidgetClassId = :classId " +
-        "and p.isactive = 'Y' order by p.seqno";
+        "from etmeta_Widget_Param p where p.widgetClass.id = :classId " +
+        "and p.active = true order by p.sequence";
 
     public WidgetClassesService(HttpServletRequest request, HttpServletResponse response) {
         super(request, response);
@@ -70,8 +70,8 @@ public class WidgetClassesService extends MetadataService {
                     .put("name",         p[0])
                     .put("displayName",  p[1])
                     .put("type",         p[2])
-                    .put("required",     "Y".equals(p[3]))
-                    .put("fixed",        "Y".equals(p[4]))
+                    .put("required",     Boolean.TRUE.equals(p[3]))
+                    .put("fixed",        Boolean.TRUE.equals(p[4]))
                     .put("defaultValue", p[5]);
             if (p[6] != null) {
                 param.put("listValues", parseListValues((String) p[6]));

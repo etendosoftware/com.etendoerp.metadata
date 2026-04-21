@@ -27,16 +27,16 @@ import java.util.Map;
 public class WidgetDataService extends MetadataService {
 
     private static final String INSTANCE_HQL =
-        "select dw.id, dw.etmetaWidgetClassId, dw.parametersJson " +
-        "from EtmetaDashboardWidget dw where dw.id = :id and dw.isactive = 'Y'";
+        "select dw.id, dw.widgetClass.id, dw.parametersJSON " +
+        "from etmeta_Dashboard_Widget dw where dw.id = :id and dw.active = true";
 
     private static final String CLASS_HQL =
-        "select wc.id, wc.type, wc.resolverClass, wc.externalDataUrl, wc.hqlQuery " +
-        "from EtmetaWidgetClass wc where wc.id = :id";
+        "select wc.id, wc.type, wc.resolverClass, wc.externalDataURL, wc.hQLQuery " +
+        "from etmeta_Widget_Class wc where wc.id = :id";
 
     private static final String PARAM_DEFAULTS_HQL =
-        "select p.name, p.defaultValue from EtmetaWidgetParam p " +
-        "where p.etmetaWidgetClassId = :classId and p.isactive = 'Y' and p.isFixed = 'N'";
+        "select p.name, p.defaultValue from etmeta_Widget_Param p " +
+        "where p.widgetClass.id = :classId and p.active = true and p.isFixed = false";
 
     // Injected in tests; in production resolved via the static holder
     private WidgetResolverRegistry registry;
