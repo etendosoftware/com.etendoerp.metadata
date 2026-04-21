@@ -126,7 +126,9 @@ public class ServiceFactory {
 
     public static MetadataService getService(final HttpServletRequest req, final HttpServletResponse res) {
         final String path = req.getPathInfo() != null
-                ? req.getPathInfo().replace("/com.etendoerp.metadata.meta/", "/")
+                ? req.getPathInfo()
+                    .replace("/com.etendoerp.metadata.meta/", "/")
+                    .replace("/com.etendoerp.metadata.sws/", "/")
                 : "";
 
         // Check exact matches first

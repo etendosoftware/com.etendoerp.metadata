@@ -6,6 +6,11 @@
         <singleton>true</singleton>
     </bean>
     <bean>
+        <name>sws</name>
+        <class>com.etendoerp.metadata.http.MetadataServlet</class>
+        <singleton>true</singleton>
+    </bean>
+    <bean>
         <name>forward</name>
         <class>com.etendoerp.metadata.http.ForwarderServlet</class>
         <singleton>true</singleton>
