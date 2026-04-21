@@ -47,8 +47,9 @@ public class ParameterBuilder extends Builder {
     }
 
     private static boolean isListParameter(Parameter parameter) {
-        return parameter != null && parameter.getReference() != null && LIST_REFERENCE_ID.contains(
-            parameter.getReference().getId());
+        return parameter != null && parameter.getReference() != null &&
+               (LIST_REFERENCE_ID.equals(parameter.getReference().getId()) ||
+                BUTTON_REFERENCE_ID.equals(parameter.getReference().getId()));
     }
 
 

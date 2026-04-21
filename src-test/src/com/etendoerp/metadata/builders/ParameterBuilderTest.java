@@ -33,6 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.mockStatic;
@@ -100,7 +101,7 @@ class ParameterBuilderTest {
       when(mockParameter.getReadOnlyLogic()).thenReturn(null);
       when(mockParameter.getReference()).thenReturn(mockReference);
       when(mockParameter.getReferenceSearchKey()).thenReturn(mockReferenceSearchKey);
-      when(mockParameter.getId()).thenReturn(PARAMETER_ID);
+      lenient().when(mockParameter.getId()).thenReturn(PARAMETER_ID);
       when(mockReference.getId()).thenReturn(referenceId);
     }
   }
