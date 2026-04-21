@@ -35,15 +35,15 @@ public class DashboardLayoutResolver {
     private static final int IDX_PARAMS     = 10;
 
     private static final String HQL =
-        "select dw.id, dw.etmetaWidgetClassId, dw.layer, dw.adUserId, " +
-        "dw.colPosition, dw.rowPosition, dw.width, dw.height, dw.isvisible, " +
-        "dw.seqno, dw.parametersJson " +
-        "from EtmetaDashboardWidget dw " +
-        "where dw.isactive = 'Y' " +
+        "select dw.id, dw.widgetClass.id, dw.layer, dw.user.id, " +
+        "dw.columnPosition, dw.rowPosition, dw.width, dw.height, dw.visible, " +
+        "dw.sequence, dw.parametersJSON " +
+        "from etmeta_Dashboard_Widget dw " +
+        "where dw.active = true " +
         "  and (dw.layer = 'SYSTEM' " +
-        "       or (dw.layer = 'CLIENT' and dw.adClientId = :clientId) " +
-        "       or (dw.layer = 'USER'   and dw.adUserId   = :userId)) " +
-        "order by dw.layer, dw.seqno";
+        "       or (dw.layer = 'CLIENT' and dw.client.id = :clientId) " +
+        "       or (dw.layer = 'USER'   and dw.user.id   = :userId)) " +
+        "order by dw.layer, dw.sequence";
 
     public JSONArray resolve() throws JSONException {
         OBContext ctx = OBContext.getOBContext();
@@ -69,7 +69,7 @@ public class DashboardLayoutResolver {
 
         JSONArray result = new JSONArray();
         for (Object[] row : best.values()) {
-            if (!"Y".equals(row[IDX_VISIBLE])) continue;
+            if (!Boolean.TRUE.equals(row[IDX_VISIBLE])) continue;
             result.put(rowToJson(row));
         }
         return result;

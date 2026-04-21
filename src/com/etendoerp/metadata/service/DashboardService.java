@@ -72,7 +72,7 @@ public class DashboardService extends MetadataService {
     private void enrichWithClassData(JSONObject widget) throws Exception {
         String classId = widget.getString("widgetClassId");
         String hql = "select wc.name, wc.type, wc.title, wc.refreshInterval " +
-                     "from EtmetaWidgetClass wc where wc.id = :id";
+                     "from etmeta_Widget_Class wc where wc.id = :id";
         Query<Object[]> q = OBDal.getInstance().getSession().createQuery(hql, Object[].class);
         q.setParameter("id", classId);
         Object[] row = q.uniqueResult();
@@ -101,18 +101,18 @@ public class DashboardService extends MetadataService {
     private void updateLayoutRecord(String instanceId, JSONObject w,
                                     String userId, boolean isAdmin) throws Exception {
         String updateHql =
-            "update EtmetaDashboardWidget dw set " +
-            "dw.colPosition = :col, dw.rowPosition = :row, " +
-            "dw.width = :width, dw.height = :height, dw.isvisible = :visible " +
+            "update etmeta_Dashboard_Widget dw set " +
+            "dw.columnPosition = :col, dw.rowPosition = :row, " +
+            "dw.width = :width, dw.height = :height, dw.visible = :visible " +
             "where dw.id = :id " +
-            (isAdmin ? "" : "and dw.adUserId = :userId");
+            (isAdmin ? "" : "and dw.user.id = :userId");
 
         Query<?> q = OBDal.getInstance().getSession().createQuery(updateHql);
         q.setParameter("col",     w.optInt("col", 0));
         q.setParameter("row",     w.optInt("row", 0));
         q.setParameter("width",   w.optInt("width", 2));
         q.setParameter("height",  w.optInt("height", 1));
-        q.setParameter("visible", w.optBoolean("isVisible", true) ? "Y" : "N");
+        q.setParameter("visible", w.optBoolean("isVisible", true));
         q.setParameter("id",      instanceId);
         if (!isAdmin) q.setParameter("userId", userId);
         q.executeUpdate();
@@ -126,14 +126,16 @@ public class DashboardService extends MetadataService {
         String clientId   = OBContext.getOBContext().getCurrentClient().getId();
         String newId      = UUID.randomUUID().toString().replace("-", "");
 
-        String insertHql =
-            "insert into EtmetaDashboardWidget " +
-            "(id, etmetaWidgetClassId, layer, adClientId, adUserId, " +
-            " colPosition, rowPosition, width, height, isvisible, seqno, parametersJson, isactive) " +
-            "values (:id, :classId, :layer, :clientId, :userId, " +
-            " :col, :row, :width, :height, 'Y', :seqno, :params, 'Y')";
+        String insertSql =
+            "INSERT INTO etmeta_dashboard_widget " +
+            "(etmeta_dashboard_widget_id, etmeta_widget_class_id, layer, ad_client_id, ad_org_id, " +
+            " ad_user_id, col_position, row_position, width, height, isvisible, seqno, " +
+            " parameters_json, isactive, created, createdby, updated, updatedby) " +
+            "VALUES (:id, :classId, :layer, :clientId, '0', " +
+            " :userId, :col, :row, :width, :height, 'Y', :seqno, " +
+            " :params, 'Y', NOW(), :uid, NOW(), :uid)";
 
-        Query<?> q = OBDal.getInstance().getSession().createQuery(insertHql);
+        org.hibernate.query.NativeQuery<?> q = OBDal.getInstance().getSession().createNativeQuery(insertSql);
         q.setParameter("id",       newId);
         q.setParameter("classId",  classId);
         q.setParameter("layer",    layer);
@@ -145,6 +147,7 @@ public class DashboardService extends MetadataService {
         q.setParameter("height",   body.optInt("height", 1));
         q.setParameter("seqno",    10);
         q.setParameter("params",   body.has("parameters") ? body.getJSONObject("parameters").toString() : null);
+        q.setParameter("uid",      OBContext.getOBContext().getUser().getId());
         q.executeUpdate();
 
         write(new JSONObject().put("instanceId", newId).put("status", "created"));
@@ -156,7 +159,7 @@ public class DashboardService extends MetadataService {
 
         if ("USER".equals(layer)) {
             Query<?> q = OBDal.getInstance().getSession()
-                    .createQuery("delete from EtmetaDashboardWidget dw where dw.id = :id");
+                    .createQuery("delete from etmeta_Dashboard_Widget dw where dw.id = :id");
             q.setParameter("id", instanceId);
             q.executeUpdate();
         } else {
@@ -166,16 +169,19 @@ public class DashboardService extends MetadataService {
             String clientId = OBContext.getOBContext().getCurrentClient().getId();
             String shadowId = UUID.randomUUID().toString().replace("-", "");
 
-            String insertHql =
-                "insert into EtmetaDashboardWidget " +
-                "(id, etmetaWidgetClassId, layer, adClientId, adUserId, " +
-                " colPosition, rowPosition, width, height, isvisible, seqno, isactive) " +
-                "values (:id, :classId, 'USER', :clientId, :userId, 0, 0, 0, 0, 'N', 0, 'Y')";
-            Query<?> q = OBDal.getInstance().getSession().createQuery(insertHql);
+            String insertSql =
+                "INSERT INTO etmeta_dashboard_widget " +
+                "(etmeta_dashboard_widget_id, etmeta_widget_class_id, layer, ad_client_id, ad_org_id, " +
+                " ad_user_id, col_position, row_position, width, height, isvisible, seqno, " +
+                " isactive, created, createdby, updated, updatedby) " +
+                "VALUES (:id, :classId, 'USER', :clientId, '0', " +
+                " :userId, 0, 0, 0, 0, 'N', 0, 'Y', NOW(), :uid, NOW(), :uid)";
+            org.hibernate.query.NativeQuery<?> q = OBDal.getInstance().getSession().createNativeQuery(insertSql);
             q.setParameter("id",       shadowId);
             q.setParameter("classId",  classId);
             q.setParameter("clientId", clientId);
             q.setParameter("userId",   userId);
+            q.setParameter("uid",      userId);
             q.executeUpdate();
         }
         write(new JSONObject().put("status", "deleted"));
@@ -183,14 +189,14 @@ public class DashboardService extends MetadataService {
 
     private String getInstanceLayer(String instanceId) {
         Query<String> q = OBDal.getInstance().getSession()
-                .createQuery("select dw.layer from EtmetaDashboardWidget dw where dw.id = :id", String.class);
+                .createQuery("select dw.layer from etmeta_Dashboard_Widget dw where dw.id = :id", String.class);
         q.setParameter("id", instanceId);
         return q.uniqueResult();
     }
 
     private String getInstanceClassId(String instanceId) {
         Query<String> q = OBDal.getInstance().getSession()
-                .createQuery("select dw.etmetaWidgetClassId from EtmetaDashboardWidget dw where dw.id = :id", String.class);
+                .createQuery("select dw.widgetClass.id from etmeta_Dashboard_Widget dw where dw.id = :id", String.class);
         q.setParameter("id", instanceId);
         return q.uniqueResult();
     }
