@@ -21,10 +21,14 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.openbravo.erpCommon.utility.Utility;
 import org.openbravo.model.ad.datamodel.Column;
+import org.openbravo.model.ad.domain.ModelImplementation;
+import org.openbravo.model.ad.domain.ModelImplementationMapping;
 import org.openbravo.model.ad.ui.Field;
 import org.openbravo.model.ad.ui.Process;
 
+import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
@@ -68,6 +72,14 @@ public class LegacyProcessResolver {
     private static final String COMMAND_DEFAULT = "DEFAULT";
     private static final String UIPATTERN_MANUAL = "M";
     private static final String TEMPLATE_EXTENSION = ".html";
+
+    // --- AD_MODEL_OBJECT.Action values of interest ---
+    private static final String ACTION_PROCESS = "P";
+    private static final String ACTION_REPORT = "R";
+
+    // Sorts Boolean.TRUE entries first, tolerates null. Useful for picking the "default" row.
+    private static final Comparator<Boolean> DEFAULT_FIRST =
+            Comparator.comparing(b -> !Boolean.TRUE.equals(b));
 
     private LegacyProcessResolver() {
     }
@@ -153,13 +165,74 @@ public class LegacyProcessResolver {
         return resolveTabUrl(field);
     }
 
+    /**
+     * Resolves the URL for a manual ({@code uipattern='M'}) process using the Openbravo
+     * dispatcher registry as primary source and the package-derived path as fallback.
+     * <p>
+     * Resolution order:
+     * <ol>
+     *   <li>{@code AD_MODEL_OBJECT_MAPPING} — the canonical URL registry consulted by the
+     *       Classic dispatcher. Covers processes with remapped URLs (e.g.
+     *       {@code /ad_process/RescheduleProcess.html}).</li>
+     *   <li>{@link #javaClassToUrl(String)} applied to the FQCN taken from
+     *       {@code AD_Process.Classname} or from the default {@code AD_MODEL_OBJECT}
+     *       implementation — legacy fallback for processes whose package coincides with
+     *       the servlet mount point.</li>
+     * </ol>
+     */
     private static String resolveManualProcessUrl(Process process) {
-        String javaClassName = process.getJavaClassName();
-        if (javaClassName == null || javaClassName.isBlank()) {
-            logger.warn("Process {} has uipattern=M but no javaClassName — cannot resolve URL", process.getId());
-            return null;
+        String mapped = resolveUrlFromMappings(process);
+        if (mapped != null && !mapped.isBlank()) {
+            return mapped;
         }
-        return javaClassToUrl(javaClassName);
+        String javaClassName = resolveJavaClassName(process);
+        if (javaClassName != null && !javaClassName.isBlank()) {
+            return javaClassToUrl(javaClassName);
+        }
+        logger.warn("Process {} has uipattern=M but no resolvable URL (no mapping, no classname)", process.getId());
+        return null;
+    }
+
+    /**
+     * Walks {@code process → ModelImplementation (action P/R) → ModelImplementationMapping}
+     * preferring rows flagged as default, and returns the first non-blank mapping name.
+     */
+    private static String resolveUrlFromMappings(Process process) {
+        return process.getADModelImplementationList().stream()
+                .filter(LegacyProcessResolver::isProcessOrReportImpl)
+                .sorted(Comparator.comparing(ModelImplementation::isDefault, DEFAULT_FIRST))
+                .flatMap(mi -> mi.getADModelImplementationMappingList().stream())
+                .sorted(Comparator.comparing(ModelImplementationMapping::isDefault, DEFAULT_FIRST))
+                .map(ModelImplementationMapping::getMappingName)
+                .filter(Objects::nonNull)
+                .filter(name -> !name.isBlank())
+                .findFirst()
+                .orElse(null);
+    }
+
+    /**
+     * Returns the FQCN of the Java implementation for this process. Reads
+     * {@code AD_Process.Classname} first; falls back to the default row in
+     * {@code AD_MODEL_OBJECT} (subtab "Process Class") when the inline value is missing.
+     */
+    private static String resolveJavaClassName(Process process) {
+        String inline = process.getJavaClassName();
+        if (inline != null && !inline.isBlank()) {
+            return inline;
+        }
+        return process.getADModelImplementationList().stream()
+                .filter(LegacyProcessResolver::isProcessOrReportImpl)
+                .sorted(Comparator.comparing(ModelImplementation::isDefault, DEFAULT_FIRST))
+                .map(ModelImplementation::getJavaClassName)
+                .filter(Objects::nonNull)
+                .filter(s -> !s.isBlank())
+                .findFirst()
+                .orElse(null);
+    }
+
+    private static boolean isProcessOrReportImpl(ModelImplementation mi) {
+        String action = mi.getAction();
+        return ACTION_PROCESS.equals(action) || ACTION_REPORT.equals(action);
     }
 
     /**
