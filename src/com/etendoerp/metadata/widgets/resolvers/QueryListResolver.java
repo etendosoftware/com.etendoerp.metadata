@@ -8,7 +8,6 @@ import org.hibernate.query.Query;
 import org.openbravo.dal.service.OBDal;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * Executes a multi-row HQL_QUERY. Column names are declared via the "columns" param
@@ -26,8 +25,11 @@ public class QueryListResolver implements WidgetDataResolver {
         String[] colNames = columnsCsv != null ? columnsCsv.split(",") : new String[0];
 
         Query<Object[]> q = OBDal.getInstance().getSession().createQuery(hql, Object[].class);
-        for (Map.Entry<String, Object> entry : ctx.getParams().entrySet()) {
-            try { q.setParameter(entry.getKey(), entry.getValue()); } catch (Exception ignored) {}
+        for (var param : q.getParameters()) {
+            String name = param.getName();
+            if (name != null) {
+                q.setParameter(name, ctx.getParams().get(name));
+            }
         }
 
         String rowsParam = ctx.param("rowsNumber");
