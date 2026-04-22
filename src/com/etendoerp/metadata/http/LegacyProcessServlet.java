@@ -3,6 +3,9 @@ package com.etendoerp.metadata.http;
 import com.auth0.jwt.interfaces.Claim;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.etendoerp.metadata.data.RequestVariables;
+import com.etendoerp.metadata.exceptions.InternalServerException;
+import com.etendoerp.metadata.utils.LegacyPaths;
+import com.etendoerp.metadata.utils.LegacyUtils;
 import com.smf.securewebservices.utils.SecureWebServicesUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.LogManager;
@@ -327,6 +330,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
                 authenticateWithToken(wrappedRequest, token);
             }
             preprocessRequest(req, wrappedRequest);
+            handleCreateFromSession(req, path, req.getSession(true));
 
             wrappedRequest.getRequestDispatcher(path).include(wrappedRequest, responseWrapper);
 
@@ -522,7 +526,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
     /**
      * Creates a new session in the database (AD_Session table).
      * This method is a duplication of the logic found in
-     * {@link org.openbravo.authentication.AuthenticationManager#createDBSession(HttpServletRequest, String, String, String)}.
+     * {@link org.openbravo.authentication.AuthenticationManager# createDBSession(HttpServletRequest, String, String, String)}.
      *
      * The duplication is necessary because the original method in
      * AuthenticationManager is 'protected'
@@ -864,5 +868,25 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         }
         matcher.appendTail(result);
         return result.toString();
+    }
+
+    private static void handleCreateFromSession(HttpServletRequest req, String path, HttpSession session) {
+        if (LegacyPaths.CREATE_FROM_HTML.equals(path) && "SAVE".equals(req.getParameter("Command"))) {
+            String windowId = req.getParameter("inpWindowId");
+            String tableId = req.getParameter("inpTableId");
+            String sessionKey = "CREATEFROM|TABID";
+
+            if (!LegacyUtils.isMutableSessionAttribute(sessionKey)) {
+                throw new InternalServerException("Attempt to set forbidden session key: " + sessionKey);
+            }
+
+            String tabId = LegacyUtils.findTabIdByWindowAndTable(windowId, tableId);
+            if (tabId != null) {
+                session.setAttribute(sessionKey, tabId);
+            } else {
+                log.warn("Could not resolve tabId for windowId={}, tableId={}. " +
+                         "CreateFrom|tabId will not be set in session.", windowId, tableId);
+            }
+        }
     }
 }
