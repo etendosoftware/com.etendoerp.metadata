@@ -60,6 +60,9 @@ public class CallAsyncProcess extends CallProcess {
    * @param executorService the executor service to use
    */
   public void setExecutorService(ExecutorService executorService) {
+    if (executorService == null) {
+      throw new OBException("ExecutorService cannot be null");
+    }
     this.executorService = executorService;
   }
 

@@ -256,7 +256,9 @@ public class CallAsyncProcessTest extends OBBaseTest {
 
             // Mock OBDal
             OBDal obDal = mock(OBDal.class);
+            org.hibernate.Session session = mock(org.hibernate.Session.class);
             obDalStatic.when(OBDal::getInstance).thenReturn(obDal);
+            when(obDal.getSession()).thenReturn(session);
             when(obDal.get(ProcessInstance.class, PINSTANCE_ID)).thenReturn(pInstance);
             when(obDal.get(Process.class, PROCESS_ID)).thenReturn(process);
 
