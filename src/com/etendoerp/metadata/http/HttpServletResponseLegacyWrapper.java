@@ -42,7 +42,6 @@ package com.etendoerp.metadata.http;
    private String redirectLocation = null;
    private boolean redirected = false;
 
-
    /**
     * Constructs a new HttpServletResponseLegacyWrapper.
     *
@@ -84,6 +83,21 @@ package com.etendoerp.metadata.http;
    public void sendRedirect(String location) throws IOException {
      this.redirectLocation = location;
      this.redirected = true;
+   }
+
+   // Absorbed: script injection changes the body size, so the real
+   // Content-Length must be recomputed by the container from the final bytes.
+   // The other headers/status/content-type can still pass through to the
+   // underlying response via the base wrapper.
+
+   @Override
+   public void setContentLength(int len) {
+     // no-op
+   }
+
+   @Override
+   public void setContentLengthLong(long len) {
+     // no-op
    }
 
    /**

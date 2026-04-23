@@ -840,4 +840,291 @@ public class LegacyProcessServletTest extends OBBaseTest {
         assertTrue("Original elements should be preserved", result.contains("<meta name=\"x\">"));
         assertTrue("Body content should be unchanged", result.contains("<div>content</div>"));
     }
+
+    // ========== Tests for popup message forwarder (new functionality) ==========
+
+    /**
+     * Tests injectPopupMessageForwarder injects the forwarder script before </HEAD>
+     * when the response is an Openbravo classic popup-message page (error).
+     */
+    @Test
+    public void testInjectPopupMessageForwarderInjectsForErrorPopup() throws Exception {
+        String html = "<HTML><HEAD><TITLE>Error</TITLE></HEAD><BODY>"
+                + "<TABLE id=\"paramTipo\" class=\"MessageBoxERROR\">"
+                + "<DIV id=\"messageBoxIDTitle\">Error</DIV>"
+                + "<DIV id=\"messageBoxIDMessage\">Something failed</DIV>"
+                + "</TABLE></BODY></HTML>";
+
+        String result = (String) invokePrivateMethod(legacyProcessServlet, "injectPopupMessageForwarder",
+                new Class<?>[] { String.class },
+                html);
+
+        int scriptIndex = result.indexOf("action:'showProcessMessage'");
+        int closeHeadIndex = result.indexOf("</HEAD>");
+        assertTrue("Forwarder script should be injected before </HEAD>",
+                scriptIndex >= 0 && closeHeadIndex >= 0 && scriptIndex < closeHeadIndex);
+        assertTrue("Forwarder should schedule closeModal via setTimeout",
+                result.contains("action:'closeModal'") && result.contains("setTimeout"));
+    }
+
+    /**
+     * Tests injectPopupMessageForwarder also injects for success-style popups.
+     * The type is computed client-side from paramTipo's className, so the server
+     * only needs to confirm the script was injected.
+     */
+    @Test
+    public void testInjectPopupMessageForwarderInjectsForSuccessPopup() throws Exception {
+        String html = "<HTML><HEAD></HEAD><BODY>"
+                + "<TABLE id=\"paramTipo\" class=\"MessageBoxSUCCESS\">"
+                + "<DIV id=\"messageBoxIDTitle\">Success</DIV>"
+                + "<DIV id=\"messageBoxIDMessage\">Process completed</DIV>"
+                + "</TABLE></BODY></HTML>";
+
+        String result = (String) invokePrivateMethod(legacyProcessServlet, "injectPopupMessageForwarder",
+                new Class<?>[] { String.class },
+                html);
+
+        assertTrue("Forwarder script should be injected for success popups",
+                result.contains("action:'showProcessMessage'"));
+    }
+
+    /**
+     * Tests injectPopupMessageForwarder does NOT inject when the popup marker is
+     * absent — covers form pages, frameset pages and plain HTML.
+     */
+    @Test
+    public void testInjectPopupMessageForwarderSkipsWhenMarkerAbsent() throws Exception {
+        String html = "<HTML><HEAD></HEAD><BODY><FORM>...</FORM></BODY></HTML>";
+
+        String result = (String) invokePrivateMethod(legacyProcessServlet, "injectPopupMessageForwarder",
+                new Class<?>[] { String.class },
+                html);
+
+        assertEquals("HTML without popup marker must remain untouched", html, result);
+    }
+
+    /**
+     * Tests injectPopupMessageForwarder does NOT inject when </HEAD> is missing,
+     * even if the popup marker is present (defensive: avoids double-injection at
+     * an unexpected position).
+     */
+    @Test
+    public void testInjectPopupMessageForwarderSkipsWhenNoHeadCloseTag() throws Exception {
+        String html = "<HTML><BODY><DIV id=\"messageBoxIDMessage\">msg</DIV></BODY></HTML>";
+
+        String result = (String) invokePrivateMethod(legacyProcessServlet, "injectPopupMessageForwarder",
+                new Class<?>[] { String.class },
+                html);
+
+        assertEquals("HTML without </HEAD> must remain untouched", html, result);
+    }
+
+    // ========== Tests for Command=PROCESS short-circuit (new functionality) ==========
+
+    private static final String POPUP_ERROR_HTML =
+            "<HTML><HEAD><TITLE>Error</TITLE></HEAD><BODY>"
+                    + "<TABLE id=\"paramTipo\" class=\"MessageBoxERROR\">"
+                    + "<DIV id=\"messageBoxIDTitle\">Error</DIV>"
+                    + "<DIV id=\"messageBoxIDMessage\">OBException: something failed</DIV>"
+                    + "</TABLE></BODY></HTML>";
+
+    private static final String POPUP_SUCCESS_HTML =
+            "<HTML><HEAD></HEAD><BODY>"
+                    + "<TABLE id=\"paramTipo\" class=\"MessageBoxSUCCESS\">"
+                    + "<DIV id=\"messageBoxIDTitle\">Success</DIV>"
+                    + "<DIV id=\"messageBoxIDMessage\">Process completed</DIV>"
+                    + "</TABLE></BODY></HTML>";
+
+    /**
+     * Tests isProcessCommandPopup returns true when body contains the marker and
+     * Command is PROCESS.
+     */
+    @Test
+    public void testIsProcessCommandPopupTrueForProcessCommand() throws Exception {
+        when(request.getParameter("Command")).thenReturn("PROCESS");
+
+        Boolean result = (Boolean) invokePrivateMethod(legacyProcessServlet, "isProcessCommandPopup",
+                new Class<?>[] { HttpServletRequest.class, String.class },
+                request, POPUP_ERROR_HTML);
+
+        assertTrue("Should short-circuit for Command=PROCESS with popup marker", result);
+    }
+
+    /**
+     * Tests isProcessCommandPopup accepts PROCESS prefix variants (PROCESSDEFAULT, etc.).
+     */
+    @Test
+    public void testIsProcessCommandPopupTrueForProcessPrefixedCommand() throws Exception {
+        when(request.getParameter("Command")).thenReturn("PROCESSDEFAULT");
+
+        Boolean result = (Boolean) invokePrivateMethod(legacyProcessServlet, "isProcessCommandPopup",
+                new Class<?>[] { HttpServletRequest.class, String.class },
+                request, POPUP_SUCCESS_HTML);
+
+        assertTrue("Should short-circuit for any PROCESS-prefixed Command", result);
+    }
+
+    /**
+     * Tests isProcessCommandPopup returns false for Command=GRID even when body has
+     * a popup marker (the GRID response should never be rewritten).
+     */
+    @Test
+    public void testIsProcessCommandPopupFalseForGridCommand() throws Exception {
+        when(request.getParameter("Command")).thenReturn("GRID");
+
+        Boolean result = (Boolean) invokePrivateMethod(legacyProcessServlet, "isProcessCommandPopup",
+                new Class<?>[] { HttpServletRequest.class, String.class },
+                request, POPUP_ERROR_HTML);
+
+        assertEquals("Command=GRID must not be short-circuited", Boolean.FALSE, result);
+    }
+
+    /**
+     * Tests isProcessCommandPopup returns false when Command parameter is missing.
+     */
+    @Test
+    public void testIsProcessCommandPopupFalseWhenCommandMissing() throws Exception {
+        when(request.getParameter("Command")).thenReturn(null);
+
+        Boolean result = (Boolean) invokePrivateMethod(legacyProcessServlet, "isProcessCommandPopup",
+                new Class<?>[] { HttpServletRequest.class, String.class },
+                request, POPUP_ERROR_HTML);
+
+        assertEquals("Missing Command must not be short-circuited", Boolean.FALSE, result);
+    }
+
+    /**
+     * Tests isProcessCommandPopup returns false when body does not contain the
+     * popup marker (e.g. a regular form/grid response).
+     */
+    @Test
+    public void testIsProcessCommandPopupFalseWhenMarkerAbsent() throws Exception {
+        when(request.getParameter("Command")).thenReturn("PROCESS");
+
+        Boolean result = (Boolean) invokePrivateMethod(legacyProcessServlet, "isProcessCommandPopup",
+                new Class<?>[] { HttpServletRequest.class, String.class },
+                request, "<html><body><form></form></body></html>");
+
+        assertEquals("Body without popup marker must not be short-circuited", Boolean.FALSE, result);
+    }
+
+    /**
+     * Tests mapMessageType maps MessageBox class suffixes to the expected types.
+     */
+    @Test
+    public void testMapMessageType() throws Exception {
+        assertEquals("ERROR maps to error", "error",
+                invokePrivateMethod(legacyProcessServlet, "mapMessageType",
+                        new Class<?>[] { String.class }, "ERROR"));
+        assertEquals("SUCCESS maps to success", "success",
+                invokePrivateMethod(legacyProcessServlet, "mapMessageType",
+                        new Class<?>[] { String.class }, "SUCCESS"));
+        assertEquals("WARNING maps to warning", "warning",
+                invokePrivateMethod(legacyProcessServlet, "mapMessageType",
+                        new Class<?>[] { String.class }, "WARNING"));
+        assertEquals("Unknown suffix falls back to info", "info",
+                invokePrivateMethod(legacyProcessServlet, "mapMessageType",
+                        new Class<?>[] { String.class }, "HIDDEN"));
+    }
+
+    /**
+     * Tests writeProcessCommandForwarder produces a minimal self-contained HTML
+     * that posts the expected payload to the parent and does NOT contain the
+     * original popup markup.
+     */
+    @Test
+    public void testWriteProcessCommandForwarderEmitsMinimalForwarder() throws Exception {
+        StringWriter stringWriter = new StringWriter();
+        PrintWriter writer = new PrintWriter(stringWriter);
+        when(response.getWriter()).thenReturn(writer);
+
+        invokePrivateMethod(legacyProcessServlet, "writeProcessCommandForwarder",
+                new Class<?>[] { HttpServletResponse.class, String.class },
+                response, POPUP_ERROR_HTML);
+
+        writer.flush();
+        String output = stringWriter.toString();
+
+        assertTrue("Response must contain the showProcessMessage dispatch",
+                output.contains("action:'showProcessMessage'"));
+        assertTrue("Response must NOT auto-close the modal",
+                !output.contains("action:'closeModal'") && !output.contains("setTimeout"));
+        assertTrue("Response payload must carry the extracted type",
+                output.contains("\"type\":\"error\""));
+        assertTrue("Response payload must carry the extracted title",
+                output.contains("\"title\":\"Error\""));
+        assertTrue("Response payload must carry the extracted message text",
+                output.contains("OBException: something failed"));
+        assertTrue("Short-circuited response must NOT carry the original popup markup",
+                !output.contains("messageBoxIDMessage") && !output.contains("paramTipo"));
+
+        verify(response).setContentType("text/html; charset=UTF-8");
+        verify(response).setStatus(HttpServletResponse.SC_OK);
+    }
+
+    /**
+     * Tests rollbackDalSessionIfErrorPopup rolls back the DAL session when the
+     * captured body is an error popup — preventing StaleStateException during
+     * the filter-chain post-commit which would otherwise abort the HTTP
+     * connection mid-stream.
+     */
+    @Test
+    public void testRollbackDalSessionWhenErrorPopup() throws Exception {
+        HttpServletResponseLegacyWrapper wrapper = mock(HttpServletResponseLegacyWrapper.class);
+        when(wrapper.getCapturedOutputAsString()).thenReturn(POPUP_ERROR_HTML);
+
+        try (MockedStatic<OBDal> mockedOBDal = mockStatic(OBDal.class)) {
+            OBDal dal = mock(OBDal.class);
+            mockedOBDal.when(OBDal::getInstance).thenReturn(dal);
+
+            invokePrivateMethod(legacyProcessServlet, "rollbackDalSessionIfErrorPopup",
+                    new Class<?>[] { HttpServletResponseLegacyWrapper.class },
+                    wrapper);
+
+            verify(dal).rollbackAndClose();
+        }
+    }
+
+    /**
+     * Tests rollbackDalSessionIfErrorPopup is a no-op for success popups and
+     * non-popup responses.
+     */
+    @Test
+    public void testRollbackDalSessionNoOpWhenNotError() throws Exception {
+        HttpServletResponseLegacyWrapper wrapper = mock(HttpServletResponseLegacyWrapper.class);
+        when(wrapper.getCapturedOutputAsString()).thenReturn(POPUP_SUCCESS_HTML);
+
+        try (MockedStatic<OBDal> mockedOBDal = mockStatic(OBDal.class)) {
+            OBDal dal = mock(OBDal.class);
+            mockedOBDal.when(OBDal::getInstance).thenReturn(dal);
+
+            invokePrivateMethod(legacyProcessServlet, "rollbackDalSessionIfErrorPopup",
+                    new Class<?>[] { HttpServletResponseLegacyWrapper.class },
+                    wrapper);
+
+            verify(dal, never()).rollbackAndClose();
+        }
+    }
+
+    /**
+     * Tests that a success popup is short-circuited with type="success".
+     */
+    @Test
+    public void testWriteProcessCommandForwarderSuccessType() throws Exception {
+        StringWriter stringWriter = new StringWriter();
+        PrintWriter writer = new PrintWriter(stringWriter);
+        when(response.getWriter()).thenReturn(writer);
+
+        invokePrivateMethod(legacyProcessServlet, "writeProcessCommandForwarder",
+                new Class<?>[] { HttpServletResponse.class, String.class },
+                response, POPUP_SUCCESS_HTML);
+
+        writer.flush();
+        String output = stringWriter.toString();
+
+        assertTrue("Success popup must produce type=success",
+                output.contains("\"type\":\"success\""));
+        assertTrue("Success title must be propagated",
+                output.contains("\"title\":\"Success\""));
+    }
 }
