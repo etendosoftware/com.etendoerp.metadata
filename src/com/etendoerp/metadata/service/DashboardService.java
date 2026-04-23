@@ -108,14 +108,15 @@ public class DashboardService extends MetadataService {
             (isAdmin ? "" : "and dw.user.id = :userId");
 
         Query<?> q = OBDal.getInstance().getSession().createQuery(updateHql);
-        q.setParameter("col",     w.optInt("col", 0));
-        q.setParameter("row",     w.optInt("row", 0));
-        q.setParameter("width",   w.optInt("width", 2));
-        q.setParameter("height",  w.optInt("height", 1));
+        q.setParameter("col",     java.math.BigDecimal.valueOf(w.optDouble("col", 0)));
+        q.setParameter("row",     java.math.BigDecimal.valueOf(w.optDouble("row", 0)));
+        q.setParameter("width",   java.math.BigDecimal.valueOf(w.optDouble("width", 2)));
+        q.setParameter("height",  java.math.BigDecimal.valueOf(w.optDouble("height", 1)));
         q.setParameter("visible", w.optBoolean("isVisible", true));
         q.setParameter("id",      instanceId);
         if (!isAdmin) q.setParameter("userId", userId);
         q.executeUpdate();
+        OBDal.getInstance().getSession().flush();
     }
 
     private void handlePostWidget() throws Exception {
@@ -124,6 +125,34 @@ public class DashboardService extends MetadataService {
         String layer      = isDashboardAdmin() ? "CLIENT" : "USER";
         String userId     = OBContext.getOBContext().getUser().getId();
         String clientId   = OBContext.getOBContext().getCurrentClient().getId();
+
+        // Remove USER shadow record (isvisible=N) so the new widget is not hidden
+        OBDal.getInstance().getSession()
+            .createQuery("delete from etmeta_Dashboard_Widget dw " +
+                         "where dw.widgetClass.id = :classId " +
+                         "and dw.layer = 'USER' and dw.user.id = :userId " +
+                         "and dw.visible = false")
+            .setParameter("classId", classId)
+            .setParameter("userId", userId)
+            .executeUpdate();
+
+        // Skip insert if an active record already exists for this classId and layer
+        Long existing = OBDal.getInstance().getSession()
+            .createQuery("select count(dw) from etmeta_Dashboard_Widget dw " +
+                         "where dw.widgetClass.id = :classId and dw.layer = :layer " +
+                         "and dw.active = true " +
+                         (layer.equals("USER") ? "and dw.user.id = :userId " : "and dw.client.id = :clientId "),
+                         Long.class)
+            .setParameter("classId", classId)
+            .setParameter("layer", layer)
+            .setParameter(layer.equals("USER") ? "userId" : "clientId",
+                          layer.equals("USER") ? userId : clientId)
+            .uniqueResult();
+        if (existing != null && existing > 0) {
+            write(new JSONObject().put("instanceId", "").put("status", "exists"));
+            return;
+        }
+
         String newId      = UUID.randomUUID().toString().replace("-", "");
 
         String insertSql =
@@ -149,6 +178,7 @@ public class DashboardService extends MetadataService {
         q.setParameter("params",   body.has("parameters") ? body.getJSONObject("parameters").toString() : null);
         q.setParameter("uid",      OBContext.getOBContext().getUser().getId());
         q.executeUpdate();
+        OBDal.getInstance().getSession().flush();
 
         write(new JSONObject().put("instanceId", newId).put("status", "created"));
     }

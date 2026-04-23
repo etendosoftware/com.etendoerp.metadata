@@ -20,20 +20,25 @@ public class FavoritesResolver implements WidgetDataResolver {
 
     @Override
     public JSONObject resolve(WidgetDataContext ctx) throws Exception {
-        String userId = ctx.getObContext().getUser().getId();
-        Query<Object[]> q = OBDal.getInstance().getSession()
-                .createQuery(HQL, Object[].class);
-        q.setParameter("userId", userId);
-        List<Object[]> rows = q.list();
+        try {
+            String userId = ctx.getObContext().getUser().getId();
+            Query<Object[]> q = OBDal.getInstance().getSession()
+                    .createQuery(HQL, Object[].class);
+            q.setParameter("userId", userId);
+            List<Object[]> rows = q.list();
 
-        JSONArray items = new JSONArray();
-        for (Object[] row : rows) {
-            items.put(new JSONObject()
-                    .put("label",    row[0])
-                    .put("icon",     row[1])
-                    .put("type",     row[2])
-                    .put("windowId", row[3]));
+            JSONArray items = new JSONArray();
+            for (Object[] row : rows) {
+                items.put(new JSONObject()
+                        .put("label",    row[0])
+                        .put("icon",     row[1])
+                        .put("type",     row[2])
+                        .put("windowId", row[3]));
+            }
+            return new JSONObject().put("items", items);
+        } catch (Exception e) {
+            // OBKMO_WorkspaceElement may not be mapped if the workspace module is not installed
+            return new JSONObject().put("items", new JSONArray());
         }
-        return new JSONObject().put("items", items);
     }
 }
