@@ -94,14 +94,11 @@ Configured via `ETMETA_WIDGET_PARAM` rows (or overridden per-instance via `PARAM
 ```hql
 select p.id, p.name, p.startingDate, p.endingDate, p.openClose
 from C_Period p
-join p.year y
-join y.calendar cal
-join cal.client c
-where c.id = :client
-  and p.startingDate <= :today
-  and p.endingDate   >= :today
-  and p.periodType   = 'S'
-  and p.isActive     = true
+where p.client.id        = :client
+  and p.startingDate    <= :today
+  and p.endingDate      >= :today
+  and p.periodType       = 'S'
+  and p.active           = true
 order by p.startingDate desc
 ```
 
@@ -112,14 +109,11 @@ Returns at most one row (first result).
 ```hql
 select p.id, p.name, p.startingDate, p.endingDate, p.openClose
 from C_Period p
-join p.year y
-join y.calendar cal
-join cal.client c
-where c.id           = :client
-  and p.endingDate   >= :dateFrom
-  and p.startingDate <= :dateTo
-  and p.periodType   = 'S'
-  and p.isActive     = true
+where p.client.id        = :client
+  and p.endingDate      >= :dateFrom
+  and p.startingDate    <= :dateTo
+  and p.periodType       = 'S'
+  and p.active           = true
 order by p.startingDate
 ```
 
@@ -128,12 +122,10 @@ order by p.startingDate
 ```hql
 select n.name, n.nonBusinessDayDate
 from C_NonBusinessDay n
-join n.calendar cal
-join cal.client c
-where c.id                    = :client
-  and n.nonBusinessDayDate   >= :dateFrom
-  and n.nonBusinessDayDate   <= :dateTo
-  and n.isActive              = true
+where n.client.id              = :client
+  and n.nonBusinessDayDate    >= :dateFrom
+  and n.nonBusinessDayDate    <= :dateTo
+  and n.active                 = true
 order by n.nonBusinessDayDate
 ```
 
