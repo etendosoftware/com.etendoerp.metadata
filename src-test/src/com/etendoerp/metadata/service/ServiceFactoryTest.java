@@ -4,11 +4,15 @@ import com.etendoerp.metadata.exceptions.InternalServerException;
 import com.etendoerp.metadata.exceptions.NotFoundException;
 import com.etendoerp.metadata.utils.LegacyPaths;
 import com.etendoerp.metadata.utils.LegacyUtils;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.openbravo.base.model.Entity;
+import org.openbravo.base.model.ModelProvider;
+import org.openbravo.base.model.Property;
 
 import javax.servlet.RequestDispatcher;
 import javax.servlet.ServletContext;
@@ -17,6 +21,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 import java.io.IOException;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -31,12 +36,36 @@ class ServiceFactoryTest {
 
   private static final String EXAMPLE_MUTABLE_SESSION_ATTRIBUTE = "143|C_ORDER_ID";
   private static final String SERVICE_NOT_NULL = "Service should not be null";
+  private static final String PARAM_WINDOW_ID = "windowId";
+  private static final String PARAM_ENTITY_NAME = "entityName";
+  private static final String PARAM_RECORD_ID = "recordId";
+  private static final String ENTITY_ORDER = "Order";
+  private static final String RECORD_ID_VALUE = "RECORD_1";
+  private static final String NON_USED_BY_LINK_PATH = "/some/legacy/path";
 
   @Mock
   private HttpServletRequest mockRequest;
 
   @Mock
   private HttpServletResponse mockResponse;
+
+  @Mock
+  private HttpServletRequest legacyReq;
+
+  @Mock
+  private HttpServletResponse legacyRes;
+
+  @Mock
+  private RequestDispatcher legacyDispatcher;
+
+  @Mock
+  private ServletContext legacyServletContext;
+
+  @BeforeEach
+  void setUpLegacyMocks() {
+    lenient().when(legacyReq.getServletContext()).thenReturn(legacyServletContext);
+    lenient().when(legacyServletContext.getRequestDispatcher(LegacyPaths.USED_BY_LINK)).thenReturn(legacyDispatcher);
+  }
 
   @Test
   void getServiceReturnsSessionService() {
@@ -201,87 +230,166 @@ class ServiceFactoryTest {
 
   @Test
   void buildLegacyForwardServiceForwardsSuccessfully() throws Exception {
-    HttpServletRequest req = mock(HttpServletRequest.class);
-    HttpServletResponse res = mock(HttpServletResponse.class);
-    HttpSession session = mock(HttpSession.class);
-    RequestDispatcher dispatcher = mock(RequestDispatcher.class);
-    ServletContext context = mock(ServletContext.class);
+    MetadataService service = invokeBuildLegacyForwardService(legacyReq, legacyRes, LegacyPaths.USED_BY_LINK);
+    assertNotNull(service);
 
-    when(req.getServletContext()).thenReturn(context);
-    when(req.getSession(true)).thenReturn(session);
-    when(req.getParameter("recordId")).thenReturn("A123");
-    when(context.getRequestDispatcher(LegacyPaths.USED_BY_LINK)).thenReturn(dispatcher);
+    service.process();
 
-    try (MockedStatic<LegacyUtils> legacy = mockStatic(LegacyUtils.class)) {
-      legacy.when(() -> LegacyUtils.isMutableSessionAttribute(EXAMPLE_MUTABLE_SESSION_ATTRIBUTE)).thenReturn(true);
-
-      MetadataService service = invokeBuildLegacyForwardService(req, res, LegacyPaths.USED_BY_LINK);
-      assertNotNull(service);
-
-      service.process();
-
-      verify(session).setAttribute(EXAMPLE_MUTABLE_SESSION_ATTRIBUTE, "A123");
-      verify(dispatcher).forward(req, res);
-    }
+    verify(legacyDispatcher).forward(legacyReq, legacyRes);
   }
 
   @Test
   void buildLegacyForwardServiceThrowsWhenAttributeNotAllowed() {
-    HttpServletRequest req = mock(HttpServletRequest.class);
-    HttpServletResponse res = mock(HttpServletResponse.class);
     HttpSession session = mock(HttpSession.class);
 
-    when(req.getSession(true)).thenReturn(session);
-    when(req.getParameter("recordId")).thenReturn("A123");
+    when(legacyReq.getSession(true)).thenReturn(session);
+    when(legacyReq.getParameter(PARAM_RECORD_ID)).thenReturn("A123");
 
     try (MockedStatic<LegacyUtils> legacy = mockStatic(LegacyUtils.class)) {
       legacy.when(() -> LegacyUtils.isMutableSessionAttribute(EXAMPLE_MUTABLE_SESSION_ATTRIBUTE)).thenReturn(false);
 
-      MetadataService service = invokeBuildLegacyForwardService(req, res, LegacyPaths.USED_BY_LINK);
+      MetadataService service = invokeBuildLegacyForwardService(legacyReq, legacyRes, LegacyPaths.USED_BY_LINK);
       assertThrows(InternalServerException.class, service::process);
     }
   }
 
   @Test
   void buildLegacyForwardServiceThrowsWhenDispatcherIsNull() {
-    HttpServletRequest req = mock(HttpServletRequest.class);
-    HttpServletResponse res = mock(HttpServletResponse.class);
-    HttpSession session = mock(HttpSession.class);
-    ServletContext context = mock(ServletContext.class);
+    when(legacyServletContext.getRequestDispatcher(LegacyPaths.USED_BY_LINK)).thenReturn(null);
 
-    when(req.getServletContext()).thenReturn(context);
-    when(context.getRequestDispatcher(LegacyPaths.USED_BY_LINK)).thenReturn(null);
-    when(req.getSession(true)).thenReturn(session);
-
-    try (MockedStatic<LegacyUtils> legacy = mockStatic(LegacyUtils.class)) {
-      legacy.when(() -> LegacyUtils.isMutableSessionAttribute(EXAMPLE_MUTABLE_SESSION_ATTRIBUTE)).thenReturn(true);
-
-      MetadataService service = invokeBuildLegacyForwardService(req, res, LegacyPaths.USED_BY_LINK);
-      assertThrows(ServletException.class, service::process);
-    }
+    MetadataService service = invokeBuildLegacyForwardService(legacyReq, legacyRes, LegacyPaths.USED_BY_LINK);
+    assertThrows(ServletException.class, service::process);
   }
 
   @Test
   void buildLegacyForwardServiceCatchesExceptionFromDispatcher() throws Exception {
-    HttpServletRequest req = mock(HttpServletRequest.class);
-    HttpServletResponse res = mock(HttpServletResponse.class);
+    doThrow(new IOException("fail")).when(legacyDispatcher).forward(legacyReq, legacyRes);
+
+    MetadataService service = invokeBuildLegacyForwardService(legacyReq, legacyRes, LegacyPaths.USED_BY_LINK);
+    assertThrows(IOException.class, service::process);
+  }
+
+
+  @Test
+  void handleLegacySessionSetsAttributeWhenAllParamsPresent() throws Exception {
     HttpSession session = mock(HttpSession.class);
-    ServletContext context = mock(ServletContext.class);
-    RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+    Entity entity = mock(Entity.class);
+    Property idProp = mock(Property.class);
+    ModelProvider modelProvider = mock(ModelProvider.class);
 
-    when(req.getServletContext()).thenReturn(context);
-    when(context.getRequestDispatcher(LegacyPaths.USED_BY_LINK)).thenReturn(dispatcher);
-    when(req.getSession(true)).thenReturn(session);
-    doThrow(new IOException("fail")).when(dispatcher).forward(req, res);
+    when(legacyReq.getSession(true)).thenReturn(session);
+    when(legacyReq.getParameter(PARAM_WINDOW_ID)).thenReturn("143");
+    when(legacyReq.getParameter(PARAM_ENTITY_NAME)).thenReturn(ENTITY_ORDER);
+    when(legacyReq.getParameter(PARAM_RECORD_ID)).thenReturn(RECORD_ID_VALUE);
+    when(entity.getIdProperties()).thenReturn(List.of(idProp));
+    when(idProp.getColumnName()).thenReturn("C_Order_ID");
 
-    try (MockedStatic<LegacyUtils> legacy = mockStatic(LegacyUtils.class)) {
-      legacy.when(() -> LegacyUtils.isMutableSessionAttribute(EXAMPLE_MUTABLE_SESSION_ATTRIBUTE)).thenReturn(true);
+    try (MockedStatic<ModelProvider> staticModelProvider = mockStatic(ModelProvider.class)) {
+      staticModelProvider.when(ModelProvider::getInstance).thenReturn(modelProvider);
+      when(modelProvider.getEntity(ENTITY_ORDER)).thenReturn(entity);
 
-      MetadataService service = invokeBuildLegacyForwardService(req, res, LegacyPaths.USED_BY_LINK);
-      assertThrows(IOException.class, service::process);
+      MetadataService service = invokeBuildLegacyForwardService(legacyReq, legacyRes, LegacyPaths.USED_BY_LINK);
+      service.process();
+
+      verify(session).setAttribute("143|C_Order_ID", RECORD_ID_VALUE);
+      verify(legacyDispatcher).forward(legacyReq, legacyRes);
     }
   }
 
+  @Test
+  void handleLegacySessionSkipsWhenEntityNotFound() throws Exception {
+    ModelProvider modelProvider = mock(ModelProvider.class);
+
+    when(legacyReq.getParameter(PARAM_WINDOW_ID)).thenReturn("143");
+    when(legacyReq.getParameter(PARAM_ENTITY_NAME)).thenReturn("Unknown");
+    when(legacyReq.getParameter(PARAM_RECORD_ID)).thenReturn(RECORD_ID_VALUE);
+
+    try (MockedStatic<ModelProvider> staticModelProvider = mockStatic(ModelProvider.class)) {
+      staticModelProvider.when(ModelProvider::getInstance).thenReturn(modelProvider);
+      when(modelProvider.getEntity("Unknown")).thenReturn(null);
+
+      MetadataService service = invokeBuildLegacyForwardService(legacyReq, legacyRes, LegacyPaths.USED_BY_LINK);
+      service.process();
+
+      verify(legacyDispatcher).forward(legacyReq, legacyRes);
+    }
+  }
+
+  @Test
+  void handleLegacySessionSkipsWhenMultipleIdProperties() throws Exception {
+    Entity entity = mock(Entity.class);
+    ModelProvider modelProvider = mock(ModelProvider.class);
+
+    when(legacyReq.getParameter(PARAM_WINDOW_ID)).thenReturn("143");
+    when(legacyReq.getParameter(PARAM_ENTITY_NAME)).thenReturn(ENTITY_ORDER);
+    when(legacyReq.getParameter(PARAM_RECORD_ID)).thenReturn(RECORD_ID_VALUE);
+    when(entity.getIdProperties()).thenReturn(List.of(mock(Property.class), mock(Property.class)));
+
+    try (MockedStatic<ModelProvider> staticModelProvider = mockStatic(ModelProvider.class)) {
+      staticModelProvider.when(ModelProvider::getInstance).thenReturn(modelProvider);
+      when(modelProvider.getEntity(ENTITY_ORDER)).thenReturn(entity);
+
+      MetadataService service = invokeBuildLegacyForwardService(legacyReq, legacyRes, LegacyPaths.USED_BY_LINK);
+      service.process();
+
+      verify(legacyDispatcher).forward(legacyReq, legacyRes);
+    }
+  }
+
+  @Test
+  void buildLegacyForwardServiceSkipsSessionForNonUsedByLinkPath() throws Exception {
+    when(legacyServletContext.getRequestDispatcher(NON_USED_BY_LINK_PATH)).thenReturn(legacyDispatcher);
+
+    MetadataService service = invokeBuildLegacyForwardService(legacyReq, legacyRes, NON_USED_BY_LINK_PATH);
+    service.process();
+
+    verify(legacyDispatcher).forward(legacyReq, legacyRes);
+  }
+
+  @Test
+  void handleLegacySessionSkipsWhenIdPropsIsNull() throws Exception {
+    Entity entity = mock(Entity.class);
+    ModelProvider modelProvider = mock(ModelProvider.class);
+
+    when(legacyReq.getParameter(PARAM_WINDOW_ID)).thenReturn("143");
+    when(legacyReq.getParameter(PARAM_ENTITY_NAME)).thenReturn(ENTITY_ORDER);
+    when(legacyReq.getParameter(PARAM_RECORD_ID)).thenReturn(RECORD_ID_VALUE);
+    when(entity.getIdProperties()).thenReturn(null);
+
+    try (MockedStatic<ModelProvider> staticModelProvider = mockStatic(ModelProvider.class)) {
+      staticModelProvider.when(ModelProvider::getInstance).thenReturn(modelProvider);
+      when(modelProvider.getEntity(ENTITY_ORDER)).thenReturn(entity);
+
+      MetadataService service = invokeBuildLegacyForwardService(legacyReq, legacyRes, LegacyPaths.USED_BY_LINK);
+      service.process();
+
+      verify(legacyDispatcher).forward(legacyReq, legacyRes);
+    }
+  }
+
+  @Test
+  void handleLegacySessionSkipsWhenWindowIdIsNull() throws Exception {
+    when(legacyReq.getParameter(PARAM_WINDOW_ID)).thenReturn(null);
+    when(legacyReq.getParameter(PARAM_ENTITY_NAME)).thenReturn(ENTITY_ORDER);
+    when(legacyReq.getParameter(PARAM_RECORD_ID)).thenReturn(RECORD_ID_VALUE);
+
+    MetadataService service = invokeBuildLegacyForwardService(legacyReq, legacyRes, LegacyPaths.USED_BY_LINK);
+    service.process();
+
+    verify(legacyDispatcher).forward(legacyReq, legacyRes);
+  }
+
+  @Test
+  void handleLegacySessionSkipsWhenRecordIdIsNull() throws Exception {
+    when(legacyReq.getParameter(PARAM_WINDOW_ID)).thenReturn("143");
+    when(legacyReq.getParameter(PARAM_ENTITY_NAME)).thenReturn(ENTITY_ORDER);
+    when(legacyReq.getParameter(PARAM_RECORD_ID)).thenReturn(null);
+
+    MetadataService service = invokeBuildLegacyForwardService(legacyReq, legacyRes, LegacyPaths.USED_BY_LINK);
+    service.process();
+
+    verify(legacyDispatcher).forward(legacyReq, legacyRes);
+  }
 
   /** Helper to create a mock HttpServletRequest with the specified path info. */
   private HttpServletRequest mockRequestWithPath(String path) {

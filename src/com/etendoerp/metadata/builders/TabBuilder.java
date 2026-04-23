@@ -208,7 +208,7 @@ public class TabBuilder extends Builder {
           fieldsJson.put(auditField, syntheticField);
           order++;
         } else {
-          logger.info("Audit column '{}' not found in table '{}'- skipping audit field '{}'", dbColumnName,
+          logger.debug("Audit column '{}' not found in table '{}'- skipping audit field '{}'", dbColumnName,
               table.getName(), auditField);
         }
       }

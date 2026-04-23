@@ -32,10 +32,15 @@ import org.openbravo.model.ad.access.User;
 
 import javax.servlet.http.Cookie;
 
+import com.etendoerp.metadata.exceptions.InternalServerException;
+import com.etendoerp.metadata.utils.LegacyPaths;
+import com.etendoerp.metadata.utils.LegacyUtils;
+
 import static com.etendoerp.metadata.MetadataTestConstants.SALES_INVOICE_HEADER_EDITION_HTML;
 import static com.etendoerp.metadata.MetadataTestConstants.TOKEN;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
@@ -60,6 +65,10 @@ public class LegacyProcessServletTest extends OBBaseTest {
     public static final String REDIRECT = "/redirect";
     public static final String LOCATION = "location";
     private static final String USER_ID_KEY = "userId";
+    private static final String CREATE_FROM_SESSION_KEY = "CREATEFROM|TABID";
+    private static final String COMMAND_KEY = "Command";
+    private static final String INP_WINDOW_ID_KEY = "inpWindowId";
+    private static final String INP_TABLE_ID_KEY = "inpTableId";
 
     @Mock
     private HttpServletRequest request;
@@ -211,7 +220,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
      */
     @Test
     public void servletShouldIdentifyLegacyFollowupRequest() throws Exception {
-        when(request.getParameter("Command")).thenReturn("BUTTON_TEST");
+        when(request.getParameter(COMMAND_KEY)).thenReturn("BUTTON_TEST");
         when(request.getSession(false)).thenReturn(session);
         when(session.getAttribute("LEGACY_TOKEN")).thenReturn("test-token");
         when(session.getAttribute("LEGACY_SERVLET_DIR")).thenReturn("/dir");
@@ -222,7 +231,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
             // Expected due to framework dependencies
         }
 
-        verify(request, atLeastOnce()).getParameter("Command");
+        verify(request, atLeastOnce()).getParameter(COMMAND_KEY);
     }
 
     /**
@@ -622,5 +631,97 @@ public class LegacyProcessServletTest extends OBBaseTest {
                 original, "submitThisPage\\(([^)]+)\\);", "extra();", true);
 
         assertTrue("Should contain injected code", result.contains("submitThisPage('action');extra();"));
+    }
+
+    // --- Tests for handleCreateFromSession ---
+
+    @Test
+    public void handleCreateFromSessionSetsTabIdForSaveCommand() throws Exception {
+        // GIVEN
+        String windowId = "169";
+        String tableId = "319";
+        String expectedTabId = "257";
+
+        when(request.getParameter(COMMAND_KEY)).thenReturn("SAVE");
+        when(request.getParameter(INP_WINDOW_ID_KEY)).thenReturn(windowId);
+        when(request.getParameter(INP_TABLE_ID_KEY)).thenReturn(tableId);
+
+        try (MockedStatic<LegacyUtils> legacyUtils = mockStatic(LegacyUtils.class)) {
+            legacyUtils.when(() -> LegacyUtils.isMutableSessionAttribute(CREATE_FROM_SESSION_KEY)).thenReturn(true);
+            legacyUtils.when(() -> LegacyUtils.findTabIdByWindowAndTable(windowId, tableId)).thenReturn(expectedTabId);
+
+            invokeHandleCreateFromSession(request, LegacyPaths.CREATE_FROM_HTML, session);
+
+            // THEN
+            verify(session).setAttribute(CREATE_FROM_SESSION_KEY, expectedTabId);
+        }
+    }
+
+    @Test
+    public void handleCreateFromSessionSkipsForNonCreateFromPath() throws Exception {
+        // GIVEN
+        invokeHandleCreateFromSession(request, "/other/path.html", session);
+
+        // THEN
+        verify(session, never()).setAttribute(anyString(), any());
+    }
+
+    @Test
+    public void handleCreateFromSessionSkipsForNonSaveCommand() throws Exception {
+        // GIVEN
+        when(request.getParameter(COMMAND_KEY)).thenReturn("FIND_PO");
+
+        invokeHandleCreateFromSession(request, LegacyPaths.CREATE_FROM_HTML, session);
+
+        // THEN
+        verify(session, never()).setAttribute(anyString(), any());
+    }
+
+    @Test
+    public void handleCreateFromSessionSkipsWhenTabIdNotFound() throws Exception {
+        // GIVEN
+        when(request.getParameter(COMMAND_KEY)).thenReturn("SAVE");
+        when(request.getParameter(INP_WINDOW_ID_KEY)).thenReturn("169");
+        when(request.getParameter(INP_TABLE_ID_KEY)).thenReturn("999");
+
+        try (MockedStatic<LegacyUtils> legacyUtils = mockStatic(LegacyUtils.class)) {
+            legacyUtils.when(() -> LegacyUtils.isMutableSessionAttribute(CREATE_FROM_SESSION_KEY)).thenReturn(true);
+            legacyUtils.when(() -> LegacyUtils.findTabIdByWindowAndTable("169", "999")).thenReturn(null);
+
+            invokeHandleCreateFromSession(request, LegacyPaths.CREATE_FROM_HTML, session);
+
+            // THEN
+            verify(session, never()).setAttribute(anyString(), any());
+        }
+    }
+
+    @Test
+    public void handleCreateFromSessionThrowsForForbiddenSessionKey() throws Exception {
+        // GIVEN
+        when(request.getParameter(COMMAND_KEY)).thenReturn("SAVE");
+        when(request.getParameter(INP_WINDOW_ID_KEY)).thenReturn("169");
+        when(request.getParameter(INP_TABLE_ID_KEY)).thenReturn("319");
+
+        try (MockedStatic<LegacyUtils> legacyUtils = mockStatic(LegacyUtils.class)) {
+            legacyUtils.when(() -> LegacyUtils.isMutableSessionAttribute(CREATE_FROM_SESSION_KEY)).thenReturn(false);
+
+            try {
+                invokeHandleCreateFromSession(request, LegacyPaths.CREATE_FROM_HTML, session);
+                fail("Expected InternalServerException to be thrown");
+            } catch (java.lang.reflect.InvocationTargetException e) {
+                assertTrue("Cause should be InternalServerException",
+                        e.getCause() instanceof InternalServerException);
+            }
+        }
+    }
+
+    private void invokeHandleCreateFromSession(HttpServletRequest req, String path, HttpSession session)
+            throws Exception {
+        Method method = LegacyProcessServlet.class.getDeclaredMethod(
+            "handleCreateFromSession",
+            HttpServletRequest.class, String.class, HttpSession.class
+        );
+        method.setAccessible(true);
+        method.invoke(null, req, path, session);
     }
 }
