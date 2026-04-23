@@ -639,4 +639,205 @@ public class LegacyProcessServletTest extends OBBaseTest {
 
         assertTrue("Should contain injected code", result.contains("submitThisPage('action');extra();"));
     }
+
+    // ========== Tests for frameMenu shim injection (new functionality) ==========
+
+    /**
+     * Tests buildShimScript includes all required frameMenu properties.
+     */
+    @Test
+    public void testBuildShimScriptIncludesRequiredProperties() throws Exception {
+        String script = (String) invokePrivateMethod(legacyProcessServlet, "buildShimScript",
+                new Class<?>[] { String.class, String.class, String.class },
+                ".", ",", "#,##0.00");
+
+        assertTrue("Should include decimal separator", script.contains("decSeparator_global:'.'"));
+        assertTrue("Should include group separator", script.contains("groupSeparator_global:','"));
+        assertTrue("Should include group interval", script.contains("groupInterval_global:'3'"));
+        assertTrue("Should include default mask", script.contains("maskNumeric_default:'#,##0.00'"));
+        assertTrue("Should include autosave flag", script.contains("autosave:false"));
+        assertTrue("Should include frameMenu assignment", script.contains("window.frameMenu=m"));
+    }
+
+    /**
+     * Tests buildShimScript defines _shimGetFrame function correctly.
+     */
+    @Test
+    public void testBuildShimScriptDefinesShimGetFrame() throws Exception {
+        String script = (String) invokePrivateMethod(legacyProcessServlet, "buildShimScript",
+                new Class<?>[] { String.class, String.class, String.class },
+                ".", ",", "#,##0.00");
+
+        assertTrue("Should define _shimGetFrame", script.contains("var _shimGetFrame=function(name)"));
+        assertTrue("Should return frameMenu mock", script.contains("if(name==='frameMenu')return window.frameMenu;"));
+        assertTrue("Should assign to window.getFrame", script.contains("window.getFrame=_shimGetFrame;"));
+    }
+
+    /**
+     * Tests buildShimScript wraps in IIFE for scope isolation.
+     */
+    @Test
+    public void testBuildShimScriptUsesIIFE() throws Exception {
+        String script = (String) invokePrivateMethod(legacyProcessServlet, "buildShimScript",
+                new Class<?>[] { String.class, String.class, String.class },
+                ".", ",", "#,##0.00");
+
+        assertTrue("Should start with IIFE", script.contains("(function(){"));
+        assertTrue("Should end with IIFE call", script.contains("})();"));
+    }
+
+    /**
+     * Tests buildFrameMenuPatchScript wraps messages.js's getFrame.
+     */
+    @Test
+    public void testBuildFrameMenuPatchScript() throws Exception {
+        String patchScript = (String) invokePrivateMethod(legacyProcessServlet, "buildFrameMenuPatchScript",
+                new Class<?>[] {});
+
+        assertTrue("Should save original getFrame", patchScript.contains("var _messagesGetFrame=getFrame;"));
+        assertTrue("Should define wrapper", patchScript.contains("window.getFrame=function(name)"));
+        assertTrue("Should return frameMenu for frameMenu", patchScript.contains("if(name==='frameMenu')return window.frameMenu;"));
+    }
+
+    /**
+     * Tests escapeJs correctly escapes single quotes.
+     */
+    @Test
+    public void testEscapeJsSingleQuotes() throws Exception {
+        String result = (String) invokePrivateMethod(legacyProcessServlet, "escapeJs",
+                new Class<?>[] { String.class },
+                "it's");
+
+        assertEquals("Single quotes should be escaped", "it\\'s", result);
+    }
+
+    /**
+     * Tests escapeJs correctly escapes backslashes.
+     */
+    @Test
+    public void testEscapeJsBackslashes() throws Exception {
+        String result = (String) invokePrivateMethod(legacyProcessServlet, "escapeJs",
+                new Class<?>[] { String.class },
+                "path\\to\\file");
+
+        assertEquals("Backslashes should be double-escaped", "path\\\\to\\\\file", result);
+    }
+
+    /**
+     * Tests escapeJs handles combined escaping.
+     */
+    @Test
+    public void testEscapeJsCombined() throws Exception {
+        String result = (String) invokePrivateMethod(legacyProcessServlet, "escapeJs",
+                new Class<?>[] { String.class },
+                "test\\it's");
+
+        assertEquals("Both escapes should be applied", "test\\\\it\\'s", result);
+    }
+
+    /**
+     * Tests injectFrameMenuShim injects after opening head tag.
+     */
+    @Test
+    public void testInjectFrameMenuShimAfterOpeningHeadTag() throws Exception {
+        String html = "<html><head><script>var x=1;</script></head><body></body></html>";
+        String result = (String) invokePrivateMethod(legacyProcessServlet, "injectFrameMenuShim",
+                new Class<?>[] { String.class },
+                html);
+
+        assertTrue("Shim should be injected after <head>",
+                result.contains("<head><script>(function(){"));
+    }
+
+    /**
+     * Tests injectFrameMenuShim handles case-insensitive HEAD tag.
+     */
+    @Test
+    public void testInjectFrameMenuShimCaseInsensitive() throws Exception {
+        String html = "<html><HEAD><script>var x=1;</script></HEAD><body></body></html>";
+        String result = (String) invokePrivateMethod(legacyProcessServlet, "injectFrameMenuShim",
+                new Class<?>[] { String.class },
+                html);
+
+        assertTrue("Should handle uppercase HEAD tag",
+                result.contains("<HEAD><script>(function(){"));
+    }
+
+    /**
+     * Tests injectFrameMenuShim handles HEAD tag with attributes.
+     */
+    @Test
+    public void testInjectFrameMenuShimHeadWithAttributes() throws Exception {
+        String html = "<html><head class=\"x\" data-y=\"z\"><script></script></head><body></body></html>";
+        String result = (String) invokePrivateMethod(legacyProcessServlet, "injectFrameMenuShim",
+                new Class<?>[] { String.class },
+                html);
+
+        assertTrue("Should inject after HEAD tag with attributes",
+                result.contains("<head class=\"x\" data-y=\"z\"><script>(function(){"));
+    }
+
+    /**
+     * Tests injectFrameMenuShim injects patch script before </HEAD>.
+     * HEAD_CLOSE_TAG in Constants.java is "</HEAD>" (uppercase), so the test HTML must also use uppercase.
+     */
+    @Test
+    public void testInjectFrameMenuShimInjectsPatchBeforeHeadClose() throws Exception {
+        String html = "<html><head><script></script></HEAD><body></body></html>";
+        String result = (String) invokePrivateMethod(legacyProcessServlet, "injectFrameMenuShim",
+                new Class<?>[] { String.class },
+                html);
+
+        int patchIndex = result.indexOf("var _messagesGetFrame=getFrame;");
+        int closeHeadIndex = result.indexOf("</HEAD>");
+        assertTrue("Patch script should be before </HEAD>",
+                patchIndex >= 0 && closeHeadIndex >= 0 && patchIndex < closeHeadIndex);
+    }
+
+    /**
+     * Tests injectFrameMenuShim injects shim but skips patch script when </HEAD> is absent.
+     * The shim itself is always injected after the opening <head> tag, but the patch script
+     * that wraps messages.js's getFrame is only injected if </HEAD> is present.
+     */
+    @Test
+    public void testInjectFrameMenuShimSkipsPatchWhenNoHeadCloseTag() throws Exception {
+        String html = "<html><head><script></script></body></html>";
+        String result = (String) invokePrivateMethod(legacyProcessServlet, "injectFrameMenuShim",
+                new Class<?>[] { String.class },
+                html);
+
+        assertTrue("Shim should still be injected after <head>",
+                result.contains("<head><script>(function(){"));
+        assertTrue("Shim should include window.frameMenu assignment",
+                result.contains("window.frameMenu=m"));
+        assertTrue("Patch script should NOT be injected when </HEAD> is absent",
+                !result.contains("var _messagesGetFrame=getFrame;"));
+    }
+
+    /**
+     * Tests injectFrameMenuShim does not modify HTML without any <head> tag at all.
+     */
+    @Test
+    public void testInjectFrameMenuShimNoHeadTagAtAll() throws Exception {
+        String html = "<html><body><div>no head tag here</div></body></html>";
+        String result = (String) invokePrivateMethod(legacyProcessServlet, "injectFrameMenuShim",
+                new Class<?>[] { String.class },
+                html);
+
+        assertEquals("HTML without any <head> tag should not be modified", html, result);
+    }
+
+    /**
+     * Tests injectFrameMenuShim preserves HTML structure.
+     */
+    @Test
+    public void testInjectFrameMenuShimPreservesStructure() throws Exception {
+        String html = "<html><head><meta name=\"x\"></head><body><div>content</div></body></html>";
+        String result = (String) invokePrivateMethod(legacyProcessServlet, "injectFrameMenuShim",
+                new Class<?>[] { String.class },
+                html);
+
+        assertTrue("Original elements should be preserved", result.contains("<meta name=\"x\">"));
+        assertTrue("Body content should be unchanged", result.contains("<div>content</div>"));
+    }
 }

@@ -817,6 +817,87 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
                 forwardedUrl);
     }
 
+    private String buildFrameMenuShim() {
+        String decSep = ".";
+        String groupSep = ",";
+        String maskNum = "#,##0.00";
+        try {
+            HttpServletRequest req = RequestContext.get().getRequest();
+            VariablesSecureApp vars = new VariablesSecureApp(req);
+            decSep = StringUtils.defaultIfBlank(vars.getSessionValue("#DECIMALSEPARATOR|QTYEDITION"), decSep);
+            groupSep = StringUtils.defaultIfBlank(vars.getSessionValue("#GROUPSEPARATOR|QTYEDITION"), groupSep);
+            maskNum = StringUtils.defaultIfBlank(vars.getSessionValue("#FORMATOUTPUT|QTYEDITION"), maskNum);
+        } catch (Exception e) {
+            log.warn("Could not read locale session values for frameMenu shim, using defaults: {}", e.getMessage());
+        }
+        return buildShimScript(escapeJs(decSep), escapeJs(groupSep), escapeJs(maskNum));
+    }
+
+    private static String buildShimScript(String decSep, String groupSep, String maskNum) {
+        return "<script>(function(){" +
+                "var m={" +
+                "decSeparator_global:'" + decSep + "'," +
+                "groupSeparator_global:'" + groupSep + "'," +
+                "groupInterval_global:'3'," +
+                "maskNumeric_default:'" + maskNum + "'," +
+                "autosave:false," +
+                "arrMessages:[]," +
+                "arrTypes:[]," +
+                "F:{formats:[],getFormat:function(n){return '" + maskNum + "';}}," +
+                "getAppUrlFromMenu:function(){return '';}," +
+                "focus:function(){}," +
+                "document:window.document" +
+                "};" +
+                "window.frameMenu=m;" +
+                "var _shimGetFrame=function(name){" +
+                "if(name==='frameMenu')return window.frameMenu;" +
+                "try{" +
+                "if(window.parent&&window.parent.frames&&window.parent.frames[name])return window.parent.frames[name];" +
+                "return null;" +
+                "}catch(e){return null;}" +
+                "};" +
+                "window.getFrame=_shimGetFrame;" +
+                "window._shimGetFrame=_shimGetFrame;" +
+                "})();</script>";
+    }
+
+    private static String buildFrameMenuPatchScript() {
+        return "<script>(function(){" +
+                "if(typeof getFrame==='function'&&typeof window.frameMenu!=='undefined'&&window.getFrame!==window._shimGetFrame){" +
+                "var _messagesGetFrame=getFrame;" +
+                "window.getFrame=function(name){" +
+                "if(name==='frameMenu')return window.frameMenu;" +
+                "try{return _messagesGetFrame(name);}catch(e){return null;}" +
+                "};" +
+                "}" +
+                "})();</script>";
+    }
+
+    private static String escapeJs(String value) {
+        return value.replace("\\", "\\\\").replace("'", "\\'");
+    }
+
+    private String injectFrameMenuShim(String responseString) {
+        // Inject shim immediately after <head> (or <HEAD>) opening tag
+        // This ensures it runs BEFORE other scripts in <head>
+        Pattern headOpenPattern = Pattern.compile("<head[^>]*>", Pattern.CASE_INSENSITIVE);
+        Matcher matcher = headOpenPattern.matcher(responseString);
+        if (matcher.find()) {
+            String headTag = matcher.group(0);
+            String shimScript = buildFrameMenuShim();
+            responseString = responseString.replace(headTag, headTag + shimScript);
+        }
+
+        // Inject patch script before </HEAD> to wrap messages.js's getFrame
+        // This is necessary because function declarations bypass Object.defineProperty setters
+        if (responseString.contains(HEAD_CLOSE_TAG)) {
+            String patchScript = buildFrameMenuPatchScript();
+            return responseString.replace(HEAD_CLOSE_TAG, patchScript.concat(HEAD_CLOSE_TAG));
+        }
+
+        return responseString;
+    }
+
     /**
      * Injects compatibility scripts and adjusts paths in the HTML response content.
      * This ensures that legacy pages can communicate with the modern frontend
@@ -841,6 +922,8 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
                         SRC_REPLACE_STRING + contextPath + "/org.openbravo.client.kernel/")
                 .replace(SRC_REPLACE_STRING + "../web/", SRC_REPLACE_STRING + contextPath + WEB_PATH)
                 .replace("href=\"../web/", "href=\"" + contextPath + WEB_PATH);
+
+        responseString = injectFrameMenuShim(responseString);
 
         if (responseString.contains(FRAMESET_CLOSE_TAG)) {
             return responseString.replace(HEAD_CLOSE_TAG, RECEIVE_AND_POST_MESSAGE_SCRIPT.concat(HEAD_CLOSE_TAG));
