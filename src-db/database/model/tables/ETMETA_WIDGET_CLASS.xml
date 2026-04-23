@@ -90,6 +90,6 @@
         <index-column name="NAME"/>
       </index>
       <check name="ETMETA_WCL_ISACTIVE_CHECK"><![CDATA[ISACTIVE IN ('Y', 'N')]]></check>
-      <check name="ETMETA_WCL_TYPE_CHECK"><![CDATA[TYPE IN ('FAVORITES', 'RECENT_DOCS', 'RECENTLY_VIEWED', 'NOTIFICATION', 'STOCK_ALERT', 'KPI', 'COPILOT', 'QUERY_LIST', 'HTML', 'URL', 'PROCESS')]]></check>
+      <check name="ETMETA_WCL_TYPE_CHECK"><![CDATA[TYPE IN ('FAVORITES', 'RECENT_DOCS', 'RECENTLY_VIEWED', 'NOTIFICATION', 'STOCK_ALERT', 'KPI', 'COPILOT', 'QUERY_LIST', 'HTML', 'URL', 'PROCESS', 'CALENDAR')]]></check>
     </table>
   </database>
