@@ -70,6 +70,17 @@ public class WidgetDataService extends MetadataService {
             String type            = (String) classRow[1];
             String externalDataUrl = (String) classRow[3];
             Map<String, Object> params = mergeParams(classId, paramsJson);
+            String pageParam     = getRequest().getParameter("page");
+            String pageSizeParam = getRequest().getParameter("pageSize");
+            if (pageParam     != null) params.put("_page",     pageParam);
+            if (pageSizeParam != null) params.put("_pageSize", pageSizeParam);
+
+            // Filter params from query string override class/instance defaults
+            getRequest().getParameterMap().forEach((key, values) -> {
+                if (!"page".equals(key) && !"pageSize".equals(key) && values.length > 0) {
+                    params.put(key, values[0]);
+                }
+            });
 
             OBContext ctx = OBContext.getOBContext();
             String bearerToken = getRequest().getHeader("Authorization");
