@@ -523,6 +523,21 @@ public class LegacyProcessServletTest extends OBBaseTest {
     }
 
     /**
+     * Tests setSessionCookie early-return when JSESSIONID is already present in headers.
+     */
+    @Test
+    public void testSetSessionCookieSkipsWhenJSessionIdAlreadySet() throws Exception {
+        when(response.getHeaders("Set-Cookie")).thenReturn(
+                java.util.List.of("JSESSIONID=existing-id; Path=/; HttpOnly"));
+
+        invokePrivateMethod(legacyProcessServlet, "setSessionCookie",
+                new Class<?>[] { HttpServletResponse.class, String.class },
+                response, "new-session-id");
+
+        verify(response, never()).addHeader(eq("Set-Cookie"), anyString());
+    }
+
+    /**
      * Tests processRedirectRequest with invalid token.
      */
     @Test

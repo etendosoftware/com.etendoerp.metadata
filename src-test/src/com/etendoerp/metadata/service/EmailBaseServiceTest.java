@@ -34,8 +34,11 @@ import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONObject;
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.MockedStatic;
 import org.openbravo.base.exception.OBException;
 import org.openbravo.base.structure.BaseOBObject;
+import org.openbravo.dal.service.OBDal;
+import org.openbravo.email.EmailUtils;
 import org.openbravo.model.ad.ui.Tab;
 import org.openbravo.model.common.enterprise.EmailServerConfiguration;
 import org.openbravo.model.common.enterprise.Organization;
@@ -466,5 +469,24 @@ public class EmailBaseServiceTest extends BaseMetadataServiceTest {
     public void testQueryAttachments_withDashedRecordId_normalisesAndReturnsEmpty() {
         JSONArray result = service.callQueryAttachments("259", "00000000-0000-0000-0000-000000000001");
         assertNotNull(MSG_RESULT_NOT_NULL, result);
+    }
+
+    @Test
+    public void testGetSmtpConfig_findAnySmtpConfig_exceptionReturnsNull() {
+        Organization org = mock(Organization.class);
+        OBDal mockDal = mock(OBDal.class);
+        when(mockDal.createCriteria(EmailServerConfiguration.class))
+                .thenThrow(new RuntimeException("DB error"));
+
+        try (MockedStatic<EmailUtils> mockedEmailUtils = mockStatic(EmailUtils.class);
+             MockedStatic<OBDal> mockedOBDal = mockStatic(OBDal.class)) {
+
+            mockedEmailUtils.when(() -> EmailUtils.getEmailConfiguration(any(Organization.class)))
+                    .thenReturn(null);
+            mockedOBDal.when(OBDal::getInstance).thenReturn(mockDal);
+
+            String result = service.callResolveSenderAddress(org);
+            assertEquals("Should return empty string when findAnySmtpConfig throws", "", result);
+        }
     }
 }
