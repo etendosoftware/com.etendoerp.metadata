@@ -20,7 +20,7 @@ public class NotificationResolver implements WidgetDataResolver {
     public boolean isAvailable() {
         try {
             org.openbravo.dal.service.OBDal.getInstance().getSession()
-                .getSessionFactory().getMetamodel().entity("AN_Note");
+                .createQuery("select 1 from AN_Note n where 1=0", Integer.class);
             return true;
         } catch (Exception e) {
             return false;

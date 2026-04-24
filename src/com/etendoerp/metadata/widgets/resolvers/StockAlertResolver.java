@@ -20,7 +20,7 @@ public class StockAlertResolver implements WidgetDataResolver {
     public boolean isAvailable() {
         try {
             org.openbravo.dal.service.OBDal.getInstance().getSession()
-                .getSessionFactory().getMetamodel().entity("M_StorageDetail");
+                .createQuery("select 1 from M_StorageDetail sd where 1=0", Integer.class);
             return true;
         } catch (Exception e) {
             return false;
