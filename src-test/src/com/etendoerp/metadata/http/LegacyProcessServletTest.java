@@ -69,6 +69,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
     private static final String COMMAND_KEY = "Command";
     private static final String INP_WINDOW_ID_KEY = "inpWindowId";
     private static final String INP_TABLE_ID_KEY = "inpTableId";
+    private static final String SET_COOKIE_HEADER = SET_COOKIE_HEADER;
 
     @Mock
     private HttpServletRequest request;
@@ -513,13 +514,13 @@ public class LegacyProcessServletTest extends OBBaseTest {
      */
     @Test
     public void testSetSessionCookie() throws Exception {
-        when(response.getHeaders("Set-Cookie")).thenReturn(Collections.emptyList());
+        when(response.getHeaders(SET_COOKIE_HEADER)).thenReturn(Collections.emptyList());
 
         invokePrivateMethod(legacyProcessServlet, "setSessionCookie",
                 new Class<?>[] { HttpServletResponse.class, String.class },
                 response, "test-session-id");
 
-        verify(response).addHeader(eq("Set-Cookie"), contains("JSESSIONID=test-session-id"));
+        verify(response).addHeader(eq(SET_COOKIE_HEADER), contains("JSESSIONID=test-session-id"));
     }
 
     /**
@@ -527,14 +528,14 @@ public class LegacyProcessServletTest extends OBBaseTest {
      */
     @Test
     public void testSetSessionCookieSkipsWhenJSessionIdAlreadySet() throws Exception {
-        when(response.getHeaders("Set-Cookie")).thenReturn(
+        when(response.getHeaders(SET_COOKIE_HEADER)).thenReturn(
                 java.util.List.of("JSESSIONID=existing-id; Path=/; HttpOnly"));
 
         invokePrivateMethod(legacyProcessServlet, "setSessionCookie",
                 new Class<?>[] { HttpServletResponse.class, String.class },
                 response, "new-session-id");
 
-        verify(response, never()).addHeader(eq("Set-Cookie"), anyString());
+        verify(response, never()).addHeader(eq(SET_COOKIE_HEADER), anyString());
     }
 
     /**

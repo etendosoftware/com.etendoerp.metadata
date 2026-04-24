@@ -83,6 +83,7 @@ class FieldBuilderWithColumnReferencedWindowTest {
     private static final String PO_WINDOW_ID = "PO_WINDOW_ID";
     private static final String SO_TAB_ID = "SO_TAB_ID";
     private static final String ENTITY_ORDER = "Order";
+    private static final String REFERENCED_WINDOW_ID_KEY = REFERENCED_WINDOW_ID_KEY;
 
     @BeforeEach
     void setUp() {
@@ -117,7 +118,7 @@ class FieldBuilderWithColumnReferencedWindowTest {
 
         JSONObject result = buildWithCriteriaResult(resolvedReferencedTab);
 
-        assertEquals(PO_WINDOW_ID, result.getString("referencedWindowId"));
+        assertEquals(PO_WINDOW_ID, result.getString(REFERENCED_WINDOW_ID_KEY));
     }
 
     @Test
@@ -128,7 +129,7 @@ class FieldBuilderWithColumnReferencedWindowTest {
 
         JSONObject result = buildWithCriteriaResult(null);
 
-        assertEquals(SO_WINDOW_ID, result.getString("referencedWindowId"));
+        assertEquals(SO_WINDOW_ID, result.getString(REFERENCED_WINDOW_ID_KEY));
     }
 
     @Test
@@ -139,7 +140,7 @@ class FieldBuilderWithColumnReferencedWindowTest {
 
         JSONObject result = buildWithAddReferencedPropertyThrowing();
 
-        assertEquals(SO_WINDOW_ID, result.getString("referencedWindowId"));
+        assertEquals(SO_WINDOW_ID, result.getString(REFERENCED_WINDOW_ID_KEY));
     }
 
     private JSONObject buildWithCriteriaResult(Tab criteriaResult) throws JSONException {
