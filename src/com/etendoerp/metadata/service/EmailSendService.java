@@ -281,6 +281,9 @@ public class EmailSendService extends EmailBaseService {
     // ── Cleanup ────────────────────────────────────────────────────────────────
 
     protected void cleanupTempFiles(List<File> tempFiles, Path tempDir) {
+        if (tempFiles == null) {
+            return;
+        }
         for (File f : tempFiles) {
             try {
                 Files.delete(f.toPath());
