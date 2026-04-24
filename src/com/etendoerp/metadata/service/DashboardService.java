@@ -60,10 +60,16 @@ public class DashboardService extends MetadataService {
     private void handleGetLayout() throws Exception {
         JSONArray widgets = new DashboardLayoutResolver().resolve();
 
-        // Enrich each entry with widget class metadata (title, type, name, refreshInterval)
+        // Enrich each entry with widget class metadata (title, type, name, refreshInterval, available)
+        com.etendoerp.metadata.widgets.WidgetResolverRegistry registry =
+            com.etendoerp.metadata.widgets.WidgetResolverRegistryHolder.getInstance();
         for (int i = 0; i < widgets.length(); i++) {
             JSONObject w = widgets.getJSONObject(i);
             enrichWithClassData(w);
+            String type = w.optString("type", "");
+            com.etendoerp.metadata.widgets.WidgetDataResolver resolver =
+                registry != null ? registry.getResolver(type) : null;
+            w.put("available", resolver == null || resolver.isAvailable());
         }
 
         write(new JSONObject().put("widgets", widgets));

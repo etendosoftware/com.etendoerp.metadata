@@ -34,4 +34,17 @@ public class WidgetDataResponse {
             throws JSONException {
         return build(instanceId, type, data, null);
     }
+
+    /**
+     * Returns an envelope signaling the widget is unavailable (required module not installed).
+     * The frontend should hide or disable this widget instead of rendering it.
+     */
+    public static JSONObject unavailable(String instanceId, String type) throws JSONException {
+        return new JSONObject()
+                .put("widgetInstanceId", instanceId)
+                .put("type", type)
+                .put("available", false)
+                .put("data", JSONObject.NULL)
+                .put("meta", JSONObject.NULL);
+    }
 }

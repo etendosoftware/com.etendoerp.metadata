@@ -98,6 +98,11 @@ public class WidgetDataService extends MetadataService {
             }
             if (resolver == null) throw new InternalServerException("No resolver for type: " + type);
 
+            if (!resolver.isAvailable()) {
+                write(WidgetDataResponse.unavailable(instanceId, type));
+                return;
+            }
+
             JSONObject data     = resolver.resolve(wdCtx);
             JSONObject envelope = WidgetDataResponse.build(instanceId, type, data);
             write(envelope);

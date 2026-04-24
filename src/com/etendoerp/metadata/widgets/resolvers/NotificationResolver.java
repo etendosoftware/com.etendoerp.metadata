@@ -16,6 +16,17 @@ import java.util.List;
 public class NotificationResolver implements WidgetDataResolver {
     @Override public String getType() { return "NOTIFICATION"; }
 
+    @Override
+    public boolean isAvailable() {
+        try {
+            org.openbravo.dal.service.OBDal.getInstance().getSession()
+                .getSessionFactory().getMetamodel().entity("AN_Note");
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     private static final String ITEMS_HQL =
         "select n.note, n.priority, n.creationDate " +
         "from AN_Note n where n.userContact.id = :userId " +
@@ -26,6 +37,7 @@ public class NotificationResolver implements WidgetDataResolver {
 
     @Override
     public JSONObject resolve(WidgetDataContext ctx) throws Exception {
+        try {
         String userId = ctx.getObContext().getUser().getId();
         int limit = parseIntParam(ctx.param("rowsNumber"), 10);
 
@@ -48,6 +60,10 @@ public class NotificationResolver implements WidgetDataResolver {
                     .put("time",     row[2] != null ? row[2].toString() : null));
         }
         return new JSONObject().put("items", items).put("totalCount", total != null ? total : 0);
+        } catch (Exception e) {
+            // AN_Note may not be mapped if the notifications module is not installed
+            return new JSONObject().put("items", new JSONArray()).put("totalCount", 0);
+        }
     }
 
     private String mapPriority(Object raw) {

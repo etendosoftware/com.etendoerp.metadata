@@ -12,6 +12,17 @@ import java.util.List;
 public class FavoritesResolver implements WidgetDataResolver {
     @Override public String getType() { return "FAVORITES"; }
 
+    @Override
+    public boolean isAvailable() {
+        try {
+            org.openbravo.dal.service.OBDal.getInstance().getSession()
+                .getSessionFactory().getMetamodel().entity("OBKMO_WorkspaceElement");
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     private static final String HQL =
         "select we.name, we.icon, we.actionType, we.windowId " +
         "from OBKMO_WorkspaceElement we " +
