@@ -39,6 +39,8 @@ import com.etendoerp.metadata.utils.LegacyUtils;
 import static com.etendoerp.metadata.MetadataTestConstants.SALES_INVOICE_HEADER_EDITION_HTML;
 import static com.etendoerp.metadata.MetadataTestConstants.TOKEN;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
@@ -739,5 +741,191 @@ public class LegacyProcessServletTest extends OBBaseTest {
         );
         method.setAccessible(true);
         method.invoke(null, req, path, session);
+    }
+
+    @Test
+    public void isValidLocationReturnsTrueForRelativePath() throws Exception {
+        boolean result = (boolean) invokePrivateMethod(legacyProcessServlet, "isValidLocation",
+                new Class<?>[] { String.class }, "/some/relative/path");
+        assertTrue("Relative path should be valid", result);
+    }
+
+    @Test
+    public void isValidLocationReturnsFalseForProtocolUrl() throws Exception {
+        boolean result = (boolean) invokePrivateMethod(legacyProcessServlet, "isValidLocation",
+                new Class<?>[] { String.class }, "https://evil.com");
+        assertFalse("Protocol URL should be invalid", result);
+    }
+
+    @Test
+    public void isValidLocationReturnsFalseForProtocolRelativeUrl() throws Exception {
+        boolean result = (boolean) invokePrivateMethod(legacyProcessServlet, "isValidLocation",
+                new Class<?>[] { String.class }, "//evil.com");
+        assertFalse("Protocol-relative URL should be invalid", result);
+    }
+
+    @Test
+    public void isRedirectRequestReturnsTrueForRedirectSuffix() throws Exception {
+        boolean result = (boolean) invokePrivateMethod(legacyProcessServlet, "isRedirectRequest",
+                new Class<?>[] { String.class }, "/some/redirect");
+        assertTrue("Path ending with /redirect should be detected", result);
+    }
+
+    @Test
+    public void isRedirectRequestReturnsFalseForNonRedirect() throws Exception {
+        boolean result = (boolean) invokePrivateMethod(legacyProcessServlet, "isRedirectRequest",
+                new Class<?>[] { String.class }, "/some/path.html");
+        assertFalse("HTML path should not be redirect", result);
+    }
+
+    @Test
+    public void isRedirectRequestReturnsFalseForNull() throws Exception {
+        boolean result = (boolean) invokePrivateMethod(legacyProcessServlet, "isRedirectRequest",
+                new Class<?>[] { String.class }, (Object) null);
+        assertFalse("Null path should not be redirect", result);
+    }
+
+    @Test
+    public void isLegacyRequestReturnsTrueForHtmlPath() throws Exception {
+        boolean result = (boolean) invokePrivateMethod(legacyProcessServlet, "isLegacyRequest",
+                new Class<?>[] { String.class }, "/some/page.html");
+        assertTrue("HTML path should be legacy", result);
+    }
+
+    @Test
+    public void isLegacyRequestReturnsFalseForNull() throws Exception {
+        boolean result = (boolean) invokePrivateMethod(legacyProcessServlet, "isLegacyRequest",
+                new Class<?>[] { String.class }, (Object) null);
+        assertFalse("Null path should not be legacy", result);
+    }
+
+    @Test
+    public void isJavaScriptRequestReturnsTrueForJsPath() throws Exception {
+        boolean result = (boolean) invokePrivateMethod(legacyProcessServlet, "isJavaScriptRequest",
+                new Class<?>[] { String.class }, "/web/js/script.js");
+        assertTrue("JS path should be detected", result);
+    }
+
+    @Test
+    public void isJavaScriptRequestReturnsFalseForNull() throws Exception {
+        boolean result = (boolean) invokePrivateMethod(legacyProcessServlet, "isJavaScriptRequest",
+                new Class<?>[] { String.class }, (Object) null);
+        assertFalse("Null path should not be JS", result);
+    }
+
+    @Test
+    public void isLegacyFollowupRequestReturnsTrueForButtonCommand() throws Exception {
+        when(request.getParameter("Command")).thenReturn("BUTTON_OK");
+        boolean result = (boolean) invokePrivateMethod(legacyProcessServlet, "isLegacyFollowupRequest",
+                new Class<?>[] { HttpServletRequest.class }, request);
+        assertTrue("BUTTON command should be followup", result);
+    }
+
+    @Test
+    public void isLegacyFollowupRequestReturnsFalseForNonButtonCommand() throws Exception {
+        when(request.getParameter("Command")).thenReturn("FIND");
+        boolean result = (boolean) invokePrivateMethod(legacyProcessServlet, "isLegacyFollowupRequest",
+                new Class<?>[] { HttpServletRequest.class }, request);
+        assertFalse("Non-BUTTON command should not be followup", result);
+    }
+
+    @Test
+    public void isLegacyFollowupRequestReturnsFalseForNullCommand() throws Exception {
+        when(request.getParameter("Command")).thenReturn(null);
+        boolean result = (boolean) invokePrivateMethod(legacyProcessServlet, "isLegacyFollowupRequest",
+                new Class<?>[] { HttpServletRequest.class }, request);
+        assertFalse("Null command should not be followup", result);
+    }
+
+    @Test
+    public void extractTargetPathReturnsServletDirPlusHtmlPath() throws Exception {
+        when(request.getPathInfo()).thenReturn("/page.html");
+        String result = (String) invokePrivateMethod(legacyProcessServlet, "extractTargetPath",
+                new Class<?>[] { HttpServletRequest.class, String.class }, request, "/SalesOrder");
+        assertEquals("/SalesOrder/page.html", result);
+    }
+
+    @Test
+    public void extractTargetPathUsesRefererWhenServletDirNull() throws Exception {
+        when(request.getPathInfo()).thenReturn("/page.html");
+        when(request.getHeader("Referer")).thenReturn(null);
+        String result = (String) invokePrivateMethod(legacyProcessServlet, "extractTargetPath",
+                new Class<?>[] { HttpServletRequest.class, String.class }, request, (Object) null);
+        assertEquals("/page.html", result);
+    }
+
+    @Test
+    public void extractTargetPathUsesRefererForNonHtmlPath() throws Exception {
+        when(request.getPathInfo()).thenReturn("/process");
+        when(request.getHeader("Referer")).thenReturn(null);
+        Object result = invokePrivateMethod(legacyProcessServlet, "extractTargetPath",
+                new Class<?>[] { HttpServletRequest.class, String.class }, request, (Object) null);
+        assertNull("Should return null when no html and no referer", result);
+    }
+
+    @Test
+    public void extractTargetPathFromRefererReturnsNullForNull() throws Exception {
+        Object result = invokePrivateMethod(legacyProcessServlet, "extractTargetPathFromReferer",
+                new Class<?>[] { String.class }, (Object) null);
+        assertNull(result);
+    }
+
+    @Test
+    public void extractTargetPathFromRefererUsesLegacyPath() throws Exception {
+        String referer = "http://host/etendodev/meta/legacy/SalesOrder/EditLines.html?foo=1";
+        String result = (String) invokePrivateMethod(legacyProcessServlet, "extractTargetPathFromReferer",
+                new Class<?>[] { String.class }, referer);
+        assertEquals("/SalesOrder/EditLines.html", result);
+    }
+
+    @Test
+    public void extractTargetPathFromRefererUsesMetaPath() throws Exception {
+        String referer = "http://host/etendodev/meta/SalesOrder/EditLines.html";
+        String result = (String) invokePrivateMethod(legacyProcessServlet, "extractTargetPathFromReferer",
+                new Class<?>[] { String.class }, referer);
+        assertEquals("/SalesOrder/EditLines.html", result);
+    }
+
+    @Test
+    public void extractTargetPathFromRefererHandlesSalesOrderShortPath() throws Exception {
+        String referer = "http://host/etendodev/meta/EditLines.html";
+        String result = (String) invokePrivateMethod(legacyProcessServlet, "extractTargetPathFromReferer",
+                new Class<?>[] { String.class }, referer);
+        assertEquals("/SalesOrderEditLines.html", result);
+    }
+
+    @Test
+    public void deriveLegacyClassReturnsNullForShortPath() throws Exception {
+        Object result = invokePrivateMethod(legacyProcessServlet, "deriveLegacyClass",
+                new Class<?>[] { String.class }, "/page.html");
+        assertNull("Single-segment path should return null", result);
+    }
+
+    @Test
+    public void deriveLegacyClassReturnsCorrectClassName() throws Exception {
+        String result = (String) invokePrivateMethod(legacyProcessServlet, "deriveLegacyClass",
+                new Class<?>[] { String.class }, "/SalesOrder/EditLines.html");
+        assertEquals("org.openbravo.erpWindows.SalesOrder.EditLines", result);
+    }
+
+    @Test
+    public void deriveLegacyClassStripsUnderscoreSuffix() throws Exception {
+        String result = (String) invokePrivateMethod(legacyProcessServlet, "deriveLegacyClass",
+                new Class<?>[] { String.class }, "/SalesOrder/EditLines_Edition.html");
+        assertEquals("org.openbravo.erpWindows.SalesOrder.EditLines", result);
+    }
+
+    @Test
+    public void sendHtmlResponseWritesContentAndStatus() throws Exception {
+        StringWriter sw = new StringWriter();
+        when(response.getWriter()).thenReturn(new PrintWriter(sw));
+
+        invokePrivateMethod(legacyProcessServlet, "sendHtmlResponse",
+                new Class<?>[] { HttpServletResponse.class, String.class },
+                response, "<html>test</html>");
+
+        verify(response).setContentType("text/html; charset=UTF-8");
+        verify(response).setStatus(HttpServletResponse.SC_OK);
+        assertTrue("Writer should contain HTML", sw.toString().contains("<html>test</html>"));
     }
 }
