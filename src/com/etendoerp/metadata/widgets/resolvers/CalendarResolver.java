@@ -71,7 +71,7 @@ public class CalendarResolver implements WidgetDataResolver {
     public boolean isAvailable() {
         try {
             org.openbravo.dal.service.OBDal.getInstance().getSession()
-                .getSessionFactory().getMetamodel().entity("C_Period");
+                .createQuery("select 1 from C_Period p where 1=0", Integer.class);
             return true;
         } catch (Exception e) {
             return false;

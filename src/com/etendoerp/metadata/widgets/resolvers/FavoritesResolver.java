@@ -16,7 +16,7 @@ public class FavoritesResolver implements WidgetDataResolver {
     public boolean isAvailable() {
         try {
             org.openbravo.dal.service.OBDal.getInstance().getSession()
-                .getSessionFactory().getMetamodel().entity("OBKMO_WorkspaceElement");
+                .createQuery("select 1 from OBKMO_WorkspaceElement we where 1=0", Integer.class);
             return true;
         } catch (Exception e) {
             return false;
