@@ -93,7 +93,7 @@ public class WidgetDataService extends MetadataService {
                     bearerToken);
 
             WidgetDataResolver resolver = registry != null ? registry.getResolver(type) : null;
-            if (resolver == null && externalDataUrl != null) {
+            if (resolver == null && (externalDataUrl != null || "PROXY".equals(type))) {
                 resolver = new ProxyResolver();
             }
             if (resolver == null) throw new InternalServerException("No resolver for type: " + type);

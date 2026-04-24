@@ -10,6 +10,7 @@ import com.etendoerp.metadata.widgets.resolvers.QueryListResolver;
 import com.etendoerp.metadata.widgets.resolvers.RecentDocsResolver;
 import com.etendoerp.metadata.widgets.resolvers.RecentlyViewedResolver;
 import com.etendoerp.metadata.widgets.resolvers.StockAlertResolver;
+import com.etendoerp.metadata.widgets.resolvers.CalendarResolver;
 import com.etendoerp.metadata.widgets.resolvers.URLResolver;
 
 /**
@@ -32,6 +33,7 @@ public class WidgetResolverRegistryHolder {
         instance.register(new HTMLResolver());
         instance.register(new URLResolver());
         instance.register(new ProcessResolver());
+        instance.register(new CalendarResolver());
     }
 
     public static WidgetResolverRegistry getInstance() { return instance; }

@@ -68,6 +68,17 @@ public class CalendarResolver implements WidgetDataResolver {
     public String getType() { return "CALENDAR"; }
 
     @Override
+    public boolean isAvailable() {
+        try {
+            org.openbravo.dal.service.OBDal.getInstance().getSession()
+                .getSessionFactory().getMetamodel().entity("C_Period");
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    @Override
     public JSONObject resolve(WidgetDataContext ctx) throws Exception {
         SimpleDateFormat sdf = new SimpleDateFormat(DATE_FORMAT);
         String client  = ctx.getObContext().getCurrentClient().getId();
