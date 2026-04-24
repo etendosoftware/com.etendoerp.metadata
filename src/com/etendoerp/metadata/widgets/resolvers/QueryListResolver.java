@@ -108,6 +108,8 @@ public class QueryListResolver implements WidgetDataResolver {
 
     private static final Pattern PAREN_OR_FROM  = Pattern.compile("[()]|\\bfrom\\b",     Pattern.CASE_INSENSITIVE);
     private static final Pattern ORDER_BY       = Pattern.compile("\\border\\s+by\\b",   Pattern.CASE_INSENSITIVE);
+    private static final Pattern GROUP_BY       = Pattern.compile("\\bgroup\\s+by\\b",   Pattern.CASE_INSENSITIVE);
+    private static final Pattern HAVING         = Pattern.compile("\\bhaving\\b",         Pattern.CASE_INSENSITIVE);
     private static final Pattern ALIAS_AT_END   = Pattern.compile("\\bas\\s+(\\w+)\\s*$", Pattern.CASE_INSENSITIVE);
 
     /** Finds the char index of the first top-level FROM (not inside parentheses). */
@@ -128,8 +130,13 @@ public class QueryListResolver implements WidgetDataResolver {
         if (fromIdx < 0) return 0L;
 
         String fromPart = hql.substring(fromIdx);
-        Matcher orderMatcher = ORDER_BY.matcher(fromPart);
-        if (orderMatcher.find()) fromPart = fromPart.substring(0, orderMatcher.start());
+        // Strip ORDER BY, GROUP BY and HAVING — count(*) needs a single scalar result
+        int cutAt = Integer.MAX_VALUE;
+        Matcher m;
+        m = GROUP_BY.matcher(fromPart); if (m.find()) cutAt = Math.min(cutAt, m.start());
+        m = HAVING.matcher(fromPart);   if (m.find()) cutAt = Math.min(cutAt, m.start());
+        m = ORDER_BY.matcher(fromPart); if (m.find()) cutAt = Math.min(cutAt, m.start());
+        if (cutAt < Integer.MAX_VALUE) fromPart = fromPart.substring(0, cutAt);
 
         Query<Long> q = OBDal.getInstance().getSession()
                 .createQuery("select count(*) " + fromPart, Long.class);

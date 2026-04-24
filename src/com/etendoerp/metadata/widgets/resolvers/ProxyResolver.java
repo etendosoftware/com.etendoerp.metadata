@@ -20,7 +20,7 @@ public class ProxyResolver implements WidgetDataResolver {
     public JSONObject resolve(WidgetDataContext ctx) throws Exception {
         String url   = ctx.classString("3"); // EXTERNAL_DATA_URL
         String token = ctx.getBearerToken();
-        if (url == null) throw new IllegalStateException("ProxyResolver: no EXTERNAL_DATA_URL defined");
+        if (url == null) return new JSONObject().put("available", false).put("reason", "no_external_url");
 
         HttpGet get = new HttpGet(url);
         if (token != null) get.setHeader("Authorization", token);
