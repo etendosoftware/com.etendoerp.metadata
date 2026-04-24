@@ -69,7 +69,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
     private static final String COMMAND_KEY = "Command";
     private static final String INP_WINDOW_ID_KEY = "inpWindowId";
     private static final String INP_TABLE_ID_KEY = "inpTableId";
-    private static final String SET_COOKIE_HEADER = SET_COOKIE_HEADER;
+    private static final String SET_COOKIE_HEADER = "Set-Cookie";
 
     @Mock
     private HttpServletRequest request;

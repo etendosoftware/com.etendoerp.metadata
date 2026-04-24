@@ -83,7 +83,7 @@ class FieldBuilderWithColumnReferencedWindowTest {
     private static final String PO_WINDOW_ID = "PO_WINDOW_ID";
     private static final String SO_TAB_ID = "SO_TAB_ID";
     private static final String ENTITY_ORDER = "Order";
-    private static final String REFERENCED_WINDOW_ID_KEY = REFERENCED_WINDOW_ID_KEY;
+    private static final String REFERENCED_WINDOW_ID_KEY = "referencedWindowId";
 
     @BeforeEach
     void setUp() {
