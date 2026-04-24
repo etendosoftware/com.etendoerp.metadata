@@ -57,6 +57,12 @@ tasks.named('test') {
     useJUnitPlatform()
 }
 
+// Redirect test class output outside build/classes/ to avoid
+// BuildValidationHandler constructing invalid "java.test.*" class names
+compileTestJava {
+    destinationDirectory = file("${buildDir}/test-classes")
+}
+
 // Resolve the full compile classpath from the workspace classpath.jar manifest
 def classpathJar = file("${rootProject.projectDir}/build/lib/classpath.jar")
 def extraTestJars = []
