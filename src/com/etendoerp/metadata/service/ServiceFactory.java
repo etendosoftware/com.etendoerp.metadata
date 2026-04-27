@@ -69,6 +69,7 @@ public class ServiceFactory {
         PREFIX_MATCH_SERVICES.put(PROCESS_PATH, ProcessMetadataService::new);
         PREFIX_MATCH_SERVICES.put(EMAIL_PATH, EmailService::new);
         PREFIX_MATCH_SERVICES.put(DASHBOARD_PATH, DashboardService::new);
+        PREFIX_MATCH_SERVICES.put(FAVORITES_PATH, FavoritesService::new);
         PREFIX_MATCH_SERVICES.put(WIDGET_DATA_PATH, WidgetDataService::new);
         PREFIX_MATCH_SERVICES.put(LEGACY_PATH, LegacyService::new);
     }
