@@ -102,4 +102,5 @@ public class Constants {
     public static final String LEGACY_COMMAND = "command";
     public static final String LEGACY_KEY_COLUMN_NAME = "keyColumnName";
     public static final String LEGACY_INP_KEY_COLUMN_ID = "inpkeyColumnId";
+    public static final String LEGACY_ADDITIONAL_PARAMETERS = "additionalParameters";
 }

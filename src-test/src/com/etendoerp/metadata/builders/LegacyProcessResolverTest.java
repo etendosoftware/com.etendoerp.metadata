@@ -19,25 +19,37 @@ package com.etendoerp.metadata.builders;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
+import org.codehaus.jettison.json.JSONObject;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.openbravo.base.model.Entity;
+import org.openbravo.base.model.ModelProvider;
+import org.openbravo.base.model.Property;
+import org.openbravo.base.model.domaintype.BooleanDomainType;
+import org.openbravo.base.model.domaintype.DateDomainType;
+import org.openbravo.base.model.domaintype.StringDomainType;
 import org.openbravo.erpCommon.utility.Utility;
 import org.openbravo.model.ad.datamodel.Column;
 import org.openbravo.model.ad.datamodel.Table;
 import org.openbravo.model.ad.domain.ModelImplementation;
 import org.openbravo.model.ad.domain.ModelImplementationMapping;
+import org.openbravo.model.ad.domain.Reference;
 import org.openbravo.model.ad.ui.Field;
 import org.openbravo.model.ad.ui.Process;
 import org.openbravo.model.ad.ui.Tab;
@@ -239,6 +251,244 @@ class LegacyProcessResolverTest {
     }
 
     // -------------------------------------------------------------------------
+    // toInpKey — must mirror columnNameToInpKey in the client (utils.ts:135)
+    // -------------------------------------------------------------------------
+
+    @Test
+    void toInpKeyConvertsKnownColumnSamples() {
+        assertEquals("inpcOrderId", LegacyProcessResolver.toInpKey("C_Order_ID"));
+        assertEquals("inpfinFinaccTransactionId", LegacyProcessResolver.toInpKey("Fin_Finacc_Transaction_ID"));
+        assertEquals("inpfinPaymentProposalId", LegacyProcessResolver.toInpKey("Fin_Payment_Proposal_ID"));
+        assertEquals("inpprocessed", LegacyProcessResolver.toInpKey("Processed"));
+        assertEquals("inpadClientId", LegacyProcessResolver.toInpKey("AD_Client_ID"));
+    }
+
+    // -------------------------------------------------------------------------
+    // buildPlaceholder — pure unit tests of the placeholder grammar
+    // -------------------------------------------------------------------------
+
+    @Test
+    void buildPlaceholderReturnsRecordIdForPrimaryKey() {
+        Property pk = mock(Property.class);
+        when(pk.isId()).thenReturn(true);
+        assertEquals("$record.id", LegacyProcessResolver.buildPlaceholder(pk));
+    }
+
+    @Test
+    void buildPlaceholderUsesPropertyNameForString() {
+        Property prop = mock(Property.class);
+        when(prop.isId()).thenReturn(false);
+        when(prop.getName()).thenReturn("docstatus");
+        when(prop.getDomainType()).thenReturn(new StringDomainType());
+        assertEquals("$record.docstatus", LegacyProcessResolver.buildPlaceholder(prop));
+    }
+
+    @Test
+    void buildPlaceholderUsesPropertyNameForFK() {
+        // FKs expose a non-PrimitiveDomainType (TableDir/Search/Table). buildPlaceholder
+        // must NOT invoke Property#getPrimitiveType() on them — that throws ClassCast.
+        Property prop = mock(Property.class);
+        when(prop.isId()).thenReturn(false);
+        when(prop.getName()).thenReturn("client");
+        when(prop.getDomainType()).thenReturn(null);
+        assertEquals("$record.client", LegacyProcessResolver.buildPlaceholder(prop));
+    }
+
+    @Test
+    void buildPlaceholderAddsYnSuffixForBooleanColumn() {
+        Property prop = mock(Property.class);
+        when(prop.isId()).thenReturn(false);
+        when(prop.getName()).thenReturn("processed");
+        when(prop.getDomainType()).thenReturn(new BooleanDomainType());
+        assertEquals("$record.processed!yn", LegacyProcessResolver.buildPlaceholder(prop));
+    }
+
+    @Test
+    void buildPlaceholderAddsDateSuffixForDateColumn() {
+        Property prop = mock(Property.class);
+        when(prop.isId()).thenReturn(false);
+        when(prop.getName()).thenReturn("dateAcct");
+        when(prop.getDomainType()).thenReturn(new DateDomainType());
+        assertEquals("$record.dateAcct!date", LegacyProcessResolver.buildPlaceholder(prop));
+    }
+
+    // -------------------------------------------------------------------------
+    // resolveAdditionalParameters — full pipeline through ModelProvider
+    // -------------------------------------------------------------------------
+
+    @Test
+    void resolveEmitsPropertyNamePlaceholderForEachIncludedColumn() throws Exception {
+        Column processed = mockDataColumn("Processed", "20");                  // Yes-No
+        Column financialAcct = mockDataColumn("FIN_Financial_Account_ID", "19"); // TableDir (FK)
+        Map<String, Property> props = new HashMap<>();
+        props.put("Processed", booleanProperty("processed"));
+        props.put("FIN_Financial_Account_ID", fkProperty("financialAccount"));
+        props.put("Fin_Finacc_Transaction_ID", idProperty());
+
+        Field field = mockFieldWithProcessAndColumns(
+                mockManualProcess(PROCESS_INVOICE_FQCN, Collections.emptyList()),
+                "EM_APRM_Processed",
+                "Fin_Finacc_Transaction_ID",
+                List.of(processed, financialAcct));
+
+        try (MockedStatic<ModelProvider> mp = mockModelProvider(props)) {
+            Optional<LegacyProcessParams> params = LegacyProcessResolver.resolve(field);
+
+            JSONObject additional = extractAdditionalParameters(params);
+            assertEquals("$record.processed!yn", additional.get("inpprocessed"));
+            assertEquals("$record.financialAccount", additional.get("inpfinFinancialAccountId"));
+        }
+    }
+
+    /**
+     * Classic submits every hidden input including Button-typed columns whose value is
+     * stored in DB (e.g. {@code EM_Aprm_Processed=P}). The new resolver must mirror that.
+     */
+    @Test
+    void resolveIncludesButtonColumnsInAdditionalParameters() throws Exception {
+        Column normal = mockDataColumn("Processed", "20");
+        Column button = mockDataColumn("EM_APRM_Processed", "28"); // Button
+        Map<String, Property> props = new HashMap<>();
+        props.put("Processed", booleanProperty("processed"));
+        props.put("EM_APRM_Processed", stringProperty("emAprmProcessed"));
+        props.put("Fin_Finacc_Transaction_ID", idProperty());
+
+        Field field = mockFieldWithProcessAndColumns(
+                mockManualProcess(PROCESS_INVOICE_FQCN, Collections.emptyList()),
+                "EM_APRM_Processed",
+                "Fin_Finacc_Transaction_ID",
+                List.of(normal, button));
+
+        try (MockedStatic<ModelProvider> mp = mockModelProvider(props)) {
+            Optional<LegacyProcessParams> params = LegacyProcessResolver.resolve(field);
+
+            JSONObject additional = extractAdditionalParameters(params);
+            assertTrue(additional.has("inpprocessed"));
+            assertTrue(additional.has("inpemAprmProcessed"));
+            assertEquals("$record.emAprmProcessed", additional.get("inpemAprmProcessed"));
+        }
+    }
+
+    @Test
+    void resolveExcludesPasswordAndImageColumnsFromAdditionalParameters() throws Exception {
+        Column normal = mockDataColumn("Processed", "20");
+        Column password = mockDataColumn("Secret", "24");  // Password
+        Column image = mockDataColumn("Logo", "32");       // Image
+        Map<String, Property> props = new HashMap<>();
+        props.put("Processed", booleanProperty("processed"));
+        // Password/Image columns are filtered before ModelProvider is consulted, so they
+        // don't need property entries.
+        props.put("Fin_Finacc_Transaction_ID", idProperty());
+
+        Field field = mockFieldWithProcessAndColumns(
+                mockManualProcess(PROCESS_INVOICE_FQCN, Collections.emptyList()),
+                "EM_APRM_Processed",
+                "Fin_Finacc_Transaction_ID",
+                List.of(normal, password, image));
+
+        try (MockedStatic<ModelProvider> mp = mockModelProvider(props)) {
+            Optional<LegacyProcessParams> params = LegacyProcessResolver.resolve(field);
+
+            JSONObject additional = extractAdditionalParameters(params);
+            assertTrue(additional.has("inpprocessed"));
+            assertFalse(additional.has("inpsecret"));
+            assertFalse(additional.has("inplogo"));
+        }
+    }
+
+    @Test
+    void resolveExcludesInactiveColumnsFromAdditionalParameters() throws Exception {
+        Column active = mockDataColumn("Processed", "20");
+        Column inactive = mockDataColumn("OldFlag", "20");
+        when(inactive.isActive()).thenReturn(false);
+        Map<String, Property> props = new HashMap<>();
+        props.put("Processed", booleanProperty("processed"));
+        props.put("Fin_Finacc_Transaction_ID", idProperty());
+
+        Field field = mockFieldWithProcessAndColumns(
+                mockManualProcess(PROCESS_INVOICE_FQCN, Collections.emptyList()),
+                "EM_APRM_Processed",
+                "Fin_Finacc_Transaction_ID",
+                List.of(active, inactive));
+
+        try (MockedStatic<ModelProvider> mp = mockModelProvider(props)) {
+            Optional<LegacyProcessParams> params = LegacyProcessResolver.resolve(field);
+
+            JSONObject additional = extractAdditionalParameters(params);
+            assertTrue(additional.has("inpprocessed"));
+            assertFalse(additional.has("inpoldflag"));
+        }
+    }
+
+    @Test
+    void resolveSkipsColumnsWhoseEntityHasNoProperty() throws Exception {
+        Column known = mockDataColumn("Processed", "20");
+        Column orphan = mockDataColumn("OrphanColumn", "10");
+        Map<String, Property> props = new HashMap<>();
+        props.put("Processed", booleanProperty("processed"));
+        // OrphanColumn deliberately absent — getPropertyByColumnName returns null.
+        props.put("Fin_Finacc_Transaction_ID", idProperty());
+
+        Field field = mockFieldWithProcessAndColumns(
+                mockManualProcess(PROCESS_INVOICE_FQCN, Collections.emptyList()),
+                "EM_APRM_Processed",
+                "Fin_Finacc_Transaction_ID",
+                List.of(known, orphan));
+
+        try (MockedStatic<ModelProvider> mp = mockModelProvider(props)) {
+            Optional<LegacyProcessParams> params = LegacyProcessResolver.resolve(field);
+
+            JSONObject additional = extractAdditionalParameters(params);
+            assertTrue(additional.has("inpprocessed"));
+            assertFalse(additional.has("inporphancolumn"));
+        }
+    }
+
+    @Test
+    void resolveEmitsRecordIdPlaceholderForPrimaryKey() throws Exception {
+        Column pk = mockDataColumn("Fin_Finacc_Transaction_ID", "13"); // ID reference
+        when(pk.isKeyColumn()).thenReturn(true);
+        Map<String, Property> props = new HashMap<>();
+        props.put("Fin_Finacc_Transaction_ID", idProperty());
+
+        Field field = mockFieldWithProcessAndColumns(
+                mockManualProcess(PROCESS_INVOICE_FQCN, Collections.emptyList()),
+                "EM_APRM_Processed",
+                "Fin_Finacc_Transaction_ID",
+                List.of(pk));
+
+        try (MockedStatic<ModelProvider> mp = mockModelProvider(props)) {
+            Optional<LegacyProcessParams> params = LegacyProcessResolver.resolve(field);
+
+            JSONObject additional = extractAdditionalParameters(params);
+            assertEquals("$record.id", additional.get("inpfinFinaccTransactionId"));
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // LegacyProcessParams.toJson — additionalParameters key omitted when empty
+    // -------------------------------------------------------------------------
+
+    @Test
+    void toJsonOmitsAdditionalParametersWhenEmpty() throws Exception {
+        LegacyProcessParams params =
+                new LegacyProcessParams(RESCHEDULE_URL, COMMAND_DEFAULT, KEY_COLUMN, KEY_COLUMN);
+        JSONObject json = params.toJson();
+        assertFalse(json.has("additionalParameters"));
+    }
+
+    @Test
+    void toJsonIncludesAdditionalParametersWhenPopulated() throws Exception {
+        LegacyProcessParams params = new LegacyProcessParams(
+                RESCHEDULE_URL, COMMAND_DEFAULT, KEY_COLUMN, KEY_COLUMN,
+                java.util.Map.of("inpprocessed", "$record.Processed"));
+        JSONObject json = params.toJson();
+        assertTrue(json.has("additionalParameters"));
+        assertEquals("$record.Processed",
+                json.getJSONObject("additionalParameters").get("inpprocessed"));
+    }
+
+    // -------------------------------------------------------------------------
     // Test fixture helpers — keep individual tests compact and readable
     // -------------------------------------------------------------------------
 
@@ -289,6 +539,114 @@ class LegacyProcessResolverTest {
         when(keyColumn.getDBColumnName()).thenReturn(keyColumnName);
 
         return field;
+    }
+
+    /**
+     * Variant of {@link #mockFieldWithProcess} where the tab's table exposes a custom
+     * column list. The key column is appended automatically so {@code resolveKeyColumnName}
+     * still finds it.
+     */
+    private Field mockFieldWithProcessAndColumns(Process process, String columnName,
+                                                 String keyColumnName, List<Column> dataColumns) {
+        Field field = mock(Field.class);
+        Column buttonColumn = mock(Column.class);
+        Tab tab = mock(Tab.class);
+        Table table = mock(Table.class);
+        Column keyColumn = mock(Column.class);
+
+        when(field.getId()).thenReturn(FIELD_ID);
+        when(field.getColumn()).thenReturn(buttonColumn);
+        when(field.getTab()).thenReturn(tab);
+
+        when(buttonColumn.getDBColumnName()).thenReturn(columnName);
+        when(buttonColumn.getProcess()).thenReturn(process);
+
+        List<Column> allColumns = new ArrayList<>(dataColumns);
+        allColumns.add(keyColumn);
+        when(tab.getTable()).thenReturn(table);
+        when(table.getADColumnList()).thenReturn(allColumns);
+        when(table.getDBTableName()).thenReturn("FIN_Finacc_Transaction");
+
+        when(keyColumn.isKeyColumn()).thenReturn(true);
+        when(keyColumn.getDBColumnName()).thenReturn(keyColumnName);
+        // Key column is excluded from additional parameters because isActive() defaults to
+        // false under LENIENT mocking, which keeps existing fixtures intact.
+
+        return field;
+    }
+
+    private Column mockDataColumn(String dbColumnName, String referenceId) {
+        Column col = mock(Column.class);
+        when(col.getDBColumnName()).thenReturn(dbColumnName);
+        when(col.isActive()).thenReturn(true);
+        when(col.isKeyColumn()).thenReturn(false);
+        if (referenceId != null) {
+            Reference ref = mock(Reference.class);
+            when(ref.getId()).thenReturn(referenceId);
+            when(col.getReference()).thenReturn(ref);
+        } else {
+            when(col.getReference()).thenReturn(null);
+        }
+        return col;
+    }
+
+    /**
+     * Stubs {@link ModelProvider#getInstance()} so that {@code getEntityByTableName(any)}
+     * returns an Entity whose {@code getPropertyByColumnName(name)} answers from the given
+     * map. Columns absent from the map produce {@code null}, mirroring the orphan-column
+     * scenario.
+     */
+    private MockedStatic<ModelProvider> mockModelProvider(Map<String, Property> propertiesByColumn) {
+        MockedStatic<ModelProvider> mocked = mockStatic(ModelProvider.class);
+        ModelProvider provider = mock(ModelProvider.class);
+        Entity entity = mock(Entity.class);
+        when(entity.getName()).thenReturn("FIN_FinaccTransaction");
+        when(entity.getPropertyByColumnName(anyString()))
+                .thenAnswer(invocation -> propertiesByColumn.get(invocation.<String>getArgument(0)));
+        when(provider.getEntityByTableName(anyString())).thenReturn(entity);
+        mocked.when(ModelProvider::getInstance).thenReturn(provider);
+        return mocked;
+    }
+
+    private Property idProperty() {
+        Property p = mock(Property.class);
+        when(p.isId()).thenReturn(true);
+        return p;
+    }
+
+    private Property booleanProperty(String name) {
+        Property p = mock(Property.class);
+        when(p.isId()).thenReturn(false);
+        when(p.getName()).thenReturn(name);
+        when(p.getDomainType()).thenReturn(new BooleanDomainType());
+        return p;
+    }
+
+    private Property stringProperty(String name) {
+        Property p = mock(Property.class);
+        when(p.isId()).thenReturn(false);
+        when(p.getName()).thenReturn(name);
+        when(p.getDomainType()).thenReturn(new StringDomainType());
+        return p;
+    }
+
+    private Property fkProperty(String name) {
+        Property p = mock(Property.class);
+        when(p.isId()).thenReturn(false);
+        when(p.getName()).thenReturn(name);
+        // FK domain types (TableDir/Search/Table) are NOT PrimitiveDomainType — use null
+        // here so the resolver follows the non-primitive path without throwing on cast.
+        when(p.getDomainType()).thenReturn(null);
+        return p;
+    }
+
+    private JSONObject extractAdditionalParameters(Optional<LegacyProcessParams> params) {
+        try {
+            JSONObject json = params.orElseThrow().toJson();
+            return json.getJSONObject("additionalParameters");
+        } catch (Exception e) {
+            throw new AssertionError("Could not extract additionalParameters from params", e);
+        }
     }
 
     private String extractUrl(Optional<LegacyProcessParams> params) {
