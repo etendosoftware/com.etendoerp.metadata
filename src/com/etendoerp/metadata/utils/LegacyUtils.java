@@ -41,7 +41,8 @@ public class LegacyUtils {
             "3663",
             "4242",
             "3670",
-            "4248");
+            "4248",
+            "7C541AC0C767FDD7E040007F01016B4D");
 
     /** Set of legacy paths used in the system. */
     private static final Set<String> LEGACY_PATHS = Set.of(
@@ -103,13 +104,15 @@ public class LegacyUtils {
     }
 
     /**
-     * Finds the ID of the first active tab that belongs to the given window and table.
+     * Finds the ID of the first active tab that belongs to the given window and
+     * table.
      * The result is ordered by sequence number to ensure deterministic output when
      * multiple tabs reference the same window and table combination.
      *
      * @param windowId the ID of the AD_Window to filter by
      * @param tableId  the ID of the AD_Table to filter by
-     * @return the ID of the matching tab, or {@code null} if either parameter is blank
+     * @return the ID of the matching tab, or {@code null} if either parameter is
+     *         blank
      *         or no active tab is found for the given window and table
      */
     public static String findTabIdByWindowAndTable(String windowId, String tableId) {
@@ -117,9 +120,8 @@ public class LegacyUtils {
             return null;
         }
         OBQuery<Tab> query = OBDal.getInstance().createQuery(
-            Tab.class,
-            "where window.id = :windowId and table.id = :tableId and active = true order by sequenceNumber"
-        );
+                Tab.class,
+                "where window.id = :windowId and table.id = :tableId and active = true order by sequenceNumber");
         query.setNamedParameter("windowId", windowId);
         query.setNamedParameter("tableId", tableId);
         query.setMaxResult(1);

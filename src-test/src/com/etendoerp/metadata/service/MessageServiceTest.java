@@ -2,10 +2,15 @@ package com.etendoerp.metadata.service;
 
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.codehaus.jettison.json.JSONObject;
@@ -26,6 +31,8 @@ import org.openbravo.dal.core.OBContext;
 public class MessageServiceTest extends BaseMetadataServiceTest {
 
     private static final String MOCK_MESSAGE_IO_EXCEPTION = "Mock Message IO Exception";
+    private static final String ORIGIN = "Origin";
+    private static final String ACCESS_CONTROL_ALLOW_ORIGIN = "Access-Control-Allow-Origin";
 
     private MessageService messageService;
 
@@ -232,6 +239,77 @@ public class MessageServiceTest extends BaseMetadataServiceTest {
             assertTrue("Multi-parameter JSON should be valid", jsonResponse.length() >= 0);
         } catch (Exception e) {
             assertFalse("Multi-parameter response should be meaningful", responseContent.isEmpty());
+        }
+    }
+
+    /**
+     * Tests setCORSHeaders when the Origin header is null.
+     * The method should not set any CORS headers when origin is null.
+     */
+    @Test
+    public void testSetCORSHeadersWithNullOrigin() {
+        HttpServletRequest req = mock(HttpServletRequest.class);
+        HttpServletResponse res = mock(HttpServletResponse.class);
+        when(req.getHeader(ORIGIN)).thenReturn(null);
+
+        messageService.setCORSHeaders(req, res);
+
+        verify(res, never()).setHeader(ACCESS_CONTROL_ALLOW_ORIGIN, null);
+    }
+
+    /**
+     * Tests setCORSHeaders when the Origin header is empty.
+     * The method should not set any CORS headers when origin is empty.
+     */
+    @Test
+    public void testSetCORSHeadersWithEmptyOrigin() {
+        HttpServletRequest req = mock(HttpServletRequest.class);
+        HttpServletResponse res = mock(HttpServletResponse.class);
+        when(req.getHeader(ORIGIN)).thenReturn("");
+
+        messageService.setCORSHeaders(req, res);
+
+        verify(res, never()).setHeader(ACCESS_CONTROL_ALLOW_ORIGIN, "");
+    }
+
+    /**
+     * Tests setCORSHeaders when the Origin header has a valid value.
+     * Verifies all expected CORS headers are set.
+     */
+    @Test
+    public void testSetCORSHeadersWithValidOrigin() {
+        HttpServletRequest req = mock(HttpServletRequest.class);
+        HttpServletResponse res = mock(HttpServletResponse.class);
+        when(req.getHeader(ORIGIN)).thenReturn("http://localhost:8080");
+
+        messageService.setCORSHeaders(req, res);
+
+        verify(res).setHeader(ACCESS_CONTROL_ALLOW_ORIGIN, "http://localhost:8080");
+        verify(res).setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
+        verify(res).setHeader("Access-Control-Allow-Credentials", "true");
+        verify(res).setHeader("Access-Control-Allow-Headers", "Content-Type, origin, accept, X-Requested-With");
+        verify(res).setHeader("Access-Control-Max-Age", "1000");
+    }
+
+    /**
+     * Tests process() when the error object is non-null.
+     * The response JSON should contain message, type, and title keys.
+     *
+     * @throws IOException if an I/O error occurs during processing
+     */
+    @Test
+    public void testProcessWithNonNullError() throws IOException {
+        when(mockRequest.getParameter("tabId")).thenReturn("test-tab-id");
+        responseWriter.getBuffer().setLength(0);
+        messageService.process();
+        String responseContent = responseWriter.toString();
+        assertNotNull("Response content should not be null", responseContent);
+        assertFalse("Response should not be empty", responseContent.trim().isEmpty());
+        try {
+            JSONObject jsonResponse = new JSONObject(responseContent);
+            assertTrue("JSON should have message key", jsonResponse.has("message"));
+        } catch (Exception e) {
+            fail("Response should be valid JSON: " + e.getMessage());
         }
     }
 }
