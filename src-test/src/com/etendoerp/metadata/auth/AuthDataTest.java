@@ -43,7 +43,8 @@ import com.etendoerp.metadata.data.AuthData;
  * warehouse, and client information.
  */
 @RunWith(MockitoJUnitRunner.class)
-public class AuthDataTest {
+public class
+AuthDataTest {
 
   @Mock
   private User mockUser;
