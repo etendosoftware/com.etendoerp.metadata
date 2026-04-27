@@ -42,18 +42,20 @@ public class DashboardLayoutResolver {
         "where dw.active = true " +
         "  and (dw.layer = 'SYSTEM' " +
         "       or (dw.layer = 'CLIENT' and dw.client.id = :clientId) " +
-        "       or (dw.layer = 'USER'   and dw.user.id   = :userId)) " +
+        "       or (dw.layer = 'USER'   and dw.user.id   = :userId and dw.role.id = :roleId)) " +
         "order by dw.layer, dw.sequence";
 
     public JSONArray resolve() throws JSONException {
         OBContext ctx = OBContext.getOBContext();
         String userId   = ctx.getUser().getId();
         String clientId = ctx.getCurrentClient().getId();
+        String roleId   = ctx.getRole().getId();
 
         Query<Object[]> q = OBDal.getInstance().getSession()
                 .createQuery(HQL, Object[].class);
         q.setParameter("clientId", clientId);
         q.setParameter("userId",   userId);
+        q.setParameter("roleId",   roleId);
         List<Object[]> rows = q.list();
 
         // Layer priority: USER(3) > CLIENT(2) > SYSTEM(1)
