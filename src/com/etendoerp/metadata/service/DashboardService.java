@@ -93,25 +93,26 @@ public class DashboardService extends MetadataService {
     private void handlePutLayout() throws Exception {
         JSONObject body = parseJsonBody();
         JSONArray widgets = body.getJSONArray("widgets");
-        String userId = OBContext.getOBContext().getUser().getId();
+        String userId  = OBContext.getOBContext().getUser().getId();
+        String roleId  = OBContext.getOBContext().getRole().getId();
         boolean isAdmin = isDashboardAdmin();
 
         for (int i = 0; i < widgets.length(); i++) {
             JSONObject w = widgets.getJSONObject(i);
             String instanceId = w.getString("instanceId");
-            updateLayoutRecord(instanceId, w, userId, isAdmin);
+            updateLayoutRecord(instanceId, w, userId, roleId, isAdmin);
         }
         write(new JSONObject().put("status", "ok"));
     }
 
     private void updateLayoutRecord(String instanceId, JSONObject w,
-                                    String userId, boolean isAdmin) throws Exception {
+                                    String userId, String roleId, boolean isAdmin) throws Exception {
         String updateHql =
             "update etmeta_Dashboard_Widget dw set " +
             "dw.columnPosition = :col, dw.rowPosition = :row, " +
             "dw.width = :width, dw.height = :height, dw.visible = :visible " +
             "where dw.id = :id " +
-            (isAdmin ? "" : "and dw.user.id = :userId");
+            (isAdmin ? "" : "and dw.user.id = :userId and dw.role.id = :roleId");
 
         Query<?> q = OBDal.getInstance().getSession().createQuery(updateHql);
         q.setParameter("col",     java.math.BigDecimal.valueOf(w.optDouble("col", 0)));
@@ -120,9 +121,86 @@ public class DashboardService extends MetadataService {
         q.setParameter("height",  java.math.BigDecimal.valueOf(w.optDouble("height", 1)));
         q.setParameter("visible", w.optBoolean("isVisible", true));
         q.setParameter("id",      instanceId);
-        if (!isAdmin) q.setParameter("userId", userId);
-        q.executeUpdate();
+        if (!isAdmin) {
+            q.setParameter("userId", userId);
+            q.setParameter("roleId", roleId);
+        }
+        int updated = q.executeUpdate();
+
+        // If no rows matched, the instance is a SYSTEM/CLIENT layer record (no user/role FK).
+        // Persist changes by upserting a USER-layer override for this user+role.
+        if (updated == 0 && !isAdmin) {
+            upsertUserLayerOverride(instanceId, w, userId, roleId);
+        }
+
         OBDal.getInstance().getSession().flush();
+    }
+
+    private void upsertUserLayerOverride(String instanceId, JSONObject w,
+                                         String userId, String roleId) throws Exception {
+        // Fetch the source (SYSTEM/CLIENT) record metadata
+        Query<Object[]> lookupQ = OBDal.getInstance().getSession()
+            .createQuery(
+                "select dw.widgetClass.id, dw.client.id, dw.sequence, dw.parametersJSON " +
+                "from etmeta_Dashboard_Widget dw where dw.id = :id",
+                Object[].class);
+        lookupQ.setParameter("id", instanceId);
+        Object[] source = lookupQ.uniqueResult();
+        if (source == null) return;
+
+        String classId  = (String) source[0];
+        String clientId = (String) source[1];
+        Number seqno    = (Number) source[2];
+        String params   = (String) source[3];
+
+        // Try to update an existing USER override for this classId+user+role
+        int userUpdated = OBDal.getInstance().getSession()
+            .createQuery(
+                "update etmeta_Dashboard_Widget dw set " +
+                "dw.columnPosition = :col, dw.rowPosition = :row, " +
+                "dw.width = :width, dw.height = :height, dw.visible = :visible " +
+                "where dw.widgetClass.id = :classId and dw.layer = 'USER' " +
+                "and dw.user.id = :userId and dw.role.id = :roleId")
+            .setParameter("col",     java.math.BigDecimal.valueOf(w.optDouble("col", 0)))
+            .setParameter("row",     java.math.BigDecimal.valueOf(w.optDouble("row", 0)))
+            .setParameter("width",   java.math.BigDecimal.valueOf(w.optDouble("width", 2)))
+            .setParameter("height",  java.math.BigDecimal.valueOf(w.optDouble("height", 1)))
+            .setParameter("visible", w.optBoolean("isVisible", true))
+            .setParameter("classId", classId)
+            .setParameter("userId",  userId)
+            .setParameter("roleId",  roleId)
+            .executeUpdate();
+
+        if (userUpdated > 0) return;
+
+        // No USER override yet — insert one
+        String newId = UUID.randomUUID().toString().replace("-", "");
+        String isVisible = w.optBoolean("isVisible", true) ? "Y" : "N";
+        String insertSql =
+            "INSERT INTO etmeta_dashboard_widget " +
+            "(etmeta_dashboard_widget_id, etmeta_widget_class_id, layer, ad_client_id, ad_org_id, " +
+            " ad_user_id, ad_role_id, col_position, row_position, width, height, isvisible, seqno, " +
+            " parameters_json, isactive, created, createdby, updated, updatedby) " +
+            "VALUES (:id, :classId, 'USER', :clientId, '0', " +
+            " :userId, :roleId, :col, :row, :width, :height, :visible, :seqno, " +
+            " :params, 'Y', NOW(), :uid, NOW(), :uid)";
+
+        org.hibernate.query.NativeQuery<?> ins =
+            OBDal.getInstance().getSession().createNativeQuery(insertSql);
+        ins.setParameter("id",       newId);
+        ins.setParameter("classId",  classId);
+        ins.setParameter("clientId", clientId);
+        ins.setParameter("userId",   userId);
+        ins.setParameter("roleId",   roleId);
+        ins.setParameter("col",      w.optDouble("col", 0));
+        ins.setParameter("row",      w.optDouble("row", 0));
+        ins.setParameter("width",    w.optDouble("width", 2));
+        ins.setParameter("height",   w.optDouble("height", 1));
+        ins.setParameter("visible",  isVisible);
+        ins.setParameter("seqno",    seqno != null ? seqno.intValue() : 10);
+        ins.setParameter("params",   params);
+        ins.setParameter("uid",      userId);
+        ins.executeUpdate();
     }
 
     private void handlePostWidget() throws Exception {
@@ -130,30 +208,37 @@ public class DashboardService extends MetadataService {
         String classId    = body.getString("widgetClassId");
         String layer      = isDashboardAdmin() ? "CLIENT" : "USER";
         String userId     = OBContext.getOBContext().getUser().getId();
+        String roleId     = OBContext.getOBContext().getRole().getId();
         String clientId   = OBContext.getOBContext().getCurrentClient().getId();
 
         // Remove USER shadow record (isvisible=N) so the new widget is not hidden
         OBDal.getInstance().getSession()
             .createQuery("delete from etmeta_Dashboard_Widget dw " +
                          "where dw.widgetClass.id = :classId " +
-                         "and dw.layer = 'USER' and dw.user.id = :userId " +
+                         "and dw.layer = 'USER' and dw.user.id = :userId and dw.role.id = :roleId " +
                          "and dw.visible = false")
             .setParameter("classId", classId)
-            .setParameter("userId", userId)
+            .setParameter("userId",  userId)
+            .setParameter("roleId",  roleId)
             .executeUpdate();
 
         // Skip insert if an active record already exists for this classId and layer
-        Long existing = OBDal.getInstance().getSession()
+        Query<Long> existsQ = OBDal.getInstance().getSession()
             .createQuery("select count(dw) from etmeta_Dashboard_Widget dw " +
                          "where dw.widgetClass.id = :classId and dw.layer = :layer " +
                          "and dw.active = true " +
-                         (layer.equals("USER") ? "and dw.user.id = :userId " : "and dw.client.id = :clientId "),
-                         Long.class)
-            .setParameter("classId", classId)
-            .setParameter("layer", layer)
-            .setParameter(layer.equals("USER") ? "userId" : "clientId",
-                          layer.equals("USER") ? userId : clientId)
-            .uniqueResult();
+                         (layer.equals("USER") ? "and dw.user.id = :userId and dw.role.id = :roleId "
+                                               : "and dw.client.id = :clientId "),
+                         Long.class);
+        existsQ.setParameter("classId", classId);
+        existsQ.setParameter("layer",   layer);
+        if (layer.equals("USER")) {
+            existsQ.setParameter("userId", userId);
+            existsQ.setParameter("roleId", roleId);
+        } else {
+            existsQ.setParameter("clientId", clientId);
+        }
+        Long existing = existsQ.uniqueResult();
         if (existing != null && existing > 0) {
             write(new JSONObject().put("instanceId", "").put("status", "exists"));
             return;
@@ -164,10 +249,10 @@ public class DashboardService extends MetadataService {
         String insertSql =
             "INSERT INTO etmeta_dashboard_widget " +
             "(etmeta_dashboard_widget_id, etmeta_widget_class_id, layer, ad_client_id, ad_org_id, " +
-            " ad_user_id, col_position, row_position, width, height, isvisible, seqno, " +
+            " ad_user_id, ad_role_id, col_position, row_position, width, height, isvisible, seqno, " +
             " parameters_json, isactive, created, createdby, updated, updatedby) " +
             "VALUES (:id, :classId, :layer, :clientId, '0', " +
-            " :userId, :col, :row, :width, :height, 'Y', :seqno, " +
+            " :userId, :roleId, :col, :row, :width, :height, 'Y', :seqno, " +
             " :params, 'Y', NOW(), :uid, NOW(), :uid)";
 
         org.hibernate.query.NativeQuery<?> q = OBDal.getInstance().getSession().createNativeQuery(insertSql);
@@ -176,13 +261,14 @@ public class DashboardService extends MetadataService {
         q.setParameter("layer",    layer);
         q.setParameter("clientId", clientId);
         q.setParameter("userId",   "USER".equals(layer) ? userId : null);
+        q.setParameter("roleId",   "USER".equals(layer) ? roleId : null);
         q.setParameter("col",      body.optInt("col", 0));
         q.setParameter("row",      body.optInt("row", 0));
         q.setParameter("width",    body.optInt("width", 2));
         q.setParameter("height",   body.optInt("height", 1));
         q.setParameter("seqno",    10);
         q.setParameter("params",   body.has("parameters") ? body.getJSONObject("parameters").toString() : null);
-        q.setParameter("uid",      OBContext.getOBContext().getUser().getId());
+        q.setParameter("uid",      userId);
         q.executeUpdate();
         OBDal.getInstance().getSession().flush();
 
@@ -199,24 +285,26 @@ public class DashboardService extends MetadataService {
             q.setParameter("id", instanceId);
             q.executeUpdate();
         } else {
-            // Insert USER shadow record with ISVISIBLE=N to hide SYSTEM/CLIENT widget for this user
+            // Insert USER shadow record with ISVISIBLE=N to hide SYSTEM/CLIENT widget for this user+role
             String classId  = getInstanceClassId(instanceId);
             String userId   = OBContext.getOBContext().getUser().getId();
+            String roleId   = OBContext.getOBContext().getRole().getId();
             String clientId = OBContext.getOBContext().getCurrentClient().getId();
             String shadowId = UUID.randomUUID().toString().replace("-", "");
 
             String insertSql =
                 "INSERT INTO etmeta_dashboard_widget " +
                 "(etmeta_dashboard_widget_id, etmeta_widget_class_id, layer, ad_client_id, ad_org_id, " +
-                " ad_user_id, col_position, row_position, width, height, isvisible, seqno, " +
+                " ad_user_id, ad_role_id, col_position, row_position, width, height, isvisible, seqno, " +
                 " isactive, created, createdby, updated, updatedby) " +
                 "VALUES (:id, :classId, 'USER', :clientId, '0', " +
-                " :userId, 0, 0, 0, 0, 'N', 0, 'Y', NOW(), :uid, NOW(), :uid)";
+                " :userId, :roleId, 0, 0, 0, 0, 'N', 0, 'Y', NOW(), :uid, NOW(), :uid)";
             org.hibernate.query.NativeQuery<?> q = OBDal.getInstance().getSession().createNativeQuery(insertSql);
             q.setParameter("id",       shadowId);
             q.setParameter("classId",  classId);
             q.setParameter("clientId", clientId);
             q.setParameter("userId",   userId);
+            q.setParameter("roleId",   roleId);
             q.setParameter("uid",      userId);
             q.executeUpdate();
         }
