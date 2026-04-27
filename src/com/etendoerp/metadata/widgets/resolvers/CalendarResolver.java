@@ -37,7 +37,7 @@ public class CalendarResolver implements WidgetDataResolver {
 
     private static final String CURRENT_PERIOD_HQL =
         "select p.id, p.name, p.startingDate, p.endingDate, p.openClose " +
-        "from C_Period p " +
+        "from FinancialMgmtPeriod p " +
         "where p.client.id        = :client " +
         "  and p.startingDate    <= :today " +
         "  and p.endingDate      >= :today " +
@@ -47,7 +47,7 @@ public class CalendarResolver implements WidgetDataResolver {
 
     private static final String PERIODS_HQL =
         "select p.id, p.name, p.startingDate, p.endingDate, p.openClose " +
-        "from C_Period p " +
+        "from FinancialMgmtPeriod p " +
         "where p.client.id        = :client " +
         "  and p.endingDate      >= :dateFrom " +
         "  and p.startingDate    <= :dateTo " +
@@ -57,7 +57,7 @@ public class CalendarResolver implements WidgetDataResolver {
 
     private static final String NBD_HQL =
         "select n.name, n.nonBusinessDayDate " +
-        "from C_NonBusinessDay n " +
+        "from FinancialMgmtNonBusinessDay n " +
         "where n.client.id              = :client " +
         "  and n.nonBusinessDayDate    >= :dateFrom " +
         "  and n.nonBusinessDayDate    <= :dateTo " +
@@ -71,7 +71,7 @@ public class CalendarResolver implements WidgetDataResolver {
     public boolean isAvailable() {
         try {
             org.openbravo.dal.service.OBDal.getInstance().getSession()
-                .createQuery("select 1 from C_Period p where 1=0", Integer.class);
+                .createQuery("select 1 from FinancialMgmtPeriod p where 1=0", Integer.class);
             return true;
         } catch (Exception e) {
             return false;
