@@ -23,7 +23,7 @@ import java.util.stream.Collectors;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
-import org.hibernate.criterion.Restrictions;
+import org.openbravo.dal.service.Restrictions;
 import org.openbravo.base.exception.OBException;
 import org.openbravo.base.model.Entity;
 import org.openbravo.base.model.ModelProvider;
@@ -37,6 +37,7 @@ import org.openbravo.dal.core.DalUtil;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.data.FieldProvider;
+import org.openbravo.data.Sqlc;
 import org.openbravo.database.ConnectionProvider;
 import org.openbravo.erpCommon.utility.ComboTableData;
 import org.openbravo.erpCommon.utility.Utility;
@@ -57,7 +58,6 @@ import org.openbravo.service.json.JsonConstants;
 import org.openbravo.userinterface.selector.Selector;
 import org.openbravo.userinterface.selector.SelectorField;
 
-import com.etendoerp.etendorx.utils.DataSourceUtils;
 import com.etendoerp.metadata.data.ReferenceSelectors;
 import com.etendoerp.metadata.utils.Constants;
 import org.openbravo.model.ad.ui.Window;
@@ -671,7 +671,7 @@ public abstract class FieldBuilder extends Builder {
      * @return The standardized input name for the column
      */
     protected static String getInputName(Column column) {
-        return DataSourceUtils.getInpName(column);
+        return "inp" + Sqlc.TransformaNombreColumna(column.getDBColumnName());
     }
 
     /**
@@ -686,12 +686,12 @@ public abstract class FieldBuilder extends Builder {
      * @param field The field to generate HQL name for
      * @return The HQL property name, or camelCased field name as fallback
      */
-    protected static String getHqlName(Field field) {
+    protected String getHqlName(Field field) {
         try {
             Column fieldColumn = field.getColumn();
             String dbTableName = fieldColumn.getTable().getDBTableName();
             String dbColumnName = fieldColumn.getDBColumnName();
-            String[] names = DataSourceUtils.getHQLColumnName(true, dbTableName, dbColumnName);
+            String[] names = resolveHQLColumnName(true, dbTableName, dbColumnName);
 
             if (names.length > 0) {
                 return names[0];
@@ -702,6 +702,37 @@ public abstract class FieldBuilder extends Builder {
 
         String name = field.getName().replaceAll("\\s+", "");
         return Character.toLowerCase(name.charAt(0)) + name.substring(1);
+    }
+
+    /**
+     * Resolves the HQL column name from the DAL model metadata.
+     * Extracted as a protected instance method so tests can override it via spy
+     * without depending on external helper classes.
+     *
+     * @param exceptionOnFail whether to throw an OBException when the entity/property is not found
+     * @param dbTableName     the database table name
+     * @param dbColumnName    the database column name
+     * @return array with [hqlPropertyName, typeName]
+     */
+    protected String[] resolveHQLColumnName(boolean exceptionOnFail, String dbTableName, String dbColumnName) {
+        Entity entity = ModelProvider.getInstance().getEntityByTableName(dbTableName);
+        if (exceptionOnFail && entity == null) {
+            logger.error("Entity of {} not found.", dbTableName);
+            throw new OBException();
+        }
+
+        Property property = entity != null ? entity.getPropertyByColumnName(dbColumnName, false) : null;
+        if (exceptionOnFail && property == null) {
+            throw new OBException();
+        }
+
+        String hqlPropertyName = property != null ? property.getName() : "null";
+        String typeName = "String";
+        if (property != null && property.isPrimitive()) {
+            typeName = property.getPrimitiveType().getSimpleName();
+        }
+
+        return new String[] { hqlPropertyName, typeName };
     }
 
     /**

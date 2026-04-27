@@ -18,9 +18,11 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -30,7 +32,7 @@ import java.util.List;
 
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
-import org.hibernate.criterion.Criterion;
+import org.openbravo.dal.service.Restriction;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -67,7 +69,6 @@ import org.openbravo.service.json.DataToJsonConverter;
 import java.lang.reflect.Method;
 import java.util.Map;
 
-import com.etendoerp.etendorx.utils.DataSourceUtils;
 import com.etendoerp.metadata.utils.Constants;
 import com.etendoerp.metadata.utils.LegacyUtils;
 import com.etendoerp.metadata.utils.Utils;
@@ -190,7 +191,6 @@ class FieldBuilderWithColumnTest {
     private JSONObject executeToJSON(Runnable extraMocks) throws JSONException {
         try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
                 MockedStatic<KernelUtils> mockedKernelUtils = mockStatic(KernelUtils.class);
-                MockedStatic<DataSourceUtils> mockedDataSourceUtils = mockStatic(DataSourceUtils.class);
                 MockedConstruction<DataToJsonConverter> ignored = mockConstruction(
                         DataToJsonConverter.class,
                         (mock, context) -> {
@@ -206,9 +206,6 @@ class FieldBuilderWithColumnTest {
 
             mockedOBContext.when(OBContext::getOBContext).thenReturn(obContext);
             mockedKernelUtils.when(() -> KernelUtils.getProperty(field)).thenReturn(fieldProperty);
-            mockedDataSourceUtils.when(
-                    () -> DataSourceUtils.getHQLColumnName(true, TEST_TABLE_NAME, TEST_COLUMN_NAME))
-                    .thenReturn(new String[] { TEST_FIELD });
 
             when(obContext.getLanguage()).thenReturn(language);
 
@@ -216,7 +213,9 @@ class FieldBuilderWithColumnTest {
                 extraMocks.run();
             }
 
-            fieldBuilder = new FieldBuilderWithColumn(field, fieldAccess);
+            fieldBuilder = spy(new FieldBuilderWithColumn(field, fieldAccess));
+            doReturn(new String[] { TEST_FIELD })
+                    .when(fieldBuilder).resolveHQLColumnName(true, TEST_TABLE_NAME, TEST_COLUMN_NAME);
             return fieldBuilder.toJSON();
         }
     }
@@ -351,7 +350,6 @@ class FieldBuilderWithColumnTest {
 
         try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
                 MockedStatic<KernelUtils> mockedKernelUtils = mockStatic(KernelUtils.class);
-                MockedStatic<DataSourceUtils> mockedDataSourceUtils = mockStatic(DataSourceUtils.class);
                 MockedStatic<org.openbravo.base.model.ModelProvider> mockedModelProvider = mockStatic(
                         org.openbravo.base.model.ModelProvider.class);
                 MockedStatic<OBDal> mockedOBDal = mockStatic(OBDal.class);
@@ -376,7 +374,7 @@ class FieldBuilderWithColumnTest {
             mockedOBDal.when(OBDal::getInstance).thenReturn(obDal);
             when(obDal.get(eq(Table.class), anyString())).thenReturn(table);
             when(obDal.createCriteria(Tab.class)).thenReturn(criteria);
-            when(criteria.add(any(Criterion.class))).thenReturn(criteria);
+            when(criteria.add(any(Restriction.class))).thenReturn(criteria);
             when(criteria.setMaxResults(anyInt())).thenReturn(criteria);
             when(criteria.uniqueResult()).thenReturn(null);
 
@@ -394,11 +392,9 @@ class FieldBuilderWithColumnTest {
                     .thenReturn(modelProviderInstance);
             when(modelProviderInstance.getEntityByTableName(TEST_TABLE_NAME)).thenReturn(parentEntity);
 
-            mockedDataSourceUtils.when(
-                    () -> DataSourceUtils.getHQLColumnName(true, TEST_TABLE_NAME, TEST_COLUMN_NAME))
-                    .thenReturn(new String[] { TEST_FIELD });
-
-            fieldBuilder = new FieldBuilderWithColumn(field, fieldAccess);
+            fieldBuilder = spy(new FieldBuilderWithColumn(field, fieldAccess));
+            doReturn(new String[] { TEST_FIELD })
+                    .when(fieldBuilder).resolveHQLColumnName(true, TEST_TABLE_NAME, TEST_COLUMN_NAME);
             JSONObject result = fieldBuilder.toJSON();
 
             assertTrue(result.has("isParentRecordProperty"));
@@ -410,7 +406,6 @@ class FieldBuilderWithColumnTest {
     void testReferencedPropertyExceptionIsHandled() throws JSONException {
         try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
                 MockedStatic<KernelUtils> mockedKernelUtils = mockStatic(KernelUtils.class);
-                MockedStatic<DataSourceUtils> mockedDataSourceUtils = mockStatic(DataSourceUtils.class);
                 MockedConstruction<DataToJsonConverter> ignored = mockConstruction(
                         DataToJsonConverter.class,
                         (mock, context) -> {
@@ -430,11 +425,9 @@ class FieldBuilderWithColumnTest {
             mockedKernelUtils.when(() -> KernelUtils.getProperty(field))
                     .thenThrow(new RuntimeException("Test exception"));
 
-            mockedDataSourceUtils.when(
-                    () -> DataSourceUtils.getHQLColumnName(true, TEST_TABLE_NAME, TEST_COLUMN_NAME))
-                    .thenReturn(new String[] { TEST_FIELD });
-
-            fieldBuilder = new FieldBuilderWithColumn(field, fieldAccess);
+            fieldBuilder = spy(new FieldBuilderWithColumn(field, fieldAccess));
+            doReturn(new String[] { TEST_FIELD })
+                    .when(fieldBuilder).resolveHQLColumnName(true, TEST_TABLE_NAME, TEST_COLUMN_NAME);
             JSONObject result = fieldBuilder.toJSON();
 
             // Should not throw, and should not have referencedEntity
@@ -449,7 +442,6 @@ class FieldBuilderWithColumnTest {
 
         try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
                 MockedStatic<KernelUtils> mockedKernelUtils = mockStatic(KernelUtils.class);
-                MockedStatic<DataSourceUtils> mockedDataSourceUtils = mockStatic(DataSourceUtils.class);
                 MockedConstruction<DataToJsonConverter> ignored = mockConstruction(
                         DataToJsonConverter.class,
                         (mock, context) -> {
@@ -463,10 +455,6 @@ class FieldBuilderWithColumnTest {
             when(obContext.getLanguage()).thenReturn(language);
 
             mockedKernelUtils.when(() -> KernelUtils.getProperty(field)).thenReturn(fieldProperty);
-
-            mockedDataSourceUtils.when(
-                    () -> DataSourceUtils.getHQLColumnName(anyBoolean(), anyString(), anyString()))
-                    .thenReturn(new String[] { TEST_FIELD });
 
             // FieldBuilderWithColumn cannot be instantiated with null column
             // This test verifies the getColumnUpdatable method returns true when column is
@@ -583,7 +571,6 @@ class FieldBuilderWithColumnTest {
     private JSONObject executeToJSONWithUtils(Runnable extraMocks) throws JSONException {
         try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
                 MockedStatic<KernelUtils> mockedKernelUtils = mockStatic(KernelUtils.class);
-                MockedStatic<DataSourceUtils> mockedDataSourceUtils = mockStatic(DataSourceUtils.class);
                 MockedStatic<OBDal> mockedOBDal = mockStatic(OBDal.class);
                 MockedStatic<Utils> mockedUtils = mockStatic(Utils.class);
                 MockedConstruction<DataToJsonConverter> ignored = mockConstruction(
@@ -601,15 +588,12 @@ class FieldBuilderWithColumnTest {
             when(obContext.getLanguage()).thenReturn(language);
             mockedKernelUtils.when(() -> KernelUtils.getProperty(field)).thenReturn(fieldProperty);
             mockedUtils.when(() -> Utils.getReferencedTab(any(Property.class))).thenReturn(null);
-            mockedDataSourceUtils.when(
-                    () -> DataSourceUtils.getHQLColumnName(true, TEST_TABLE_NAME, TEST_COLUMN_NAME))
-                    .thenReturn(new String[] { TEST_FIELD });
 
             // Prevent OBDal.get() from hitting EntityAccessChecker when referencedProperty is non-null
             mockedOBDal.when(OBDal::getInstance).thenReturn(obDal);
             when(obDal.get(eq(Table.class), any())).thenReturn(table);
             when(obDal.createCriteria(Tab.class)).thenReturn(criteria);
-            when(criteria.add(any(Criterion.class))).thenReturn(criteria);
+            when(criteria.add(any(Restriction.class))).thenReturn(criteria);
             when(criteria.setMaxResults(anyInt())).thenReturn(criteria);
             when(criteria.uniqueResult()).thenReturn(null);
 
@@ -617,7 +601,9 @@ class FieldBuilderWithColumnTest {
                 extraMocks.run();
             }
 
-            fieldBuilder = new FieldBuilderWithColumn(field, fieldAccess);
+            fieldBuilder = spy(new FieldBuilderWithColumn(field, fieldAccess));
+            doReturn(new String[] { TEST_FIELD })
+                    .when(fieldBuilder).resolveHQLColumnName(true, TEST_TABLE_NAME, TEST_COLUMN_NAME);
             return fieldBuilder.toJSON();
         }
     }

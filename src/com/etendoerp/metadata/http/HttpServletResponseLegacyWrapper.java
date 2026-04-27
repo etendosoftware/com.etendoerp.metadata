@@ -17,9 +17,9 @@
 
 package com.etendoerp.metadata.http;
 
- import javax.servlet.ServletOutputStream;
- import javax.servlet.WriteListener;
- import javax.servlet.http.HttpServletResponse;
+ import jakarta.servlet.ServletOutputStream;
+ import jakarta.servlet.WriteListener;
+ import jakarta.servlet.http.HttpServletResponse;
  import java.io.ByteArrayOutputStream;
  import java.io.IOException;
  import java.io.OutputStreamWriter;
@@ -31,7 +31,7 @@ package com.etendoerp.metadata.http;
   * A custom HttpServletResponseLegacyWrapper that captures the output written to the response.
   * It allows retrieval of the captured output as a byte array or string.
   */
- public class HttpServletResponseLegacyWrapper extends javax.servlet.http.HttpServletResponseWrapper {
+ public class HttpServletResponseLegacyWrapper extends jakarta.servlet.http.HttpServletResponseWrapper {
 
    // Buffer to capture response content.
    private final ByteArrayOutputStream contentCapture;

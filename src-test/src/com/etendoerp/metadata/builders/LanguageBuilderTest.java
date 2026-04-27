@@ -21,7 +21,7 @@ import java.util.List;
 
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
-import org.hibernate.criterion.Criterion;
+import org.openbravo.dal.service.Restriction;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -134,7 +134,7 @@ class LanguageBuilderTest {
       // Mock OBDal
       obDalStatic.when(OBDal::getReadOnlyInstance).thenReturn(obDal);
       when(obDal.createCriteria(Language.class)).thenReturn(criteria);
-      when(criteria.add(any(Criterion.class))).thenReturn(criteria);
+      when(criteria.add(any(Restriction.class))).thenReturn(criteria);
       when(criteria.list()).thenReturn(systemLanguages);
 
       // Create language builder
@@ -191,7 +191,7 @@ class LanguageBuilderTest {
       // Mock OBDal
       obDalStatic.when(OBDal::getReadOnlyInstance).thenReturn(obDal);
       when(obDal.createCriteria(Language.class)).thenReturn(criteria);
-      when(criteria.add(any(Criterion.class))).thenReturn(criteria);
+      when(criteria.add(any(Restriction.class))).thenReturn(criteria);
       when(criteria.list()).thenReturn(emptyLanguageList);
 
       LanguageBuilder languageBuilder = new LanguageBuilder();
@@ -231,7 +231,7 @@ class LanguageBuilderTest {
       // Mock OBDal
       obDalStatic.when(OBDal::getReadOnlyInstance).thenReturn(obDal);
       when(obDal.createCriteria(Language.class)).thenReturn(criteria);
-      when(criteria.add(any(Criterion.class))).thenReturn(criteria);
+      when(criteria.add(any(Restriction.class))).thenReturn(criteria);
       when(criteria.list()).thenReturn(singleLanguageList);
 
       // Create language builder
@@ -278,7 +278,7 @@ class LanguageBuilderTest {
       // Mock OBDal to throw exception
       obDalStatic.when(OBDal::getReadOnlyInstance).thenReturn(obDal);
       when(obDal.createCriteria(Language.class)).thenReturn(criteria);
-      when(criteria.add(any(Criterion.class))).thenReturn(criteria);
+      when(criteria.add(any(Restriction.class))).thenReturn(criteria);
       when(criteria.list()).thenThrow(new RuntimeException("Database connection error"));
 
       LanguageBuilder languageBuilder = new LanguageBuilder();

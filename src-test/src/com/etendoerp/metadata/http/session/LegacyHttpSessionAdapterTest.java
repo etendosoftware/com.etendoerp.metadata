@@ -17,7 +17,7 @@ import static org.junit.Assert.assertTrue;
 
 import java.util.Enumeration;
 
-import javax.servlet.ServletContext;
+import jakarta.servlet.ServletContext;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -184,17 +184,6 @@ public class LegacyHttpSessionAdapterTest extends OBBaseTest {
   @Test
   public void getMaxInactiveIntervalShouldReturnMinusOne() {
     assertEquals(-1, session.getMaxInactiveInterval());
-  }
-
-  /**
-   * Tests that the deprecated session context method returns null.
-   *
-   * <p>This test validates that getSessionContext() returns null, which is the
-   * expected behavior for this deprecated method in modern servlet implementations.</p>
-   */
-  @Test
-  public void getSessionContextShouldReturnNull() {
-    assertNull(session.getSessionContext());
   }
 
   /**
@@ -464,22 +453,6 @@ public class LegacyHttpSessionAdapterTest extends OBBaseTest {
   public void getMaxInactiveIntervalAfterInvalidateShouldThrowException() {
     session.invalidate();
     session.getMaxInactiveInterval();
-  }
-
-  /**
-   * Tests that getting session context after invalidation throws IllegalStateException.
-   *
-   * <p>This test validates that once a session is invalidated, attempting to get
-   * the session context throws an IllegalStateException, even though this method
-   * is deprecated and normally returns null.</p>
-   *
-   * @throws IllegalStateException
-   *     when getting session context on invalidated session (expected)
-   */
-  @Test(expected = IllegalStateException.class)
-  public void getSessionContextAfterInvalidateShouldThrowException() {
-    session.invalidate();
-    session.getSessionContext();
   }
 
   /**

@@ -28,7 +28,6 @@ import org.openbravo.model.ad.ui.Tab;
 import org.openbravo.service.json.DataResolvingMode;
 import org.openbravo.service.json.DataToJsonConverter;
 
-import com.etendoerp.etendorx.utils.DataSourceUtils;
 
 /**
  * Test class for FieldBuilderWithoutColumn.
@@ -85,7 +84,6 @@ class FieldBuilderWithoutColumnTest {
      */
     private JSONObject executeToJSON(Runnable extraMocks) throws JSONException {
         try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
-                MockedStatic<DataSourceUtils> mockedDataSourceUtils = mockStatic(DataSourceUtils.class);
                 MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class,
                         (mock, context) -> {
                             JSONObject base = new JSONObject().put("id", FIELD_ID);
@@ -96,14 +94,13 @@ class FieldBuilderWithoutColumnTest {
             mockedOBContext.when(OBContext::getOBContext).thenReturn(obContext);
             when(obContext.getLanguage()).thenReturn(language);
 
-            mockedDataSourceUtils.when(() -> DataSourceUtils.getHQLColumnName(true, TEST_TABLE_NAME, TEST_COLUMN_NAME))
-                    .thenReturn(new String[] { TEST_FIELD });
-
             if (extraMocks != null) {
                 extraMocks.run();
             }
 
-            FieldBuilderWithoutColumn fieldBuilder = new FieldBuilderWithoutColumn(field, fieldAccess);
+            FieldBuilderWithoutColumn fieldBuilder = spy(new FieldBuilderWithoutColumn(field, fieldAccess));
+            doReturn(new String[] { TEST_FIELD })
+                    .when(fieldBuilder).resolveHQLColumnName(true, TEST_TABLE_NAME, TEST_COLUMN_NAME);
             return fieldBuilder.toJSON();
         }
     }
@@ -127,7 +124,6 @@ class FieldBuilderWithoutColumnTest {
     @Test
     void testConstructorWithNullFieldAccess() throws JSONException {
         try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
-                MockedStatic<DataSourceUtils> mockedDataSourceUtils = mockStatic(DataSourceUtils.class);
                 MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class,
                         (mock, context) -> {
                             JSONObject base = new JSONObject().put("id", FIELD_ID);
@@ -138,10 +134,9 @@ class FieldBuilderWithoutColumnTest {
             mockedOBContext.when(OBContext::getOBContext).thenReturn(obContext);
             when(obContext.getLanguage()).thenReturn(language);
 
-            mockedDataSourceUtils.when(() -> DataSourceUtils.getHQLColumnName(true, TEST_TABLE_NAME, TEST_COLUMN_NAME))
-                    .thenReturn(new String[] { TEST_FIELD });
-
-            FieldBuilderWithoutColumn builder = new FieldBuilderWithoutColumn(field, null);
+            FieldBuilderWithoutColumn builder = spy(new FieldBuilderWithoutColumn(field, null));
+            doReturn(new String[] { TEST_FIELD })
+                    .when(builder).resolveHQLColumnName(true, TEST_TABLE_NAME, TEST_COLUMN_NAME);
             JSONObject result = builder.toJSON();
 
             assertNotNull(result, "toJSON should work even with null fieldAccess");

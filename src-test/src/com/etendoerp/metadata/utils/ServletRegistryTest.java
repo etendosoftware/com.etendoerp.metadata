@@ -11,9 +11,9 @@ import org.openbravo.base.secureApp.HttpSecureAppServlet;
 import org.openbravo.base.weld.WeldUtils;
 import org.openbravo.client.kernel.RequestContext;
 
-import javax.servlet.ServletConfig;
-import javax.servlet.ServletContext;
-import javax.servlet.ServletRegistration;
+import jakarta.servlet.ServletConfig;
+import jakarta.servlet.ServletContext;
+import jakarta.servlet.ServletRegistration;
 
 import static com.etendoerp.metadata.MetadataTestConstants.TEST_PATH;
 import static com.etendoerp.metadata.MetadataTestConstants.TEST_PATH_WILDCARD;

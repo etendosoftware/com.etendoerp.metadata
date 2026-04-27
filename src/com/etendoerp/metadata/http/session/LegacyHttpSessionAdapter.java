@@ -17,9 +17,8 @@
 
 package com.etendoerp.metadata.http.session;
 
-    import javax.servlet.ServletContext;
-    import javax.servlet.http.HttpSession;
-    import javax.servlet.http.HttpSessionContext;
+    import jakarta.servlet.ServletContext;
+    import jakarta.servlet.http.HttpSession;
     import java.util.Collections;
     import java.util.Enumeration;
 
@@ -78,12 +77,6 @@ package com.etendoerp.metadata.http.session;
         return -1;
       }
 
-      @Override
-      @Deprecated
-      public HttpSessionContext getSessionContext() {
-        checkValid();
-        return null;
-      }
 
       @Override
       public Object getAttribute(String name) {
@@ -92,7 +85,6 @@ package com.etendoerp.metadata.http.session;
         return attributeStore.getAttribute(id, name);
       }
 
-      @Override
       public Object getValue(String name) {
         return getAttribute(name);
       }
@@ -104,7 +96,6 @@ package com.etendoerp.metadata.http.session;
         return Collections.enumeration(attributeStore.getAttributes(id).keySet());
       }
 
-      @Override
       public String[] getValueNames() {
         checkValid();
         return attributeStore.getAttributes(id).keySet().toArray(new String[0]);
@@ -121,7 +112,6 @@ package com.etendoerp.metadata.http.session;
         lastAccessedTime = System.currentTimeMillis();
       }
 
-      @Override
       public void putValue(String name, Object value) {
         setAttribute(name, value);
       }
@@ -133,7 +123,6 @@ package com.etendoerp.metadata.http.session;
         lastAccessedTime = System.currentTimeMillis();
       }
 
-      @Override
       public void removeValue(String name) {
         removeAttribute(name);
       }
