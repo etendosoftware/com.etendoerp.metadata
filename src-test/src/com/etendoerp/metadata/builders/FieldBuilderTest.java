@@ -140,7 +140,6 @@ class FieldBuilderTest {
   private static final String DATASOURCE_FIELD = "datasource.field";
   private static final String DATASOURCE_FIELD_DOLLAR = "datasource$field";
   private static final String VALUE_PROPERTY = "valueProperty";
-  private static final String DISPLAY_PROPERTY = "displayProperty";
   private static final String SEARCH_FIELD = "searchField";
   private static final String TEST_TABLE = "TestTable";
 

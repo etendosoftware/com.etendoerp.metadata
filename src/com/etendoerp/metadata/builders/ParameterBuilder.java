@@ -47,8 +47,15 @@ public class ParameterBuilder extends Builder {
     }
 
     private static boolean isListParameter(Parameter parameter) {
-        return parameter != null && parameter.getReference() != null && LIST_REFERENCE_ID.contains(
-            parameter.getReference().getId());
+        return parameter != null && parameter.getReference() != null &&
+               (LIST_REFERENCE_ID.equals(parameter.getReference().getId()) ||
+                BUTTON_REFERENCE_ID.equals(parameter.getReference().getId()));
+    }
+
+
+    private static boolean isButtonListParameter(Parameter parameter) {
+        return parameter != null && parameter.getReference() != null &&
+               BUTTON_LIST_REFERENCE_ID.equals(parameter.getReference().getId());
     }
 
     private static boolean isWindowReference(Parameter parameter) {
@@ -64,6 +71,7 @@ public class ParameterBuilder extends Builder {
         addDisplayLogicExpression(json, parameter);
         addSelectorInfo(json, parameter);
         addListInfo(json, parameter);
+        addButtonListInfo(json, parameter);
         addWindowInfo(json, parameter);
 
         return json;
@@ -110,6 +118,16 @@ public class ParameterBuilder extends Builder {
             }
         } catch (Exception e) {
             logger.warn("Error building refList for parameter {}: {}", parameter.getId(), e.getMessage(), e);
+        }
+    }
+
+    private void addButtonListInfo(JSONObject json, Parameter parameter) {
+        try {
+            if (isButtonListParameter(parameter) && parameter.getReferenceSearchKey() != null) {
+                json.put("refList", getListInfo(parameter.getReferenceSearchKey(), language));
+            }
+        } catch (Exception e) {
+            logger.warn("Error building refList for BUTTON_LIST parameter {}: {}", parameter.getId(), e.getMessage(), e);
         }
     }
 

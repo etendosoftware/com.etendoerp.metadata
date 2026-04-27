@@ -55,6 +55,7 @@ public class Constants {
     public static final String RESPONSE_VALUES = "response";
     private static final String SELECTOR_REFERENCE_ID = "95E2A8B50A254B2AAE6774B8C2F28120";
     public static final String BUTTON_REFERENCE_ID = "28";
+    public static final String BUTTON_LIST_REFERENCE_ID = "FF80818132F94B500132F9575619000A";
     private static final String SEARCH_REFERENCE_ID = "30";
     private static final String TABLE_DIR_REFERENCE_ID = "19";
     private static final String TABLE_REFERENCE_ID = "18";

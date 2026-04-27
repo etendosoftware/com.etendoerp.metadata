@@ -96,6 +96,7 @@ public final class MetadataTestConstants {
   public static final String ATTR2 = "attr2";
   public static final String ATTR3 = "attr3";
   public static final String VALUE = "value";
+  public static final String LABEL = "label";
   public static final String OBJECT = "object";
   public static final String JSON_ADDRESS_SAMPLE = "{\"address1\":\"123 Main St\",\"city\":\"Springfield\",\"countryId\":\"US\"}";
   public static final String CREATE = "create";

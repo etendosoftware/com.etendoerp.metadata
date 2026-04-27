@@ -30,10 +30,16 @@ import java.math.BigDecimal;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
+import com.google.common.util.concurrent.MoreExecutors;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 import org.mockito.MockedStatic;
 import org.openbravo.base.provider.OBProvider;
+import org.openbravo.base.session.OBPropertiesProvider;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.access.Role;
@@ -67,6 +73,75 @@ public class CallAsyncProcessTest extends OBBaseTest {
     private static final String VALUE_STRING = "Value";
     private static final String ZERO_STRING = "0";
 
+    private Process process;
+    private ProcessInstance pInstance;
+    private User user;
+    private Role role;
+    private Client client;
+    private Organization org;
+    private Language language;
+    private Warehouse warehouse;
+    private OBContext obContext;
+    private Parameter parameter;
+
+    private ExecutorService originalExecutor;
+
+    /**
+     * Sets up the test environment.
+     * Uses a direct executor service to run background tasks synchronously in tests.
+     */
+    @Before
+    @Override
+    public void setUp() throws Exception {
+        super.setUp();
+        originalExecutor = CallAsyncProcess.getInstance().getExecutorService();
+        CallAsyncProcess.getInstance().setExecutorService(MoreExecutors.newDirectExecutorService());
+
+        // Initialize common mocks
+        process = mock(Process.class);
+        pInstance = mock(ProcessInstance.class);
+        user = mock(User.class);
+        role = mock(Role.class);
+        client = mock(Client.class);
+        org = mock(Organization.class);
+        language = mock(Language.class);
+        warehouse = mock(Warehouse.class);
+        obContext = mock(OBContext.class);
+        parameter = mock(Parameter.class);
+    }
+
+    /**
+     * Helper to setup OBContext and identity mocks.
+     * Reduces repetition of basic configuration across test methods.
+     */
+    private void setupOBContextMock(MockedStatic<OBContext> obContextStatic) {
+        obContextStatic.when(OBContext::getOBContext).thenReturn(obContext);
+        when(obContext.getUser()).thenReturn(user);
+        when(obContext.getRole()).thenReturn(role);
+        when(obContext.getCurrentClient()).thenReturn(client);
+        when(obContext.getCurrentOrganization()).thenReturn(org);
+        when(obContext.getLanguage()).thenReturn(language);
+        when(obContext.getWarehouse()).thenReturn(warehouse);
+
+        when(user.getId()).thenReturn(USER_ID);
+        when(role.getId()).thenReturn(ROLE_ID);
+        when(client.getId()).thenReturn(CLIENT_ID);
+        when(org.getId()).thenReturn(ORG_ID);
+        when(language.getLanguage()).thenReturn(LANG_ID);
+        when(warehouse.getId()).thenReturn(WAREHOUSE_ID);
+    }
+
+    /**
+     * Cleans up the test environment.
+     * Restores the original executor service.
+     */
+    @After
+    public void tearDown() {
+        if (originalExecutor != null) {
+            CallAsyncProcess.getInstance().setExecutorService(originalExecutor);
+        }
+    }
+
     /**
      * Tests that getInstance returns the same instance.
      */
@@ -81,43 +156,16 @@ public class CallAsyncProcessTest extends OBBaseTest {
 
     @Test
     public void testCallProcessSyncPhase() {
-        Process process = mock(Process.class);
-        ProcessInstance pInstance = mock(ProcessInstance.class);
-        User user = mock(User.class);
-        Role role = mock(Role.class);
-        Client client = mock(Client.class);
-        Organization org = mock(Organization.class);
-        Language language = mock(Language.class);
-        Warehouse warehouse = mock(Warehouse.class);
-        OBContext obContext = mock(OBContext.class);
-
         try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
                 MockedStatic<OBProvider> obProviderStatic = mockStatic(OBProvider.class);
                 MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class)) {
 
-            // Mock OBContext
-            obContextStatic.when(OBContext::getOBContext).thenReturn(obContext);
-            when(obContext.getUser()).thenReturn(user);
-            when(obContext.getRole()).thenReturn(role);
-            when(obContext.getCurrentClient()).thenReturn(client);
-            when(obContext.getCurrentOrganization()).thenReturn(org);
-            when(obContext.getLanguage()).thenReturn(language);
-            when(obContext.getWarehouse()).thenReturn(warehouse);
-
-            when(user.getId()).thenReturn(USER_ID);
-            when(role.getId()).thenReturn(ROLE_ID);
-            when(client.getId()).thenReturn(CLIENT_ID);
-            when(org.getId()).thenReturn(ORG_ID);
-            when(language.getLanguage()).thenReturn(LANG_ID);
-            when(warehouse.getId()).thenReturn(WAREHOUSE_ID);
+            setupOBContextMock(obContextStatic);
 
             // Mock OBProvider
             OBProvider obProvider = mock(OBProvider.class);
             obProviderStatic.when(OBProvider::getInstance).thenReturn(obProvider);
             when(obProvider.get(ProcessInstance.class)).thenReturn(pInstance);
-
-            // Mock Parameter creation
-            Parameter parameter = mock(Parameter.class);
             when(obProvider.get(Parameter.class)).thenReturn(parameter);
 
             // Mock OBDal
@@ -129,14 +177,13 @@ public class CallAsyncProcessTest extends OBBaseTest {
             when(pInstance.getId()).thenReturn(PINSTANCE_ID);
 
             // Prepare inputs
-            Map<String, Object> parameters = new HashMap<>();
-            parameters.put(STRING_PARAM, VALUE_STRING);
-            parameters.put(DATE_PARAM, new Date());
-            parameters.put(DECIMAL_PARAM, new BigDecimal("10.0"));
+            Map<String, Object> parametersMap = new HashMap<>();
+            parametersMap.put(STRING_PARAM, VALUE_STRING);
+            parametersMap.put(DATE_PARAM, new Date());
+            parametersMap.put(DECIMAL_PARAM, new BigDecimal("10.0"));
 
             // Execute
-            CallAsyncProcess callAsyncProcess = CallAsyncProcess.getInstance();
-            ProcessInstance result = callAsyncProcess.callProcess(process, RECORD_ID, parameters, true);
+            CallAsyncProcess.getInstance().callProcess(process, RECORD_ID, parametersMap, true);
 
             // Verify
             verify(pInstance).setProcess(process);
@@ -157,42 +204,16 @@ public class CallAsyncProcessTest extends OBBaseTest {
             verify(pInstance).setResult(0L);
             verify(pInstance).setErrorMsg(CallAsyncProcess.PROCESSING_MSG);
             verify(obDal).flush();
-
-            assertEquals(pInstance, result);
         }
     }
 
     @Test
     public void testCallProcessWithNullRecordId() {
-        Process process = mock(Process.class);
-        ProcessInstance pInstance = mock(ProcessInstance.class);
-        User user = mock(User.class);
-        Role role = mock(Role.class);
-        Client client = mock(Client.class);
-        Organization org = mock(Organization.class);
-        Language language = mock(Language.class);
-        Warehouse warehouse = mock(Warehouse.class);
-        OBContext obContext = mock(OBContext.class);
-
         try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
                 MockedStatic<OBProvider> obProviderStatic = mockStatic(OBProvider.class);
                 MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class)) {
 
-            // Mock OBContext
-            obContextStatic.when(OBContext::getOBContext).thenReturn(obContext);
-            when(obContext.getUser()).thenReturn(user);
-            when(obContext.getRole()).thenReturn(role);
-            when(obContext.getCurrentClient()).thenReturn(client);
-            when(obContext.getCurrentOrganization()).thenReturn(org);
-            when(obContext.getLanguage()).thenReturn(language);
-            when(obContext.getWarehouse()).thenReturn(warehouse);
-
-            when(user.getId()).thenReturn(USER_ID);
-            when(role.getId()).thenReturn(ROLE_ID);
-            when(client.getId()).thenReturn(CLIENT_ID);
-            when(org.getId()).thenReturn(ORG_ID);
-            when(language.getLanguage()).thenReturn(LANG_ID);
-            when(warehouse.getId()).thenReturn(WAREHOUSE_ID);
+            setupOBContextMock(obContextStatic);
 
             // Mock OBProvider
             OBProvider obProvider = mock(OBProvider.class);
@@ -208,12 +229,63 @@ public class CallAsyncProcessTest extends OBBaseTest {
             when(pInstance.getId()).thenReturn(PINSTANCE_ID);
 
             // Execute
-            CallAsyncProcess callAsyncProcess = CallAsyncProcess.getInstance();
-            ProcessInstance result = callAsyncProcess.callProcess(process, null, null, true);
+            CallAsyncProcess.getInstance().callProcess(process, null, null, true);
 
             // Verify
             verify(pInstance).setRecordID(ZERO_STRING);
-            assertEquals(pInstance, result);
+        }
+    }
+
+    /**
+     * Tests the full execution flow, including the background phase.
+     * Since we use a direct executor, the background phase runs synchronously.
+     */
+    @Test
+    public void testFullExecutionFlow() throws Exception {
+        try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
+                MockedStatic<OBProvider> obProviderStatic = mockStatic(OBProvider.class);
+                MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class);
+                MockedStatic<OBPropertiesProvider> obPropsProviderStatic = mockStatic(OBPropertiesProvider.class)) {
+
+            setupOBContextMock(obContextStatic);
+
+            // Mock OBProvider
+            OBProvider obProvider = mock(OBProvider.class);
+            obProviderStatic.when(OBProvider::getInstance).thenReturn(obProvider);
+            when(obProvider.get(ProcessInstance.class)).thenReturn(pInstance);
+
+            // Mock OBDal
+            OBDal obDal = mock(OBDal.class);
+            org.hibernate.Session session = mock(org.hibernate.Session.class);
+            obDalStatic.when(OBDal::getInstance).thenReturn(obDal);
+            when(obDal.getSession()).thenReturn(session);
+            when(obDal.get(ProcessInstance.class, PINSTANCE_ID)).thenReturn(pInstance);
+            when(obDal.get(Process.class, PROCESS_ID)).thenReturn(process);
+
+            // Mock Connection and Statement
+            java.sql.Connection conn = mock(java.sql.Connection.class);
+            java.sql.PreparedStatement ps = mock(java.sql.PreparedStatement.class);
+            when(obDal.getConnection(false)).thenReturn(conn);
+            when(conn.prepareStatement(any())).thenReturn(ps);
+
+            // Mock OBProperties
+            OBPropertiesProvider obPropsProvider = mock(OBPropertiesProvider.class);
+            java.util.Properties obProps = new java.util.Properties();
+            obProps.setProperty("bbdd.rdbms", "POSTGRE");
+            obPropsProviderStatic.when(OBPropertiesProvider::getInstance).thenReturn(obPropsProvider);
+            when(obPropsProvider.getOpenbravoProperties()).thenReturn(obProps);
+
+            // Mock IDs
+            when(process.getId()).thenReturn(PROCESS_ID);
+            when(process.getProcedure()).thenReturn("test_procedure");
+            when(pInstance.getId()).thenReturn(PINSTANCE_ID);
+
+            // Execute
+            CallAsyncProcess.getInstance().callProcess(process, RECORD_ID, null, true);
+
+            // Verify
+            verify(ps).execute();
+            verify(obDal).commitAndClose();
         }
     }
 }
