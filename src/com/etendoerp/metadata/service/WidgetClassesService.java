@@ -1,6 +1,8 @@
 package com.etendoerp.metadata.service;
 
 import com.etendoerp.metadata.exceptions.InternalServerException;
+import com.etendoerp.metadata.widgets.WidgetDataResolver;
+import com.etendoerp.metadata.widgets.WidgetResolverRegistryHolder;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONObject;
 import org.hibernate.query.Query;
@@ -40,15 +42,19 @@ public class WidgetClassesService extends MetadataService {
             Query<Object[]> q = OBDal.getInstance().getSession()
                     .createQuery(CLASS_HQL, Object[].class);
             for (Object[] row : q.list()) {
+                String type = (String) row[2];
+                WidgetDataResolver resolver = WidgetResolverRegistryHolder.getInstance().getResolver(type);
+                boolean available = resolver == null || resolver.isAvailable();
                 JSONObject cls = new JSONObject()
                         .put("widgetClassId", row[0])
                         .put("name",          row[1])
-                        .put("type",          row[2])
+                        .put("type",          type)
                         .put("title",         row[3])
                         .put("description",   row[4])
                         .put("defaultWidth",  row[5])
                         .put("defaultHeight", row[6])
                         .put("refreshInterval", row[7])
+                        .put("available",     available)
                         .put("params", buildParams((String) row[0]));
                 classes.put(cls);
             }

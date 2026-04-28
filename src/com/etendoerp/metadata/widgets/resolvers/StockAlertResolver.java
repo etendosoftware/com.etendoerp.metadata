@@ -4,7 +4,6 @@ import com.etendoerp.metadata.widgets.WidgetDataContext;
 import com.etendoerp.metadata.widgets.WidgetDataResolver;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONObject;
-import org.hibernate.query.Query;
 import org.openbravo.dal.service.OBDal;
 
 import java.math.BigDecimal;
@@ -19,48 +18,46 @@ public class StockAlertResolver implements WidgetDataResolver {
     @Override
     public boolean isAvailable() {
         try {
-            org.openbravo.dal.service.OBDal.getInstance().getSession()
-                .createQuery("select 1 from M_StorageDetail sd where 1=0", Integer.class);
+            OBDal.getInstance().getSession()
+                .createNativeQuery("SELECT 1 FROM m_storage_detail WHERE 1=0")
+                .list();
             return true;
         } catch (Exception e) {
             return false;
         }
     }
 
-    private static final String HQL =
-        "select p.name, p.id, p.minimumstock, sum(sd.quantityOnHand) " +
-        "from M_StorageDetail sd join sd.product p " +
-        "where sd.isactive = 'Y' " +
-        "group by p.name, p.id, p.minimumstock " +
-        "having sum(sd.quantityOnHand) < p.minimumstock " +
-        "order by (p.minimumstock - sum(sd.quantityOnHand)) desc";
+    private static final String SQL =
+        "SELECT p.name, p.m_product_id, p.stockmin, SUM(sd.qtyonhand) " +
+        "FROM m_storage_detail sd " +
+        "JOIN m_product p ON p.m_product_id = sd.m_product_id " +
+        "WHERE sd.isactive = 'Y' AND p.stockmin > 0 " +
+        "GROUP BY p.name, p.m_product_id, p.stockmin " +
+        "HAVING SUM(sd.qtyonhand) < p.stockmin " +
+        "ORDER BY (p.stockmin - SUM(sd.qtyonhand)) DESC";
 
     @Override
     public JSONObject resolve(WidgetDataContext ctx) throws Exception {
-        try {
-            int limit = parseIntParam(ctx.param("rowsNumber"), 5);
+        int limit = parseIntParam(ctx.param("rowsNumber"), 5);
 
-            Query<Object[]> q = OBDal.getInstance().getSession()
-                    .createQuery(HQL, Object[].class);
-            q.setMaxResults(limit);
-            List<Object[]> rows = q.list();
+        @SuppressWarnings("unchecked")
+        List<Object[]> rows = OBDal.getInstance().getSession()
+                .createNativeQuery(SQL)
+                .setMaxResults(limit)
+                .list();
 
-            JSONArray items = new JSONArray();
-            for (Object[] row : rows) {
-                BigDecimal current  = row[3] != null ? (BigDecimal) row[3] : BigDecimal.ZERO;
-                BigDecimal minStock = row[2] != null ? (BigDecimal) row[2] : BigDecimal.ZERO;
-                items.put(new JSONObject()
-                        .put("productName",    row[0])
-                        .put("productId",      row[1])
-                        .put("currentStock",   current.intValue())
-                        .put("estimatedStock", minStock.intValue())
-                        .put("unit",           "Unidades"));
-            }
-            return new JSONObject().put("items", items);
-        } catch (Exception e) {
-            // M_StorageDetail may not be mapped if the warehouse module is not installed
-            return new JSONObject().put("items", new JSONArray());
+        JSONArray items = new JSONArray();
+        for (Object[] row : rows) {
+            BigDecimal current  = row[3] != null ? new BigDecimal(row[3].toString()) : BigDecimal.ZERO;
+            BigDecimal minStock = row[2] != null ? new BigDecimal(row[2].toString()) : BigDecimal.ZERO;
+            items.put(new JSONObject()
+                    .put("productName",    row[0])
+                    .put("productId",      row[1])
+                    .put("currentStock",   current.intValue())
+                    .put("estimatedStock", minStock.intValue())
+                    .put("unit",           "Unidades"));
         }
+        return new JSONObject().put("items", items);
     }
 
     private int parseIntParam(String val, int def) {

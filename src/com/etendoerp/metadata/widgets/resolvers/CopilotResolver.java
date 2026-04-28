@@ -10,6 +10,7 @@ import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONObject;
+import org.openbravo.dal.service.OBDal;
 
 /**
  * Proxies a request to the Copilot API with the user's bearer token and org context.
@@ -17,6 +18,15 @@ import org.codehaus.jettison.json.JSONObject;
  */
 public class CopilotResolver implements WidgetDataResolver {
     @Override public String getType() { return "COPILOT"; }
+
+    @Override
+    public boolean isAvailable() {
+        Number count = (Number) OBDal.getInstance().getSession()
+                .createNativeQuery(
+                    "SELECT COUNT(*) FROM ad_module WHERE javapackage LIKE '%copilot%' AND isactive = 'Y'")
+                .uniqueResult();
+        return count != null && count.longValue() > 0;
+    }
 
     @Override
     public JSONObject resolve(WidgetDataContext ctx) throws Exception {
