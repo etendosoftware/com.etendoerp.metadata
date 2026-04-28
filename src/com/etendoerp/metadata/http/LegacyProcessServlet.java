@@ -78,10 +78,31 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             "window.parent.postMessage({ type: \"fromIframe\", action: event.data.action }, \"*\");" +
             "}});</script>";
 
-    private static final String POST_MESSAGE_SCRIPT = "<script>const sendMessage = (action) => {" +
-            "if (window.parent) {" +
-            "window.parent.postMessage({ type: \"fromForm\", action: action, }, \"*\");" +
-            "}}</script>";
+    /**
+     * Script injected into legacy form pages to expose {@code window.sendMessage}
+     * and to guarantee that the parent always receives a final notification even
+     * when the page is unloaded mid-flight (redirect, navigation, browser-tab
+     * change). Tracks whether a "final" message ({@code showProcessMessage} or
+     * {@code closeModal}) was emitted; if not, on {@code pagehide}/{@code beforeunload}
+     * it sends an {@code iframeUnloaded} action so the new UI can show the
+     * fallback warning instead of leaving the user without feedback.
+     */
+    private static final String POST_MESSAGE_SCRIPT = "<script>(function(){" +
+            "var sent=false;" +
+            "window.sendMessage=function(action){" +
+            "if(!window.parent)return;" +
+            "window.parent.postMessage({type:'fromForm',action:action},'*');" +
+            "if(action==='showProcessMessage'||action==='closeModal'){sent=true;window.__etendoMessageSent=true;}" +
+            "};" +
+            "function notifyUnload(){" +
+            "if(sent||window.__etendoMessageSent)return;" +
+            "if(!window.parent)return;" +
+            "window.parent.postMessage({type:'fromForm',action:'iframeUnloaded'},'*');" +
+            "sent=true;window.__etendoMessageSent=true;" +
+            "}" +
+            "window.addEventListener('pagehide',notifyUnload);" +
+            "window.addEventListener('beforeunload',notifyUnload);" +
+            "})();</script>";
 
     /**
      * Marker used to detect Openbravo classic "popup message" response pages
@@ -121,6 +142,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             "else if(cls.indexOf('WARNING')>=0)type='warning';" +
             "var payload={type:type,title:(t.textContent||'').trim(),text:(m.textContent||'').trim()};" +
             "window.parent.postMessage({type:'fromForm',action:'showProcessMessage',payload:payload},'*');" +
+            "window.__etendoMessageSent=true;" +
             "setTimeout(function(){" +
             "window.parent.postMessage({type:'fromForm',action:'closeModal'},'*');" +
             "},150);" +
@@ -160,6 +182,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             "<!DOCTYPE html>\n<html><head><meta charset=\"UTF-8\"><script>" +
                     "(function(){if(!window.parent)return;" +
                     "window.parent.postMessage({type:'fromForm',action:'showProcessMessage',payload:%s},'*');" +
+                    "window.__etendoMessageSent=true;" +
                     "})();</script></head><body></body></html>";
 
     public static final String SET_COOKIE = "Set-Cookie";
@@ -1130,7 +1153,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             resWithNewScript = resWithNewScript.replace("href=\"../web/", "href=\"" + contextPath + WEB_PATH);
 
             return injectCodeAfterFunctionCall(
-                    injectCodeAfterFunctionCall(
+                    injectCodeBeforeFunctionCall(
                             resWithNewScript,
                             "submitThisPage\\(([^)]+)\\);",
                             "sendMessage('processOrder');",
@@ -1171,6 +1194,27 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             String originalSubmitButtonAction = matcher.group(0);
             String modifiedSubmitButtonAction = originalSubmitButtonAction + newFunctionCall;
             matcher.appendReplacement(result, Matcher.quoteReplacement(modifiedSubmitButtonAction));
+        }
+        matcher.appendTail(result);
+        return result.toString();
+    }
+
+    /**
+     * Same as {@link #injectCodeAfterFunctionCall} but inserts {@code newFunctionCall}
+     * BEFORE the matched call. Used when the call itself triggers navigation
+     * (e.g. {@code submitThisPage}) and we need the side-effect (e.g. postMessage)
+     * to fire before the page can unload.
+     */
+    private String injectCodeBeforeFunctionCall(String originalRes, String originalFunctionCall,
+            String newFunctionCall, boolean isRegex) {
+        Pattern pattern = isRegex ? Pattern.compile(originalFunctionCall)
+                : Pattern.compile(Pattern.quote(originalFunctionCall));
+        Matcher matcher = pattern.matcher(originalRes);
+        StringBuilder result = new StringBuilder();
+        while (matcher.find()) {
+            String original = matcher.group(0);
+            String modified = newFunctionCall + original;
+            matcher.appendReplacement(result, Matcher.quoteReplacement(modified));
         }
         matcher.appendTail(result);
         return result.toString();

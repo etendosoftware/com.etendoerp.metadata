@@ -1127,4 +1127,111 @@ public class LegacyProcessServletTest extends OBBaseTest {
         assertTrue("Success title must be propagated",
                 output.contains("\"title\":\"Success\""));
     }
+
+    // ========== Tests for unload-aware postMessage hardening ==========
+
+    /**
+     * Reads a private static String constant from LegacyProcessServlet via reflection.
+     */
+    private String readScriptConstant(String fieldName) throws Exception {
+        java.lang.reflect.Field field = LegacyProcessServlet.class.getDeclaredField(fieldName);
+        field.setAccessible(true);
+        return (String) field.get(null);
+    }
+
+    /**
+     * The form-page script must wire pagehide/beforeunload listeners that emit
+     * {@code iframeUnloaded} so the parent always receives a final message even
+     * when the legacy page navigates away or fails before posting one itself.
+     */
+    @Test
+    public void postMessageScriptShouldIncludePagehideListener() throws Exception {
+        String script = readScriptConstant("POST_MESSAGE_SCRIPT");
+
+        assertTrue("Script must register pagehide listener",
+                script.contains("addEventListener('pagehide'"));
+        assertTrue("Script must register beforeunload listener",
+                script.contains("addEventListener('beforeunload'"));
+        assertTrue("Script must emit iframeUnloaded action when no final message was sent",
+                script.contains("action:'iframeUnloaded'"));
+        assertTrue("Script must guard against duplicate sends via a flag",
+                script.contains("__etendoMessageSent"));
+        assertTrue("Script must mark the flag for showProcessMessage final action",
+                script.contains("'showProcessMessage'"));
+        assertTrue("Script must mark the flag for closeModal final action",
+                script.contains("'closeModal'"));
+        assertTrue("sendMessage must be exposed on window so injected callers can invoke it",
+                script.contains("window.sendMessage"));
+    }
+
+    /**
+     * The popup-message forwarder must mark the message-sent flag so the
+     * pagehide listener does not emit a redundant {@code iframeUnloaded} during
+     * the 150 ms delay before {@code closeModal}.
+     */
+    @Test
+    public void showProcessMessageScriptShouldMarkMessageSent() throws Exception {
+        String script = readScriptConstant("SHOW_PROCESS_MESSAGE_SCRIPT");
+
+        int postIndex = script.indexOf("action:'showProcessMessage'");
+        int markIndex = script.indexOf("__etendoMessageSent=true");
+        int closeIndex = script.indexOf("action:'closeModal'");
+
+        assertTrue("Script must post showProcessMessage", postIndex >= 0);
+        assertTrue("Script must mark the message-sent flag", markIndex >= 0);
+        assertTrue("Script must still schedule closeModal", closeIndex >= 0);
+        assertTrue("Flag must be set after showProcessMessage and before closeModal",
+                postIndex < markIndex && markIndex < closeIndex);
+    }
+
+    /**
+     * The minimal forwarder served for {@code Command=PROCESS} popups also needs
+     * to mark the flag for symmetry with the full popup path.
+     */
+    @Test
+    public void minimalForwarderShouldMarkMessageSent() throws Exception {
+        String forwarder = readScriptConstant("MINIMAL_FORWARDER_HTML");
+
+        assertTrue("Minimal forwarder must mark the message-sent flag",
+                forwarder.contains("__etendoMessageSent=true"));
+    }
+
+    /**
+     * {@code sendMessage('processOrder')} must be injected BEFORE
+     * {@code submitThisPage(...)} so the postMessage is queued before the form
+     * submit can trigger a navigation that destroys the document.
+     */
+    @Test
+    public void processOrderShouldBeInjectedBeforeSubmitThisPage() throws Exception {
+        String html = "<html><body><form><a onclick=\"submitThisPage('save');\">go</a></form></body></html>";
+
+        String result = (String) invokePrivateMethod(legacyProcessServlet, "injectCodeBeforeFunctionCall",
+                new Class<?>[] { String.class, String.class, String.class, boolean.class },
+                html, "submitThisPage\\(([^)]+)\\);", "sendMessage('processOrder');", true);
+
+        assertTrue("processOrder must be emitted before submitThisPage",
+                result.contains("sendMessage('processOrder');submitThisPage('save');"));
+        assertTrue("Original submitThisPage call must be preserved",
+                result.contains("submitThisPage('save');"));
+        assertTrue("processOrder must NOT remain after submitThisPage",
+                !result.contains("submitThisPage('save');sendMessage('processOrder');"));
+    }
+
+    /**
+     * The before-call helper must inject the new code in front of every match,
+     * not only the first occurrence (action buttons, save buttons, etc. all
+     * resolve to {@code submitThisPage}).
+     */
+    @Test
+    public void injectCodeBeforeFunctionCallShouldInjectAtEveryMatch() throws Exception {
+        String html = "submitThisPage('a');submitThisPage('b');";
+
+        String result = (String) invokePrivateMethod(legacyProcessServlet, "injectCodeBeforeFunctionCall",
+                new Class<?>[] { String.class, String.class, String.class, boolean.class },
+                html, "submitThisPage\\(([^)]+)\\);", "sendMessage('processOrder');", true);
+
+        assertEquals("Both submitThisPage calls must be preceded by sendMessage",
+                "sendMessage('processOrder');submitThisPage('a');sendMessage('processOrder');submitThisPage('b');",
+                result);
+    }
 }
