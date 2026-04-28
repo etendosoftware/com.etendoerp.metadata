@@ -106,6 +106,12 @@ public class MetadataFilter implements Filter {
                         return;
                     }
                 }
+                // PATCH is not handled by the standard WebService servlet chain (no doPatch in
+                // HttpServlet), so dispatch it directly to MetadataServlet before chaining.
+                if ("PATCH".equals(httpReq.getMethod())) {
+                    new MetadataServlet().process(httpReq, httpRes);
+                    return;
+                }
                 chain.doFilter(httpReq, httpRes);
 
             } catch (Throwable t) {
