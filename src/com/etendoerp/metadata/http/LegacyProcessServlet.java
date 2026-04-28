@@ -53,8 +53,6 @@ import static com.etendoerp.metadata.utils.Constants.FORM_CLOSE_TAG;
 import static com.etendoerp.metadata.utils.Constants.FRAMESET_CLOSE_TAG;
 import static com.etendoerp.metadata.utils.Constants.HEAD_CLOSE_TAG;
 import static com.etendoerp.metadata.utils.Constants.PUBLIC_JS_PATH;
-import static com.etendoerp.metadata.utils.LegacyPaths.ABOUT_MODAL;
-import static com.etendoerp.metadata.utils.LegacyPaths.MANUAL_PROCESS;
 
 /**
  * Legacy servlet that uses existing HttpServletRequestWrapper infrastructure
@@ -587,7 +585,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
 
         output = getInjectedContent(path, output);
 
-        writeFinalResponse(res, wrapper, path, output);
+        writeFinalResponse(res, wrapper, output);
     }
 
     private void writeRedirect(HttpServletResponse res,
@@ -604,7 +602,6 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
 
     private void writeFinalResponse(HttpServletResponse res,
             HttpServletResponseLegacyWrapper wrapper,
-            String path,
             String output) throws IOException {
 
         HttpServletRequest req = RequestContext.get().getRequest();
@@ -613,13 +610,8 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             return;
         }
 
-        if (ABOUT_MODAL.equals(path) || MANUAL_PROCESS.equals(path)) {
-            res.setContentType("text/html; charset=UTF-8");
-            res.setCharacterEncoding("UTF-8");
-        } else {
-            res.setContentType(wrapper.getContentType());
-        }
-
+        res.setContentType("text/html; charset=UTF-8");
+        res.setCharacterEncoding("UTF-8");
         res.setStatus(wrapper.getStatus());
         res.getWriter().write(output);
         res.getWriter().flush();

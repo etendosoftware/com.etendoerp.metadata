@@ -360,6 +360,61 @@ public class HttpServletResponseLegacyWrapperTest extends OBBaseTest {
   }
 
   /**
+   * Tests that the encoding resolved when the writer is created is reused when
+   * reading the captured bytes back, even if the underlying response encoding
+   * changes between the two operations. This reproduces the scenario in which
+   * the legacy WAD chain mutates the response encoding mid-flight (via
+   * {@code setContentType} or {@code setCharacterEncoding} during a nested
+   * {@code RequestDispatcher.include()}), which previously corrupted bytes
+   * such as NBSP ({@code 0xA0}) into the Unicode replacement character.
+   *
+   * @throws IOException if I/O operations fail during the test
+   */
+  @Test
+  public void encodingChangeBetweenWriteAndReadShouldNotCorruptOutput() throws IOException {
+    when(mockResponse.getCharacterEncoding()).thenReturn(ISO_ENCODING).thenReturn(UTF8_ENCODING);
+    HttpServletResponseLegacyWrapper encodingWrapper =
+        new HttpServletResponseLegacyWrapper(mockResponse);
+
+    PrintWriter writer = encodingWrapper.getWriter();
+    String nbsp = " ";
+    writer.write(nbsp);
+    writer.flush();
+
+    String capturedString = encodingWrapper.getCapturedOutputAsString();
+    assertEquals("NBSP should round-trip when encoding changes after write", nbsp, capturedString);
+    assertFalse("Output must not contain the Unicode replacement character",
+        capturedString.contains("�"));
+  }
+
+  /**
+   * Tests that accented characters written under one encoding survive a later
+   * change in the underlying response encoding. This guards against the same
+   * mid-flight encoding-mutation regression as
+   * {@link #encodingChangeBetweenWriteAndReadShouldNotCorruptOutput()} but with
+   * payload typical of legacy ERP HTML (acutes, tildes).
+   *
+   * @throws IOException if I/O operations fail during the test
+   */
+  @Test
+  public void accentedCharsSurviveEncodingChangeAfterWrite() throws IOException {
+    when(mockResponse.getCharacterEncoding()).thenReturn(ISO_ENCODING).thenReturn(UTF8_ENCODING);
+    HttpServletResponseLegacyWrapper encodingWrapper =
+        new HttpServletResponseLegacyWrapper(mockResponse);
+
+    PrintWriter writer = encodingWrapper.getWriter();
+    String accented = "Acción";
+    writer.write(accented);
+    writer.flush();
+
+    String capturedString = encodingWrapper.getCapturedOutputAsString();
+    assertEquals("Accented chars should round-trip when encoding changes after write",
+        accented, capturedString);
+    assertFalse("Output must not contain the Unicode replacement character",
+        capturedString.contains("�"));
+  }
+
+  /**
    * Tests that flushBuffer works correctly with OutputStream.
    *
    * <p>This test validates that the flushBuffer method properly flushes
