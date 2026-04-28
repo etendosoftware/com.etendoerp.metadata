@@ -116,10 +116,10 @@ public class Utils {
   private static Warehouse getWarehouse(Warehouse warehouse, Organization selectedOrg, Warehouse defaultWarehouse, Role defaultRole) {
     try {
       Method method = SecureWebServicesUtils.class.getDeclaredMethod("getWarehouse", Warehouse.class,
-          Organization.class, Warehouse.class, Role.class);
+          Organization.class, Warehouse.class);
       method.setAccessible(true);
 
-      return (Warehouse) method.invoke(null, warehouse, selectedOrg, defaultWarehouse, defaultRole);
+      return (Warehouse) method.invoke(null, warehouse, selectedOrg, defaultWarehouse);
     } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
       throw new OBException(e);
     }
