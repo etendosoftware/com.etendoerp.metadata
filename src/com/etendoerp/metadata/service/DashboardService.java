@@ -45,6 +45,8 @@ public class DashboardService extends MetadataService {
                 handlePostWidget();
             } else if (DELETE.equals(method) && path.contains("/widget/")) {
                 handleDeleteWidget(extractLastSegment(path));
+            } else if (PATCH.equals(method) && path.contains("/widget/") && path.endsWith("/params")) {
+                handlePatchWidgetParams(extractSecondToLastSegment(path));
             } else {
                 throw new NotFoundException();
             }
@@ -267,12 +269,101 @@ public class DashboardService extends MetadataService {
         q.setParameter("width",    body.optInt("width", 2));
         q.setParameter("height",   body.optInt("height", 1));
         q.setParameter("seqno",    10);
+        if (body.has("parameters")) {
+            validateParams(body.getJSONObject("parameters"));
+        }
         q.setParameter("params",   body.has("parameters") ? body.getJSONObject("parameters").toString() : null);
         q.setParameter("uid",      userId);
         q.executeUpdate();
         OBDal.getInstance().getSession().flush();
 
         write(new JSONObject().put("instanceId", newId).put("status", "created"));
+    }
+
+    private void handlePatchWidgetParams(String instanceId) throws Exception {
+        JSONObject body   = parseJsonBody();
+        JSONObject params = body.getJSONObject("parameters");
+        validateParams(params);
+        String userId     = OBContext.getOBContext().getUser().getId();
+        String roleId     = OBContext.getOBContext().getRole().getId();
+
+        // Try updating directly if this is a USER-layer record owned by this user
+        int updated = OBDal.getInstance().getSession()
+            .createQuery("update etmeta_Dashboard_Widget dw set dw.parametersJSON = :params " +
+                         "where dw.id = :id and dw.layer = 'USER' " +
+                         "and dw.user.id = :userId and dw.role.id = :roleId")
+            .setParameter("params",  params.toString())
+            .setParameter("id",      instanceId)
+            .setParameter("userId",  userId)
+            .setParameter("roleId",  roleId)
+            .executeUpdate();
+
+        if (updated == 0) {
+            // SYSTEM/CLIENT instance — upsert a USER-layer override carrying the new params
+            upsertUserLayerOverrideWithParams(instanceId, params.toString(), userId, roleId);
+        }
+
+        OBDal.getInstance().getSession().flush();
+        write(new JSONObject().put("status", "ok"));
+    }
+
+    private void upsertUserLayerOverrideWithParams(String instanceId, String newParams,
+                                                   String userId, String roleId) throws Exception {
+        Query<Object[]> lookupQ = OBDal.getInstance().getSession()
+            .createQuery(
+                "select dw.widgetClass.id, dw.client.id, dw.sequence, " +
+                "dw.columnPosition, dw.rowPosition, dw.width, dw.height " +
+                "from etmeta_Dashboard_Widget dw where dw.id = :id",
+                Object[].class);
+        lookupQ.setParameter("id", instanceId);
+        Object[] source = lookupQ.uniqueResult();
+        if (source == null) throw new NotFoundException();
+
+        String classId  = (String) source[0];
+        String clientId = (String) source[1];
+        Number seqno    = (Number) source[2];
+        Number col      = (Number) source[3];
+        Number row      = (Number) source[4];
+        Number width    = (Number) source[5];
+        Number height   = (Number) source[6];
+
+        // Try updating existing USER override for this classId+user+role
+        int userUpdated = OBDal.getInstance().getSession()
+            .createQuery("update etmeta_Dashboard_Widget dw set dw.parametersJSON = :params " +
+                         "where dw.widgetClass.id = :classId and dw.layer = 'USER' " +
+                         "and dw.user.id = :userId and dw.role.id = :roleId")
+            .setParameter("params",  newParams)
+            .setParameter("classId", classId)
+            .setParameter("userId",  userId)
+            .setParameter("roleId",  roleId)
+            .executeUpdate();
+
+        if (userUpdated > 0) return;
+
+        // No USER override yet — insert one
+        String newId     = UUID.randomUUID().toString().replace("-", "");
+        String insertSql =
+            "INSERT INTO etmeta_dashboard_widget " +
+            "(etmeta_dashboard_widget_id, etmeta_widget_class_id, layer, ad_client_id, ad_org_id, " +
+            " ad_user_id, ad_role_id, col_position, row_position, width, height, isvisible, seqno, " +
+            " parameters_json, isactive, created, createdby, updated, updatedby) " +
+            "VALUES (:id, :classId, 'USER', :clientId, '0', " +
+            " :userId, :roleId, :col, :row, :width, :height, 'Y', :seqno, " +
+            " :params, 'Y', NOW(), :uid, NOW(), :uid)";
+        OBDal.getInstance().getSession().createNativeQuery(insertSql)
+            .setParameter("id",       newId)
+            .setParameter("classId",  classId)
+            .setParameter("clientId", clientId)
+            .setParameter("userId",   userId)
+            .setParameter("roleId",   roleId)
+            .setParameter("col",      col != null ? col.intValue() : 0)
+            .setParameter("row",      row != null ? row.intValue() : 0)
+            .setParameter("width",    width != null ? width.intValue() : 2)
+            .setParameter("height",   height != null ? height.intValue() : 1)
+            .setParameter("seqno",    seqno != null ? seqno.intValue() : 10)
+            .setParameter("params",   newParams)
+            .setParameter("uid",      userId)
+            .executeUpdate();
     }
 
     private void handleDeleteWidget(String instanceId) throws Exception {
@@ -340,5 +431,45 @@ public class DashboardService extends MetadataService {
     private String extractLastSegment(String path) {
         String[] parts = path.split("/");
         return parts[parts.length - 1];
+    }
+
+    /**
+     * Validates widget parameters before persisting.
+     * Any value that looks like a URL must use https:// to prevent javascript: and data: injection.
+     * The host is parsed via {@link java.net.URI} to block bypass patterns such as
+     * {@code https://evil.com\@google.com}.
+     */
+    private void validateParams(JSONObject params) throws Exception {
+        java.util.Iterator<String> keys = params.keys();
+        while (keys.hasNext()) {
+            String key = keys.next();
+            Object val = params.get(key);
+            if (!(val instanceof String)) continue;
+            String strVal = ((String) val).trim();
+            if (strVal.isEmpty()) continue;
+            // Detect URL-like values: anything containing ":" that isn't a plain word
+            if (!strVal.contains(":")) continue;
+            if (!strVal.startsWith("https://")) {
+                throw new com.etendoerp.metadata.exceptions.UnprocessableContentException(
+                    "Invalid value for parameter '" + key + "': only https:// URLs are allowed");
+            }
+            // Validate the host to block bypass patterns like https://evil.com\@google.com
+            try {
+                java.net.URI uri = new java.net.URI(strVal);
+                String host = uri.getHost();
+                if (host == null || host.contains("@") || host.contains("\\")) {
+                    throw new com.etendoerp.metadata.exceptions.UnprocessableContentException(
+                        "Invalid value for parameter '" + key + "': malformed URL host");
+                }
+            } catch (java.net.URISyntaxException e) {
+                throw new com.etendoerp.metadata.exceptions.UnprocessableContentException(
+                    "Invalid value for parameter '" + key + "': malformed URL");
+            }
+        }
+    }
+
+    private String extractSecondToLastSegment(String path) {
+        String[] parts = path.split("/");
+        return parts[parts.length - 2];
     }
 }
