@@ -9,7 +9,11 @@ public class URLResolver implements WidgetDataResolver {
 
     @Override
     public JSONObject resolve(WidgetDataContext ctx) throws Exception {
-        String url = ctx.classString("3"); // EXTERNAL_DATA_URL
+        // Instance param "src" mirrors Classic OBUrlWidget behaviour (parameters.src)
+        String url = ctx.param("src");
+        if (url == null || url.isEmpty()) {
+            url = ctx.classString("3"); // EXTERNAL_DATA_URL fallback
+        }
         return new JSONObject()
                 .put("url",     url != null ? url : "")
                 .put("sandbox", true);
