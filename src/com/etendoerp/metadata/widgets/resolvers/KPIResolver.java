@@ -13,6 +13,8 @@ import java.util.Map;
  * Named params in HQL (e.g. :period) are filled from the instance params map.
  */
 public class KPIResolver implements WidgetDataResolver {
+    private static final String CHART_TYPE = "chartType";
+
     @Override public String getType() { return "KPI"; }
 
     @Override
@@ -22,7 +24,7 @@ public class KPIResolver implements WidgetDataResolver {
 
         Query<Object> q = OBDal.getInstance().getSession().createQuery(hql, Object.class);
         for (Map.Entry<String, Object> entry : ctx.getParams().entrySet()) {
-            try { q.setParameter(entry.getKey(), entry.getValue()); } catch (Exception ignored) {}
+            try { q.setParameter(entry.getKey(), entry.getValue()); } catch (Exception ignored) { /* param not in HQL, skip */ }
         }
         Object value = q.uniqueResult();
 
@@ -31,6 +33,6 @@ public class KPIResolver implements WidgetDataResolver {
                 .put("unit",      ctx.param("unit"))
                 .put("label",     ctx.param("label"))
                 .put("trend",     ctx.param("trend"))
-                .put("chartType", ctx.param("chartType") != null ? ctx.param("chartType") : "number");
+                .put(CHART_TYPE, ctx.param(CHART_TYPE) != null ? ctx.param(CHART_TYPE) : "number");
     }
 }

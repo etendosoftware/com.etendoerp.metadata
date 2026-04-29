@@ -49,7 +49,10 @@ import java.util.function.BiFunction;
 import java.util.function.BiConsumer;
 import org.hibernate.exception.GenericJDBCException;
 
+/** Builds and caches field-level metadata for Etendo tabs. */
 public class TabProcessor {
+  private TabProcessor() { }
+
   private static final Logger logger = LogManager.getLogger(TabProcessor.class);
   private static final String FIELD_CACHE = "FIELDS_METADATA";
   private static final String FIELD_ACCESS_CACHE = "FIELD_ACCESS_METADATA";
@@ -89,6 +92,23 @@ public class TabProcessor {
     return fieldAccess.isActive() && isFieldAccessible(fieldAccess.getField());
   }
 
+  /**
+   * Builds a cached JSON object of fields from a list of field-like items, applying access filtering.
+   *
+   * @param <T>              the type of field items (e.g. Field or FieldAccess)
+   * @param id               the entity ID used for cache keying
+   * @param updated          the last-updated timestamp used for cache keying
+   * @param data             the list of field-like items to process
+   * @param accessPredicate  predicate that determines if a field item is accessible
+   * @param columnExtractor  function to extract the column from a field item
+   * @param customJsExtractor function to extract custom JS from a field item
+   * @param clientClassExtractor function to extract the client class from a field item
+   * @param nameExtractor    function to extract the name from a field item
+   * @param nameSetter       consumer to set a new name on a field item
+   * @param fieldMapper      function to convert a field item to JSON
+   * @param cache            the concurrent map cache to store results
+   * @return a JSON object mapping field names to their JSON representations
+   */
   public static <T> JSONObject getFields(String id, String updated, List<T> data, Predicate<T> accessPredicate,
                                          Function<T, Column> columnExtractor, Function<T,String> customJsExtractor,
       Function<T, String> clientClassExtractor,
@@ -159,12 +179,24 @@ public class TabProcessor {
     }
   }
 
+  /**
+   * Returns the fields JSON for a tab, using its field list and default access rules.
+   *
+   * @param tab the tab whose fields to retrieve
+   * @return a JSON object mapping field names to their JSON representations
+   */
   public static JSONObject getTabFields(Tab tab) {
     return getFields(tab.getId(), tab.getUpdated().toString(), tab.getADFieldList(), TabProcessor::isFieldAccessible,
         Field::getColumn, Field::getEtmetaCustomjs, Field::getClientclass, Field::getName,
         Field::setName, TabProcessor::getJSONField, fieldCache);
   }
 
+  /**
+   * Returns the fields JSON for a tab access record, applying role-level field access restrictions.
+   *
+   * @param tabAccess the tab access record whose field access list to process
+   * @return a JSON object mapping field names to their JSON representations
+   */
   public static JSONObject getTabFields(TabAccess tabAccess) {
     return getFields(tabAccess.getId(), tabAccess.getUpdated().toString(), tabAccess.getADFieldAccessList(),
         TabProcessor::isFieldAccessAccessible, fieldAccess -> fieldAccess.getField().getColumn(),
@@ -175,6 +207,12 @@ public class TabProcessor {
         TabProcessor::getJSONField, fieldAccessCache);
   }
 
+  /**
+   * Resolves the DAL entity property name for a given database column.
+   *
+   * @param column the database column to resolve
+   * @return the entity property name, or {@code null} if it cannot be resolved
+   */
   public static String getEntityColumnName(Column column) {
     if (column == null) {
       logger.warn("Column parameter is null in getEntityColumnName");
@@ -205,6 +243,13 @@ public class TabProcessor {
     return property.getName();
   }
 
+  /**
+   * Converts a Field entity to its JSON representation.
+   *
+   * @param field      the field to convert
+   * @param withColumn {@code true} to use column-based builder, {@code false} for column-less builder
+   * @return the JSON representation of the field
+   */
   public static JSONObject getJSONField(Field field, boolean withColumn) {
     try {
       if (withColumn) {
@@ -218,6 +263,13 @@ public class TabProcessor {
     }
   }
 
+  /**
+   * Converts a FieldAccess entity to its JSON representation.
+   *
+   * @param access     the field access record to convert
+   * @param withColumn {@code true} to use column-based builder, {@code false} for column-less builder
+   * @return the JSON representation of the field
+   */
   public static JSONObject getJSONField(FieldAccess access, boolean withColumn) {
 
     try {
@@ -250,6 +302,13 @@ public class TabProcessor {
     fieldAccessCache.clear();
   }
 
+  /**
+   * Checks whether the current role has access to the process linked to a field's column.
+   *
+   * @param field    the field to check
+   * @param windowId the window ID used for access evaluation
+   * @return {@code true} if access is granted or no process is linked
+   */
   public static boolean hasAccessToProcess(Field field, String windowId) {
     Column col = field.getColumn();
 

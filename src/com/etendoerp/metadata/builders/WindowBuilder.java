@@ -41,10 +41,18 @@ import org.openbravo.dal.core.OBContext;
 import com.etendoerp.metadata.exceptions.NotFoundException;
 import com.etendoerp.metadata.exceptions.UnauthorizedException;
 
+/**
+ * Builds a JSON representation of a window including its tabs and role-based access permissions.
+ */
 public class WindowBuilder extends Builder {
     private static final Map<String, Boolean> tabAllowedCache = new ConcurrentHashMap<>();
     private final String id;
 
+    /**
+     * Creates a new WindowBuilder for the window with the given ID.
+     *
+     * @param id the database ID of the window to build
+     */
     public WindowBuilder(String id) {
         this.id = id;
     }

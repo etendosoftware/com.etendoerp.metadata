@@ -4,6 +4,7 @@ import com.etendoerp.metadata.widgets.WidgetDataContext;
 import com.etendoerp.metadata.widgets.WidgetDataResolver;
 import org.codehaus.jettison.json.JSONObject;
 
+/** Resolves widget data for URL-type widgets by returning the iframe source URL. */
 public class URLResolver implements WidgetDataResolver {
     @Override public String getType() { return "URL"; }
 

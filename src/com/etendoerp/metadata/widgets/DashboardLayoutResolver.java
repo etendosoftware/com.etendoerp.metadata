@@ -7,7 +7,9 @@ import org.hibernate.query.Query;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
 
-import java.util.*;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Queries ETMETA_DASHBOARD_WIDGET and applies SYSTEM → CLIENT → USER layer inheritance.
@@ -25,7 +27,6 @@ public class DashboardLayoutResolver {
     private static final int IDX_ID         = 0;
     private static final int IDX_CLASS_ID   = 1;
     private static final int IDX_LAYER      = 2;
-    private static final int IDX_USER_ID    = 3;
     private static final int IDX_COL        = 4;
     private static final int IDX_ROW        = 5;
     private static final int IDX_WIDTH      = 6;
@@ -45,6 +46,12 @@ public class DashboardLayoutResolver {
         "       or (dw.layer = 'USER'   and dw.user.id   = :userId and dw.role.id = :roleId)) " +
         "order by dw.layer, dw.sequence";
 
+    /**
+     * Resolves the dashboard widget layout for the current user applying layer inheritance.
+     *
+     * @return a JSONArray of resolved widget instances
+     * @throws JSONException if JSON construction fails
+     */
     public JSONArray resolve() throws JSONException {
         OBContext ctx = OBContext.getOBContext();
         String userId   = ctx.getUser().getId();

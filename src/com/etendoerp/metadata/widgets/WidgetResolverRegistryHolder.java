@@ -20,6 +20,8 @@ import com.etendoerp.metadata.widgets.resolvers.URLResolver;
 public class WidgetResolverRegistryHolder {
     private static WidgetResolverRegistry instance;
 
+    private WidgetResolverRegistryHolder() { }
+
     static {
         instance = new WidgetResolverRegistry();
         instance.register(new RecentDocsResolver());

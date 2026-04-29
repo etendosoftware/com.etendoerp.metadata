@@ -31,7 +31,14 @@ import org.openbravo.erpCommon.utility.OBError;
 
 import com.etendoerp.metadata.data.RequestVariables;
 
+/** Serves GET /meta/message returning pending OBError messages for a tab. */
 public class MessageService extends MetadataService {
+    /**
+     * Creates a new MessageService for the given request/response pair.
+     *
+     * @param request  the HTTP request
+     * @param response the HTTP response
+     */
     public MessageService(HttpServletRequest request, HttpServletResponse response) {
         super(request, response);
     }

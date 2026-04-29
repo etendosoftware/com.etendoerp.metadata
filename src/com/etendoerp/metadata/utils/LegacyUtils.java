@@ -27,6 +27,8 @@ import java.util.Set;
  */
 public class LegacyUtils {
 
+    private LegacyUtils() { }
+
     /**
      * Set of process IDs that do not have an associated AD_Process_ID or EM_OBUIAPP_Process_ID,
      * and therefore must be treated in a special way by the system.

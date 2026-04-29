@@ -23,6 +23,10 @@ public interface WidgetDataResolver {
      * Resolves and returns the data payload for the given widget instance.
      * Return value becomes the "data" field inside the standard response envelope.
      * Only called when isAvailable() returns true.
+     *
+     * @param context the widget data context carrying instance, class, and parameter info
+     * @return the resolved data as a JSON object
+     * @throws Exception if resolution fails
      */
     JSONObject resolve(WidgetDataContext context) throws Exception;
 }

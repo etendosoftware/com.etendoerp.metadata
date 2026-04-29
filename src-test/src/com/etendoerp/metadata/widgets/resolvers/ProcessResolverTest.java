@@ -6,32 +6,42 @@ import org.hibernate.Session;
 import org.hibernate.query.Query;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.*;
+import org.mockito.Mock;
+import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.openbravo.dal.service.OBDal;
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class ProcessResolverTest {
+    private static final String PROCESS_ID = "processId";
+
     @Mock OBDal   obDal;
     @Mock Session session;
 
     @Test
-    void resolve_missingProcessId_returnsError() throws Exception {
+    void resolveMissingProcessIdReturnsError() throws Exception {
         WidgetDataContext ctx = mock(WidgetDataContext.class);
-        when(ctx.param("processId")).thenReturn(null);
+        when(ctx.param(PROCESS_ID)).thenReturn(null);
 
         JSONObject result = new ProcessResolver().resolve(ctx);
         assertEquals("error", result.getString("status"));
-        assertTrue(result.getString("message").contains("processId"));
+        assertTrue(result.getString("message").contains(PROCESS_ID));
     }
 
     @SuppressWarnings("unchecked")
     @Test
-    void resolve_validProcessId_returnsSuccess() throws Exception {
+    void resolveValidProcessIdReturnsSuccess() throws Exception {
         WidgetDataContext ctx = mock(WidgetDataContext.class);
-        when(ctx.param("processId")).thenReturn("proc1");
+        when(ctx.param(PROCESS_ID)).thenReturn("proc1");
 
         Object[] row = { "proc1", "My Process" };
         Query<Object[]> q = mock(Query.class);

@@ -28,10 +28,14 @@ import org.openbravo.model.ad.ui.Tab;
 import com.etendoerp.metadata.builders.TabBuilder;
 import com.etendoerp.metadata.exceptions.NotFoundException;
 
-/**
- * @author luuchorocha
- */
+/** Serves GET /meta/tab/{id} with tab metadata including fields. */
 public class TabService extends MetadataService {
+    /**
+     * Creates a new TabService for the given request/response pair.
+     *
+     * @param request  the HTTP request
+     * @param response the HTTP response
+     */
     public TabService(HttpServletRequest request, HttpServletResponse response) {
         super(request, response);
     }

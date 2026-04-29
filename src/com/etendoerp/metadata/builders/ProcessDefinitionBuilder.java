@@ -23,9 +23,17 @@ import org.openbravo.client.application.Parameter;
 import org.openbravo.client.application.Process;
 import org.openbravo.service.json.DataResolvingMode;
 
+/**
+ * Builds a JSON representation of an OBUIAPP process definition and its parameters.
+ */
 public class ProcessDefinitionBuilder extends Builder {
     private final Process process;
 
+    /**
+     * Creates a new ProcessDefinitionBuilder for the given process definition.
+     *
+     * @param process the OBUIAPP process definition to build JSON for
+     */
     public ProcessDefinitionBuilder(Process process) {
         this.process = process;
     }

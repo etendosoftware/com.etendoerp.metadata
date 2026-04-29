@@ -3,17 +3,18 @@ package com.etendoerp.metadata.widgets.resolvers;
 import com.etendoerp.metadata.widgets.WidgetDataContext;
 import org.codehaus.jettison.json.JSONObject;
 import org.junit.jupiter.api.Test;
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class HTMLResolverTest {
     @Test
-    void getType_returnsHTML() {
+    void getTypeReturnsHtml() {
         assertEquals("HTML", new HTMLResolver().getType());
     }
 
     @Test
-    void resolve_returnsDescriptionAsContent() throws Exception {
+    void resolveReturnsDescriptionAsContent() throws Exception {
         WidgetDataContext ctx = mock(WidgetDataContext.class);
         when(ctx.classString("4")).thenReturn("<p>Hello</p>");
 

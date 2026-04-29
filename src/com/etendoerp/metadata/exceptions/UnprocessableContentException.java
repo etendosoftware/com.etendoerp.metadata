@@ -17,13 +17,17 @@
 
 package com.etendoerp.metadata.exceptions;
 
+/**
+ * Exception indicating that the request content could not be processed (HTTP 422).
+ */
 public class UnprocessableContentException extends RuntimeException {
-    private final static String DEFAULT_MESSAGE = "Unprocessable content";
+    private static final String DEFAULT_MESSAGE = "Unprocessable content";
 
     public UnprocessableContentException(String message) {
         super(message.isEmpty() ? DEFAULT_MESSAGE : message);
     }
 
+    /** Creates a new UnprocessableContentException with the default message. */
     public UnprocessableContentException() {
         super(DEFAULT_MESSAGE);
     }

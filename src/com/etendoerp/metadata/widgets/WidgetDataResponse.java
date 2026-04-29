@@ -16,6 +16,19 @@ import java.time.Instant;
  */
 public class WidgetDataResponse {
 
+    private WidgetDataResponse() {
+    }
+
+    /**
+     * Builds the standard response envelope for a widget data request.
+     *
+     * @param instanceId the widget instance identifier
+     * @param type       the widget type
+     * @param data       the resolved data payload
+     * @param totalRows  total row count, or {@code null} if unknown
+     * @return the JSON envelope
+     * @throws JSONException if JSON construction fails
+     */
     public static JSONObject build(String instanceId, String type, JSONObject data,
                                    Integer totalRows) throws JSONException {
         JSONObject meta = new JSONObject()
@@ -30,6 +43,15 @@ public class WidgetDataResponse {
                 .put("meta", meta);
     }
 
+    /**
+     * Builds the standard response envelope with no total row count.
+     *
+     * @param instanceId the widget instance identifier
+     * @param type       the widget type
+     * @param data       the resolved data payload
+     * @return the JSON envelope
+     * @throws JSONException if JSON construction fails
+     */
     public static JSONObject build(String instanceId, String type, JSONObject data)
             throws JSONException {
         return build(instanceId, type, data, null);
@@ -38,6 +60,11 @@ public class WidgetDataResponse {
     /**
      * Returns an envelope signaling the widget is unavailable (required module not installed).
      * The frontend should hide or disable this widget instead of rendering it.
+     *
+     * @param instanceId the widget instance identifier
+     * @param type       the widget type
+     * @return a JSON envelope with {@code available: false}
+     * @throws JSONException if the JSON object cannot be constructed
      */
     public static JSONObject unavailable(String instanceId, String type) throws JSONException {
         return new JSONObject()

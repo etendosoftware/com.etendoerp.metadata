@@ -11,6 +11,10 @@ import org.openbravo.dal.service.OBDal;
  * Returns { "status": "success|error", "message": "...", "result": {} }.
  */
 public class ProcessResolver implements WidgetDataResolver {
+    private static final String STATUS_KEY = "status";
+    private static final String MESSAGE_KEY = "message";
+    private static final String RESULT_KEY = "result";
+
     @Override public String getType() { return "PROCESS"; }
 
     private static final String HQL =
@@ -21,9 +25,9 @@ public class ProcessResolver implements WidgetDataResolver {
         String processId = ctx.param("processId");
         if (processId == null) {
             return new JSONObject()
-                    .put("status",  "error")
-                    .put("message", "processId param missing")
-                    .put("result",  new JSONObject());
+                    .put(STATUS_KEY,  "error")
+                    .put(MESSAGE_KEY, "processId param missing")
+                    .put(RESULT_KEY,  new JSONObject());
         }
 
         Query<Object[]> q = OBDal.getInstance().getSession()
@@ -33,16 +37,16 @@ public class ProcessResolver implements WidgetDataResolver {
 
         if (row == null) {
             return new JSONObject()
-                    .put("status",  "error")
-                    .put("message", "Process not found: " + processId)
-                    .put("result",  new JSONObject());
+                    .put(STATUS_KEY,  "error")
+                    .put(MESSAGE_KEY, "Process not found: " + processId)
+                    .put(RESULT_KEY,  new JSONObject());
         }
 
         String name = (String) row[1];
         return new JSONObject()
-                .put("status",  "success")
-                .put("message", "Process '" + name + "' is ready to execute.")
-                .put("result",  new JSONObject()
+                .put(STATUS_KEY,  "success")
+                .put(MESSAGE_KEY, "Process '" + name + "' is ready to execute.")
+                .put(RESULT_KEY,  new JSONObject()
                         .put("processId", processId)
                         .put("name",      name));
     }

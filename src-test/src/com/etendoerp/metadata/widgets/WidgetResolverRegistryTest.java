@@ -1,13 +1,17 @@
 package com.etendoerp.metadata.widgets;
 
 import org.junit.jupiter.api.Test;
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class WidgetResolverRegistryTest {
 
     @Test
-    void getResolverByType_returnsMatchingResolver() {
+    void getResolverByTypeReturnsMatchingResolver() {
         WidgetDataResolver htmlResolver = mock(WidgetDataResolver.class);
         when(htmlResolver.getType()).thenReturn("HTML");
 
@@ -20,13 +24,13 @@ class WidgetResolverRegistryTest {
     }
 
     @Test
-    void getResolverByType_returnsNullForUnknownType() {
+    void getResolverByTypeReturnsNullForUnknownType() {
         WidgetResolverRegistry registry = new WidgetResolverRegistry();
         assertNull(registry.getResolver("UNKNOWN"));
     }
 
     @Test
-    void register_duplicateType_lastOneWins() {
+    void registerDuplicateTypeLastOneWins() {
         WidgetDataResolver r1 = mock(WidgetDataResolver.class);
         WidgetDataResolver r2 = mock(WidgetDataResolver.class);
         when(r1.getType()).thenReturn("HTML");
