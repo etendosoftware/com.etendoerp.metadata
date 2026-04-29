@@ -113,7 +113,7 @@ public class Utils {
    * @param defaultWarehouse  The default warehouse.
    * @return The selected warehouse.
    */
-  private static Warehouse getWarehouse(Warehouse warehouse, Organization selectedOrg, Warehouse defaultWarehouse, Role defaultRole) {
+  private static Warehouse getWarehouse(Warehouse warehouse, Organization selectedOrg, Warehouse defaultWarehouse) {
     try {
       Method method = SecureWebServicesUtils.class.getDeclaredMethod("getWarehouse", Warehouse.class,
           Organization.class, Warehouse.class);
@@ -210,7 +210,7 @@ public class Utils {
 
       Role selectedRole = getRole(role, userRoleList, defaultWsRole, defaultRole);
       Organization selectedOrg = getOrganization(org, selectedRole, defaultRole, defaultOrg);
-      Warehouse selectedWarehouse = getWarehouse(warehouse, selectedOrg, warehouseFallback, defaultRole);
+      Warehouse selectedWarehouse = getWarehouse(warehouse, selectedOrg, warehouseFallback);
 
       if (SecureWebServicesUtils.isNewVersionPrivKey(privateKey)) {
         String algorithmUsed = getAlgorithmUsed();

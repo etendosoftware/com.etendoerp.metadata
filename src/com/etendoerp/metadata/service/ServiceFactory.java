@@ -44,9 +44,7 @@ import java.util.function.BiFunction;
 
 import static com.etendoerp.metadata.utils.Constants.*;
 
-/**
- * @author luuchorocha
- */
+/** Routes incoming HTTP requests to the appropriate MetadataService implementation. */
 public class ServiceFactory {
 
     private static final Logger log = LogManager.getLogger(ServiceFactory.class);
@@ -84,65 +82,83 @@ public class ServiceFactory {
 
     private static MetadataService buildLegacyForwardService(HttpServletRequest req, HttpServletResponse res,
             String path) {
-        return new MetadataService(req, res) {
-            @Override
-            public void process() throws ServletException, IOException {
-                try {
-                    handleLegacySession(req, path);
-                    forwardToPath(req, res, path);
-                } catch (Exception e) {
-                    rethrowLegacyException(e);
-                }
+        return new LegacyForwardService(req, res, path);
+    }
+
+    /** Named inner class extracted from anonymous MetadataService to reduce cognitive complexity. */
+    private static class LegacyForwardService extends MetadataService {
+        private final String path;
+
+        LegacyForwardService(HttpServletRequest req, HttpServletResponse res, String path) {
+            super(req, res);
+            this.path = path;
+        }
+
+        @Override
+        public void process() throws ServletException, IOException {
+            try {
+                handleLegacySession();
+                forwardRequest();
+            } catch (Exception e) {
+                rethrowOrWrap(e);
             }
-        };
+        }
+
+        private void handleLegacySession() {
+            if (!LegacyPaths.USED_BY_LINK.equals(path)) {
+                return;
+            }
+            String windowId = getRequest().getParameter("windowId");
+            String entityName = getRequest().getParameter("entityName");
+            String recordId = getRequest().getParameter("recordId");
+
+            if (windowId == null || entityName == null || recordId == null) {
+                return;
+            }
+
+            Entity entity = ModelProvider.getInstance().getEntity(entityName);
+            if (entity == null) {
+                log.warn("Entity '{}' not found in ModelProvider, cannot set session for UsedByLink", entityName);
+                return;
+            }
+
+            java.util.List<Property> idProps = entity.getIdProperties();
+            if (idProps == null || idProps.size() != 1) {
+                log.warn("Expected exactly one ID property for entity '{}', got {}", entityName, idProps);
+                return;
+            }
+
+            String columnName = idProps.get(0).getColumnName();
+            HttpSession session = getRequest().getSession(true);
+            session.setAttribute(windowId + "|" + columnName, recordId);
+        }
+
+        private void forwardRequest() throws ServletException, IOException {
+            RequestDispatcher dispatcher = getRequest().getServletContext().getRequestDispatcher(path);
+
+            if (dispatcher == null) {
+                throw new ServletException("No dispatcher found for path: " + path);
+            }
+
+            dispatcher.forward(getRequest(), getResponse());
+        }
+
+        private void rethrowOrWrap(Exception e) throws ServletException, IOException {
+            if (e instanceof ServletException)
+                throw (ServletException) e;
+            if (e instanceof IOException)
+                throw (IOException) e;
+            throw new InternalServerException("Failed to forward legacy request: " + e.getMessage(), e);
+        }
     }
 
-    private static void handleLegacySession(HttpServletRequest req, String path) {
-        if (!LegacyPaths.USED_BY_LINK.equals(path)) {
-            return;
-        }
-        String windowId = req.getParameter("windowId");
-        String entityName = req.getParameter("entityName");
-        String recordId = req.getParameter("recordId");
-
-        if (windowId == null || entityName == null || recordId == null) {
-            return;
-        }
-
-        Entity entity = ModelProvider.getInstance().getEntity(entityName);
-        if (entity == null) {
-            log.warn("Entity '{}' not found in ModelProvider, cannot set session for UsedByLink", entityName);
-            return;
-        }
-
-        java.util.List<Property> idProps = entity.getIdProperties();
-        if (idProps == null || idProps.size() != 1) {
-            log.warn("Expected exactly one ID property for entity '{}', got {}", entityName, idProps);
-            return;
-        }
-
-        String columnName = idProps.get(0).getColumnName();
-        HttpSession session = req.getSession(true);
-        session.setAttribute(windowId + "|" + columnName, recordId);
-    }
-
-    private static void forwardToPath(HttpServletRequest req, HttpServletResponse res, String path)
-            throws ServletException, IOException {
-        RequestDispatcher dispatcher = req.getServletContext().getRequestDispatcher(path);
-        if (dispatcher == null) {
-            throw new ServletException("No dispatcher found for path: " + path);
-        }
-        dispatcher.forward(req, res);
-    }
-
-    private static void rethrowLegacyException(Exception e) throws ServletException, IOException {
-        if (e instanceof ServletException)
-            throw (ServletException) e;
-        if (e instanceof IOException)
-            throw (IOException) e;
-        throw new InternalServerException("Failed to forward legacy request: " + e.getMessage(), e);
-    }
-
+    /**
+     * Returns the MetadataService that handles the given request path.
+     *
+     * @param req the incoming HTTP request
+     * @param res the HTTP response
+     * @return the matching service instance
+     */
     public static MetadataService getService(final HttpServletRequest req, final HttpServletResponse res) {
         final String path = req.getPathInfo() != null
                 ? req.getPathInfo()

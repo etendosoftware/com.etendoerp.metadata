@@ -21,12 +21,20 @@ import org.openbravo.model.ad.domain.ReferencedTree;
 import org.openbravo.userinterface.selector.Selector;
 
 /**
- * @author luuchorocha
+ * Holds the selector and tree selector associated with a reference.
  */
 public class ReferenceSelectors {
+    /** The standard selector for this reference, or {@code null} if not applicable. */
     public final Selector selector;
+    /** The tree selector for this reference, or {@code null} if not applicable. */
     public final ReferencedTree treeSelector;
 
+    /**
+     * Creates a new ReferenceSelectors with the given selector and tree selector.
+     *
+     * @param selector     the standard selector, or {@code null}
+     * @param treeSelector the tree selector, or {@code null}
+     */
     public ReferenceSelectors(Selector selector, ReferencedTree treeSelector) {
         this.selector = selector;
         this.treeSelector = treeSelector;

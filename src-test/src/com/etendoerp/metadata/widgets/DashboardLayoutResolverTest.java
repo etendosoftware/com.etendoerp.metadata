@@ -18,12 +18,18 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class DashboardLayoutResolverTest {
+
+    private static final String USER_123 = USER_123;
 
     @Mock OBContext mockContext;
     @Mock OBDal mockOBDal;
@@ -33,11 +39,11 @@ class DashboardLayoutResolverTest {
 
     @SuppressWarnings("unchecked")
     @Test
-    void resolve_userLayerOverridesSystem() throws Exception {
+    void resolveUserLayerOverridesSystem() throws Exception {
         // SYSTEM row for widget class "wc1"
         Object[] systemRow = { "sys-instance-id", "wc1", "SYSTEM", null, 0, 0, 2, 1, "Y", 10, null };
         // USER row for same widget class
-        Object[] userRow   = { "usr-instance-id", "wc1", "USER",   "user-123", 1, 0, 2, 1, "Y", 10, null };
+        Object[] userRow   = { "usr-instance-id", "wc1", "USER",   USER_123, 1, 0, 2, 1, "Y", 10, null };
 
         Query<Object[]> mockQuery = mock(Query.class);
         when(mockSession.createQuery(anyString(), eq(Object[].class))).thenReturn(mockQuery);
@@ -45,7 +51,7 @@ class DashboardLayoutResolverTest {
         when(mockQuery.list()).thenReturn(Arrays.asList(systemRow, userRow));
 
         when(mockContext.getUser()).thenReturn(mockUser);
-        when(mockUser.getId()).thenReturn("user-123");
+        when(mockUser.getId()).thenReturn(USER_123);
         when(mockContext.getCurrentClient()).thenReturn(mockClient);
         when(mockClient.getId()).thenReturn("client-123");
 
@@ -67,7 +73,7 @@ class DashboardLayoutResolverTest {
     }
 
     @Test
-    void resolve_systemRowUsedWhenNoOverride() throws Exception {
+    void resolveSystemRowUsedWhenNoOverride() throws Exception {
         Object[] systemRow = { "sys-id", "wc1", "SYSTEM", null, 0, 0, 2, 1, "Y", 10, null };
 
         @SuppressWarnings("unchecked")
@@ -77,7 +83,7 @@ class DashboardLayoutResolverTest {
         when(mockQuery.list()).thenReturn(Collections.singletonList(systemRow));
 
         when(mockContext.getUser()).thenReturn(mockUser);
-        when(mockUser.getId()).thenReturn("user-123");
+        when(mockUser.getId()).thenReturn(USER_123);
         when(mockContext.getCurrentClient()).thenReturn(mockClient);
         when(mockClient.getId()).thenReturn("client-123");
 

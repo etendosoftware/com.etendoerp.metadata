@@ -17,13 +17,17 @@
 
 package com.etendoerp.metadata.exceptions;
 
+/**
+ * Exception indicating that a requested resource was not found (HTTP 404).
+ */
 public class NotFoundException extends RuntimeException {
-    private final static String DEFAULT_MESSAGE = "Not found";
+    private static final String DEFAULT_MESSAGE = "Not found";
 
     public NotFoundException(String message) {
         super(message.isEmpty() ? DEFAULT_MESSAGE : message);
     }
 
+    /** Creates a new NotFoundException with the default message. */
     public NotFoundException() {
         super(DEFAULT_MESSAGE);
     }

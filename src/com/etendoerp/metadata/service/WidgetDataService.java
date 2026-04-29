@@ -2,7 +2,11 @@ package com.etendoerp.metadata.service;
 
 import com.etendoerp.metadata.exceptions.InternalServerException;
 import com.etendoerp.metadata.exceptions.NotFoundException;
-import com.etendoerp.metadata.widgets.*;
+import com.etendoerp.metadata.widgets.WidgetDataContext;
+import com.etendoerp.metadata.widgets.WidgetDataResolver;
+import com.etendoerp.metadata.widgets.WidgetDataResponse;
+import com.etendoerp.metadata.widgets.WidgetResolverRegistry;
+import com.etendoerp.metadata.widgets.WidgetResolverRegistryHolder;
 import com.etendoerp.metadata.widgets.resolvers.ProxyResolver;
 import org.codehaus.jettison.json.JSONObject;
 import org.hibernate.query.Query;
@@ -41,6 +45,12 @@ public class WidgetDataService extends MetadataService {
     // Injected in tests; in production resolved via the static holder
     private WidgetResolverRegistry registry;
 
+    /**
+     * Creates a new WidgetDataService for the given request/response pair.
+     *
+     * @param request  the HTTP request
+     * @param response the HTTP response
+     */
     public WidgetDataService(HttpServletRequest request, HttpServletResponse response) {
         super(request, response);
         this.registry = WidgetResolverRegistryHolder.getInstance();
@@ -70,33 +80,11 @@ public class WidgetDataService extends MetadataService {
             String type            = (String) classRow[1];
             String externalDataUrl = (String) classRow[3];
             Map<String, Object> params = mergeParams(classId, paramsJson);
-            String pageParam     = getRequest().getParameter("page");
-            String pageSizeParam = getRequest().getParameter("pageSize");
-            if (pageParam     != null) params.put("_page",     pageParam);
-            if (pageSizeParam != null) params.put("_pageSize", pageSizeParam);
+            applyRequestParams(params);
 
-            // Filter params from query string override class/instance defaults
-            getRequest().getParameterMap().forEach((key, values) -> {
-                if (!"page".equals(key) && !"pageSize".equals(key) && values.length > 0) {
-                    params.put(key, values[0]);
-                }
-            });
+            WidgetDataContext wdCtx = buildDataContext(instanceId, instanceRow, classRow, params);
 
-            OBContext ctx = OBContext.getOBContext();
-            String bearerToken = getRequest().getHeader("Authorization");
-            WidgetDataContext wdCtx = new WidgetDataContext(
-                    instanceId,
-                    toMap(instanceRow),
-                    toMap(classRow),
-                    params,
-                    ctx,
-                    bearerToken);
-
-            WidgetDataResolver resolver = registry != null ? registry.getResolver(type) : null;
-            if (resolver == null && (externalDataUrl != null || "PROXY".equals(type))) {
-                resolver = new ProxyResolver();
-            }
-            if (resolver == null) throw new InternalServerException("No resolver for type: " + type);
+            WidgetDataResolver resolver = resolveWidget(type, externalDataUrl);
 
             if (!resolver.isAvailable()) {
                 write(WidgetDataResponse.unavailable(instanceId, type));
@@ -114,6 +102,35 @@ public class WidgetDataService extends MetadataService {
         } finally {
             OBContext.restorePreviousMode();
         }
+    }
+
+    private void applyRequestParams(Map<String, Object> params) {
+        String pageParam     = getRequest().getParameter("page");
+        String pageSizeParam = getRequest().getParameter("pageSize");
+        if (pageParam     != null) params.put("_page",     pageParam);
+        if (pageSizeParam != null) params.put("_pageSize", pageSizeParam);
+
+        getRequest().getParameterMap().forEach((key, values) -> {
+            if (!"page".equals(key) && !"pageSize".equals(key) && values.length > 0) {
+                params.put(key, values[0]);
+            }
+        });
+    }
+
+    private WidgetDataContext buildDataContext(String instanceId, Object[] instanceRow,
+            Object[] classRow, Map<String, Object> params) {
+        OBContext ctx = OBContext.getOBContext();
+        String bearerToken = getRequest().getHeader("Authorization");
+        return new WidgetDataContext(instanceId, toMap(instanceRow), toMap(classRow), params, ctx, bearerToken);
+    }
+
+    private WidgetDataResolver resolveWidget(String type, String externalDataUrl) {
+        WidgetDataResolver resolver = registry != null ? registry.getResolver(type) : null;
+        if (resolver == null && (externalDataUrl != null || "PROXY".equals(type))) {
+            resolver = new ProxyResolver();
+        }
+        if (resolver == null) throw new InternalServerException("No resolver for type: " + type);
+        return resolver;
     }
 
     private Object[] loadInstance(String instanceId) {
@@ -143,7 +160,7 @@ public class WidgetDataService extends MetadataService {
             java.util.Iterator<?> keys = overrides.keys();
             while (keys.hasNext()) {
                 String k = (String) keys.next();
-                try { merged.put(k, overrides.get(k)); } catch (Exception ignored) {}
+                try { merged.put(k, overrides.get(k)); } catch (Exception ignored) { /* skip unparseable override */ }
             }
         }
         return merged;

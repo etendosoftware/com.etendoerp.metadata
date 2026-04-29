@@ -134,7 +134,7 @@ public class FieldBuilderWithColumn extends FieldBuilder {
      */
     @Override
     protected boolean getColumnUpdatable() {
-        return field.getColumn() != null ? field.getColumn().isUpdatable() : true;
+        return field.getColumn() == null || field.getColumn().isUpdatable();
     }
 
     /**

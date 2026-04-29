@@ -23,7 +23,11 @@ public class WidgetResolverRegistry {
         }
     }
 
-    /** For unit tests to inject mocks without CDI. */
+    /**
+     * Registers a resolver manually (used by unit tests to inject mocks without CDI).
+     *
+     * @param resolver the resolver to register
+     */
     public void register(WidgetDataResolver resolver) {
         byType.put(resolver.getType(), resolver);
     }
@@ -32,6 +36,9 @@ public class WidgetResolverRegistry {
      * Returns the resolver for the given TYPE string, or null if none is registered.
      * The caller should fall back to ProxyResolver when this returns null and
      * EXTERNAL_DATA_URL is set.
+     *
+     * @param type the widget type key
+     * @return the matching resolver, or {@code null}
      */
     public WidgetDataResolver getResolver(String type) {
         return byType.get(type);

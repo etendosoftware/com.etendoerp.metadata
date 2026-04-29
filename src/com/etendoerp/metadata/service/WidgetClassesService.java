@@ -30,6 +30,12 @@ public class WidgetClassesService extends MetadataService {
         "from etmeta_Widget_Param p where p.widgetClass.id = :classId " +
         "and p.active = true order by p.sequence";
 
+    /**
+     * Creates a new WidgetClassesService for the given request/response pair.
+     *
+     * @param request  the HTTP request
+     * @param response the HTTP response
+     */
     public WidgetClassesService(HttpServletRequest request, HttpServletResponse response) {
         super(request, response);
     }

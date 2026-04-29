@@ -125,54 +125,9 @@ public class MetadataFilter implements Filter {
         }
     }
 
-    /**
-     * Extracts the logic for handling the captured response to reduce the cognitive complexity of doFilter.
-     */
-    private void handleCapturedResponse(HttpServletRequest httpReq, HttpServletResponse httpRes, HttpServletResponseLegacyWrapper captureWrapper) throws IOException {
-        byte[] body = captureWrapper.getCapturedOutput();
-        int status = captureWrapper.getStatus();
-        String contentType = captureWrapper.getContentType();
-        if (isEmptySuccessfulHtml(body, status)) {
-            handleEmptyHtmlResponse(httpReq, httpRes);
-        } else {
-            relayCapturedOutput(httpRes, body, status, contentType);
-        }
-    }
-
-    private boolean isEmptySuccessfulHtml(byte[] body, int status) {
-        return body.length == 0 && (status == 0 || status == HttpServletResponse.SC_OK);
-    }
-
-    private void handleEmptyHtmlResponse(HttpServletRequest httpReq, HttpServletResponse httpRes) throws IOException {
-        String uri = httpReq != null ? httpReq.getRequestURI() : "";
-        String html = buildHtmlError(UUID.randomUUID().toString(),
-                HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
-                httpReq != null ? httpReq.getMethod() : "",
-                uri,
-                "Empty response returned by downstream component");
-        httpRes.reset();
-        httpRes.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-        httpRes.setCharacterEncoding(StandardCharsets.UTF_8.name());
-        httpRes.setContentType("text/html; charset=UTF-8");
-        httpRes.getWriter().write(html);
-        httpRes.getWriter().flush();
-    }
-
-    private void relayCapturedOutput(HttpServletResponse httpRes, byte[] body, int status, String contentType) throws IOException {
-        if (contentType != null) {
-            httpRes.setContentType(contentType);
-        }
-        if (status != 0) {
-            httpRes.setStatus(status);
-        }
-        if (body.length > 0) {
-            httpRes.getOutputStream().write(body);
-            httpRes.getOutputStream().flush();
-        }
-    }
-
     @Override
     public void destroy() {
+        // No resources to release; required by Filter contract
     }
 
     private void handleException(ServletRequest req, ServletResponse res, Throwable t) throws IOException {
@@ -203,37 +158,41 @@ public class MetadataFilter implements Filter {
         }
 
         int status = Utils.getHttpStatusFor(root);
+        boolean wantsHtml = determineWantsHtml(uri, accept, request);
 
-        // Decide response type: HTML for legacy pages (.html in URI or Accept contains text/html), JSON otherwise
+        if (wantsHtml) {
+            writeHtmlError(response, correlationId, status, method, uri, rootClass, rootMsg);
+        } else {
+            writeJsonError(response, correlationId, status, root);
+        }
+    }
+
+    private boolean determineWantsHtml(String uri, String accept, HttpServletRequest request) {
         String isc = request != null ? request.getParameter("isc_dataFormat") : null;
         boolean wantsHtml = (uri != null && uri.toLowerCase().endsWith(HTML))
                 || (accept != null && accept.toLowerCase().contains("text/html"));
         if (isc != null && isc.equalsIgnoreCase("json")) {
             wantsHtml = false;
         }
-
-        if (wantsHtml) {
-            String body = buildHtmlErrorDetailed(correlationId, status, method, uri, rootClass, rootMsg, request);
-            response.reset();
-            response.setStatus(status);
-            response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-            response.setContentType("text/html; charset=UTF-8");
-            response.getWriter().write(body);
-            response.getWriter().flush();
-        } else {
-            String json = Utils.convertToJson(root).toString();
-            // Attach correlation id for easier server/client matching
-            json = json.substring(0, json.length() - 1) + ",\"cid\":\"" + correlationId + "\"}";
-            Utils.writeJsonResponse(response, status, json);
-        }
+        return wantsHtml;
     }
 
-    private boolean shouldCaptureHtml(HttpServletRequest req, HttpServletResponse res) {
-        if (req == null || res == null) return false;
-        String uri = req.getRequestURI();
-        String accept = req.getHeader("Accept");
-        return (uri != null && uri.toLowerCase().endsWith(HTML))
-                || (accept != null && accept.toLowerCase().contains("text/html"));
+    private void writeHtmlError(HttpServletResponse response, String correlationId, int status,
+            String method, String uri, String rootClass, String rootMsg) throws IOException {
+        String body = buildHtmlErrorDetailed(correlationId, status, method, uri, rootClass, rootMsg);
+        response.reset();
+        response.setStatus(status);
+        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+        response.setContentType("text/html; charset=UTF-8");
+        response.getWriter().write(body);
+        response.getWriter().flush();
+    }
+
+    private void writeJsonError(HttpServletResponse response, String correlationId,
+            int status, Throwable root) throws IOException {
+        String json = Utils.convertToJson(root).toString();
+        json = json.substring(0, json.length() - 1) + ",\"cid\":\"" + correlationId + "\"}";
+        Utils.writeJsonResponse(response, status, json);
     }
 
     private String buildHtmlError(String cid, int status, String method, String uri, String message) {
@@ -256,7 +215,7 @@ public class MetadataFilter implements Filter {
                 + "</body></html>";
     }
 
-    private String buildHtmlErrorDetailed(String cid, int status, String method, String uri, String exClass, String message, HttpServletRequest req) {
+    private String buildHtmlErrorDetailed(String cid, int status, String method, String uri, String exClass, String message) {
         String base = buildHtmlError(cid, status, method, uri, message + (exClass != null ? " (" + exClass + ")" : ""));
         boolean isLegacyHtml = uri != null && uri.toLowerCase().endsWith(HTML);
         boolean isCNF = exClass != null && (exClass.endsWith("ClassNotFoundException") || (message != null && message.contains("org.openbravo.erpWindows")));

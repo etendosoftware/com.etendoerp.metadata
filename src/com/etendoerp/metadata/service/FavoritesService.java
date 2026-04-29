@@ -25,6 +25,9 @@ import java.io.IOException;
  */
 public class FavoritesService extends MetadataService {
 
+    private static final String MENU_ID = "menuId";
+    private static final String USER_ID = "userId";
+    private static final String ROLE_ID = "roleId";
     private static final String TOGGLE_PATH = "/favorites/toggle";
 
     private static final String EXISTS_HQL =
@@ -41,6 +44,12 @@ public class FavoritesService extends MetadataService {
         "select coalesce(max(f.sequenceNo), 0) from etmeta_User_Favorite f " +
         "where f.userContact.id = :userId and f.role.id = :roleId and f.active = true";
 
+    /**
+     * Creates a new FavoritesService for the given request/response pair.
+     *
+     * @param request  the HTTP request
+     * @param response the HTTP response
+     */
     public FavoritesService(HttpServletRequest request, HttpServletResponse response) {
         super(request, response);
     }
@@ -59,7 +68,7 @@ public class FavoritesService extends MetadataService {
             OBContext.setAdminMode(true);
 
             JSONObject body = new JSONObject(readBody());
-            String menuId = body.getString("menuId");
+            String menuId = body.getString(MENU_ID);
             String userId = OBContext.getOBContext().getUser().getId();
             String roleId = OBContext.getOBContext().getRole().getId();
 
@@ -78,21 +87,21 @@ public class FavoritesService extends MetadataService {
     private JSONObject toggle(String userId, String menuId, String roleId) throws Exception {
         Query<Long> existsQ = OBDal.getInstance().getSession()
                 .createQuery(EXISTS_HQL, Long.class);
-        existsQ.setParameter("userId", userId);
-        existsQ.setParameter("menuId", menuId);
-        existsQ.setParameter("roleId", roleId);
+        existsQ.setParameter(USER_ID, userId);
+        existsQ.setParameter(MENU_ID, menuId);
+        existsQ.setParameter(ROLE_ID, roleId);
         boolean exists = existsQ.uniqueResult() > 0;
 
         if (exists) {
             // remove via bulk DELETE to avoid Hibernate stale-state issues
             OBDal.getInstance().getSession()
                     .createQuery(DELETE_HQL)
-                    .setParameter("userId", userId)
-                    .setParameter("menuId", menuId)
-                    .setParameter("roleId", roleId)
+                    .setParameter(USER_ID, userId)
+                    .setParameter(MENU_ID, menuId)
+                    .setParameter(ROLE_ID, roleId)
                     .executeUpdate();
             OBDal.getInstance().flush();
-            return new JSONObject().put("action", "removed").put("menuId", menuId);
+            return new JSONObject().put("action", "removed").put(MENU_ID, menuId);
         }
 
         // add
@@ -103,8 +112,8 @@ public class FavoritesService extends MetadataService {
 
         Query<Long> seqQ = OBDal.getInstance().getSession()
                 .createQuery(MAX_SEQNO_HQL, Long.class);
-        seqQ.setParameter("userId", userId);
-        seqQ.setParameter("roleId", roleId);
+        seqQ.setParameter(USER_ID, userId);
+        seqQ.setParameter(ROLE_ID, roleId);
         Long maxSeq = seqQ.uniqueResult();
 
         UserFavorite fav = (UserFavorite) org.openbravo.base.provider.OBProvider.getInstance().get(UserFavorite.class);
@@ -123,7 +132,7 @@ public class FavoritesService extends MetadataService {
             throw e;
         }
 
-        return new JSONObject().put("action", "added").put("menuId", menuId);
+        return new JSONObject().put("action", "added").put(MENU_ID, menuId);
     }
 
     private String readBody() throws IOException {

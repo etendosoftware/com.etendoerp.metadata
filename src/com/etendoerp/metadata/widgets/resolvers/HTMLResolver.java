@@ -4,6 +4,7 @@ import com.etendoerp.metadata.widgets.WidgetDataContext;
 import com.etendoerp.metadata.widgets.WidgetDataResolver;
 import org.codehaus.jettison.json.JSONObject;
 
+/** Resolves widget data for HTML-type widgets by returning stored HTML content. */
 public class HTMLResolver implements WidgetDataResolver {
     @Override public String getType() { return "HTML"; }
 

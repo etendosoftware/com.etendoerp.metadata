@@ -6,11 +6,17 @@ import org.hibernate.Session;
 import org.hibernate.query.Query;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.*;
+import org.mockito.Mock;
+import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.openbravo.dal.service.OBDal;
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class KPIResolverTest {
@@ -18,12 +24,12 @@ class KPIResolverTest {
     @Mock Session session;
 
     @Test
-    void getType_returnsKPI() {
+    void getTypeReturnsKpi() {
         assertEquals("KPI", new KPIResolver().getType());
     }
 
     @Test
-    void resolve_returnsValueFromHqlQuery() throws Exception {
+    void resolveReturnsValueFromHqlQuery() throws Exception {
         WidgetDataContext ctx = mock(WidgetDataContext.class);
         when(ctx.classString("4")).thenReturn("select 95 from dual");
         when(ctx.param("label")).thenReturn("Facturas completadas");

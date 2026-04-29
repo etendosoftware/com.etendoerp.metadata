@@ -23,6 +23,9 @@ package com.etendoerp.metadata.http.session;
     import java.util.Collections;
     import java.util.Enumeration;
 
+    /**
+     * In-memory HttpSession implementation backed by a SessionAttributeStore for stateless environments.
+     */
     public class LegacyHttpSessionAdapter implements HttpSession {
       private final String id;
       private final ServletContext servletContext;
@@ -31,6 +34,12 @@ package com.etendoerp.metadata.http.session;
       private long lastAccessedTime;
       private boolean invalidated = false;
 
+      /**
+       * Creates a new LegacyHttpSessionAdapter.
+       *
+       * @param sessionId      the session identifier
+       * @param servletContext  the servlet context for this session
+       */
       public LegacyHttpSessionAdapter(String sessionId, ServletContext servletContext) {
         this.id = sessionId;
         this.servletContext = servletContext;
@@ -78,8 +87,12 @@ package com.etendoerp.metadata.http.session;
         return -1;
       }
 
+      /**
+       * @deprecated As of Java Servlet API. This method is included for compatibility only
+       * and will always return null.
+       */
       @Override
-      @Deprecated
+      @Deprecated(since = "1.0")
       public HttpSessionContext getSessionContext() {
         checkValid();
         return null;

@@ -34,6 +34,9 @@ import java.util.List;
 public class CalendarResolver implements WidgetDataResolver {
 
     private static final String DATE_FORMAT = "yyyy-MM-dd";
+    private static final String PARAM_DATE_FROM = "dateFrom";
+    private static final String PARAM_DATE_TO = "dateTo";
+    private static final String PARAM_CLIENT = "client";
 
     private static final String CURRENT_PERIOD_HQL =
         "select p.id, p.name, p.startingDate, p.endingDate, p.openClose " +
@@ -85,8 +88,8 @@ public class CalendarResolver implements WidgetDataResolver {
         Date   today   = new Date();
 
         // ── resolve date range (defaults: current month in server timezone)
-        String fromStr = ctx.param("dateFrom");
-        String toStr   = ctx.param("dateTo");
+        String fromStr = ctx.param(PARAM_DATE_FROM);
+        String toStr   = ctx.param(PARAM_DATE_TO);
         Date dateFrom  = (fromStr != null) ? sdf.parse(fromStr) : firstDayOfMonth(today);
         Date dateTo    = (toStr   != null) ? sdf.parse(toStr)   : lastDayOfMonth(today);
 
@@ -103,8 +106,8 @@ public class CalendarResolver implements WidgetDataResolver {
         return new JSONObject()
                 .put("currentPeriod", currentPeriod != null ? currentPeriod : JSONObject.NULL)
                 .put("entries",       entries)
-                .put("dateFrom",      sdf.format(dateFrom))
-                .put("dateTo",        sdf.format(dateTo));
+                .put(PARAM_DATE_FROM,      sdf.format(dateFrom))
+                .put(PARAM_DATE_TO,        sdf.format(dateTo));
     }
 
     // ── internal helpers ────────────────────────────────────────────────────
@@ -113,7 +116,7 @@ public class CalendarResolver implements WidgetDataResolver {
                                           SimpleDateFormat sdf) throws Exception {
         Query<Object[]> q = OBDal.getInstance().getSession()
                 .createQuery(CURRENT_PERIOD_HQL, Object[].class);
-        q.setParameter("client", client);
+        q.setParameter(PARAM_CLIENT, client);
         q.setParameter("today",  today);
         q.setMaxResults(1);
         List<Object[]> rows = q.list();
@@ -129,9 +132,9 @@ public class CalendarResolver implements WidgetDataResolver {
         if (includePeriods) {
             Query<Object[]> q = OBDal.getInstance().getSession()
                     .createQuery(PERIODS_HQL, Object[].class);
-            q.setParameter("client",   client);
-            q.setParameter("dateFrom", dateFrom);
-            q.setParameter("dateTo",   dateTo);
+            q.setParameter(PARAM_CLIENT,   client);
+            q.setParameter(PARAM_DATE_FROM, dateFrom);
+            q.setParameter(PARAM_DATE_TO,   dateTo);
             for (Object[] row : q.list()) {
                 JSONObject e = periodToJson(row, sdf);
                 e.put("type", "PERIOD");
@@ -144,9 +147,9 @@ public class CalendarResolver implements WidgetDataResolver {
         if (includeNbd) {
             Query<Object[]> q = OBDal.getInstance().getSession()
                     .createQuery(NBD_HQL, Object[].class);
-            q.setParameter("client",   client);
-            q.setParameter("dateFrom", dateFrom);
-            q.setParameter("dateTo",   dateTo);
+            q.setParameter(PARAM_CLIENT,   client);
+            q.setParameter(PARAM_DATE_FROM, dateFrom);
+            q.setParameter(PARAM_DATE_TO,   dateTo);
             for (Object[] row : q.list()) {
                 nbdEntries.add(new JSONObject()
                         .put("type", "NON_BUSINESS_DAY")
@@ -155,9 +158,15 @@ public class CalendarResolver implements WidgetDataResolver {
             }
         }
 
-        // ── merge: iterate both sorted lists, PERIOD before NBD on same date
+        return mergeSortedEntries(periodEntries, nbdEntries);
+    }
+
+    /** Merges two pre-sorted lists, placing PERIOD entries before NBD entries on the same date. */
+    private JSONArray mergeSortedEntries(List<JSONObject> periodEntries,
+                                         List<JSONObject> nbdEntries) throws Exception {
         JSONArray result = new JSONArray();
-        int pi = 0, ni = 0;
+        int pi = 0;
+        int ni = 0;
         while (pi < periodEntries.size() || ni < nbdEntries.size()) {
             if (pi >= periodEntries.size()) {
                 result.put(nbdEntries.get(ni++));

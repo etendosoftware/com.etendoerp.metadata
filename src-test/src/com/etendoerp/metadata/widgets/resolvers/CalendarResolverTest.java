@@ -7,7 +7,8 @@ import org.hibernate.Session;
 import org.hibernate.query.Query;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.*;
+import org.mockito.Mock;
+import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -18,34 +19,59 @@ import org.openbravo.model.ad.system.Client;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Date;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class CalendarResolverTest {
+
+    private static final String DATE_FORMAT = "yyyy-MM-dd";
+    private static final String DATE_FROM = "dateFrom";
+    private static final String DATE_TO = "dateTo";
+    private static final String QUERY_TODAY = ":today";
+    private static final String QUERY_DATE_TO = ":dateTo";
+    private static final String QUERY_NBD = "nonBusinessDayDate";
+    private static final String MARCH_2026 = "March 2026";
+    private static final String DATE_2026_03_01 = "2026-03-01";
+    private static final String DATE_2026_03_31 = "2026-03-31";
+    private static final String CURRENT_PERIOD = "currentPeriod";
+    private static final String FALSE_STR = "false";
+    private static final String ENTRIES = "entries";
+    private static final String DATE_2026_04_03 = "2026-04-03";
+    private static final String EASTER = "Easter";
+    private static final String DATE_2026_04_30 = "2026-04-30";
 
     @Mock OBDal    obDal;
     @Mock Session  session;
     @Mock OBContext obContext;
     @Mock Client   mockClient;
 
-    // ── helper: build a period row: [id, name, startDate, endDate, openClose]
+    // helper: build a period row: [id, name, startDate, endDate, openClose]
     private Object[] periodRow(String id, String name, String start, String end, String oc)
             throws Exception {
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+        SimpleDateFormat sdf = new SimpleDateFormat(DATE_FORMAT);
         return new Object[]{ id, name, sdf.parse(start), sdf.parse(end), oc };
     }
 
-    // ── helper: build a non-business-day row: [name, date]
+    // helper: build a non-business-day row: [name, date]
     private Object[] nbdRow(String name, String date) throws Exception {
-        return new Object[]{ name, new SimpleDateFormat("yyyy-MM-dd").parse(date) };
+        return new Object[]{ name, new SimpleDateFormat(DATE_FORMAT).parse(date) };
     }
 
-    // ── helper: mock a Query<Object[]> that returns given rows
+    // helper: mock a Query<Object[]> that returns given rows
     @SuppressWarnings("unchecked")
     private Query<Object[]> mockQuery(Object[]... rows) {
         Query<Object[]> q = mock(Query.class);
@@ -54,7 +80,7 @@ class CalendarResolverTest {
         return q;
     }
 
-    // ── helper: mock a single-result Query<Object[]>
+    // helper: mock a single-result Query<Object[]>
     @SuppressWarnings("unchecked")
     private Query<Object[]> mockQuerySingle(Object[] row) {
         Query<Object[]> q = mock(Query.class);
@@ -73,179 +99,174 @@ class CalendarResolverTest {
         return q;
     }
 
-    // ── shared context mock
+    // shared context mock
     private WidgetDataContext ctxWithParams(String dateFrom, String dateTo,
                                             String includePeriods, String includeNbd) {
         WidgetDataContext ctx = mock(WidgetDataContext.class);
         when(ctx.getObContext()).thenReturn(obContext);
         when(obContext.getCurrentClient()).thenReturn(mockClient);
         when(mockClient.getId()).thenReturn("clientId1");
-        lenient().when(ctx.param("dateFrom")).thenReturn(dateFrom);
-        lenient().when(ctx.param("dateTo")).thenReturn(dateTo);
+        lenient().when(ctx.param(DATE_FROM)).thenReturn(dateFrom);
+        lenient().when(ctx.param(DATE_TO)).thenReturn(dateTo);
         lenient().when(ctx.param("includePeriods")).thenReturn(includePeriods);
         lenient().when(ctx.param("includeNonBusinessDays")).thenReturn(includeNbd);
         return ctx;
     }
 
-    // ─────────────────────────────────────────────────
-
     @Test
-    void getType_returnsCALENDAR() {
+    void getTypeReturnsCalendar() {
         assertEquals("CALENDAR", new CalendarResolver().getType());
     }
 
     @Test
-    void currentPeriod_populatedWhenPeriodCoversToday() throws Exception {
-        Object[] pRow = periodRow("pid1", "March 2026", "2026-03-01", "2026-03-31", "O");
-        // currentPeriod query returns a row; periods-in-range also returns it; nbd empty
+    void currentPeriodPopulatedWhenPeriodCoversToday() throws Exception {
+        Object[] pRow = periodRow("pid1", MARCH_2026, DATE_2026_03_01, DATE_2026_03_31, "O");
         Query<Object[]> currentQ = mockQuerySingle(pRow);
         Query<Object[]> periodsQ = mockQuery(pRow);
         Query<Object[]> nbdQ    = mockQuery();
 
-        when(session.createQuery(contains(":today"), eq(Object[].class)))
+        when(session.createQuery(contains(QUERY_TODAY), eq(Object[].class)))
                 .thenReturn(currentQ);
-        when(session.createQuery(contains(":dateTo"), eq(Object[].class)))
+        when(session.createQuery(contains(QUERY_DATE_TO), eq(Object[].class)))
                 .thenReturn(periodsQ);
-        when(session.createQuery(contains("nonBusinessDayDate"), eq(Object[].class)))
+        when(session.createQuery(contains(QUERY_NBD), eq(Object[].class)))
                 .thenReturn(nbdQ);
 
-        WidgetDataContext ctx = ctxWithParams("2026-03-01", "2026-03-31", "true", "true");
+        WidgetDataContext ctx = ctxWithParams(DATE_2026_03_01, DATE_2026_03_31, "true", "true");
 
         try (MockedStatic<OBDal> dal = mockStatic(OBDal.class)) {
             dal.when(OBDal::getInstance).thenReturn(obDal);
             when(obDal.getSession()).thenReturn(session);
 
             JSONObject result = new CalendarResolver().resolve(ctx);
-            assertFalse(result.isNull("currentPeriod"));
-            assertEquals("March 2026", result.getJSONObject("currentPeriod").getString("name"));
-            assertEquals("O", result.getJSONObject("currentPeriod").getString("openClose"));
+            assertFalse(result.isNull(CURRENT_PERIOD));
+            assertEquals(MARCH_2026, result.getJSONObject(CURRENT_PERIOD).getString("name"));
+            assertEquals("O", result.getJSONObject(CURRENT_PERIOD).getString("openClose"));
         }
     }
 
     @Test
-    void currentPeriod_nullWhenNoPeriodCoversToday() throws Exception {
+    void currentPeriodNullWhenNoPeriodCoversToday() throws Exception {
         Query<Object[]> currentQ = mockQueryEmpty();
         Query<Object[]> periodsQ = mockQuery();
         Query<Object[]> nbdQ    = mockQuery();
 
-        when(session.createQuery(contains(":today"), eq(Object[].class)))
+        when(session.createQuery(contains(QUERY_TODAY), eq(Object[].class)))
                 .thenReturn(currentQ);
-        when(session.createQuery(contains(":dateTo"), eq(Object[].class)))
+        when(session.createQuery(contains(QUERY_DATE_TO), eq(Object[].class)))
                 .thenReturn(periodsQ);
-        when(session.createQuery(contains("nonBusinessDayDate"), eq(Object[].class)))
+        when(session.createQuery(contains(QUERY_NBD), eq(Object[].class)))
                 .thenReturn(nbdQ);
 
-        WidgetDataContext ctx = ctxWithParams("2026-03-01", "2026-03-31", "true", "true");
+        WidgetDataContext ctx = ctxWithParams(DATE_2026_03_01, DATE_2026_03_31, "true", "true");
 
         try (MockedStatic<OBDal> dal = mockStatic(OBDal.class)) {
             dal.when(OBDal::getInstance).thenReturn(obDal);
             when(obDal.getSession()).thenReturn(session);
 
             JSONObject result = new CalendarResolver().resolve(ctx);
-            assertTrue(result.isNull("currentPeriod"));
+            assertTrue(result.isNull(CURRENT_PERIOD));
         }
     }
 
     @Test
-    void entries_containsPeriodEntriesWithId() throws Exception {
-        Object[] pRow = periodRow("pid1", "March 2026", "2026-03-01", "2026-03-31", "O");
+    void entriesContainsPeriodEntriesWithId() throws Exception {
+        Object[] pRow = periodRow("pid1", MARCH_2026, DATE_2026_03_01, DATE_2026_03_31, "O");
         Query<Object[]> currentQ = mockQueryEmpty();
         Query<Object[]> periodsQ = mockQuery(pRow);
         Query<Object[]> nbdQ    = mockQuery();
 
-        when(session.createQuery(contains(":today"), eq(Object[].class)))
+        when(session.createQuery(contains(QUERY_TODAY), eq(Object[].class)))
                 .thenReturn(currentQ);
-        when(session.createQuery(contains(":dateTo"), eq(Object[].class)))
+        when(session.createQuery(contains(QUERY_DATE_TO), eq(Object[].class)))
                 .thenReturn(periodsQ);
-        when(session.createQuery(contains("nonBusinessDayDate"), eq(Object[].class)))
+        when(session.createQuery(contains(QUERY_NBD), eq(Object[].class)))
                 .thenReturn(nbdQ);
 
-        WidgetDataContext ctx = ctxWithParams("2026-03-01", "2026-03-31", "true", "false");
+        WidgetDataContext ctx = ctxWithParams(DATE_2026_03_01, DATE_2026_03_31, "true", FALSE_STR);
 
         try (MockedStatic<OBDal> dal = mockStatic(OBDal.class)) {
             dal.when(OBDal::getInstance).thenReturn(obDal);
             when(obDal.getSession()).thenReturn(session);
 
-            JSONArray entries = new CalendarResolver().resolve(ctx).getJSONArray("entries");
+            JSONArray entries = new CalendarResolver().resolve(ctx).getJSONArray(ENTRIES);
             assertEquals(1, entries.length());
             JSONObject e = entries.getJSONObject(0);
             assertEquals("PERIOD", e.getString("type"));
             assertEquals("pid1",   e.getString("id"));
-            assertEquals("March 2026", e.getString("name"));
+            assertEquals(MARCH_2026, e.getString("name"));
         }
     }
 
     @Test
-    void entries_containsNonBusinessDayEntries() throws Exception {
-        Object[] nbdRow = nbdRow("Easter", "2026-04-03");
+    void entriesContainsNonBusinessDayEntries() throws Exception {
+        Object[] nbdRow = nbdRow(EASTER, DATE_2026_04_03);
         Query<Object[]> currentQ = mockQueryEmpty();
         Query<Object[]> periodsQ = mockQuery();
         Query<Object[]> nbdQ    = mockQuery(nbdRow);
 
-        when(session.createQuery(contains(":today"), eq(Object[].class)))
+        when(session.createQuery(contains(QUERY_TODAY), eq(Object[].class)))
                 .thenReturn(currentQ);
-        when(session.createQuery(contains(":dateTo"), eq(Object[].class)))
+        when(session.createQuery(contains(QUERY_DATE_TO), eq(Object[].class)))
                 .thenReturn(periodsQ);
-        when(session.createQuery(contains("nonBusinessDayDate"), eq(Object[].class)))
+        when(session.createQuery(contains(QUERY_NBD), eq(Object[].class)))
                 .thenReturn(nbdQ);
 
-        WidgetDataContext ctx = ctxWithParams("2026-04-01", "2026-04-30", "false", "true");
+        WidgetDataContext ctx = ctxWithParams("2026-04-01", DATE_2026_04_30, FALSE_STR, "true");
 
         try (MockedStatic<OBDal> dal = mockStatic(OBDal.class)) {
             dal.when(OBDal::getInstance).thenReturn(obDal);
             when(obDal.getSession()).thenReturn(session);
 
-            JSONArray entries = new CalendarResolver().resolve(ctx).getJSONArray("entries");
+            JSONArray entries = new CalendarResolver().resolve(ctx).getJSONArray(ENTRIES);
             assertEquals(1, entries.length());
             JSONObject e = entries.getJSONObject(0);
             assertEquals("NON_BUSINESS_DAY", e.getString("type"));
-            assertEquals("Easter", e.getString("name"));
+            assertEquals(EASTER, e.getString("name"));
         }
     }
 
     @Test
-    void entries_emptyWhenBothFlagsAreFalse() throws Exception {
+    void entriesEmptyWhenBothFlagsAreFalse() throws Exception {
         Query<Object[]> currentQ = mockQueryEmpty();
 
-        when(session.createQuery(contains(":today"), eq(Object[].class)))
+        when(session.createQuery(contains(QUERY_TODAY), eq(Object[].class)))
                 .thenReturn(currentQ);
-        // periods and nbd queries should NOT be called when both flags are false
 
-        WidgetDataContext ctx = ctxWithParams("2026-03-01", "2026-03-31", "false", "false");
+        WidgetDataContext ctx = ctxWithParams(DATE_2026_03_01, DATE_2026_03_31, FALSE_STR, FALSE_STR);
 
         try (MockedStatic<OBDal> dal = mockStatic(OBDal.class)) {
             dal.when(OBDal::getInstance).thenReturn(obDal);
             when(obDal.getSession()).thenReturn(session);
 
             JSONObject result = new CalendarResolver().resolve(ctx);
-            assertEquals(0, result.getJSONArray("entries").length());
+            assertEquals(0, result.getJSONArray(ENTRIES).length());
         }
     }
 
     @Test
-    void entries_sortedChronologicallyPeriodBeforeNbdOnSameDate() throws Exception {
-        // Period starts 2026-04-03; NBD also on 2026-04-03 → PERIOD comes first
-        Object[] pRow  = periodRow("pid1", "April 2026", "2026-04-03", "2026-04-30", "O");
-        Object[] nbdRow = nbdRow("Easter", "2026-04-03");
+    void entriesSortedChronologicallyPeriodBeforeNbdOnSameDate() throws Exception {
+        Object[] pRow  = periodRow("pid1", "April 2026", DATE_2026_04_03, DATE_2026_04_30, "O");
+        Object[] nbdRow = nbdRow(EASTER, DATE_2026_04_03);
 
         Query<Object[]> currentQ = mockQueryEmpty();
         Query<Object[]> periodsQ = mockQuery(pRow);
         Query<Object[]> nbdQ    = mockQuery(nbdRow);
 
-        when(session.createQuery(contains(":today"), eq(Object[].class)))
+        when(session.createQuery(contains(QUERY_TODAY), eq(Object[].class)))
                 .thenReturn(currentQ);
-        when(session.createQuery(contains(":dateTo"), eq(Object[].class)))
+        when(session.createQuery(contains(QUERY_DATE_TO), eq(Object[].class)))
                 .thenReturn(periodsQ);
-        when(session.createQuery(contains("nonBusinessDayDate"), eq(Object[].class)))
+        when(session.createQuery(contains(QUERY_NBD), eq(Object[].class)))
                 .thenReturn(nbdQ);
 
-        WidgetDataContext ctx = ctxWithParams("2026-04-01", "2026-04-30", "true", "true");
+        WidgetDataContext ctx = ctxWithParams("2026-04-01", DATE_2026_04_30, "true", "true");
 
         try (MockedStatic<OBDal> dal = mockStatic(OBDal.class)) {
             dal.when(OBDal::getInstance).thenReturn(obDal);
             when(obDal.getSession()).thenReturn(session);
 
-            JSONArray entries = new CalendarResolver().resolve(ctx).getJSONArray("entries");
+            JSONArray entries = new CalendarResolver().resolve(ctx).getJSONArray(ENTRIES);
             assertEquals(2, entries.length());
             assertEquals("PERIOD",           entries.getJSONObject(0).getString("type"));
             assertEquals("NON_BUSINESS_DAY", entries.getJSONObject(1).getString("type"));
@@ -253,19 +274,18 @@ class CalendarResolverTest {
     }
 
     @Test
-    void defaultDateRange_fallsBackToCurrentMonth() throws Exception {
+    void defaultDateRangeFallsBackToCurrentMonth() throws Exception {
         Query<Object[]> currentQ = mockQueryEmpty();
         Query<Object[]> periodsQ = mockQuery();
         Query<Object[]> nbdQ    = mockQuery();
 
-        when(session.createQuery(contains(":today"), eq(Object[].class)))
+        when(session.createQuery(contains(QUERY_TODAY), eq(Object[].class)))
                 .thenReturn(currentQ);
-        when(session.createQuery(contains(":dateTo"), eq(Object[].class)))
+        when(session.createQuery(contains(QUERY_DATE_TO), eq(Object[].class)))
                 .thenReturn(periodsQ);
-        when(session.createQuery(contains("nonBusinessDayDate"), eq(Object[].class)))
+        when(session.createQuery(contains(QUERY_NBD), eq(Object[].class)))
                 .thenReturn(nbdQ);
 
-        // No dateFrom/dateTo params
         WidgetDataContext ctx = ctxWithParams(null, null, "true", "true");
 
         try (MockedStatic<OBDal> dal = mockStatic(OBDal.class)) {
@@ -273,14 +293,12 @@ class CalendarResolverTest {
             when(obDal.getSession()).thenReturn(session);
 
             JSONObject result = new CalendarResolver().resolve(ctx);
-            // dateFrom and dateTo must be present and non-null
-            assertFalse(result.isNull("dateFrom"));
-            assertFalse(result.isNull("dateTo"));
-            // both must be valid yyyy-MM-dd strings
-            assertDoesNotThrow(() -> new SimpleDateFormat("yyyy-MM-dd")
-                    .parse(result.getString("dateFrom")));
-            assertDoesNotThrow(() -> new SimpleDateFormat("yyyy-MM-dd")
-                    .parse(result.getString("dateTo")));
+            assertFalse(result.isNull(DATE_FROM));
+            assertFalse(result.isNull(DATE_TO));
+            assertDoesNotThrow(() -> new SimpleDateFormat(DATE_FORMAT)
+                    .parse(result.getString(DATE_FROM)));
+            assertDoesNotThrow(() -> new SimpleDateFormat(DATE_FORMAT)
+                    .parse(result.getString(DATE_TO)));
         }
     }
 }

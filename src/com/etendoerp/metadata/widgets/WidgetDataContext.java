@@ -18,6 +18,16 @@ public class WidgetDataContext {
     private final OBContext obContext;
     private final String bearerToken;
 
+    /**
+     * Creates a new WidgetDataContext.
+     *
+     * @param instanceId   the widget instance identifier
+     * @param instanceData the dashboard widget row fields
+     * @param classData    the widget class row fields
+     * @param params       merged parameter values
+     * @param obContext     the current OBContext
+     * @param bearerToken  the Authorization header value, or {@code null}
+     */
     public WidgetDataContext(String instanceId,
                              Map<String, Object> instanceData,
                              Map<String, Object> classData,
@@ -39,13 +49,23 @@ public class WidgetDataContext {
     public OBContext getObContext()                 { return obContext; }
     public String getBearerToken()                 { return bearerToken; }
 
-    /** Convenience: get a class field as String. */
+    /**
+     * Returns a class-data field value as a String.
+     *
+     * @param key the field key
+     * @return the value as String, or {@code null}
+     */
     public String classString(String key) {
         Object v = classData.get(key);
         return v != null ? v.toString() : null;
     }
 
-    /** Convenience: get a param value as String. */
+    /**
+     * Returns a parameter value as a String.
+     *
+     * @param key the parameter name
+     * @return the value as String, or {@code null}
+     */
     public String param(String key) {
         Object v = params.get(key);
         return v != null ? v.toString() : null;

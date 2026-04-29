@@ -25,11 +25,16 @@ import javax.servlet.http.HttpServletRequest;
 import org.openbravo.base.secureApp.VariablesSecureApp;
 
 /**
- * @author luuchorocha
+ * Extends VariablesSecureApp to track session attributes with their original case-sensitive names.
  */
 public class RequestVariables extends VariablesSecureApp {
     private final Map<String, Object> casedSessionAttributes = new HashMap<>();
 
+    /**
+     * Creates a new RequestVariables from the given HTTP request.
+     *
+     * @param request the HTTP servlet request
+     */
     public RequestVariables(HttpServletRequest request) {
         super(request);
     }

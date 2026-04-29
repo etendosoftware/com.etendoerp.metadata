@@ -56,6 +56,16 @@ public class QueryListResolver implements WidgetDataResolver {
         List<Object[]> rawRows = q.list();
         if (totalRows < 0) totalRows = rawRows.size();
 
+        JSONArray rows = buildRows(rawRows, colNames);
+        JSONArray colDefs = buildColumnDefs(colNames);
+
+        return new JSONObject()
+                .put("columns",   colDefs)
+                .put("rows",      rows)
+                .put("totalRows", totalRows);
+    }
+
+    private JSONArray buildRows(List<Object[]> rawRows, String[] colNames) throws Exception {
         JSONArray rows = new JSONArray();
         for (Object[] raw : rawRows) {
             JSONObject row = new JSONObject();
@@ -65,18 +75,17 @@ public class QueryListResolver implements WidgetDataResolver {
             }
             rows.put(row);
         }
+        return rows;
+    }
 
+    private JSONArray buildColumnDefs(String[] colNames) throws Exception {
         JSONArray colDefs = new JSONArray();
         for (String col : colNames) {
             String name = col.trim();
-            if (name.endsWith("Id")) continue; // ID fields stay in rows for navigation, not displayed
+            if (name.endsWith("Id")) continue;
             colDefs.put(new JSONObject().put("name", name).put("label", toLabel(name)));
         }
-
-        return new JSONObject()
-                .put("columns",   colDefs)
-                .put("rows",      rows)
-                .put("totalRows", totalRows);
+        return colDefs;
     }
 
     private Map<String, Object> buildResolvedParams(WidgetDataContext ctx) {
@@ -185,7 +194,8 @@ public class QueryListResolver implements WidgetDataResolver {
     /** Splits a string by commas that are not inside parentheses. */
     private List<String> splitTopLevel(String s) {
         List<String> result = new ArrayList<>();
-        int depth = 0, start = 0;
+        int depth = 0;
+        int start = 0;
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);
             if      (c == '(') depth++;

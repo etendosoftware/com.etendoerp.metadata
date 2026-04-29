@@ -7,7 +7,8 @@ import org.hibernate.Session;
 import org.hibernate.query.Query;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.*;
+import org.mockito.Mock;
+import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
@@ -15,8 +16,15 @@ import org.openbravo.model.ad.access.User;
 
 import java.util.Collections;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class NotificationResolverTest {
@@ -26,13 +34,13 @@ class NotificationResolverTest {
     @Mock User     mockUser;
 
     @Test
-    void getType_returnsNOTIFICATION() {
+    void getTypeReturnsNotification() {
         assertEquals("NOTIFICATION", new NotificationResolver().getType());
     }
 
     @SuppressWarnings("unchecked")
     @Test
-    void resolve_returnsMappedItems() throws Exception {
+    void resolveReturnsMappedItems() throws Exception {
         WidgetDataContext ctx = mock(WidgetDataContext.class);
         when(ctx.getObContext()).thenReturn(obContext);
         when(obContext.getUser()).thenReturn(mockUser);

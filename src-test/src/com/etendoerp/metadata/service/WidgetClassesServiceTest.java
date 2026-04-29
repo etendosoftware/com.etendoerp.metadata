@@ -3,7 +3,8 @@ package com.etendoerp.metadata.service;
 import org.codehaus.jettison.json.JSONObject;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.*;
+import org.mockito.Mock;
+import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
@@ -17,11 +18,18 @@ import java.io.StringWriter;
 import java.util.Collections;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class WidgetClassesServiceTest {
+
+    private static final String CLASSES = CLASSES;
 
     @Mock HttpServletRequest  request;
     @Mock HttpServletResponse response;
@@ -31,7 +39,7 @@ class WidgetClassesServiceTest {
     @Mock Query<Object[]>      query;
 
     @Test
-    void getClasses_returnsClassesArray() throws Exception {
+    void getClassesReturnsClassesArray() throws Exception {
         StringWriter sw = new StringWriter();
         when(response.getWriter()).thenReturn(new PrintWriter(sw));
 
@@ -58,9 +66,9 @@ class WidgetClassesServiceTest {
 
             String output = sw.toString();
             JSONObject result = new JSONObject(output);
-            assertTrue(result.has("classes"));
-            assertEquals(1, result.getJSONArray("classes").length());
-            assertEquals("KPI", result.getJSONArray("classes").getJSONObject(0).getString("type"));
+            assertTrue(result.has(CLASSES));
+            assertEquals(1, result.getJSONArray(CLASSES).length());
+            assertEquals("KPI", result.getJSONArray(CLASSES).getJSONObject(0).getString("type"));
         }
     }
 }

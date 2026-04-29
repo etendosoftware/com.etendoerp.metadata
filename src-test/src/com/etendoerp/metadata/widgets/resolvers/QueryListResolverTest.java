@@ -6,15 +6,20 @@ import org.hibernate.Session;
 import org.hibernate.query.Query;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.*;
+import org.mockito.Mock;
+import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.openbravo.dal.service.OBDal;
 
 import java.util.Collections;
 import java.util.HashMap;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class QueryListResolverTest {
@@ -22,13 +27,13 @@ class QueryListResolverTest {
     @Mock Session session;
 
     @Test
-    void getType_returnsQUERY_LIST() {
+    void getTypeReturnsQueryList() {
         assertEquals("QUERY_LIST", new QueryListResolver().getType());
     }
 
     @SuppressWarnings("unchecked")
     @Test
-    void resolve_returnsRowsAndColumns() throws Exception {
+    void resolveReturnsRowsAndColumns() throws Exception {
         WidgetDataContext ctx = mock(WidgetDataContext.class);
         when(ctx.classString("4")).thenReturn("select o.documentNo, o.grandTotalAmount from Order o");
         when(ctx.param("columns")).thenReturn("docNo,total");

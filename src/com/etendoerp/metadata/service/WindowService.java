@@ -33,6 +33,12 @@ import java.io.IOException;
  * Creates a new {@code WindowService} instance using the given request and response.
  */
 public class WindowService extends MetadataService {
+    /**
+     * Creates a new WindowService.
+     *
+     * @param request  the HTTP request
+     * @param response the HTTP response
+     */
     public WindowService(HttpServletRequest request, HttpServletResponse response) {
         super(request, response);
     }

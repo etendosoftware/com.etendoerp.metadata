@@ -22,6 +22,9 @@ import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.base.weld.WeldUtils;
 import org.openbravo.client.kernel.I18NComponent;
 
+/**
+ * Builds a JSON object containing all internationalization labels.
+ */
 public class LabelsBuilder extends Builder {
     @Override
     public JSONObject toJSON() throws JSONException {

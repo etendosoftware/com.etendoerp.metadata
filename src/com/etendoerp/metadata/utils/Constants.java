@@ -18,12 +18,17 @@
 package com.etendoerp.metadata.utils;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 /**
+ * Shared path and configuration constants for the metadata module.
+ *
  * @author luuchorocha
  */
 public class Constants {
+    private Constants() { }
+
     public static final String MODULE_BASE_PATH = "/meta";
     public static final String SERVLET_PATH = "/forward";
     public static final String LEGACY_PATH = "/legacy";
@@ -59,8 +64,9 @@ public class Constants {
     private static final String TABLE_DIR_REFERENCE_ID = "19";
     private static final String TABLE_REFERENCE_ID = "18";
     private static final String TREE_REFERENCE_ID = "8C57A4A2E05F4261A1FADF47C30398AD";
-    public static final List<String> SELECTOR_REFERENCES = Arrays.asList(TABLE_REFERENCE_ID, TABLE_DIR_REFERENCE_ID,
-            SEARCH_REFERENCE_ID, SELECTOR_REFERENCE_ID, TREE_REFERENCE_ID);
+    public static final List<String> SELECTOR_REFERENCES = Collections.unmodifiableList(Arrays.asList(
+            TABLE_REFERENCE_ID, TABLE_DIR_REFERENCE_ID,
+            SEARCH_REFERENCE_ID, SELECTOR_REFERENCE_ID, TREE_REFERENCE_ID));
     public static final String WINDOW_REFERENCE_ID = "FF80818132D8F0F30132D9BC395D0038";
     public static final String FORM_CLOSE_TAG = "</FORM>";
     public static final String FRAMESET_CLOSE_TAG = "</FRAMESET>";
