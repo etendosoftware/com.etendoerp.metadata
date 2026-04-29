@@ -80,6 +80,9 @@ public class Constants {
     public static final String LOCALE_KEY = "Locale";
     public static final String DEFAULT_LOCALE = "en_US";
     public static final String PUBLIC_JS_PATH = "/web/js/";
+    public static final String DASHBOARD_PATH = "/dashboard/";
+    public static final String WIDGET_DATA_PATH = "/widget/";
+    public static final String WIDGET_CLASSES_PATH = "/widget/classes";
 
     // Audit Fields
     public static final String CREATION_DATE = "creationDate";
