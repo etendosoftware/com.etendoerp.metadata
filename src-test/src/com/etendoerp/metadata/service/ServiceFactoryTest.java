@@ -131,6 +131,20 @@ class ServiceFactoryTest {
   }
 
   @Test
+  void getServiceReturnsSavedViewService() {
+    MetadataService service = ServiceFactory.getService(mockRequestWithPath("/com.etendoerp.metadata.meta/saved-views/abc-123"), mockResponse);
+    assertNotNull(service, SERVICE_NOT_NULL);
+    assertInstanceOf(SavedViewService.class, service);
+  }
+
+  @Test
+  void getServiceReturnsSavedViewServiceForBasePathWithoutId() {
+    MetadataService service = ServiceFactory.getService(mockRequestWithPath("/com.etendoerp.metadata.meta/saved-views"), mockResponse);
+    assertNotNull(service, SERVICE_NOT_NULL);
+    assertInstanceOf(SavedViewService.class, service);
+  }
+
+  @Test
   void getServiceReturnsProcessMetadataService() {
     MetadataService service = ServiceFactory.getService(mockRequestWithPath("/com.etendoerp.metadata.meta/process/123"), mockResponse);
     assertNotNull(service, SERVICE_NOT_NULL);

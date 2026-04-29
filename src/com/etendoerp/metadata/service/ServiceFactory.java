@@ -68,6 +68,7 @@ public class ServiceFactory {
         PREFIX_MATCH_SERVICES.put(LANGUAGE_PATH, LanguageService::new);
         PREFIX_MATCH_SERVICES.put(LOCATION_PATH, LocationMetadataService::new);
         PREFIX_MATCH_SERVICES.put(TOOLBAR_PATH, ToolbarService::new);
+        PREFIX_MATCH_SERVICES.put(SAVED_VIEW_PATH, SavedViewService::new);
         PREFIX_MATCH_SERVICES.put(REPORT_AND_PROCESS_PATH, ReportAndProcessService::new);
         PREFIX_MATCH_SERVICES.put(PROCESS_EXECUTION_PATH, ProcessExecutionService::new);
         PREFIX_MATCH_SERVICES.put(PROCESS_PATH, ProcessMetadataService::new);
