@@ -31,6 +31,9 @@ import org.openbravo.base.model.Property;
 
 import com.etendoerp.metadata.exceptions.InternalServerException;
 import com.etendoerp.metadata.exceptions.NotFoundException;
+import com.etendoerp.metadata.service.DashboardService;
+import com.etendoerp.metadata.service.WidgetClassesService;
+import com.etendoerp.metadata.service.WidgetDataService;
 import com.etendoerp.metadata.utils.LegacyPaths;
 import com.etendoerp.metadata.utils.LegacyUtils;
 
@@ -61,6 +64,7 @@ public class ServiceFactory {
         EXACT_MATCH_SERVICES.put(EMAIL_SEND_PATH, EmailSendService::new);
         EXACT_MATCH_SERVICES.put(EMAIL_CONFIG_PATH, EmailConfigService::new);
         EXACT_MATCH_SERVICES.put(EMAIL_ATTACHMENTS_PATH, EmailAttachmentService::new);
+        EXACT_MATCH_SERVICES.put(WIDGET_CLASSES_PATH, WidgetClassesService::new);
 
         // Prefix match services (order matters for overlapping prefixes)
         PREFIX_MATCH_SERVICES.put(WINDOW_PATH, WindowService::new);
@@ -72,6 +76,8 @@ public class ServiceFactory {
         PREFIX_MATCH_SERVICES.put(PROCESS_EXECUTION_PATH, ProcessExecutionService::new);
         PREFIX_MATCH_SERVICES.put(PROCESS_PATH, ProcessMetadataService::new);
         PREFIX_MATCH_SERVICES.put(EMAIL_PATH, EmailService::new);
+        PREFIX_MATCH_SERVICES.put(DASHBOARD_PATH, DashboardService::new);
+        PREFIX_MATCH_SERVICES.put(WIDGET_DATA_PATH, WidgetDataService::new);
         PREFIX_MATCH_SERVICES.put(LEGACY_PATH, LegacyService::new);
     }
 
