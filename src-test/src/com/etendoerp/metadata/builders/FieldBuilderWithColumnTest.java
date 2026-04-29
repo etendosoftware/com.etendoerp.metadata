@@ -269,9 +269,10 @@ class FieldBuilderWithColumnTest {
     @Test
     void testToJSONWithLegacyProcess() throws JSONException {
         try (MockedStatic<LegacyUtils> legacy = mockStatic(LegacyUtils.class);
+                MockedStatic<LegacyProcessResolver> resolver = mockStatic(LegacyProcessResolver.class);
                 MockedStatic<ProcessActionBuilder> builder = mockStatic(ProcessActionBuilder.class)) {
 
-            legacy.when(() -> LegacyUtils.isLegacyProcess(FIELD_ID)).thenReturn(true);
+            resolver.when(() -> LegacyProcessResolver.isLegacy(field)).thenReturn(true);
             legacy.when(() -> LegacyUtils.getLegacyProcess(FIELD_ID)).thenReturn(process);
 
             builder.when(() -> ProcessActionBuilder.getFieldProcess(field, process))

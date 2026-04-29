@@ -74,7 +74,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
 
     private static final String RECEIVE_AND_POST_MESSAGE_SCRIPT = "<script>window.addEventListener(\"message\", (event) => {"
             +
-            "if (event.data?.type === \"fromForm\" && window.parent) {" +
+            "if (event.data?.type === \"" + LegacyMessageProtocol.MESSAGE_TYPE + "\" && window.parent) {" +
             "window.parent.postMessage({ type: \"fromIframe\", action: event.data.action }, \"*\");" +
             "}});</script>";
 
@@ -91,13 +91,15 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             "var sent=false;" +
             "window.sendMessage=function(action){" +
             "if(!window.parent)return;" +
-            "window.parent.postMessage({type:'fromForm',action:action},'*');" +
-            "if(action==='showProcessMessage'||action==='closeModal'){sent=true;window.__etendoMessageSent=true;}" +
+            "window.parent.postMessage({type:'" + LegacyMessageProtocol.MESSAGE_TYPE + "',action:action},'*');" +
+            "if(action==='" + LegacyMessageProtocol.ACTION_SHOW_PROCESS_MESSAGE + "'||action==='"
+            + LegacyMessageProtocol.ACTION_CLOSE_MODAL + "'){sent=true;window.__etendoMessageSent=true;}" +
             "};" +
             "function notifyUnload(){" +
             "if(sent||window.__etendoMessageSent)return;" +
             "if(!window.parent)return;" +
-            "window.parent.postMessage({type:'fromForm',action:'iframeUnloaded'},'*');" +
+            "window.parent.postMessage({type:'" + LegacyMessageProtocol.MESSAGE_TYPE + "',action:'"
+            + LegacyMessageProtocol.ACTION_IFRAME_UNLOADED + "'},'*');" +
             "sent=true;window.__etendoMessageSent=true;" +
             "}" +
             "window.addEventListener('pagehide',notifyUnload);" +
@@ -141,10 +143,12 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             "else if(cls.indexOf('SUCCESS')>=0)type='success';" +
             "else if(cls.indexOf('WARNING')>=0)type='warning';" +
             "var payload={type:type,title:(t.textContent||'').trim(),text:(m.textContent||'').trim()};" +
-            "window.parent.postMessage({type:'fromForm',action:'showProcessMessage',payload:payload},'*');" +
+            "window.parent.postMessage({type:'" + LegacyMessageProtocol.MESSAGE_TYPE + "',action:'"
+            + LegacyMessageProtocol.ACTION_SHOW_PROCESS_MESSAGE + "',payload:payload},'*');" +
             "window.__etendoMessageSent=true;" +
             "setTimeout(function(){" +
-            "window.parent.postMessage({type:'fromForm',action:'closeModal'},'*');" +
+            "window.parent.postMessage({type:'" + LegacyMessageProtocol.MESSAGE_TYPE + "',action:'"
+            + LegacyMessageProtocol.ACTION_CLOSE_MODAL + "'},'*');" +
             "},150);" +
             "}" +
             "if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',forward);" +
@@ -181,7 +185,8 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
     private static final String MINIMAL_FORWARDER_HTML =
             "<!DOCTYPE html>\n<html><head><meta charset=\"UTF-8\"><script>" +
                     "(function(){if(!window.parent)return;" +
-                    "window.parent.postMessage({type:'fromForm',action:'showProcessMessage',payload:%s},'*');" +
+                    "window.parent.postMessage({type:'" + LegacyMessageProtocol.MESSAGE_TYPE + "',action:'"
+                    + LegacyMessageProtocol.ACTION_SHOW_PROCESS_MESSAGE + "',payload:%s},'*');" +
                     "window.__etendoMessageSent=true;" +
                     "})();</script></head><body></body></html>";
 
@@ -193,11 +198,11 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
      * leaving the iframe on Tomcat's error page. The HTTP status is 200 so the body
      * is loaded and the script runs.
      */
-    private static final String REQUEST_FAILED_ACTION = "requestFailed";
     private static final String REQUEST_FAILED_FORWARDER_HTML =
             "<!DOCTYPE html>\n<html><head><meta charset=\"UTF-8\"><script>" +
                     "(function(){if(!window.parent)return;" +
-                    "window.parent.postMessage({type:'fromForm',action:'" + REQUEST_FAILED_ACTION + "'},'*');" +
+                    "window.parent.postMessage({type:'" + LegacyMessageProtocol.MESSAGE_TYPE + "',action:'"
+                    + LegacyMessageProtocol.ACTION_REQUEST_FAILED + "'},'*');" +
                     "window.__etendoMessageSent=true;" +
                     "})();</script></head><body></body></html>";
 
@@ -928,6 +933,16 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         return extractTargetPathFromReferer(req.getHeader("Referer"));
     }
 
+    /**
+     * Best-effort extraction of the legacy target servlet path from the {@code Referer}
+     * header. Used as fallback when {@code LEGACY_SERVLET_DIR} is not yet present in
+     * the session (e.g. a follow-up request that races with the first servlet hit).
+     *
+     * <p>Returns {@code null} when the path cannot be inferred — the caller
+     * ({@link #processLegacyFollowupRequest}) treats {@code null} as "give up" and
+     * surfaces a {@code requestFailed} forwarder so the iframe shows the proper
+     * error overlay instead of Tomcat's default page.
+     */
     private String extractTargetPathFromReferer(String referer) {
         if (referer == null)
             return null;
@@ -947,9 +962,6 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
                 int queryIndex = afterMeta.indexOf('?');
                 if (queryIndex != -1) {
                     afterMeta = afterMeta.substring(0, queryIndex);
-                }
-                if (afterMeta.endsWith(HTML_EXTENSION) && !afterMeta.contains("/")) {
-                    return "/SalesOrder" + afterMeta;
                 }
                 return afterMeta;
             }
@@ -1191,10 +1203,10 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
                     injectCodeBeforeFunctionCall(
                             resWithNewScript,
                             "submitThisPage\\(([^)]+)\\);",
-                            "sendMessage('processOrder');",
+                            "sendMessage('" + LegacyMessageProtocol.ACTION_PROCESS_ORDER + "');",
                             true),
                     "close(This)?Page\\(\\);",
-                    "sendMessage('closeModal');",
+                    "sendMessage('" + LegacyMessageProtocol.ACTION_CLOSE_MODAL + "');",
                     true);
         }
 

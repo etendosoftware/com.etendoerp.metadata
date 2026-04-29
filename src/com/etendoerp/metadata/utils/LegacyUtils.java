@@ -22,24 +22,12 @@ import org.openbravo.model.ad.ui.Process;
 import java.util.Set;
 
 /**
- * Utility class for identifying legacy process in the system.
- * These legacy processes are identified by their unique process IDs.
+ * Utility class for legacy-process auxiliary helpers (stub processes, path
+ * detection, mutable session attribute registry). Legacy detection itself is
+ * handled by {@link com.etendoerp.metadata.builders.LegacyProcessResolver#isLegacy(
+ * org.openbravo.model.ad.ui.Field)} and lives there exclusively.
  */
 public class LegacyUtils {
-
-    /**
-     * @deprecated Use {@link com.etendoerp.metadata.builders.LegacyProcessResolver#isLegacy(org.openbravo.model.ad.ui.Field)}
-     * instead. Detection is now column-name based and covers all legacy processes
-     * without requiring manual registration of field IDs.
-     */
-    @Deprecated
-    private static final Set<String> LEGACY_PROCESS_IDS = Set.of(
-            "3663",
-            "4242",
-            "3670",
-            "4248",
-            "7C541AC0C767FDD7E040007F01016B4D"
-    );
 
     /** Set of legacy paths used in the system. */
     private static final Set<String> LEGACY_PATHS = Set.of(
@@ -51,19 +39,6 @@ public class LegacyUtils {
             "CREATEFROM|TABID"
     );
 
-
-    /**
-     * @deprecated Use {@link com.etendoerp.metadata.builders.LegacyProcessResolver#isLegacy(org.openbravo.model.ad.ui.Field)}
-     * instead. This method relies on a hardcoded set of field IDs and is no longer
-     * the primary detection mechanism.
-     */
-    @Deprecated
-    public static boolean isLegacyProcess(String processId) {
-        if (processId == null) {
-            return false;
-        }
-        return LEGACY_PROCESS_IDS.contains(processId);
-    }
 
     /**
      * Creates a minimal stub {@link Process} for fields that have no {@code AD_Process_ID}

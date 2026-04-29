@@ -97,10 +97,26 @@ public class Constants {
     public static final String COLOR_REFERENCE_ID = "27";
     public static final String COLOR_FIELD_NAME = "colorFieldName";
 
-    // Legacy process action JSON keys
+    // === Legacy process action JSON keys ===
+    //
+    // Keys used to serialize {@link com.etendoerp.metadata.builders.LegacyProcessParams}
+    // into the JSON payload that {@code ProcessActionBuilder} attaches to the
+    // {@code processAction} field of every legacy-iframe button. These values must
+    // remain stable; the client reads them in
+    // {@code client/packages/MainUI/utils/processes/manual/utils.ts:tryResolveFromApi}.
+
+    /** Classic HTML page URL (e.g. {@code /SalesOrder/Header_Edition.html}). */
     public static final String LEGACY_URL = "url";
+    /** WAD {@code Command} parameter value (e.g. {@code BUTTONDocAction104} or {@code DEFAULT}). */
     public static final String LEGACY_COMMAND = "command";
+    /** DB name of the tab's primary-key column, sent as {@code keyColumnName} query param. */
     public static final String LEGACY_KEY_COLUMN_NAME = "keyColumnName";
+    /** DB name of the tab's primary-key column, sent as {@code inpkeyColumnId} query param. */
     public static final String LEGACY_INP_KEY_COLUMN_ID = "inpkeyColumnId";
+    /**
+     * Snapshot of {@code inp*} column-name placeholders. Each entry follows
+     * {@code "inp<camelCaseColumn>" → "$record.<jpaProperty>[!coercion]"}; the client
+     * resolves the {@code $record.*} placeholders at button-click time.
+     */
     public static final String LEGACY_ADDITIONAL_PARAMETERS = "additionalParameters";
 }

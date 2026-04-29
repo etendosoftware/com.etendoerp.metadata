@@ -17,90 +17,38 @@
 
 package com.etendoerp.metadata.utils;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
 /**
- * Tests for LegacyUtils that execute real code logic without complex framework dependencies.
+ * Tests for the auxiliary helpers in {@link LegacyUtils}. Legacy-process detection
+ * itself is covered by
+ * {@code com.etendoerp.metadata.builders.LegacyProcessResolverTest}.
  */
 class LegacyUtilsExecutionTest {
 
-    /**
-     * Tests isLegacyProcess method with known legacy process IDs.
-     */
     @Test
-    void isLegacyProcessWithKnownLegacyIdsReturnsTrue() {
-        assertTrue(LegacyUtils.isLegacyProcess("3663"));
-        assertTrue(LegacyUtils.isLegacyProcess("4242"));
-        assertTrue(LegacyUtils.isLegacyProcess("3670"));
-        assertTrue(LegacyUtils.isLegacyProcess("4248"));
+    void isLegacyPathRecognisesUsedByLink() {
+        assertTrue(LegacyUtils.isLegacyPath(LegacyPaths.USED_BY_LINK));
     }
 
-    /**
-     * Tests isLegacyProcess method with non-legacy process IDs.
-     */
     @Test
-    void isLegacyProcessWithNonLegacyIdsReturnsFalse() {
-        assertFalse(LegacyUtils.isLegacyProcess("1234"));
-        assertFalse(LegacyUtils.isLegacyProcess("9999"));
-        assertFalse(LegacyUtils.isLegacyProcess("0"));
-        assertFalse(LegacyUtils.isLegacyProcess("5555"));
+    void isLegacyPathRejectsUnknownPaths() {
+        assertFalse(LegacyUtils.isLegacyPath("/some/other/path.html"));
+        assertFalse(LegacyUtils.isLegacyPath(""));
     }
 
-    /**
-     * Tests isLegacyProcess method with null input throws NPE.
-     */
     @Test
-    void isLegacyProcessWithNullInputReturnsFalse() {
-        assertFalse(LegacyUtils.isLegacyProcess(null));
+    void isMutableSessionAttributeRecognisesKnownEntries() {
+        assertTrue(LegacyUtils.isMutableSessionAttribute("143|C_ORDER_ID"));
+        assertTrue(LegacyUtils.isMutableSessionAttribute("CREATEFROM|TABID"));
     }
 
-    /**
-     * Tests isLegacyProcess method with empty string input.
-     */
     @Test
-    void isLegacyProcessWithEmptyStringReturnsFalse() {
-        assertFalse(LegacyUtils.isLegacyProcess(""));
-    }
-
-    /**
-     * Tests isLegacyProcess method with whitespace input.
-     */
-    @Test
-    void isLegacyProcessWithWhitespaceReturnsFalse() {
-        assertFalse(LegacyUtils.isLegacyProcess(" "));
-        assertFalse(LegacyUtils.isLegacyProcess("\t"));
-        assertFalse(LegacyUtils.isLegacyProcess("\n"));
-    }
-
-    /**
-     * Tests isLegacyProcess method case sensitivity.
-     */
-    @Test
-    void isLegacyProcessIsCaseSensitive() {
-        assertTrue(LegacyUtils.isLegacyProcess("3663"));
-        assertFalse(LegacyUtils.isLegacyProcess("3663 "));
-        assertFalse(LegacyUtils.isLegacyProcess(" 3663"));
-    }
-
-    /**
-     * Tests isLegacyProcess method with numeric strings that are close but not exact matches.
-     */
-    @Test
-    void isLegacyProcessWithSimilarButNotExactIdsReturnsFalse() {
-        assertFalse(LegacyUtils.isLegacyProcess("3662")); // One less than 3663
-        assertFalse(LegacyUtils.isLegacyProcess("3664")); // One more than 3663
-        assertFalse(LegacyUtils.isLegacyProcess("4241")); // One less than 4242
-        assertFalse(LegacyUtils.isLegacyProcess("4243")); // One more than 4242
-    }
-
-    /**
-     * Tests isLegacyProcess method with very long strings.
-     */
-    @Test
-    void isLegacyProcessWithLongStringsReturnsFalse() {
-        assertFalse(LegacyUtils.isLegacyProcess("366333333333333333333"));
-        assertFalse(LegacyUtils.isLegacyProcess("4242424242424242424242"));
+    void isMutableSessionAttributeRejectsUnknownEntries() {
+        assertFalse(LegacyUtils.isMutableSessionAttribute("999|C_ORDER_ID"));
+        assertFalse(LegacyUtils.isMutableSessionAttribute(""));
     }
 }
