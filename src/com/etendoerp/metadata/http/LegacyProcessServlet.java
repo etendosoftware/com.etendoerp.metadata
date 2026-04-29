@@ -65,6 +65,9 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
     private static final String JWT_TOKEN = "#JWT_TOKEN";
     private static final String HTML_EXTENSION = ".html";
     private static final String JS_EXTENSION = ".js";
+    private static final String ACTION_JSON_SEPARATOR = "',action:";
+    private static final String HTML_UTF8_CONTENT_TYPE = "text/html; charset=UTF-8";
+    private static final String UTF8_CHARSET = "UTF-8";
     private static final String TOKEN_PARAM = "token";
     private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String BEARER_PREFIX = "Bearer ";
@@ -91,15 +94,16 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             "var sent=false;" +
             "window.sendMessage=function(action){" +
             "if(!window.parent)return;" +
-            "window.parent.postMessage({type:'" + LegacyMessageProtocol.MESSAGE_TYPE + "',action:action},'*');" +
+            "window.parent.postMessage({type:'" + LegacyMessageProtocol.MESSAGE_TYPE + ACTION_JSON_SEPARATOR
+            + "action},'*');" +
             "if(action==='" + LegacyMessageProtocol.ACTION_SHOW_PROCESS_MESSAGE + "'||action==='"
             + LegacyMessageProtocol.ACTION_CLOSE_MODAL + "'){sent=true;window.__etendoMessageSent=true;}" +
             "};" +
             "function notifyUnload(){" +
             "if(sent||window.__etendoMessageSent)return;" +
             "if(!window.parent)return;" +
-            "window.parent.postMessage({type:'" + LegacyMessageProtocol.MESSAGE_TYPE + "',action:'"
-            + LegacyMessageProtocol.ACTION_IFRAME_UNLOADED + "'},'*');" +
+            "window.parent.postMessage({type:'" + LegacyMessageProtocol.MESSAGE_TYPE + ACTION_JSON_SEPARATOR
+            + "'" + LegacyMessageProtocol.ACTION_IFRAME_UNLOADED + "'},'*');" +
             "sent=true;window.__etendoMessageSent=true;" +
             "}" +
             "window.addEventListener('pagehide',notifyUnload);" +
@@ -143,12 +147,12 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             "else if(cls.indexOf('SUCCESS')>=0)type='success';" +
             "else if(cls.indexOf('WARNING')>=0)type='warning';" +
             "var payload={type:type,title:(t.textContent||'').trim(),text:(m.textContent||'').trim()};" +
-            "window.parent.postMessage({type:'" + LegacyMessageProtocol.MESSAGE_TYPE + "',action:'"
-            + LegacyMessageProtocol.ACTION_SHOW_PROCESS_MESSAGE + "',payload:payload},'*');" +
+            "window.parent.postMessage({type:'" + LegacyMessageProtocol.MESSAGE_TYPE + ACTION_JSON_SEPARATOR
+            + "'" + LegacyMessageProtocol.ACTION_SHOW_PROCESS_MESSAGE + "',payload:payload},'*');" +
             "window.__etendoMessageSent=true;" +
             "setTimeout(function(){" +
-            "window.parent.postMessage({type:'" + LegacyMessageProtocol.MESSAGE_TYPE + "',action:'"
-            + LegacyMessageProtocol.ACTION_CLOSE_MODAL + "'},'*');" +
+            "window.parent.postMessage({type:'" + LegacyMessageProtocol.MESSAGE_TYPE + ACTION_JSON_SEPARATOR
+            + "'" + LegacyMessageProtocol.ACTION_CLOSE_MODAL + "'},'*');" +
             "},150);" +
             "}" +
             "if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',forward);" +
@@ -183,10 +187,10 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
      * The payload placeholder is a JSON object with {@code type}/{@code title}/{@code text}.
      */
     private static final String MINIMAL_FORWARDER_HTML =
-            "<!DOCTYPE html>\n<html><head><meta charset=\"UTF-8\"><script>" +
+            "<!DOCTYPE html>\n<html><head><meta charset=\"" + UTF8_CHARSET + "\"><script>" +
                     "(function(){if(!window.parent)return;" +
-                    "window.parent.postMessage({type:'" + LegacyMessageProtocol.MESSAGE_TYPE + "',action:'"
-                    + LegacyMessageProtocol.ACTION_SHOW_PROCESS_MESSAGE + "',payload:%s},'*');" +
+                    "window.parent.postMessage({type:'" + LegacyMessageProtocol.MESSAGE_TYPE + ACTION_JSON_SEPARATOR
+                    + "'" + LegacyMessageProtocol.ACTION_SHOW_PROCESS_MESSAGE + "',payload:%s},'*');" +
                     "window.__etendoMessageSent=true;" +
                     "})();</script></head><body></body></html>";
 
@@ -199,10 +203,10 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
      * is loaded and the script runs.
      */
     private static final String REQUEST_FAILED_FORWARDER_HTML =
-            "<!DOCTYPE html>\n<html><head><meta charset=\"UTF-8\"><script>" +
+            "<!DOCTYPE html>\n<html><head><meta charset=\"" + UTF8_CHARSET + "\"><script>" +
                     "(function(){if(!window.parent)return;" +
-                    "window.parent.postMessage({type:'" + LegacyMessageProtocol.MESSAGE_TYPE + "',action:'"
-                    + LegacyMessageProtocol.ACTION_REQUEST_FAILED + "'},'*');" +
+                    "window.parent.postMessage({type:'" + LegacyMessageProtocol.MESSAGE_TYPE + ACTION_JSON_SEPARATOR
+                    + "'" + LegacyMessageProtocol.ACTION_REQUEST_FAILED + "'},'*');" +
                     "window.__etendoMessageSent=true;" +
                     "})();</script></head><body></body></html>";
 
@@ -425,8 +429,8 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
     private void writeRequestFailedForwarder(HttpServletResponse res, Exception cause) {
         log.error("Forwarding request failure to iframe parent", cause);
         try {
-            res.setContentType("text/html; charset=UTF-8");
-            res.setCharacterEncoding("UTF-8");
+            res.setContentType(HTML_UTF8_CONTENT_TYPE);
+            res.setCharacterEncoding(UTF8_CHARSET);
             res.setStatus(HttpServletResponse.SC_OK);
             res.getWriter().write(REQUEST_FAILED_FORWARDER_HTML);
             res.getWriter().flush();
@@ -443,7 +447,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
      * @throws IOException if an error occurs while writing the response
      */
     private void sendHtmlResponse(HttpServletResponse res, String html) throws IOException {
-        res.setContentType("text/html; charset=UTF-8");
+        res.setContentType(HTML_UTF8_CONTENT_TYPE);
         res.setStatus(HttpServletResponse.SC_OK);
         res.getWriter().write(html);
         res.getWriter().flush();
@@ -530,8 +534,8 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             String jsContent = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
             String processedContent = transformJavaScriptContent(jsContent);
 
-            res.setContentType("application/javascript; charset=UTF-8");
-            res.setCharacterEncoding("UTF-8");
+            res.setContentType("application/javascript; charset=" + UTF8_CHARSET);
+            res.setCharacterEncoding(UTF8_CHARSET);
             res.setStatus(HttpServletResponse.SC_OK);
             res.getWriter().write(processedContent);
             res.getWriter().flush();
@@ -675,8 +679,8 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             return;
         }
 
-        res.setContentType("text/html; charset=UTF-8");
-        res.setCharacterEncoding("UTF-8");
+        res.setContentType(HTML_UTF8_CONTENT_TYPE);
+        res.setCharacterEncoding(UTF8_CHARSET);
         res.setStatus(wrapper.getStatus());
         res.getWriter().write(output);
         res.getWriter().flush();
@@ -749,8 +753,8 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         String payload = buildForwarderPayload(mapMessageType(typeClass), title, text);
         String html = String.format(MINIMAL_FORWARDER_HTML, payload);
 
-        res.setContentType("text/html; charset=UTF-8");
-        res.setCharacterEncoding("UTF-8");
+        res.setContentType(HTML_UTF8_CONTENT_TYPE);
+        res.setCharacterEncoding(UTF8_CHARSET);
         res.setStatus(HttpServletResponse.SC_OK);
         res.getWriter().write(html);
         res.getWriter().flush();
@@ -1073,7 +1077,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
                 "<!DOCTYPE html>\n" +
                         "<html>\n" +
                         "    <head>\n" +
-                        "        <meta charset='UTF-8'/>\n" +
+                        "        <meta charset='" + UTF8_CHARSET + "'/>\n" +
                         "        <meta http-equiv=\"refresh\" content=\"0; url='%s'\"/>\n" +
                         "    </head>\n" +
                         "</html>",

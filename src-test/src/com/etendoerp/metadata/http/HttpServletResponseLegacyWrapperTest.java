@@ -377,7 +377,7 @@ public class HttpServletResponseLegacyWrapperTest extends OBBaseTest {
         new HttpServletResponseLegacyWrapper(mockResponse);
 
     PrintWriter writer = encodingWrapper.getWriter();
-    String nbsp = " ";
+    String nbsp = "\u00A0";
     writer.write(nbsp);
     writer.flush();
 
@@ -867,4 +867,3 @@ public class HttpServletResponseLegacyWrapperTest extends OBBaseTest {
     assertTrue(SHOULD_BE_MARKED_AS_REDIRECTED, wrapper.isRedirected());
   }
 }
-

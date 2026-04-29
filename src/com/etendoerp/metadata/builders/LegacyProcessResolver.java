@@ -542,15 +542,13 @@ public class LegacyProcessResolver {
             }
             Map<String, String> params = new LinkedHashMap<>();
             for (Column col : table.getADColumnList()) {
-                if (!shouldIncludeColumn(col)) {
-                    continue;
+                if (shouldIncludeColumn(col)) {
+                    Property property = safePropertyFor(entity, col);
+                    if (property != null) {
+                        String inpKey = toInpKey(col.getDBColumnName());
+                        params.put(inpKey, buildPlaceholder(property));
+                    }
                 }
-                Property property = safePropertyFor(entity, col);
-                if (property == null) {
-                    continue;
-                }
-                String inpKey = toInpKey(col.getDBColumnName());
-                params.put(inpKey, buildPlaceholder(property));
             }
             return params;
         } catch (Exception e) {

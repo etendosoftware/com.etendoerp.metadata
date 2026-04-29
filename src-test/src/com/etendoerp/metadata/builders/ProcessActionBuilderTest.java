@@ -76,6 +76,7 @@ import org.openbravo.service.json.DataToJsonConverter;
 class ProcessActionBuilderTest {
 
     private static final String DISPLAY_LOGIC_EXPRESSION = "displayLogicExpression";
+    private static final String AD_PROCESS_REQUEST_ID = "AD_Process_Request_ID";
 
     @Mock
     private Process mockProcess;
@@ -391,8 +392,8 @@ class ProcessActionBuilderTest {
         LegacyProcessParams legacyParams = new LegacyProcessParams(
                 "/ad_process/RescheduleProcess.html",
                 "DEFAULT",
-                "AD_Process_Request_ID",
-                "AD_Process_Request_ID");
+                AD_PROCESS_REQUEST_ID,
+                AD_PROCESS_REQUEST_ID);
 
         try (MockedStatic<OBContext> contextMock = mockStatic(OBContext.class);
              MockedStatic<LegacyProcessResolver> resolverMock = mockStatic(LegacyProcessResolver.class);
@@ -414,8 +415,8 @@ class ProcessActionBuilderTest {
             assertNotNull(result);
             assertEquals("/ad_process/RescheduleProcess.html", result.getString("url"));
             assertEquals("DEFAULT", result.getString("command"));
-            assertEquals("AD_Process_Request_ID", result.getString("keyColumnName"));
-            assertEquals("AD_Process_Request_ID", result.getString("inpkeyColumnId"));
+            assertEquals(AD_PROCESS_REQUEST_ID, result.getString("keyColumnName"));
+            assertEquals(AD_PROCESS_REQUEST_ID, result.getString("inpkeyColumnId"));
         }
     }
 

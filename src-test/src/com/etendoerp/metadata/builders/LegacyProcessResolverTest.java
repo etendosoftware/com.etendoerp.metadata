@@ -84,6 +84,15 @@ class LegacyProcessResolverTest {
     private static final String ACTION_REPORT = "R";
     private static final String ACTION_CALLOUT = "C";
 
+    private static final String RESCHEDULE_KEY = "Reschedule";
+    private static final String C_INVOICE_ID = "C_Invoice_ID";
+    private static final String FIN_FINACC_TRANSACTION_ID = "Fin_Finacc_Transaction_ID";
+    private static final String PROCESSED = "Processed";
+    private static final String INP_PROCESSED = "inpprocessed";
+    private static final String PROCESSED_LOWER = "processed";
+    private static final String EM_APRM_PROCESSED = "EM_APRM_Processed";
+    private static final String ADDITIONAL_PARAMETERS = "additionalParameters";
+
     /**
      * Representative case — fieldId 57A2B365BDC69F57E040007F010171B4 (Reschedule Process):
      * AD_Process.Classname is null; classname and URL live in AD_MODEL_OBJECT /
@@ -94,7 +103,7 @@ class LegacyProcessResolverTest {
         ModelImplementationMapping mapping = mockMapping(RESCHEDULE_URL, true);
         ModelImplementation impl = mockImpl(ACTION_PROCESS, RESCHEDULE_FQCN, true, List.of(mapping));
         Process process = mockManualProcess(null, List.of(impl));
-        Field field = mockFieldWithProcess(process, "Reschedule", KEY_COLUMN);
+        Field field = mockFieldWithProcess(process, RESCHEDULE_KEY, KEY_COLUMN);
 
         Optional<LegacyProcessParams> params = LegacyProcessResolver.resolve(field);
 
@@ -111,14 +120,14 @@ class LegacyProcessResolverTest {
     @Test
     void resolveFallsBackToInlineClassnameWhenNoMappingsPresent() {
         Process process = mockManualProcess(PROCESS_INVOICE_FQCN, Collections.emptyList());
-        Field field = mockFieldWithProcess(process, "EM_APRM_Processinvoice", "C_Invoice_ID");
+        Field field = mockFieldWithProcess(process, "EM_APRM_Processinvoice", C_INVOICE_ID);
 
         Optional<LegacyProcessParams> params = LegacyProcessResolver.resolve(field);
 
         assertTrue(params.isPresent());
         assertEquals(PROCESS_INVOICE_DERIVED_URL, extractUrl(params));
         assertEquals(COMMAND_DEFAULT, extractCommand(params));
-        assertEquals("C_Invoice_ID", extractKeyColumn(params));
+        assertEquals(C_INVOICE_ID, extractKeyColumn(params));
     }
 
     /**
@@ -129,7 +138,7 @@ class LegacyProcessResolverTest {
     void resolveFallsBackToModelImplementationClassnameWhenNoMappings() {
         ModelImplementation impl = mockImpl(ACTION_PROCESS, PROCESS_INVOICE_FQCN, true, Collections.emptyList());
         Process process = mockManualProcess(null, List.of(impl));
-        Field field = mockFieldWithProcess(process, "EM_APRM_Processinvoice", "C_Invoice_ID");
+        Field field = mockFieldWithProcess(process, "EM_APRM_Processinvoice", C_INVOICE_ID);
 
         Optional<LegacyProcessParams> params = LegacyProcessResolver.resolve(field);
 
@@ -153,7 +162,7 @@ class LegacyProcessResolverTest {
 
         // Intentionally place non-default first to verify sorting matters.
         Process process = mockManualProcess(null, List.of(nonDefault, defaultImpl));
-        Field field = mockFieldWithProcess(process, "Reschedule", KEY_COLUMN);
+        Field field = mockFieldWithProcess(process, RESCHEDULE_KEY, KEY_COLUMN);
 
         Optional<LegacyProcessParams> params = LegacyProcessResolver.resolve(field);
 
@@ -170,7 +179,7 @@ class LegacyProcessResolverTest {
         ModelImplementation calloutOnly =
                 mockImpl(ACTION_CALLOUT, "org.openbravo.erpCommon.ad_callouts.SomeCallout", true, Collections.emptyList());
         Process process = mockManualProcess(null, List.of(calloutOnly));
-        Field field = mockFieldWithProcess(process, "Reschedule", KEY_COLUMN);
+        Field field = mockFieldWithProcess(process, RESCHEDULE_KEY, KEY_COLUMN);
 
         Optional<LegacyProcessParams> params = LegacyProcessResolver.resolve(field);
 
@@ -204,7 +213,7 @@ class LegacyProcessResolverTest {
         ModelImplementationMapping mapping = mockMapping(RESCHEDULE_URL, false);
         ModelImplementation impl = mockImpl(ACTION_PROCESS, RESCHEDULE_FQCN, false, List.of(mapping));
         Process process = mockManualProcess(null, List.of(impl));
-        Field field = mockFieldWithProcess(process, "Reschedule", KEY_COLUMN);
+        Field field = mockFieldWithProcess(process, RESCHEDULE_KEY, KEY_COLUMN);
 
         Optional<LegacyProcessParams> params = LegacyProcessResolver.resolve(field);
 
@@ -257,9 +266,9 @@ class LegacyProcessResolverTest {
     @Test
     void toInpKeyConvertsKnownColumnSamples() {
         assertEquals("inpcOrderId", LegacyProcessResolver.toInpKey("C_Order_ID"));
-        assertEquals("inpfinFinaccTransactionId", LegacyProcessResolver.toInpKey("Fin_Finacc_Transaction_ID"));
+        assertEquals("inpfinFinaccTransactionId", LegacyProcessResolver.toInpKey(FIN_FINACC_TRANSACTION_ID));
         assertEquals("inpfinPaymentProposalId", LegacyProcessResolver.toInpKey("Fin_Payment_Proposal_ID"));
-        assertEquals("inpprocessed", LegacyProcessResolver.toInpKey("Processed"));
+        assertEquals(INP_PROCESSED, LegacyProcessResolver.toInpKey(PROCESSED));
         assertEquals("inpadClientId", LegacyProcessResolver.toInpKey("AD_Client_ID"));
     }
 
@@ -298,7 +307,7 @@ class LegacyProcessResolverTest {
     void buildPlaceholderAddsYnSuffixForBooleanColumn() {
         Property prop = mock(Property.class);
         when(prop.isId()).thenReturn(false);
-        when(prop.getName()).thenReturn("processed");
+        when(prop.getName()).thenReturn(PROCESSED_LOWER);
         when(prop.getDomainType()).thenReturn(new BooleanDomainType());
         assertEquals("$record.processed!yn", LegacyProcessResolver.buildPlaceholder(prop));
     }
@@ -318,24 +327,24 @@ class LegacyProcessResolverTest {
 
     @Test
     void resolveEmitsPropertyNamePlaceholderForEachIncludedColumn() throws Exception {
-        Column processed = mockDataColumn("Processed", "20");                  // Yes-No
+        Column processed = mockDataColumn(PROCESSED, "20");                  // Yes-No
         Column financialAcct = mockDataColumn("FIN_Financial_Account_ID", "19"); // TableDir (FK)
         Map<String, Property> props = new HashMap<>();
-        props.put("Processed", booleanProperty("processed"));
+        props.put(PROCESSED, booleanProperty(PROCESSED_LOWER));
         props.put("FIN_Financial_Account_ID", fkProperty("financialAccount"));
-        props.put("Fin_Finacc_Transaction_ID", idProperty());
+        props.put(FIN_FINACC_TRANSACTION_ID, idProperty());
 
         Field field = mockFieldWithProcessAndColumns(
                 mockManualProcess(PROCESS_INVOICE_FQCN, Collections.emptyList()),
-                "EM_APRM_Processed",
-                "Fin_Finacc_Transaction_ID",
+                EM_APRM_PROCESSED,
+                FIN_FINACC_TRANSACTION_ID,
                 List.of(processed, financialAcct));
 
         try (MockedStatic<ModelProvider> mp = mockModelProvider(props)) {
             Optional<LegacyProcessParams> params = LegacyProcessResolver.resolve(field);
 
             JSONObject additional = extractAdditionalParameters(params);
-            assertEquals("$record.processed!yn", additional.get("inpprocessed"));
+            assertEquals("$record.processed!yn", additional.get(INP_PROCESSED));
             assertEquals("$record.financialAccount", additional.get("inpfinFinancialAccountId"));
         }
     }
@@ -346,24 +355,24 @@ class LegacyProcessResolverTest {
      */
     @Test
     void resolveIncludesButtonColumnsInAdditionalParameters() throws Exception {
-        Column normal = mockDataColumn("Processed", "20");
-        Column button = mockDataColumn("EM_APRM_Processed", "28"); // Button
+        Column normal = mockDataColumn(PROCESSED, "20");
+        Column button = mockDataColumn(EM_APRM_PROCESSED, "28"); // Button
         Map<String, Property> props = new HashMap<>();
-        props.put("Processed", booleanProperty("processed"));
-        props.put("EM_APRM_Processed", stringProperty("emAprmProcessed"));
-        props.put("Fin_Finacc_Transaction_ID", idProperty());
+        props.put(PROCESSED, booleanProperty(PROCESSED_LOWER));
+        props.put(EM_APRM_PROCESSED, stringProperty("emAprmProcessed"));
+        props.put(FIN_FINACC_TRANSACTION_ID, idProperty());
 
         Field field = mockFieldWithProcessAndColumns(
                 mockManualProcess(PROCESS_INVOICE_FQCN, Collections.emptyList()),
-                "EM_APRM_Processed",
-                "Fin_Finacc_Transaction_ID",
+                EM_APRM_PROCESSED,
+                FIN_FINACC_TRANSACTION_ID,
                 List.of(normal, button));
 
         try (MockedStatic<ModelProvider> mp = mockModelProvider(props)) {
             Optional<LegacyProcessParams> params = LegacyProcessResolver.resolve(field);
 
             JSONObject additional = extractAdditionalParameters(params);
-            assertTrue(additional.has("inpprocessed"));
+            assertTrue(additional.has(INP_PROCESSED));
             assertTrue(additional.has("inpemAprmProcessed"));
             assertEquals("$record.emAprmProcessed", additional.get("inpemAprmProcessed"));
         }
@@ -371,26 +380,26 @@ class LegacyProcessResolverTest {
 
     @Test
     void resolveExcludesPasswordAndImageColumnsFromAdditionalParameters() throws Exception {
-        Column normal = mockDataColumn("Processed", "20");
+        Column normal = mockDataColumn(PROCESSED, "20");
         Column password = mockDataColumn("Secret", "24");  // Password
         Column image = mockDataColumn("Logo", "32");       // Image
         Map<String, Property> props = new HashMap<>();
-        props.put("Processed", booleanProperty("processed"));
+        props.put(PROCESSED, booleanProperty(PROCESSED_LOWER));
         // Password/Image columns are filtered before ModelProvider is consulted, so they
         // don't need property entries.
-        props.put("Fin_Finacc_Transaction_ID", idProperty());
+        props.put(FIN_FINACC_TRANSACTION_ID, idProperty());
 
         Field field = mockFieldWithProcessAndColumns(
                 mockManualProcess(PROCESS_INVOICE_FQCN, Collections.emptyList()),
-                "EM_APRM_Processed",
-                "Fin_Finacc_Transaction_ID",
+                EM_APRM_PROCESSED,
+                FIN_FINACC_TRANSACTION_ID,
                 List.of(normal, password, image));
 
         try (MockedStatic<ModelProvider> mp = mockModelProvider(props)) {
             Optional<LegacyProcessParams> params = LegacyProcessResolver.resolve(field);
 
             JSONObject additional = extractAdditionalParameters(params);
-            assertTrue(additional.has("inpprocessed"));
+            assertTrue(additional.has(INP_PROCESSED));
             assertFalse(additional.has("inpsecret"));
             assertFalse(additional.has("inplogo"));
         }
@@ -398,63 +407,63 @@ class LegacyProcessResolverTest {
 
     @Test
     void resolveExcludesInactiveColumnsFromAdditionalParameters() throws Exception {
-        Column active = mockDataColumn("Processed", "20");
+        Column active = mockDataColumn(PROCESSED, "20");
         Column inactive = mockDataColumn("OldFlag", "20");
         when(inactive.isActive()).thenReturn(false);
         Map<String, Property> props = new HashMap<>();
-        props.put("Processed", booleanProperty("processed"));
-        props.put("Fin_Finacc_Transaction_ID", idProperty());
+        props.put(PROCESSED, booleanProperty(PROCESSED_LOWER));
+        props.put(FIN_FINACC_TRANSACTION_ID, idProperty());
 
         Field field = mockFieldWithProcessAndColumns(
                 mockManualProcess(PROCESS_INVOICE_FQCN, Collections.emptyList()),
-                "EM_APRM_Processed",
-                "Fin_Finacc_Transaction_ID",
+                EM_APRM_PROCESSED,
+                FIN_FINACC_TRANSACTION_ID,
                 List.of(active, inactive));
 
         try (MockedStatic<ModelProvider> mp = mockModelProvider(props)) {
             Optional<LegacyProcessParams> params = LegacyProcessResolver.resolve(field);
 
             JSONObject additional = extractAdditionalParameters(params);
-            assertTrue(additional.has("inpprocessed"));
+            assertTrue(additional.has(INP_PROCESSED));
             assertFalse(additional.has("inpoldflag"));
         }
     }
 
     @Test
     void resolveSkipsColumnsWhoseEntityHasNoProperty() throws Exception {
-        Column known = mockDataColumn("Processed", "20");
+        Column known = mockDataColumn(PROCESSED, "20");
         Column orphan = mockDataColumn("OrphanColumn", "10");
         Map<String, Property> props = new HashMap<>();
-        props.put("Processed", booleanProperty("processed"));
+        props.put(PROCESSED, booleanProperty(PROCESSED_LOWER));
         // OrphanColumn deliberately absent — getPropertyByColumnName returns null.
-        props.put("Fin_Finacc_Transaction_ID", idProperty());
+        props.put(FIN_FINACC_TRANSACTION_ID, idProperty());
 
         Field field = mockFieldWithProcessAndColumns(
                 mockManualProcess(PROCESS_INVOICE_FQCN, Collections.emptyList()),
-                "EM_APRM_Processed",
-                "Fin_Finacc_Transaction_ID",
+                EM_APRM_PROCESSED,
+                FIN_FINACC_TRANSACTION_ID,
                 List.of(known, orphan));
 
         try (MockedStatic<ModelProvider> mp = mockModelProvider(props)) {
             Optional<LegacyProcessParams> params = LegacyProcessResolver.resolve(field);
 
             JSONObject additional = extractAdditionalParameters(params);
-            assertTrue(additional.has("inpprocessed"));
+            assertTrue(additional.has(INP_PROCESSED));
             assertFalse(additional.has("inporphancolumn"));
         }
     }
 
     @Test
     void resolveEmitsRecordIdPlaceholderForPrimaryKey() throws Exception {
-        Column pk = mockDataColumn("Fin_Finacc_Transaction_ID", "13"); // ID reference
+        Column pk = mockDataColumn(FIN_FINACC_TRANSACTION_ID, "13"); // ID reference
         when(pk.isKeyColumn()).thenReturn(true);
         Map<String, Property> props = new HashMap<>();
-        props.put("Fin_Finacc_Transaction_ID", idProperty());
+        props.put(FIN_FINACC_TRANSACTION_ID, idProperty());
 
         Field field = mockFieldWithProcessAndColumns(
                 mockManualProcess(PROCESS_INVOICE_FQCN, Collections.emptyList()),
-                "EM_APRM_Processed",
-                "Fin_Finacc_Transaction_ID",
+                EM_APRM_PROCESSED,
+                FIN_FINACC_TRANSACTION_ID,
                 List.of(pk));
 
         try (MockedStatic<ModelProvider> mp = mockModelProvider(props)) {
@@ -474,18 +483,18 @@ class LegacyProcessResolverTest {
         LegacyProcessParams params =
                 new LegacyProcessParams(RESCHEDULE_URL, COMMAND_DEFAULT, KEY_COLUMN, KEY_COLUMN);
         JSONObject json = params.toJson();
-        assertFalse(json.has("additionalParameters"));
+        assertFalse(json.has(ADDITIONAL_PARAMETERS));
     }
 
     @Test
     void toJsonIncludesAdditionalParametersWhenPopulated() throws Exception {
         LegacyProcessParams params = new LegacyProcessParams(
                 RESCHEDULE_URL, COMMAND_DEFAULT, KEY_COLUMN, KEY_COLUMN,
-                java.util.Map.of("inpprocessed", "$record.Processed"));
+                java.util.Map.of(INP_PROCESSED, "$record.Processed"));
         JSONObject json = params.toJson();
-        assertTrue(json.has("additionalParameters"));
+        assertTrue(json.has(ADDITIONAL_PARAMETERS));
         assertEquals("$record.Processed",
-                json.getJSONObject("additionalParameters").get("inpprocessed"));
+                json.getJSONObject(ADDITIONAL_PARAMETERS).get(INP_PROCESSED));
     }
 
     // -------------------------------------------------------------------------
@@ -643,7 +652,7 @@ class LegacyProcessResolverTest {
     private JSONObject extractAdditionalParameters(Optional<LegacyProcessParams> params) {
         try {
             JSONObject json = params.orElseThrow().toJson();
-            return json.getJSONObject("additionalParameters");
+            return json.getJSONObject(ADDITIONAL_PARAMETERS);
         } catch (Exception e) {
             throw new AssertionError("Could not extract additionalParameters from params", e);
         }

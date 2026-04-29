@@ -66,9 +66,11 @@ import static org.mockito.Mockito.*;
  */
 @RunWith(MockitoJUnitRunner.Silent.class)
 public class LegacyProcessServletTest extends OBBaseTest {
+    private static final String HTML_UTF8_CONTENT_TYPE = "text/html; charset=UTF-8";
     private static final String PARAM_INP_KEY = "inpKey";
     private static final String PARAM_INP_WINDOW_ID = "inpwindowId";
     private static final String PARAM_INP_KEY_COLUMN_ID = "inpkeyColumnId";
+    private static final String COMMAND_PARAM = "Command";
     private static final String NOT_EXIST_JS_FILE = "/web/js/nonexistent.js";
     private static final String TEST_JS_FILE = "/web/js/test-script.js";
     private static final String CALENDAR_JS_FILE = "/web/js/calendar-lang.js";
@@ -76,6 +78,18 @@ public class LegacyProcessServletTest extends OBBaseTest {
     public static final String REDIRECT = "/redirect";
     public static final String LOCATION = "location";
     private static final String USER_ID_KEY = "userId";
+    private static final String SUBMIT_THIS_PAGE_PATTERN = "submitThisPage\\(([^)]+)\\);";
+    private static final String BUILD_SHIM_SCRIPT = "buildShimScript";
+    private static final String DEFAULT_NUMERIC_MASK = "#,##0.00";
+    private static final String MESSAGES_GET_FRAME_ASSIGNMENT = "var _messagesGetFrame=getFrame;";
+    private static final String ESCAPE_JS = "escapeJs";
+    private static final String INJECT_FRAME_MENU_SHIM = "injectFrameMenuShim";
+    private static final String INJECT_POPUP_MESSAGE_FORWARDER = "injectPopupMessageForwarder";
+    private static final String ACTION_SHOW_PROCESS_MESSAGE = "action:'showProcessMessage'";
+    private static final String ACTION_CLOSE_MODAL = "action:'closeModal'";
+    private static final String IS_PROCESS_COMMAND_POPUP = "isProcessCommandPopup";
+    private static final String MAP_MESSAGE_TYPE = "mapMessageType";
+    private static final String WRITE_REQUEST_FAILED_FORWARDER = "writeRequestFailedForwarder";
 
     @Mock
     private HttpServletRequest request;
@@ -218,7 +232,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
             // Expected due to framework dependencies
         }
 
-        verify(response).setContentType("text/html; charset=UTF-8");
+        verify(response).setContentType(HTML_UTF8_CONTENT_TYPE);
         verify(response).setStatus(HttpServletResponse.SC_OK);
     }
 
@@ -227,7 +241,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
      */
     @Test
     public void servletShouldIdentifyLegacyFollowupRequest() throws Exception {
-        when(request.getParameter("Command")).thenReturn("BUTTON_TEST");
+        when(request.getParameter(COMMAND_PARAM)).thenReturn("BUTTON_TEST");
         when(request.getSession(false)).thenReturn(session);
         when(session.getAttribute("LEGACY_TOKEN")).thenReturn("test-token");
         when(session.getAttribute("LEGACY_SERVLET_DIR")).thenReturn("/dir");
@@ -238,7 +252,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
             // Expected due to framework dependencies
         }
 
-        verify(request, atLeastOnce()).getParameter("Command");
+        verify(request, atLeastOnce()).getParameter(COMMAND_PARAM);
     }
 
     /**
@@ -626,7 +640,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
                 new Class<?>[] { HttpServletRequest.class, HttpServletResponse.class },
                 request, response);
 
-        verify(response).setContentType("text/html; charset=UTF-8");
+        verify(response).setContentType(HTML_UTF8_CONTENT_TYPE);
         verify(response).setStatus(HttpServletResponse.SC_OK);
         verify(response, never()).sendError(eq(HttpServletResponse.SC_UNAUTHORIZED), anyString());
     }
@@ -651,14 +665,14 @@ public class LegacyProcessServletTest extends OBBaseTest {
      */
     @Test
     public void testBuildShimScriptIncludesRequiredProperties() throws Exception {
-        String script = (String) invokePrivateMethod(legacyProcessServlet, "buildShimScript",
+        String script = (String) invokePrivateMethod(legacyProcessServlet, BUILD_SHIM_SCRIPT,
                 new Class<?>[] { String.class, String.class, String.class },
-                ".", ",", "#,##0.00");
+                ".", ",", DEFAULT_NUMERIC_MASK);
 
         assertTrue("Should include decimal separator", script.contains("decSeparator_global:'.'"));
         assertTrue("Should include group separator", script.contains("groupSeparator_global:','"));
         assertTrue("Should include group interval", script.contains("groupInterval_global:'3'"));
-        assertTrue("Should include default mask", script.contains("maskNumeric_default:'#,##0.00'"));
+        assertTrue("Should include default mask", script.contains("maskNumeric_default:'" + DEFAULT_NUMERIC_MASK + "'"));
         assertTrue("Should include autosave flag", script.contains("autosave:false"));
         assertTrue("Should include frameMenu assignment", script.contains("window.frameMenu=m"));
     }
@@ -668,9 +682,9 @@ public class LegacyProcessServletTest extends OBBaseTest {
      */
     @Test
     public void testBuildShimScriptDefinesShimGetFrame() throws Exception {
-        String script = (String) invokePrivateMethod(legacyProcessServlet, "buildShimScript",
+        String script = (String) invokePrivateMethod(legacyProcessServlet, BUILD_SHIM_SCRIPT,
                 new Class<?>[] { String.class, String.class, String.class },
-                ".", ",", "#,##0.00");
+                ".", ",", DEFAULT_NUMERIC_MASK);
 
         assertTrue("Should define _shimGetFrame", script.contains("var _shimGetFrame=function(name)"));
         assertTrue("Should return frameMenu mock", script.contains("if(name==='frameMenu')return window.frameMenu;"));
@@ -682,9 +696,9 @@ public class LegacyProcessServletTest extends OBBaseTest {
      */
     @Test
     public void testBuildShimScriptUsesIIFE() throws Exception {
-        String script = (String) invokePrivateMethod(legacyProcessServlet, "buildShimScript",
+        String script = (String) invokePrivateMethod(legacyProcessServlet, BUILD_SHIM_SCRIPT,
                 new Class<?>[] { String.class, String.class, String.class },
-                ".", ",", "#,##0.00");
+                ".", ",", DEFAULT_NUMERIC_MASK);
 
         assertTrue("Should start with IIFE", script.contains("(function(){"));
         assertTrue("Should end with IIFE call", script.contains("})();"));
@@ -698,7 +712,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
         String patchScript = (String) invokePrivateMethod(legacyProcessServlet, "buildFrameMenuPatchScript",
                 new Class<?>[] {});
 
-        assertTrue("Should save original getFrame", patchScript.contains("var _messagesGetFrame=getFrame;"));
+        assertTrue("Should save original getFrame", patchScript.contains(MESSAGES_GET_FRAME_ASSIGNMENT));
         assertTrue("Should define wrapper", patchScript.contains("window.getFrame=function(name)"));
         assertTrue("Should return frameMenu for frameMenu", patchScript.contains("if(name==='frameMenu')return window.frameMenu;"));
     }
@@ -708,7 +722,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
      */
     @Test
     public void testEscapeJsSingleQuotes() throws Exception {
-        String result = (String) invokePrivateMethod(legacyProcessServlet, "escapeJs",
+        String result = (String) invokePrivateMethod(legacyProcessServlet, ESCAPE_JS,
                 new Class<?>[] { String.class },
                 "it's");
 
@@ -720,7 +734,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
      */
     @Test
     public void testEscapeJsBackslashes() throws Exception {
-        String result = (String) invokePrivateMethod(legacyProcessServlet, "escapeJs",
+        String result = (String) invokePrivateMethod(legacyProcessServlet, ESCAPE_JS,
                 new Class<?>[] { String.class },
                 "path\\to\\file");
 
@@ -732,7 +746,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
      */
     @Test
     public void testEscapeJsCombined() throws Exception {
-        String result = (String) invokePrivateMethod(legacyProcessServlet, "escapeJs",
+        String result = (String) invokePrivateMethod(legacyProcessServlet, ESCAPE_JS,
                 new Class<?>[] { String.class },
                 "test\\it's");
 
@@ -745,7 +759,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
     @Test
     public void testInjectFrameMenuShimAfterOpeningHeadTag() throws Exception {
         String html = "<html><head><script>var x=1;</script></head><body></body></html>";
-        String result = (String) invokePrivateMethod(legacyProcessServlet, "injectFrameMenuShim",
+        String result = (String) invokePrivateMethod(legacyProcessServlet, INJECT_FRAME_MENU_SHIM,
                 new Class<?>[] { String.class },
                 html);
 
@@ -759,7 +773,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
     @Test
     public void testInjectFrameMenuShimCaseInsensitive() throws Exception {
         String html = "<html><HEAD><script>var x=1;</script></HEAD><body></body></html>";
-        String result = (String) invokePrivateMethod(legacyProcessServlet, "injectFrameMenuShim",
+        String result = (String) invokePrivateMethod(legacyProcessServlet, INJECT_FRAME_MENU_SHIM,
                 new Class<?>[] { String.class },
                 html);
 
@@ -773,7 +787,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
     @Test
     public void testInjectFrameMenuShimHeadWithAttributes() throws Exception {
         String html = "<html><head class=\"x\" data-y=\"z\"><script></script></head><body></body></html>";
-        String result = (String) invokePrivateMethod(legacyProcessServlet, "injectFrameMenuShim",
+        String result = (String) invokePrivateMethod(legacyProcessServlet, INJECT_FRAME_MENU_SHIM,
                 new Class<?>[] { String.class },
                 html);
 
@@ -788,11 +802,11 @@ public class LegacyProcessServletTest extends OBBaseTest {
     @Test
     public void testInjectFrameMenuShimInjectsPatchBeforeHeadClose() throws Exception {
         String html = "<html><head><script></script></HEAD><body></body></html>";
-        String result = (String) invokePrivateMethod(legacyProcessServlet, "injectFrameMenuShim",
+        String result = (String) invokePrivateMethod(legacyProcessServlet, INJECT_FRAME_MENU_SHIM,
                 new Class<?>[] { String.class },
                 html);
 
-        int patchIndex = result.indexOf("var _messagesGetFrame=getFrame;");
+        int patchIndex = result.indexOf(MESSAGES_GET_FRAME_ASSIGNMENT);
         int closeHeadIndex = result.indexOf("</HEAD>");
         assertTrue("Patch script should be before </HEAD>",
                 patchIndex >= 0 && closeHeadIndex >= 0 && patchIndex < closeHeadIndex);
@@ -806,7 +820,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
     @Test
     public void testInjectFrameMenuShimSkipsPatchWhenNoHeadCloseTag() throws Exception {
         String html = "<html><head><script></script></body></html>";
-        String result = (String) invokePrivateMethod(legacyProcessServlet, "injectFrameMenuShim",
+        String result = (String) invokePrivateMethod(legacyProcessServlet, INJECT_FRAME_MENU_SHIM,
                 new Class<?>[] { String.class },
                 html);
 
@@ -815,7 +829,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
         assertTrue("Shim should include window.frameMenu assignment",
                 result.contains("window.frameMenu=m"));
         assertTrue("Patch script should NOT be injected when </HEAD> is absent",
-                !result.contains("var _messagesGetFrame=getFrame;"));
+                !result.contains(MESSAGES_GET_FRAME_ASSIGNMENT));
     }
 
     /**
@@ -824,7 +838,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
     @Test
     public void testInjectFrameMenuShimNoHeadTagAtAll() throws Exception {
         String html = "<html><body><div>no head tag here</div></body></html>";
-        String result = (String) invokePrivateMethod(legacyProcessServlet, "injectFrameMenuShim",
+        String result = (String) invokePrivateMethod(legacyProcessServlet, INJECT_FRAME_MENU_SHIM,
                 new Class<?>[] { String.class },
                 html);
 
@@ -837,7 +851,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
     @Test
     public void testInjectFrameMenuShimPreservesStructure() throws Exception {
         String html = "<html><head><meta name=\"x\"></head><body><div>content</div></body></html>";
-        String result = (String) invokePrivateMethod(legacyProcessServlet, "injectFrameMenuShim",
+        String result = (String) invokePrivateMethod(legacyProcessServlet, INJECT_FRAME_MENU_SHIM,
                 new Class<?>[] { String.class },
                 html);
 
@@ -859,16 +873,16 @@ public class LegacyProcessServletTest extends OBBaseTest {
                 + "<DIV id=\"messageBoxIDMessage\">Something failed</DIV>"
                 + "</TABLE></BODY></HTML>";
 
-        String result = (String) invokePrivateMethod(legacyProcessServlet, "injectPopupMessageForwarder",
+        String result = (String) invokePrivateMethod(legacyProcessServlet, INJECT_POPUP_MESSAGE_FORWARDER,
                 new Class<?>[] { String.class },
                 html);
 
-        int scriptIndex = result.indexOf("action:'showProcessMessage'");
+        int scriptIndex = result.indexOf(ACTION_SHOW_PROCESS_MESSAGE);
         int closeHeadIndex = result.indexOf("</HEAD>");
         assertTrue("Forwarder script should be injected before </HEAD>",
                 scriptIndex >= 0 && closeHeadIndex >= 0 && scriptIndex < closeHeadIndex);
         assertTrue("Forwarder should schedule closeModal via setTimeout",
-                result.contains("action:'closeModal'") && result.contains("setTimeout"));
+                result.contains(ACTION_CLOSE_MODAL) && result.contains("setTimeout"));
     }
 
     /**
@@ -884,12 +898,12 @@ public class LegacyProcessServletTest extends OBBaseTest {
                 + "<DIV id=\"messageBoxIDMessage\">Process completed</DIV>"
                 + "</TABLE></BODY></HTML>";
 
-        String result = (String) invokePrivateMethod(legacyProcessServlet, "injectPopupMessageForwarder",
+        String result = (String) invokePrivateMethod(legacyProcessServlet, INJECT_POPUP_MESSAGE_FORWARDER,
                 new Class<?>[] { String.class },
                 html);
 
         assertTrue("Forwarder script should be injected for success popups",
-                result.contains("action:'showProcessMessage'"));
+                result.contains(ACTION_SHOW_PROCESS_MESSAGE));
     }
 
     /**
@@ -900,7 +914,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
     public void testInjectPopupMessageForwarderSkipsWhenMarkerAbsent() throws Exception {
         String html = "<HTML><HEAD></HEAD><BODY><FORM>...</FORM></BODY></HTML>";
 
-        String result = (String) invokePrivateMethod(legacyProcessServlet, "injectPopupMessageForwarder",
+        String result = (String) invokePrivateMethod(legacyProcessServlet, INJECT_POPUP_MESSAGE_FORWARDER,
                 new Class<?>[] { String.class },
                 html);
 
@@ -916,7 +930,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
     public void testInjectPopupMessageForwarderSkipsWhenNoHeadCloseTag() throws Exception {
         String html = "<HTML><BODY><DIV id=\"messageBoxIDMessage\">msg</DIV></BODY></HTML>";
 
-        String result = (String) invokePrivateMethod(legacyProcessServlet, "injectPopupMessageForwarder",
+        String result = (String) invokePrivateMethod(legacyProcessServlet, INJECT_POPUP_MESSAGE_FORWARDER,
                 new Class<?>[] { String.class },
                 html);
 
@@ -945,9 +959,9 @@ public class LegacyProcessServletTest extends OBBaseTest {
      */
     @Test
     public void testIsProcessCommandPopupTrueForProcessCommand() throws Exception {
-        when(request.getParameter("Command")).thenReturn("PROCESS");
+        when(request.getParameter(COMMAND_PARAM)).thenReturn("PROCESS");
 
-        Boolean result = (Boolean) invokePrivateMethod(legacyProcessServlet, "isProcessCommandPopup",
+        Boolean result = (Boolean) invokePrivateMethod(legacyProcessServlet, IS_PROCESS_COMMAND_POPUP,
                 new Class<?>[] { HttpServletRequest.class, String.class },
                 request, POPUP_ERROR_HTML);
 
@@ -959,9 +973,9 @@ public class LegacyProcessServletTest extends OBBaseTest {
      */
     @Test
     public void testIsProcessCommandPopupTrueForProcessPrefixedCommand() throws Exception {
-        when(request.getParameter("Command")).thenReturn("PROCESSDEFAULT");
+        when(request.getParameter(COMMAND_PARAM)).thenReturn("PROCESSDEFAULT");
 
-        Boolean result = (Boolean) invokePrivateMethod(legacyProcessServlet, "isProcessCommandPopup",
+        Boolean result = (Boolean) invokePrivateMethod(legacyProcessServlet, IS_PROCESS_COMMAND_POPUP,
                 new Class<?>[] { HttpServletRequest.class, String.class },
                 request, POPUP_SUCCESS_HTML);
 
@@ -974,9 +988,9 @@ public class LegacyProcessServletTest extends OBBaseTest {
      */
     @Test
     public void testIsProcessCommandPopupFalseForGridCommand() throws Exception {
-        when(request.getParameter("Command")).thenReturn("GRID");
+        when(request.getParameter(COMMAND_PARAM)).thenReturn("GRID");
 
-        Boolean result = (Boolean) invokePrivateMethod(legacyProcessServlet, "isProcessCommandPopup",
+        Boolean result = (Boolean) invokePrivateMethod(legacyProcessServlet, IS_PROCESS_COMMAND_POPUP,
                 new Class<?>[] { HttpServletRequest.class, String.class },
                 request, POPUP_ERROR_HTML);
 
@@ -988,9 +1002,9 @@ public class LegacyProcessServletTest extends OBBaseTest {
      */
     @Test
     public void testIsProcessCommandPopupFalseWhenCommandMissing() throws Exception {
-        when(request.getParameter("Command")).thenReturn(null);
+        when(request.getParameter(COMMAND_PARAM)).thenReturn(null);
 
-        Boolean result = (Boolean) invokePrivateMethod(legacyProcessServlet, "isProcessCommandPopup",
+        Boolean result = (Boolean) invokePrivateMethod(legacyProcessServlet, IS_PROCESS_COMMAND_POPUP,
                 new Class<?>[] { HttpServletRequest.class, String.class },
                 request, POPUP_ERROR_HTML);
 
@@ -1003,9 +1017,9 @@ public class LegacyProcessServletTest extends OBBaseTest {
      */
     @Test
     public void testIsProcessCommandPopupFalseWhenMarkerAbsent() throws Exception {
-        when(request.getParameter("Command")).thenReturn("PROCESS");
+        when(request.getParameter(COMMAND_PARAM)).thenReturn("PROCESS");
 
-        Boolean result = (Boolean) invokePrivateMethod(legacyProcessServlet, "isProcessCommandPopup",
+        Boolean result = (Boolean) invokePrivateMethod(legacyProcessServlet, IS_PROCESS_COMMAND_POPUP,
                 new Class<?>[] { HttpServletRequest.class, String.class },
                 request, "<html><body><form></form></body></html>");
 
@@ -1018,16 +1032,16 @@ public class LegacyProcessServletTest extends OBBaseTest {
     @Test
     public void testMapMessageType() throws Exception {
         assertEquals("ERROR maps to error", "error",
-                invokePrivateMethod(legacyProcessServlet, "mapMessageType",
+                invokePrivateMethod(legacyProcessServlet, MAP_MESSAGE_TYPE,
                         new Class<?>[] { String.class }, "ERROR"));
         assertEquals("SUCCESS maps to success", "success",
-                invokePrivateMethod(legacyProcessServlet, "mapMessageType",
+                invokePrivateMethod(legacyProcessServlet, MAP_MESSAGE_TYPE,
                         new Class<?>[] { String.class }, "SUCCESS"));
         assertEquals("WARNING maps to warning", "warning",
-                invokePrivateMethod(legacyProcessServlet, "mapMessageType",
+                invokePrivateMethod(legacyProcessServlet, MAP_MESSAGE_TYPE,
                         new Class<?>[] { String.class }, "WARNING"));
         assertEquals("Unknown suffix falls back to info", "info",
-                invokePrivateMethod(legacyProcessServlet, "mapMessageType",
+                invokePrivateMethod(legacyProcessServlet, MAP_MESSAGE_TYPE,
                         new Class<?>[] { String.class }, "HIDDEN"));
     }
 
@@ -1050,9 +1064,9 @@ public class LegacyProcessServletTest extends OBBaseTest {
         String output = stringWriter.toString();
 
         assertTrue("Response must contain the showProcessMessage dispatch",
-                output.contains("action:'showProcessMessage'"));
+                output.contains(ACTION_SHOW_PROCESS_MESSAGE));
         assertTrue("Response must NOT auto-close the modal",
-                !output.contains("action:'closeModal'") && !output.contains("setTimeout"));
+                !output.contains(ACTION_CLOSE_MODAL) && !output.contains("setTimeout"));
         assertTrue("Response payload must carry the extracted type",
                 output.contains("\"type\":\"error\""));
         assertTrue("Response payload must carry the extracted title",
@@ -1062,7 +1076,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
         assertTrue("Short-circuited response must NOT carry the original popup markup",
                 !output.contains("messageBoxIDMessage") && !output.contains("paramTipo"));
 
-        verify(response).setContentType("text/html; charset=UTF-8");
+        verify(response).setContentType(HTML_UTF8_CONTENT_TYPE);
         verify(response).setStatus(HttpServletResponse.SC_OK);
     }
 
@@ -1137,7 +1151,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
     /**
      * Reads a private static String constant from LegacyProcessServlet via reflection.
      */
-    private String readScriptConstant(String fieldName) throws Exception {
+    private String readScriptConstant(String fieldName) throws ReflectiveOperationException {
         java.lang.reflect.Field field = LegacyProcessServlet.class.getDeclaredField(fieldName);
         field.setAccessible(true);
         return (String) field.get(null);
@@ -1177,9 +1191,9 @@ public class LegacyProcessServletTest extends OBBaseTest {
     public void showProcessMessageScriptShouldMarkMessageSent() throws Exception {
         String script = readScriptConstant("SHOW_PROCESS_MESSAGE_SCRIPT");
 
-        int postIndex = script.indexOf("action:'showProcessMessage'");
+        int postIndex = script.indexOf(ACTION_SHOW_PROCESS_MESSAGE);
         int markIndex = script.indexOf("__etendoMessageSent=true");
-        int closeIndex = script.indexOf("action:'closeModal'");
+        int closeIndex = script.indexOf(ACTION_CLOSE_MODAL);
 
         assertTrue("Script must post showProcessMessage", postIndex >= 0);
         assertTrue("Script must mark the message-sent flag", markIndex >= 0);
@@ -1211,7 +1225,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
 
         String result = (String) invokePrivateMethod(legacyProcessServlet, "injectCodeBeforeFunctionCall",
                 new Class<?>[] { String.class, String.class, String.class, boolean.class },
-                html, "submitThisPage\\(([^)]+)\\);", "sendMessage('processOrder');", true);
+                html, SUBMIT_THIS_PAGE_PATTERN, "sendMessage('processOrder');", true);
 
         assertTrue("processOrder must be emitted before submitThisPage",
                 result.contains("sendMessage('processOrder');submitThisPage('save');"));
@@ -1232,7 +1246,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
 
         String result = (String) invokePrivateMethod(legacyProcessServlet, "injectCodeBeforeFunctionCall",
                 new Class<?>[] { String.class, String.class, String.class, boolean.class },
-                html, "submitThisPage\\(([^)]+)\\);", "sendMessage('processOrder');", true);
+                html, SUBMIT_THIS_PAGE_PATTERN, "sendMessage('processOrder');", true);
 
         assertEquals("Both submitThisPage calls must be preceded by sendMessage",
                 "sendMessage('processOrder');submitThisPage('a');sendMessage('processOrder');submitThisPage('b');",
@@ -1247,7 +1261,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
      */
     @Test
     public void writeRequestFailedForwarderSetsStatusOk() throws Exception {
-        invokePrivateMethod(legacyProcessServlet, "writeRequestFailedForwarder",
+        invokePrivateMethod(legacyProcessServlet, WRITE_REQUEST_FAILED_FORWARDER,
                 new Class<?>[] { HttpServletResponse.class, Exception.class },
                 response, new RuntimeException("test error"));
 
@@ -1260,11 +1274,11 @@ public class LegacyProcessServletTest extends OBBaseTest {
      */
     @Test
     public void writeRequestFailedForwarderSetsHtmlContentType() throws Exception {
-        invokePrivateMethod(legacyProcessServlet, "writeRequestFailedForwarder",
+        invokePrivateMethod(legacyProcessServlet, WRITE_REQUEST_FAILED_FORWARDER,
                 new Class<?>[] { HttpServletResponse.class, Exception.class },
                 response, new RuntimeException("test error"));
 
-        verify(response).setContentType("text/html; charset=UTF-8");
+        verify(response).setContentType(HTML_UTF8_CONTENT_TYPE);
         verify(response).setCharacterEncoding("UTF-8");
     }
 
@@ -1279,7 +1293,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
         PrintWriter pw = new PrintWriter(writer);
         when(response.getWriter()).thenReturn(pw);
 
-        invokePrivateMethod(legacyProcessServlet, "writeRequestFailedForwarder",
+        invokePrivateMethod(legacyProcessServlet, WRITE_REQUEST_FAILED_FORWARDER,
                 new Class<?>[] { HttpServletResponse.class, Exception.class },
                 response, new RuntimeException("proxy error"));
 
@@ -1299,7 +1313,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
         when(response.getWriter()).thenThrow(new java.io.IOException("stream closed"));
 
         try {
-            invokePrivateMethod(legacyProcessServlet, "writeRequestFailedForwarder",
+            invokePrivateMethod(legacyProcessServlet, WRITE_REQUEST_FAILED_FORWARDER,
                     new Class<?>[] { HttpServletResponse.class, Exception.class },
                     response, new RuntimeException("original error"));
         } catch (Exception e) {
