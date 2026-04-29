@@ -23,8 +23,8 @@ import java.util.stream.Collectors;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
-import org.hibernate.criterion.Restrictions;
 import org.openbravo.base.exception.OBException;
+import org.openbravo.client.application.ApplicationConstants;
 import org.openbravo.base.model.Entity;
 import org.openbravo.base.model.ModelProvider;
 import org.openbravo.base.model.Property;
@@ -41,7 +41,6 @@ import org.openbravo.database.ConnectionProvider;
 import org.openbravo.erpCommon.utility.ComboTableData;
 import org.openbravo.erpCommon.utility.Utility;
 import org.openbravo.model.ad.access.FieldAccess;
-import org.openbravo.model.ad.access.WindowAccess;
 import org.openbravo.model.ad.datamodel.Column;
 import org.openbravo.model.ad.domain.Reference;
 import org.openbravo.model.ad.domain.ReferencedTree;
@@ -60,7 +59,6 @@ import org.openbravo.userinterface.selector.SelectorField;
 import com.etendoerp.etendorx.utils.DataSourceUtils;
 import com.etendoerp.metadata.data.ReferenceSelectors;
 import com.etendoerp.metadata.utils.Constants;
-import org.openbravo.model.ad.ui.Window;
 
 /**
  * Abstract base class for building field metadata in JSON format.
@@ -746,12 +744,15 @@ public abstract class FieldBuilder extends Builder {
     protected static String getHqlName(Field field) {
         try {
             Column fieldColumn = field.getColumn();
-            String dbTableName = fieldColumn.getTable().getDBTableName();
-            String dbColumnName = fieldColumn.getDBColumnName();
-            String[] names = DataSourceUtils.getHQLColumnName(true, dbTableName, dbColumnName);
+            // Only attempt DAL entity lookup for physical table-based tables (not HQL or other virtual types)
+            if (ApplicationConstants.TABLEBASEDTABLE.equals(fieldColumn.getTable().getDataOriginType())) {
+                String dbTableName = fieldColumn.getTable().getDBTableName();
+                String dbColumnName = fieldColumn.getDBColumnName();
+                String[] names = DataSourceUtils.getHQLColumnName(true, dbTableName, dbColumnName);
 
-            if (names.length > 0) {
-                return names[0];
+                if (names.length > 0) {
+                    return names[0];
+                }
             }
         } catch (Exception e) {
             logger.warn(e.getMessage(), e);

@@ -127,6 +127,9 @@ class FieldBuilderTest {
   private static final String DISPLAY_PROPERTY = "displayProperty";
   private static final String SEARCH_FIELD = "searchField";
   private static final String TEST_TABLE = "TestTable";
+  private static final String DB_TABLE_NAME = "test_table";
+  private static final String DB_COLUMN_NAME = "test_column";
+  private static final String GET_HQL_NAME_METHOD = "getHqlName";
 
   /**
    * Sets up the necessary mocks and their behaviors before each test.
@@ -549,19 +552,53 @@ class FieldBuilderTest {
   @Test
   void testGetHqlNameSuccess() throws Exception {
     when(column.getTable()).thenReturn(table);
-    when(table.getDBTableName()).thenReturn("test_table");
-    when(column.getDBColumnName()).thenReturn("test_column");
+    when(table.getDataOriginType()).thenReturn("Table");
+    when(table.getDBTableName()).thenReturn(DB_TABLE_NAME);
+    when(column.getDBColumnName()).thenReturn(DB_COLUMN_NAME);
     when(field.getName()).thenReturn(TEST_FIELD);
 
     try (MockedStatic<DataSourceUtils> mockedDataSourceUtils = mockStatic(DataSourceUtils.class)) {
-      mockedDataSourceUtils.when(() -> DataSourceUtils.getHQLColumnName(true, "test_table", "test_column"))
+      mockedDataSourceUtils.when(() -> DataSourceUtils.getHQLColumnName(true, DB_TABLE_NAME, DB_COLUMN_NAME))
           .thenReturn(new String[] { "hqlColumnName" });
 
-      Method method = FieldBuilder.class.getDeclaredMethod("getHqlName", Field.class);
+      Method method = FieldBuilder.class.getDeclaredMethod(GET_HQL_NAME_METHOD, Field.class);
       method.setAccessible(true);
       String result = (String) method.invoke(null, field);
 
       assertEquals("hqlColumnName", result);
+    }
+  }
+
+  @Test
+  void testGetHqlNameFallsBackWhenNotTableBased() throws Exception {
+    when(column.getTable()).thenReturn(table);
+    when(table.getDataOriginType()).thenReturn("HQL");
+    when(field.getName()).thenReturn("Test Field");
+
+    Method method = FieldBuilder.class.getDeclaredMethod(GET_HQL_NAME_METHOD, Field.class);
+    method.setAccessible(true);
+    String result = (String) method.invoke(null, field);
+
+    assertEquals("testField", result);
+  }
+
+  @Test
+  void testGetHqlNameFallsBackWhenHQLColumnNamesEmpty() throws Exception {
+    when(column.getTable()).thenReturn(table);
+    when(table.getDataOriginType()).thenReturn("Table");
+    when(table.getDBTableName()).thenReturn(DB_TABLE_NAME);
+    when(column.getDBColumnName()).thenReturn(DB_COLUMN_NAME);
+    when(field.getName()).thenReturn("Test Field");
+
+    try (MockedStatic<DataSourceUtils> mockedDataSourceUtils = mockStatic(DataSourceUtils.class)) {
+      mockedDataSourceUtils.when(() -> DataSourceUtils.getHQLColumnName(true, DB_TABLE_NAME, DB_COLUMN_NAME))
+          .thenReturn(new String[0]);
+
+      Method method = FieldBuilder.class.getDeclaredMethod(GET_HQL_NAME_METHOD, Field.class);
+      method.setAccessible(true);
+      String result = (String) method.invoke(null, field);
+
+      assertEquals("testField", result);
     }
   }
 
