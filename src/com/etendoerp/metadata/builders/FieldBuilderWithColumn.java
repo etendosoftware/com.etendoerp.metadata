@@ -282,12 +282,15 @@ public class FieldBuilderWithColumn extends FieldBuilder {
         }
 
         if (referenced != null) {
-            Tab referencedTab = getReferencedTab(referenced);
+            // Only resolve via Utils if addReferencedProperty did not already set a valid window ID
+            if (!json.has(REFERENCED_WINDOW_ID) || json.isNull(REFERENCED_WINDOW_ID)) {
+                Tab referencedTab = getReferencedTab(referenced);
 
-            if (referencedTab != null) {
-                json.put(REFERENCED_ENTITY, referenced.getEntity().getName());
-                json.put(REFERENCED_WINDOW_ID, referencedTab.getWindow().getId());
-                json.put(REFERENCED_TAB_ID, referencedTab.getId());
+                if (referencedTab != null) {
+                    json.put(REFERENCED_ENTITY, referenced.getEntity().getName());
+                    json.put(REFERENCED_WINDOW_ID, referencedTab.getWindow().getId());
+                    json.put(REFERENCED_TAB_ID, referencedTab.getId());
+                }
             }
 
             Property colorProp = findColorProperty(referenced.getEntity());

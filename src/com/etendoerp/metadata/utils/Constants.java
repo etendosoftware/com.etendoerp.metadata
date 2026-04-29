@@ -72,6 +72,10 @@ public class Constants {
     public static final String PATCH = "PATCH";
     public static final String DELETE = "DELETE";
     public static final String LOCATION_PATH = "/location/";
+    public static final String EMAIL_PATH = "/email";
+    public static final String EMAIL_SEND_PATH = "/email/send";
+    public static final String EMAIL_CONFIG_PATH = "/email/config";
+    public static final String EMAIL_ATTACHMENTS_PATH = "/email/attachments";
     public static final String TOOLBAR_PATH = "/toolbar";
     public static final String SAVED_VIEW_PATH = "/saved-views";
     public static final String REPORT_AND_PROCESS_PATH = "/report-and-process/";

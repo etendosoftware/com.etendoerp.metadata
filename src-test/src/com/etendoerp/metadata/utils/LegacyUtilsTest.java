@@ -11,6 +11,12 @@ import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.openbravo.base.provider.OBProvider;
 import org.openbravo.model.ad.ui.Process;
+import org.openbravo.dal.service.OBDal;
+import org.openbravo.dal.service.OBQuery;
+import org.openbravo.model.ad.ui.Tab;
+import java.util.List;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.anyString;
 
 /**
  * Unit tests for {@link LegacyUtils}.
@@ -20,6 +26,8 @@ import org.openbravo.model.ad.ui.Process;
 class LegacyUtilsTest {
 
   private static final String LEGACY_PROCESS_NAME = "Legacy Process Placeholder";
+  private static final String TABLE_ID = "319";
+  private static final String WINDOW_ID = "169";
 
   /**
    * Tests the isLegacyProcess method for a process ID that exists in the legacy list.
@@ -173,5 +181,67 @@ class LegacyUtilsTest {
     assertFalse(processIds.isEmpty());
     assertFalse(paths.isEmpty());
     assertFalse(attributes.isEmpty());
+  }
+
+  @Test
+  void isMutableSessionAttributeCreateFromTabIdReturnsTrue() {
+    assertTrue(LegacyUtils.isMutableSessionAttribute("CREATEFROM|TABID"));
+  }
+
+  @Test
+  void findTabIdByWindowAndTableReturnsNullForNullWindowId() {
+    assertNull(LegacyUtils.findTabIdByWindowAndTable(null, TABLE_ID));
+  }
+
+  @Test
+  void findTabIdByWindowAndTableReturnsNullForNullTableId() {
+    assertNull(LegacyUtils.findTabIdByWindowAndTable(WINDOW_ID, null));
+  }
+
+  @Test
+  void findTabIdByWindowAndTableReturnsNullForEmptyWindowId() {
+    assertNull(LegacyUtils.findTabIdByWindowAndTable("", TABLE_ID));
+  }
+
+  @SuppressWarnings("unchecked")
+  @Test
+  void findTabIdByWindowAndTableReturnsTabIdWhenFound() {
+    Tab mockTab = mock(Tab.class);
+    when(mockTab.getId()).thenReturn("257");
+
+    OBQuery<Tab> mockQuery = mock(OBQuery.class);
+    when(mockQuery.list()).thenReturn(List.of(mockTab));
+
+    OBDal mockDal = mock(OBDal.class);
+    when(mockDal.createQuery(eq(Tab.class), anyString())).thenReturn(mockQuery);
+
+    try (MockedStatic<OBDal> mockedOBDal = mockStatic(OBDal.class)) {
+      mockedOBDal.when(OBDal::getInstance).thenReturn(mockDal);
+
+      String result = LegacyUtils.findTabIdByWindowAndTable(WINDOW_ID, TABLE_ID);
+
+      assertEquals("257", result);
+      verify(mockQuery).setNamedParameter("windowId", WINDOW_ID);
+      verify(mockQuery).setNamedParameter("tableId", TABLE_ID);
+      verify(mockQuery).setMaxResult(1);
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  @Test
+  void findTabIdByWindowAndTableReturnsNullWhenNoTabFound() {
+    OBQuery<Tab> mockQuery = mock(OBQuery.class);
+    when(mockQuery.list()).thenReturn(List.of());
+
+    OBDal mockDal = mock(OBDal.class);
+    when(mockDal.createQuery(eq(Tab.class), anyString())).thenReturn(mockQuery);
+
+    try (MockedStatic<OBDal> mockedOBDal = mockStatic(OBDal.class)) {
+      mockedOBDal.when(OBDal::getInstance).thenReturn(mockDal);
+
+      String result = LegacyUtils.findTabIdByWindowAndTable(WINDOW_ID, "999");
+
+      assertNull(result);
+    }
   }
 }
