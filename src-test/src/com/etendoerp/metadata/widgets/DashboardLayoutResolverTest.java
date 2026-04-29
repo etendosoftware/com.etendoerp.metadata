@@ -46,7 +46,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class DashboardLayoutResolverTest {
 
-    private static final String USER_123 = USER_123;
+    private static final String USER_123 = "user123";
 
     @Mock OBContext mockContext;
     @Mock OBDal mockOBDal;

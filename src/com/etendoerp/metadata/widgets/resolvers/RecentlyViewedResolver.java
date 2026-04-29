@@ -28,7 +28,7 @@ import org.codehaus.jettison.json.JSONObject;
  * The resolver signals this to the frontend via source="localStorage" so it can read local data
  * instead of expecting items from the backend.
  *
- * TODO: Migrate to Option A — create POST /meta/navigation/track endpoint, store in
+ * FUTURE: Migrate to Option A — create POST /meta/navigation/track endpoint, store in
  * ETMETA_NAV_LOG, and query here. See docs/adr/widget-navigation-data-source.md.
  */
 public class RecentlyViewedResolver implements WidgetDataResolver {

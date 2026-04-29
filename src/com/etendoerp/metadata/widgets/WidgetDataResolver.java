@@ -45,5 +45,6 @@ public interface WidgetDataResolver {
      * @return the resolved data as a JSON object
      * @throws Exception if resolution fails
      */
+    @SuppressWarnings("java:S112")
     JSONObject resolve(WidgetDataContext context) throws Exception;
 }
