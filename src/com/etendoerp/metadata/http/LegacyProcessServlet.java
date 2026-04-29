@@ -185,6 +185,22 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
                     "window.__etendoMessageSent=true;" +
                     "})();</script></head><body></body></html>";
 
+    /**
+     * Self-contained HTML served when the legacy iframe pipeline cannot complete the
+     * request (e.g. unhandled exception, missing follow-up token, unresolvable target
+     * path). Posts a {@code requestFailed} action to the parent window so the new UI
+     * renders its own user-facing copy ({@code process.requestFailed.*}) instead of
+     * leaving the iframe on Tomcat's error page. The HTTP status is 200 so the body
+     * is loaded and the script runs.
+     */
+    private static final String REQUEST_FAILED_ACTION = "requestFailed";
+    private static final String REQUEST_FAILED_FORWARDER_HTML =
+            "<!DOCTYPE html>\n<html><head><meta charset=\"UTF-8\"><script>" +
+                    "(function(){if(!window.parent)return;" +
+                    "window.parent.postMessage({type:'fromForm',action:'" + REQUEST_FAILED_ACTION + "'},'*');" +
+                    "window.__etendoMessageSent=true;" +
+                    "})();</script></head><body></body></html>";
+
     public static final String SET_COOKIE = "Set-Cookie";
     public static final String ERROR_SENDING_ERROR_RESPONSE = "Error sending error response: {}";
 
@@ -393,6 +409,28 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
     }
 
     /**
+     * Writes a minimal HTML response that postMessages a {@code requestFailed} action
+     * to the parent window. Used when the legacy iframe pipeline aborts and we need
+     * the new UI to surface a friendly error overlay instead of letting the iframe
+     * load Tomcat's default error page.
+     *
+     * @param res   the HttpServletResponse to write the forwarder HTML into
+     * @param cause the original exception (logged for diagnostics; not exposed to the client)
+     */
+    private void writeRequestFailedForwarder(HttpServletResponse res, Exception cause) {
+        log.error("Forwarding request failure to iframe parent", cause);
+        try {
+            res.setContentType("text/html; charset=UTF-8");
+            res.setCharacterEncoding("UTF-8");
+            res.setStatus(HttpServletResponse.SC_OK);
+            res.getWriter().write(REQUEST_FAILED_FORWARDER_HTML);
+            res.getWriter().flush();
+        } catch (IOException e) {
+            log.error("Failed to write requestFailed forwarder: {}", e.getMessage(), e);
+        }
+    }
+
+    /**
      * Sends a successful HTML response to the client.
      *
      * @param res  the HttpServletResponse
@@ -455,8 +493,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
 
         } catch (Exception e) {
             log.error("Error processing legacy request {}: {}", path, e.getMessage(), e);
-            res.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
-                    "Error processing legacy request: " + e.getMessage());
+            writeRequestFailedForwarder(res, e);
         }
     }
 
@@ -833,8 +870,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         String servletDir = (String) req.getSession(false).getAttribute("LEGACY_SERVLET_DIR");
 
         if (token == null) {
-            log.error("No token found in session for legacy follow-up request");
-            res.sendError(HttpServletResponse.SC_UNAUTHORIZED, "No authentication token for follow-up request");
+            writeRequestFailedForwarder(res, new OBException("No authentication token for follow-up request"));
             return;
         }
 
@@ -869,14 +905,13 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
                 log.debug("Forwarding follow-up request to: {}", targetPath);
                 wrappedRequest.getRequestDispatcher(targetPath).forward(wrappedRequest, res);
             } else {
-                log.error("Could not determine target path for follow-up request. PathInfo: {}, ServletDir: {}",
-                        req.getPathInfo(), servletDir);
-                res.sendError(HttpServletResponse.SC_BAD_REQUEST, "Could not determine target servlet");
+                writeRequestFailedForwarder(res, new OBException(String.format(
+                        "Could not determine target path for follow-up request. PathInfo: %s, ServletDir: %s",
+                        req.getPathInfo(), servletDir)));
             }
 
         } catch (Exception e) {
-            log.error("Error processing legacy follow-up request: {}", e.getMessage(), e);
-            res.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Error processing follow-up request");
+            writeRequestFailedForwarder(res, e);
         }
     }
 

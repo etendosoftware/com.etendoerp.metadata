@@ -613,7 +613,9 @@ public class LegacyProcessServletTest extends OBBaseTest {
     }
 
     /**
-     * Tests processLegacyFollowupRequest without token in session.
+     * Tests processLegacyFollowupRequest without token in session writes the
+     * requestFailed forwarder HTML instead of sending an HTTP 401 error,
+     * so the iframe can postMessage the failure to its parent window.
      */
     @Test
     public void testProcessLegacyFollowupRequestNoToken() throws Exception {
@@ -624,7 +626,9 @@ public class LegacyProcessServletTest extends OBBaseTest {
                 new Class<?>[] { HttpServletRequest.class, HttpServletResponse.class },
                 request, response);
 
-        verify(response).sendError(eq(HttpServletResponse.SC_UNAUTHORIZED), anyString());
+        verify(response).setContentType("text/html; charset=UTF-8");
+        verify(response).setStatus(HttpServletResponse.SC_OK);
+        verify(response, never()).sendError(eq(HttpServletResponse.SC_UNAUTHORIZED), anyString());
     }
 
     /**
@@ -1233,5 +1237,73 @@ public class LegacyProcessServletTest extends OBBaseTest {
         assertEquals("Both submitThisPage calls must be preceded by sendMessage",
                 "sendMessage('processOrder');submitThisPage('a');sendMessage('processOrder');submitThisPage('b');",
                 result);
+    }
+
+    // ========== Tests for writeRequestFailedForwarder ==========
+
+    /**
+     * Tests that writeRequestFailedForwarder sets HTTP status 200 so the browser
+     * loads the body and the postMessage script executes.
+     */
+    @Test
+    public void writeRequestFailedForwarderSetsStatusOk() throws Exception {
+        invokePrivateMethod(legacyProcessServlet, "writeRequestFailedForwarder",
+                new Class<?>[] { HttpServletResponse.class, Exception.class },
+                response, new RuntimeException("test error"));
+
+        verify(response).setStatus(HttpServletResponse.SC_OK);
+        verify(response, never()).sendError(anyInt(), anyString());
+    }
+
+    /**
+     * Tests that writeRequestFailedForwarder sets the correct content type.
+     */
+    @Test
+    public void writeRequestFailedForwarderSetsHtmlContentType() throws Exception {
+        invokePrivateMethod(legacyProcessServlet, "writeRequestFailedForwarder",
+                new Class<?>[] { HttpServletResponse.class, Exception.class },
+                response, new RuntimeException("test error"));
+
+        verify(response).setContentType("text/html; charset=UTF-8");
+        verify(response).setCharacterEncoding("UTF-8");
+    }
+
+    /**
+     * Tests that writeRequestFailedForwarder writes an HTML body containing a
+     * postMessage call with action 'requestFailed', so the parent React component
+     * can display a user-friendly error overlay.
+     */
+    @Test
+    public void writeRequestFailedForwarderWritesPostMessageScript() throws Exception {
+        StringWriter writer = new StringWriter();
+        PrintWriter pw = new PrintWriter(writer);
+        when(response.getWriter()).thenReturn(pw);
+
+        invokePrivateMethod(legacyProcessServlet, "writeRequestFailedForwarder",
+                new Class<?>[] { HttpServletResponse.class, Exception.class },
+                response, new RuntimeException("proxy error"));
+
+        pw.flush();
+        String html = writer.toString();
+        assertTrue("Should contain postMessage call", html.contains("postMessage"));
+        assertTrue("Should specify 'requestFailed' action", html.contains("action:'requestFailed'"));
+        assertTrue("Should be a DOCTYPE HTML document", html.contains("<!DOCTYPE html>"));
+    }
+
+    /**
+     * Tests that writeRequestFailedForwarder survives gracefully when the response
+     * writer itself throws an IOException — the outer exception must not propagate.
+     */
+    @Test
+    public void writeRequestFailedForwarderHandlesIoException() throws Exception {
+        when(response.getWriter()).thenThrow(new java.io.IOException("stream closed"));
+
+        try {
+            invokePrivateMethod(legacyProcessServlet, "writeRequestFailedForwarder",
+                    new Class<?>[] { HttpServletResponse.class, Exception.class },
+                    response, new RuntimeException("original error"));
+        } catch (Exception e) {
+            throw new AssertionError("writeRequestFailedForwarder must not propagate IOException", e);
+        }
     }
 }
