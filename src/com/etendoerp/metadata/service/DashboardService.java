@@ -482,27 +482,30 @@ public class DashboardService extends MetadataService {
         while (keys.hasNext()) {
             String key = keys.next();
             Object val = params.get(key);
-            if (!(val instanceof String)) continue;
-            String strVal = ((String) val).trim();
-            if (strVal.isEmpty()) continue;
-            // Detect URL-like values: anything containing ":" that isn't a plain word
-            if (!strVal.contains(":")) continue;
-            if (!strVal.startsWith("https://")) {
-                throw new com.etendoerp.metadata.exceptions.UnprocessableContentException(
-                    INVALID_VALUE_FOR_PARAM + key + "': only https:// URLs are allowed");
-            }
-            // Validate the host to block bypass patterns like https://evil.com\@google.com
-            try {
-                java.net.URI uri = new java.net.URI(strVal);
-                String host = uri.getHost();
-                if (host == null || host.contains("@") || host.contains("\\")) {
-                    throw new com.etendoerp.metadata.exceptions.UnprocessableContentException(
-                        INVALID_VALUE_FOR_PARAM + key + "': malformed URL host");
+            if (val instanceof String) {
+                String strVal = ((String) val).trim();
+                if (!strVal.isEmpty() && strVal.contains(":")) {
+                    validateUrlParam(key, strVal);
                 }
-            } catch (java.net.URISyntaxException e) {
-                throw new com.etendoerp.metadata.exceptions.UnprocessableContentException(
-                    INVALID_VALUE_FOR_PARAM + key + "': malformed URL");
             }
+        }
+    }
+
+    private void validateUrlParam(String key, String strVal) {
+        if (!strVal.startsWith("https://")) {
+            throw new com.etendoerp.metadata.exceptions.UnprocessableContentException(
+                INVALID_VALUE_FOR_PARAM + key + "': only https:// URLs are allowed");
+        }
+        try {
+            java.net.URI uri = new java.net.URI(strVal);
+            String host = uri.getHost();
+            if (host == null || host.contains("@") || host.contains("\\")) {
+                throw new com.etendoerp.metadata.exceptions.UnprocessableContentException(
+                    INVALID_VALUE_FOR_PARAM + key + "': malformed URL host");
+            }
+        } catch (java.net.URISyntaxException e) {
+            throw new com.etendoerp.metadata.exceptions.UnprocessableContentException(
+                INVALID_VALUE_FOR_PARAM + key + "': malformed URL");
         }
     }
 

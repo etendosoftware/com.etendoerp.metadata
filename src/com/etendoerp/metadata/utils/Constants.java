@@ -26,6 +26,7 @@ import java.util.List;
  *
  * @author luuchorocha
  */
+@SuppressWarnings("java:S1075")
 public class Constants {
     private Constants() { }
 

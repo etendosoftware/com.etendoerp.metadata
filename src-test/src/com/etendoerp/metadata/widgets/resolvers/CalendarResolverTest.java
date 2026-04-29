@@ -78,13 +78,13 @@ class CalendarResolverTest {
 
     // helper: build a period row: [id, name, startDate, endDate, openClose]
     private Object[] periodRow(String id, String name, String start, String end, String oc)
-            throws Exception {
+            throws java.text.ParseException {
         SimpleDateFormat sdf = new SimpleDateFormat(DATE_FORMAT);
         return new Object[]{ id, name, sdf.parse(start), sdf.parse(end), oc };
     }
 
     // helper: build a non-business-day row: [name, date]
-    private Object[] nbdRow(String name, String date) throws Exception {
+    private Object[] nbdRow(String name, String date) throws java.text.ParseException {
         return new Object[]{ name, new SimpleDateFormat(DATE_FORMAT).parse(date) };
     }
 

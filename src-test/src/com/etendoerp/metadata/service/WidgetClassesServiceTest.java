@@ -46,7 +46,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class WidgetClassesServiceTest {
 
-    private static final String CLASSES = CLASSES;
+    private static final String CLASSES = "classes";
 
     @Mock HttpServletRequest  request;
     @Mock HttpServletResponse response;
