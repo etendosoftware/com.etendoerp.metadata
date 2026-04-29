@@ -41,7 +41,9 @@ package com.etendoerp.metadata.http;
    private boolean writerUsed = false;
    private String redirectLocation = null;
    private boolean redirected = false;
-
+   // Encoding resolved on first read/write and reused for the lifetime of the
+   // wrapper, so encoding changes mid-flight don't corrupt the captured bytes.
+   private String capturedEncoding;
 
    /**
     * Constructs a new HttpServletResponseLegacyWrapper.
@@ -67,6 +69,7 @@ package com.etendoerp.metadata.http;
        throw new IllegalStateException("getWriter() has already been called for this response");
      }
      if (capturingStream == null) {
+       resolveCapturedEncoding();
        capturingStream = new CapturingServletOutputStream(contentCapture);
      }
      outputStreamUsed = true;
@@ -84,6 +87,21 @@ package com.etendoerp.metadata.http;
    public void sendRedirect(String location) throws IOException {
      this.redirectLocation = location;
      this.redirected = true;
+   }
+
+   // Absorbed: script injection changes the body size, so the real
+   // Content-Length must be recomputed by the container from the final bytes.
+   // The other headers/status/content-type can still pass through to the
+   // underlying response via the base wrapper.
+
+   @Override
+   public void setContentLength(int len) {
+     // no-op
+   }
+
+   @Override
+   public void setContentLengthLong(long len) {
+     // no-op
    }
 
    /**
@@ -117,14 +135,28 @@ package com.etendoerp.metadata.http;
        throw new IllegalStateException("getOutputStream() has already been called for this response");
      }
      if (writer == null) {
-       String encoding = getCharacterEncoding();
-       if (encoding == null) {
-         encoding = StandardCharsets.UTF_8.name();
-       }
-       writer = new PrintWriter(new OutputStreamWriter(contentCapture, encoding));
+       writer = new PrintWriter(new OutputStreamWriter(contentCapture, resolveCapturedEncoding()));
      }
      writerUsed = true;
      return writer;
+   }
+
+   /**
+    * Resolves the character encoding to use for this captured response, lazily
+    * and only once. Subsequent calls return the cached value so writes and
+    * reads always agree, even if the underlying response's encoding changes
+    * mid-flight via {@code setContentType()}/{@code setCharacterEncoding()}
+    * during the {@code RequestDispatcher.include()} chain. Falls back to UTF-8
+    * when the underlying response has no encoding set.
+    *
+    * @return the cached encoding name, never null.
+    */
+   private String resolveCapturedEncoding() {
+     if (capturedEncoding == null) {
+       String encoding = getCharacterEncoding();
+       capturedEncoding = (encoding != null) ? encoding : StandardCharsets.UTF_8.name();
+     }
+     return capturedEncoding;
    }
 
    /**
@@ -153,11 +185,7 @@ package com.etendoerp.metadata.http;
     */
    public String getCapturedOutputAsString() throws UnsupportedEncodingException {
      byte[] bytes = getCapturedOutput();
-     String encoding = getCharacterEncoding();
-     if (encoding == null) {
-       encoding = StandardCharsets.UTF_8.name();
-     }
-     return new String(bytes, encoding);
+     return new String(bytes, resolveCapturedEncoding());
    }
 
    /**
@@ -194,6 +222,7 @@ package com.etendoerp.metadata.http;
      writerUsed = false;
      writer = null;
      capturingStream = null;
+     capturedEncoding = null;
    }
 
    /**

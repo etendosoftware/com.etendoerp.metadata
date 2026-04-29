@@ -38,6 +38,7 @@ import static org.mockito.Mockito.when;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Optional;
 import java.util.function.Consumer;
 
 import org.apache.commons.lang3.StringUtils;
@@ -75,6 +76,7 @@ import org.openbravo.service.json.DataToJsonConverter;
 class ProcessActionBuilderTest {
 
     private static final String DISPLAY_LOGIC_EXPRESSION = "displayLogicExpression";
+    private static final String AD_PROCESS_REQUEST_ID = "AD_Process_Request_ID";
 
     @Mock
     private Process mockProcess;
@@ -363,6 +365,59 @@ class ProcessActionBuilderTest {
 
         assertNotNull(result);
         assertEquals(0, result.length());
+    }
+
+    /**
+     * Verifies that {@code getFieldProcess} merges the legacy URL/command/key-column
+     * keys returned by {@link LegacyProcessResolver} into the process JSON. This is the
+     * contract the frontend consumes via {@code button.processAction.url/command/...}.
+     *
+     * @throws JSONException if there is an error during JSON processing
+     */
+    @Test
+    void testGetFieldProcessIncludesLegacyParamsWhenResolverResolves() throws JSONException {
+        Column mockColumn = mock(Column.class);
+        Reference mockRef = mock(Reference.class);
+        Tab mockTab = mock(Tab.class);
+        when(mockField.getId()).thenReturn("field-id");
+        when(mockField.getColumn()).thenReturn(mockColumn);
+        when(mockField.getName()).thenReturn("Field Name");
+        when(mockField.getTab()).thenReturn(mockTab);
+        when(mockColumn.getId()).thenReturn("col-id");
+        when(mockColumn.getName()).thenReturn("Column Name");
+        when(mockColumn.getReference()).thenReturn(mockRef);
+        when(mockRef.getId()).thenReturn("28");
+        when(mockProcess.getADProcessParameterList()).thenReturn(Collections.emptyList());
+
+        LegacyProcessParams legacyParams = new LegacyProcessParams(
+                "/ad_process/RescheduleProcess.html",
+                "DEFAULT",
+                AD_PROCESS_REQUEST_ID,
+                AD_PROCESS_REQUEST_ID);
+
+        try (MockedStatic<OBContext> contextMock = mockStatic(OBContext.class);
+             MockedStatic<LegacyProcessResolver> resolverMock = mockStatic(LegacyProcessResolver.class);
+             MockedStatic<Utility> utilityMock = mockStatic(Utility.class);
+             MockedConstruction<DataToJsonConverter> ignored = mockConstruction(
+                     DataToJsonConverter.class,
+                     (mock, context) ->
+                             when(mock.toJsonObject(any(Process.class), eq(DataResolvingMode.FULL_TRANSLATABLE)))
+                                     .thenReturn(new JSONObject().put("id", TEST_PROCESS_ID)))) {
+
+            contextMock.when(OBContext::getOBContext).thenReturn(mockOBContext);
+            when(mockOBContext.getLanguage()).thenReturn(mockLanguage);
+            resolverMock.when(() -> LegacyProcessResolver.resolve(mockField))
+                    .thenReturn(Optional.of(legacyParams));
+            utilityMock.when(() -> Utility.getTabURL(mockTab, null, false)).thenReturn("/tab/url.html");
+
+            JSONObject result = ProcessActionBuilder.getFieldProcess(mockField, mockProcess);
+
+            assertNotNull(result);
+            assertEquals("/ad_process/RescheduleProcess.html", result.getString("url"));
+            assertEquals("DEFAULT", result.getString("command"));
+            assertEquals(AD_PROCESS_REQUEST_ID, result.getString("keyColumnName"));
+            assertEquals(AD_PROCESS_REQUEST_ID, result.getString("inpkeyColumnId"));
+        }
     }
 
     /**

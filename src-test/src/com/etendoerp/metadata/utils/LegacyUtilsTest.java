@@ -38,35 +38,6 @@ class LegacyUtilsTest {
   private static final String LEGACY_PROCESS_NAME = "Legacy Process Placeholder";
 
   /**
-   * Tests the isLegacyProcess method for a process ID that exists in the legacy list.
-   */
-  @Test
-  void isLegacyProcessWithExistingIdReturnsTrue() {
-    assertTrue(LegacyUtils.isLegacyProcess("3663"));
-    assertTrue(LegacyUtils.isLegacyProcess("4242"));
-    assertTrue(LegacyUtils.isLegacyProcess("3670"));
-    assertTrue(LegacyUtils.isLegacyProcess("4248"));
-  }
-
-  /**
-   * Tests the isLegacyProcess method for a process ID that does not exist in the legacy list.
-   */
-  @Test
-  void isLegacyProcessWithNonExistingIdReturnsFalse() {
-    assertFalse(LegacyUtils.isLegacyProcess("1234"));
-    assertFalse(LegacyUtils.isLegacyProcess("9999"));
-    assertFalse(LegacyUtils.isLegacyProcess(""));
-  }
-
-  @Test
-  void isLegacyProcessWithNullReturnsFalseOrNoException() {
-    assertDoesNotThrow(() -> {
-      boolean result = LegacyUtils.isLegacyProcess(null);
-      assertFalse(result, "Null should not be legacy");
-    });
-  }
-
-  /**
    * Tests the getLegacyProcess method to ensure it creates and populates a Process instance correctly.
    */
   @Test
@@ -165,28 +136,23 @@ class LegacyUtilsTest {
   }
 
   /**
-   * Tests that the legacy process IDs, paths, and attributes are not empty or null.
+   * Tests that the legacy paths and mutable session attributes sets are initialized.
    */
   @Test
   void staticSetsAreInitializedCorrectly() throws Exception {
     // Using reflection to verify that sets are initialized
-    var processIdsField = LegacyUtils.class.getDeclaredField("LEGACY_PROCESS_IDS");
     var pathsField = LegacyUtils.class.getDeclaredField("LEGACY_PATHS");
     var attributesField = LegacyUtils.class.getDeclaredField("MUTABLE_SESSION_ATTRIBUTES");
 
-    processIdsField.setAccessible(true);
     pathsField.setAccessible(true);
     attributesField.setAccessible(true);
 
-    Set<?> processIds = (Set<?>) processIdsField.get(null);
     Set<?> paths = (Set<?>) pathsField.get(null);
     Set<?> attributes = (Set<?>) attributesField.get(null);
 
-    assertNotNull(processIds);
     assertNotNull(paths);
     assertNotNull(attributes);
 
-    assertFalse(processIds.isEmpty());
     assertFalse(paths.isEmpty());
     assertFalse(attributes.isEmpty());
   }

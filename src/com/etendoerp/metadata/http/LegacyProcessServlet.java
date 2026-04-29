@@ -23,6 +23,8 @@ import com.smf.securewebservices.utils.SecureWebServicesUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.codehaus.jettison.json.JSONException;
+import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.base.HttpBaseUtils;
 import org.openbravo.base.exception.OBException;
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
@@ -51,8 +53,6 @@ import static com.etendoerp.metadata.utils.Constants.FORM_CLOSE_TAG;
 import static com.etendoerp.metadata.utils.Constants.FRAMESET_CLOSE_TAG;
 import static com.etendoerp.metadata.utils.Constants.HEAD_CLOSE_TAG;
 import static com.etendoerp.metadata.utils.Constants.PUBLIC_JS_PATH;
-import static com.etendoerp.metadata.utils.LegacyPaths.ABOUT_MODAL;
-import static com.etendoerp.metadata.utils.LegacyPaths.MANUAL_PROCESS;
 
 /**
  * Legacy servlet that uses existing HttpServletRequestWrapper infrastructure
@@ -65,6 +65,9 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
     private static final String JWT_TOKEN = "#JWT_TOKEN";
     private static final String HTML_EXTENSION = ".html";
     private static final String JS_EXTENSION = ".js";
+    private static final String ACTION_JSON_SEPARATOR = "',action:";
+    private static final String HTML_UTF8_CONTENT_TYPE = "text/html; charset=UTF-8";
+    private static final String UTF8_CHARSET = "UTF-8";
     private static final String TOKEN_PARAM = "token";
     private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String BEARER_PREFIX = "Bearer ";
@@ -74,14 +77,139 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
 
     private static final String RECEIVE_AND_POST_MESSAGE_SCRIPT = "<script>window.addEventListener(\"message\", (event) => {"
             +
-            "if (event.data?.type === \"fromForm\" && window.parent) {" +
+            "if (event.data?.type === \"" + LegacyMessageProtocol.MESSAGE_TYPE + "\" && window.parent) {" +
             "window.parent.postMessage({ type: \"fromIframe\", action: event.data.action }, \"*\");" +
             "}});</script>";
 
-    private static final String POST_MESSAGE_SCRIPT = "<script>const sendMessage = (action) => {" +
-            "if (window.parent) {" +
-            "window.parent.postMessage({ type: \"fromForm\", action: action, }, \"*\");" +
-            "}}</script>";
+    /**
+     * Script injected into legacy form pages to expose {@code window.sendMessage}
+     * and to guarantee that the parent always receives a final notification even
+     * when the page is unloaded mid-flight (redirect, navigation, browser-tab
+     * change). Tracks whether a "final" message ({@code showProcessMessage} or
+     * {@code closeModal}) was emitted; if not, on {@code pagehide}/{@code beforeunload}
+     * it sends an {@code iframeUnloaded} action so the new UI can show the
+     * fallback warning instead of leaving the user without feedback.
+     */
+    private static final String POST_MESSAGE_SCRIPT = "<script>(function(){" +
+            "var sent=false;" +
+            "window.sendMessage=function(action){" +
+            "if(!window.parent)return;" +
+            "window.parent.postMessage({type:'" + LegacyMessageProtocol.MESSAGE_TYPE + ACTION_JSON_SEPARATOR
+            + "action},'*');" +
+            "if(action==='" + LegacyMessageProtocol.ACTION_SHOW_PROCESS_MESSAGE + "'||action==='"
+            + LegacyMessageProtocol.ACTION_CLOSE_MODAL + "'){sent=true;window.__etendoMessageSent=true;}" +
+            "};" +
+            "function notifyUnload(){" +
+            "if(sent||window.__etendoMessageSent)return;" +
+            "if(!window.parent)return;" +
+            "window.parent.postMessage({type:'" + LegacyMessageProtocol.MESSAGE_TYPE + ACTION_JSON_SEPARATOR
+            + "'" + LegacyMessageProtocol.ACTION_IFRAME_UNLOADED + "'},'*');" +
+            "sent=true;window.__etendoMessageSent=true;" +
+            "}" +
+            "window.addEventListener('pagehide',notifyUnload);" +
+            "window.addEventListener('beforeunload',notifyUnload);" +
+            "})();</script>";
+
+    /**
+     * Marker used to detect Openbravo classic "popup message" response pages
+     * (error/success/info/warning dialogs emitted by action button servlets).
+     * These pages share the template: id="messageBoxIDTitle" + id="messageBoxIDMessage"
+     * + id="paramTipo" class="MessageBox{TYPE}".
+     */
+    private static final String POPUP_MESSAGE_MARKER = "id=\"messageBoxIDMessage\"";
+
+    /**
+     * Marker matching the CSS class the Openbravo error popup template writes.
+     * When present in the captured body the DAL session is almost certainly
+     * dirty (the WAD servlet caught its own OBException without rolling back),
+     * so we must rollback before the filter chain tries to commit.
+     */
+    private static final String ERROR_POPUP_CLASS_MARKER = "MessageBoxERROR";
+
+    /**
+     * Script injected into popup-message pages. Extracts the title/text/type from
+     * the DOM and forwards them to the parent window so the new UI can render the
+     * dialog with its own styles, then closes the iframe modal.
+     *
+     * <p>Delays {@code closeModal} by 150 ms so the parent processes
+     * {@code showProcessMessage} and captures the payload before the iframe is
+     * unmounted (otherwise the React state update is discarded).
+     */
+    private static final String SHOW_PROCESS_MESSAGE_SCRIPT = "<script>(function(){" +
+            "function forward(){" +
+            "var t=document.getElementById('messageBoxIDTitle');" +
+            "var m=document.getElementById('messageBoxIDMessage');" +
+            "var p=document.getElementById('paramTipo');" +
+            "if(!t||!m||!window.parent)return;" +
+            "var cls=(p&&p.className)||'';" +
+            "var type='info';" +
+            "if(cls.indexOf('ERROR')>=0)type='error';" +
+            "else if(cls.indexOf('SUCCESS')>=0)type='success';" +
+            "else if(cls.indexOf('WARNING')>=0)type='warning';" +
+            "var payload={type:type,title:(t.textContent||'').trim(),text:(m.textContent||'').trim()};" +
+            "window.parent.postMessage({type:'" + LegacyMessageProtocol.MESSAGE_TYPE + ACTION_JSON_SEPARATOR
+            + "'" + LegacyMessageProtocol.ACTION_SHOW_PROCESS_MESSAGE + "',payload:payload},'*');" +
+            "window.__etendoMessageSent=true;" +
+            "setTimeout(function(){" +
+            "window.parent.postMessage({type:'" + LegacyMessageProtocol.MESSAGE_TYPE + ACTION_JSON_SEPARATOR
+            + "'" + LegacyMessageProtocol.ACTION_CLOSE_MODAL + "'},'*');" +
+            "},150);" +
+            "}" +
+            "if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',forward);" +
+            "else forward();" +
+            "})();</script>";
+
+    /**
+     * Request parameter name and canonical value prefix used by Openbravo
+     * action-button servlets to signal "execute the action". Matching variants
+     * like {@code PROCESSDEFAULT} requires a {@code startsWith} check rather than
+     * equality.
+     */
+    private static final String COMMAND_PARAM = "Command";
+    private static final String PROCESS_COMMAND_PREFIX = "PROCESS";
+
+    /**
+     * Patterns used to extract the popup title, message and message-type class
+     * from the captured legacy HTML. The popup template is stable across
+     * Openbravo versions and modules.
+     */
+    private static final Pattern POPUP_TITLE_PATTERN = Pattern.compile(
+            "id=\"messageBoxIDTitle\"[^>]*>([^<]*)<", Pattern.CASE_INSENSITIVE);
+    private static final Pattern POPUP_MESSAGE_PATTERN = Pattern.compile(
+            "id=\"messageBoxIDMessage\"[^>]*>([^<]*)<", Pattern.CASE_INSENSITIVE);
+    private static final Pattern POPUP_TYPE_PATTERN = Pattern.compile(
+            "id=\"paramTipo\"[^>]*class=\"MessageBox([A-Z]+)\"", Pattern.CASE_INSENSITIVE);
+
+    /**
+     * Minimal self-contained HTML served for {@code Command=PROCESS} popups.
+     * Bypasses the legacy HTML pipeline entirely: a tiny (~500 B) response
+     * cannot trigger the chunked-encoding race that breaks the full popup path.
+     * The payload placeholder is a JSON object with {@code type}/{@code title}/{@code text}.
+     */
+    private static final String MINIMAL_FORWARDER_HTML =
+            "<!DOCTYPE html>\n<html><head><meta charset=\"" + UTF8_CHARSET + "\"><script>" +
+                    "(function(){if(!window.parent)return;" +
+                    "window.parent.postMessage({type:'" + LegacyMessageProtocol.MESSAGE_TYPE + ACTION_JSON_SEPARATOR
+                    + "'" + LegacyMessageProtocol.ACTION_SHOW_PROCESS_MESSAGE + "',payload:%s},'*');" +
+                    "window.__etendoMessageSent=true;" +
+                    "})();</script></head><body></body></html>";
+
+    /**
+     * Self-contained HTML served when the legacy iframe pipeline cannot complete the
+     * request (e.g. unhandled exception, missing follow-up token, unresolvable target
+     * path). Posts a {@code requestFailed} action to the parent window so the new UI
+     * renders its own user-facing copy ({@code process.requestFailed.*}) instead of
+     * leaving the iframe on Tomcat's error page. The HTTP status is 200 so the body
+     * is loaded and the script runs.
+     */
+    private static final String REQUEST_FAILED_FORWARDER_HTML =
+            "<!DOCTYPE html>\n<html><head><meta charset=\"" + UTF8_CHARSET + "\"><script>" +
+                    "(function(){if(!window.parent)return;" +
+                    "window.parent.postMessage({type:'" + LegacyMessageProtocol.MESSAGE_TYPE + ACTION_JSON_SEPARATOR
+                    + "'" + LegacyMessageProtocol.ACTION_REQUEST_FAILED + "'},'*');" +
+                    "window.__etendoMessageSent=true;" +
+                    "})();</script></head><body></body></html>";
+
     public static final String SET_COOKIE = "Set-Cookie";
     public static final String ERROR_SENDING_ERROR_RESPONSE = "Error sending error response: {}";
 
@@ -290,6 +418,28 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
     }
 
     /**
+     * Writes a minimal HTML response that postMessages a {@code requestFailed} action
+     * to the parent window. Used when the legacy iframe pipeline aborts and we need
+     * the new UI to surface a friendly error overlay instead of letting the iframe
+     * load Tomcat's default error page.
+     *
+     * @param res   the HttpServletResponse to write the forwarder HTML into
+     * @param cause the original exception (logged for diagnostics; not exposed to the client)
+     */
+    private void writeRequestFailedForwarder(HttpServletResponse res, Exception cause) {
+        log.error("Forwarding request failure to iframe parent", cause);
+        try {
+            res.setContentType(HTML_UTF8_CONTENT_TYPE);
+            res.setCharacterEncoding(UTF8_CHARSET);
+            res.setStatus(HttpServletResponse.SC_OK);
+            res.getWriter().write(REQUEST_FAILED_FORWARDER_HTML);
+            res.getWriter().flush();
+        } catch (IOException e) {
+            log.error("Failed to write requestFailed forwarder: {}", e.getMessage(), e);
+        }
+    }
+
+    /**
      * Sends a successful HTML response to the client.
      *
      * @param res  the HttpServletResponse
@@ -297,7 +447,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
      * @throws IOException if an error occurs while writing the response
      */
     private void sendHtmlResponse(HttpServletResponse res, String html) throws IOException {
-        res.setContentType("text/html; charset=UTF-8");
+        res.setContentType(HTML_UTF8_CONTENT_TYPE);
         res.setStatus(HttpServletResponse.SC_OK);
         res.getWriter().write(html);
         res.getWriter().flush();
@@ -346,12 +496,13 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
 
             wrappedRequest.getRequestDispatcher(path).include(wrappedRequest, responseWrapper);
 
+            rollbackDalSessionIfErrorPopup(responseWrapper);
+
             handleResponse(res, responseWrapper, path, contextPath);
 
         } catch (Exception e) {
             log.error("Error processing legacy request {}: {}", path, e.getMessage(), e);
-            res.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
-                    "Error processing legacy request: " + e.getMessage());
+            writeRequestFailedForwarder(res, e);
         }
     }
 
@@ -383,8 +534,8 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             String jsContent = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
             String processedContent = transformJavaScriptContent(jsContent);
 
-            res.setContentType("application/javascript; charset=UTF-8");
-            res.setCharacterEncoding("UTF-8");
+            res.setContentType("application/javascript; charset=" + UTF8_CHARSET);
+            res.setCharacterEncoding(UTF8_CHARSET);
             res.setStatus(HttpServletResponse.SC_OK);
             res.getWriter().write(processedContent);
             res.getWriter().flush();
@@ -503,7 +654,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
 
         output = getInjectedContent(path, output);
 
-        writeFinalResponse(res, wrapper, path, output);
+        writeFinalResponse(res, wrapper, output);
     }
 
     private void writeRedirect(HttpServletResponse res,
@@ -520,19 +671,130 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
 
     private void writeFinalResponse(HttpServletResponse res,
             HttpServletResponseLegacyWrapper wrapper,
-            String path,
             String output) throws IOException {
 
-        if (ABOUT_MODAL.equals(path) || MANUAL_PROCESS.equals(path)) {
-            res.setContentType("text/html; charset=UTF-8");
-            res.setCharacterEncoding("UTF-8");
-        } else {
-            res.setContentType(wrapper.getContentType());
+        HttpServletRequest req = RequestContext.get().getRequest();
+        if (isProcessCommandPopup(req, output)) {
+            writeProcessCommandForwarder(res, output);
+            return;
         }
 
+        res.setContentType(HTML_UTF8_CONTENT_TYPE);
+        res.setCharacterEncoding(UTF8_CHARSET);
         res.setStatus(wrapper.getStatus());
         res.getWriter().write(output);
         res.getWriter().flush();
+    }
+
+    /**
+     * Detects whether the captured response is the popup emitted by an action
+     * button servlet in response to {@code Command=PROCESS}. Combines two
+     * independent signals — the request parameter and a marker in the body —
+     * so GRID/SAVE/DEFAULT requests that happen to contain the marker (highly
+     * unlikely) are not accidentally rerouted.
+     *
+     * @param req  the original request
+     * @param body the captured legacy HTML
+     * @return {@code true} when the short-circuit path should serve the response
+     */
+    private boolean isProcessCommandPopup(HttpServletRequest req, String body) {
+        if (body == null || !body.contains(POPUP_MESSAGE_MARKER)) {
+            return false;
+        }
+        String command = req.getParameter(COMMAND_PARAM);
+        if (command == null) {
+            return false;
+        }
+        return command.toUpperCase().startsWith(PROCESS_COMMAND_PREFIX);
+    }
+
+    /**
+     * Returns the first captured group for {@code pattern} in {@code source},
+     * or {@code fallback} when no match is found. Trims the match to drop the
+     * whitespace Openbravo templates leave around the title/message text.
+     */
+    private String extractFirstGroup(Pattern pattern, String source, String fallback) {
+        Matcher matcher = pattern.matcher(source);
+        if (matcher.find()) {
+            return matcher.group(1).trim();
+        }
+        return fallback;
+    }
+
+    /**
+     * Maps the Openbravo {@code MessageBoxXXX} CSS class suffix to the type
+     * string the new UI overlay expects.
+     */
+    private String mapMessageType(String classSuffix) {
+        String upper = classSuffix.toUpperCase();
+        if (upper.contains("ERROR")) return "error";
+        if (upper.contains("SUCCESS")) return "success";
+        if (upper.contains("WARNING")) return "warning";
+        return "info";
+    }
+
+    /**
+     * Writes the short-circuit response for {@code Command=PROCESS} popups: a
+     * tiny, self-contained HTML that dispatches {@code showProcessMessage} and
+     * {@code closeModal} to the parent window. Because the body is small and
+     * written in one go, Tomcat does not trigger chunked encoding, avoiding
+     * the {@code ERR_INCOMPLETE_CHUNKED_ENCODING} race that affected the full
+     * popup path.
+     *
+     * @param res           the real response
+     * @param capturedHtml  the original popup HTML captured by the wrapper
+     * @throws IOException if the response writer fails
+     */
+    private void writeProcessCommandForwarder(HttpServletResponse res, String capturedHtml) throws IOException {
+        String title = extractFirstGroup(POPUP_TITLE_PATTERN, capturedHtml, "");
+        String text = extractFirstGroup(POPUP_MESSAGE_PATTERN, capturedHtml, "");
+        String typeClass = extractFirstGroup(POPUP_TYPE_PATTERN, capturedHtml, "INFO");
+
+        String payload = buildForwarderPayload(mapMessageType(typeClass), title, text);
+        String html = String.format(MINIMAL_FORWARDER_HTML, payload);
+
+        res.setContentType(HTML_UTF8_CONTENT_TYPE);
+        res.setCharacterEncoding(UTF8_CHARSET);
+        res.setStatus(HttpServletResponse.SC_OK);
+        res.getWriter().write(html);
+        res.getWriter().flush();
+    }
+
+    private String buildForwarderPayload(String type, String title, String text) {
+        try {
+            JSONObject payload = new JSONObject();
+            payload.put("type", type);
+            payload.put("title", title);
+            payload.put("text", text);
+            return payload.toString();
+        } catch (JSONException e) {
+            log.warn("Could not build forwarder payload, using fallback: {}", e.getMessage());
+            return "{\"type\":\"info\",\"title\":\"\",\"text\":\"\"}";
+        }
+    }
+
+    /**
+     * Rolls back the DAL session when the captured response is an Openbravo
+     * error popup. WAD action-button servlets (e.g. Reconciliation) catch their
+     * own {@code OBException} to render the popup, but they leave the Hibernate
+     * session with stale entities. Without this rollback, the post-request
+     * commit in the filter chain throws {@code StaleStateException}, which
+     * aborts the HTTP connection mid-stream and produces
+     * {@code ERR_INCOMPLETE_CHUNKED_ENCODING} in the browser.
+     *
+     * @param wrapper the capturing wrapper holding the legacy response body
+     */
+    private void rollbackDalSessionIfErrorPopup(HttpServletResponseLegacyWrapper wrapper) {
+        try {
+            String body = wrapper.getCapturedOutputAsString();
+            if (body == null || !body.contains(ERROR_POPUP_CLASS_MARKER)) {
+                return;
+            }
+            OBDal.getInstance().rollbackAndClose();
+            log.debug("Rolled back DAL session after detecting error popup in legacy response");
+        } catch (Exception e) {
+            log.warn("Could not rollback DAL session after error popup: {}", e.getMessage());
+        }
     }
 
     /**
@@ -617,8 +879,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         String servletDir = (String) req.getSession(false).getAttribute("LEGACY_SERVLET_DIR");
 
         if (token == null) {
-            log.error("No token found in session for legacy follow-up request");
-            res.sendError(HttpServletResponse.SC_UNAUTHORIZED, "No authentication token for follow-up request");
+            writeRequestFailedForwarder(res, new OBException("No authentication token for follow-up request"));
             return;
         }
 
@@ -653,14 +914,13 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
                 log.debug("Forwarding follow-up request to: {}", targetPath);
                 wrappedRequest.getRequestDispatcher(targetPath).forward(wrappedRequest, res);
             } else {
-                log.error("Could not determine target path for follow-up request. PathInfo: {}, ServletDir: {}",
-                        req.getPathInfo(), servletDir);
-                res.sendError(HttpServletResponse.SC_BAD_REQUEST, "Could not determine target servlet");
+                writeRequestFailedForwarder(res, new OBException(String.format(
+                        "Could not determine target path for follow-up request. PathInfo: %s, ServletDir: %s",
+                        req.getPathInfo(), servletDir)));
             }
 
         } catch (Exception e) {
-            log.error("Error processing legacy follow-up request: {}", e.getMessage(), e);
-            res.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Error processing follow-up request");
+            writeRequestFailedForwarder(res, e);
         }
     }
 
@@ -677,6 +937,16 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         return extractTargetPathFromReferer(req.getHeader("Referer"));
     }
 
+    /**
+     * Best-effort extraction of the legacy target servlet path from the {@code Referer}
+     * header. Used as fallback when {@code LEGACY_SERVLET_DIR} is not yet present in
+     * the session (e.g. a follow-up request that races with the first servlet hit).
+     *
+     * <p>Returns {@code null} when the path cannot be inferred — the caller
+     * ({@link #processLegacyFollowupRequest}) treats {@code null} as "give up" and
+     * surfaces a {@code requestFailed} forwarder so the iframe shows the proper
+     * error overlay instead of Tomcat's default page.
+     */
     private String extractTargetPathFromReferer(String referer) {
         if (referer == null)
             return null;
@@ -696,9 +966,6 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
                 int queryIndex = afterMeta.indexOf('?');
                 if (queryIndex != -1) {
                     afterMeta = afterMeta.substring(0, queryIndex);
-                }
-                if (afterMeta.endsWith(HTML_EXTENSION) && !afterMeta.contains("/")) {
-                    return "/SalesOrder" + afterMeta;
                 }
                 return afterMeta;
             }
@@ -810,11 +1077,92 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
                 "<!DOCTYPE html>\n" +
                         "<html>\n" +
                         "    <head>\n" +
-                        "        <meta charset='UTF-8'/>\n" +
+                        "        <meta charset='" + UTF8_CHARSET + "'/>\n" +
                         "        <meta http-equiv=\"refresh\" content=\"0; url='%s'\"/>\n" +
                         "    </head>\n" +
                         "</html>",
                 forwardedUrl);
+    }
+
+    private String buildFrameMenuShim() {
+        String decSep = ".";
+        String groupSep = ",";
+        String maskNum = "#,##0.00";
+        try {
+            HttpServletRequest req = RequestContext.get().getRequest();
+            VariablesSecureApp vars = new VariablesSecureApp(req);
+            decSep = StringUtils.defaultIfBlank(vars.getSessionValue("#DECIMALSEPARATOR|QTYEDITION"), decSep);
+            groupSep = StringUtils.defaultIfBlank(vars.getSessionValue("#GROUPSEPARATOR|QTYEDITION"), groupSep);
+            maskNum = StringUtils.defaultIfBlank(vars.getSessionValue("#FORMATOUTPUT|QTYEDITION"), maskNum);
+        } catch (Exception e) {
+            log.warn("Could not read locale session values for frameMenu shim, using defaults: {}", e.getMessage());
+        }
+        return buildShimScript(escapeJs(decSep), escapeJs(groupSep), escapeJs(maskNum));
+    }
+
+    private static String buildShimScript(String decSep, String groupSep, String maskNum) {
+        return "<script>(function(){" +
+                "var m={" +
+                "decSeparator_global:'" + decSep + "'," +
+                "groupSeparator_global:'" + groupSep + "'," +
+                "groupInterval_global:'3'," +
+                "maskNumeric_default:'" + maskNum + "'," +
+                "autosave:false," +
+                "arrMessages:[]," +
+                "arrTypes:[]," +
+                "F:{formats:[],getFormat:function(n){return '" + maskNum + "';}}," +
+                "getAppUrlFromMenu:function(){return '';}," +
+                "focus:function(){}," +
+                "document:window.document" +
+                "};" +
+                "window.frameMenu=m;" +
+                "var _shimGetFrame=function(name){" +
+                "if(name==='frameMenu')return window.frameMenu;" +
+                "try{" +
+                "if(window.parent&&window.parent.frames&&window.parent.frames[name])return window.parent.frames[name];" +
+                "return null;" +
+                "}catch(e){return null;}" +
+                "};" +
+                "window.getFrame=_shimGetFrame;" +
+                "window._shimGetFrame=_shimGetFrame;" +
+                "})();</script>";
+    }
+
+    private static String buildFrameMenuPatchScript() {
+        return "<script>(function(){" +
+                "if(typeof getFrame==='function'&&typeof window.frameMenu!=='undefined'&&window.getFrame!==window._shimGetFrame){" +
+                "var _messagesGetFrame=getFrame;" +
+                "window.getFrame=function(name){" +
+                "if(name==='frameMenu')return window.frameMenu;" +
+                "try{return _messagesGetFrame(name);}catch(e){return null;}" +
+                "};" +
+                "}" +
+                "})();</script>";
+    }
+
+    private static String escapeJs(String value) {
+        return value.replace("\\", "\\\\").replace("'", "\\'");
+    }
+
+    private String injectFrameMenuShim(String responseString) {
+        // Inject shim immediately after <head> (or <HEAD>) opening tag
+        // This ensures it runs BEFORE other scripts in <head>
+        Pattern headOpenPattern = Pattern.compile("<head[^>]*>", Pattern.CASE_INSENSITIVE);
+        Matcher matcher = headOpenPattern.matcher(responseString);
+        if (matcher.find()) {
+            String headTag = matcher.group(0);
+            String shimScript = buildFrameMenuShim();
+            responseString = responseString.replace(headTag, headTag + shimScript);
+        }
+
+        // Inject patch script before </HEAD> to wrap messages.js's getFrame
+        // This is necessary because function declarations bypass Object.defineProperty setters
+        if (responseString.contains(HEAD_CLOSE_TAG)) {
+            String patchScript = buildFrameMenuPatchScript();
+            return responseString.replace(HEAD_CLOSE_TAG, patchScript.concat(HEAD_CLOSE_TAG));
+        }
+
+        return responseString;
     }
 
     /**
@@ -842,6 +1190,8 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
                 .replace(SRC_REPLACE_STRING + "../web/", SRC_REPLACE_STRING + contextPath + WEB_PATH)
                 .replace("href=\"../web/", "href=\"" + contextPath + WEB_PATH);
 
+        responseString = injectFrameMenuShim(responseString);
+
         if (responseString.contains(FRAMESET_CLOSE_TAG)) {
             return responseString.replace(HEAD_CLOSE_TAG, RECEIVE_AND_POST_MESSAGE_SCRIPT.concat(HEAD_CLOSE_TAG));
         }
@@ -854,17 +1204,35 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             resWithNewScript = resWithNewScript.replace("href=\"../web/", "href=\"" + contextPath + WEB_PATH);
 
             return injectCodeAfterFunctionCall(
-                    injectCodeAfterFunctionCall(
+                    injectCodeBeforeFunctionCall(
                             resWithNewScript,
                             "submitThisPage\\(([^)]+)\\);",
-                            "sendMessage('processOrder');",
+                            "sendMessage('" + LegacyMessageProtocol.ACTION_PROCESS_ORDER + "');",
                             true),
                     "close(This)?Page\\(\\);",
-                    "sendMessage('closeModal');",
+                    "sendMessage('" + LegacyMessageProtocol.ACTION_CLOSE_MODAL + "');",
                     true);
         }
 
-        return responseString;
+        return injectPopupMessageForwarder(responseString);
+    }
+
+    /**
+     * Injects the {@link #SHOW_PROCESS_MESSAGE_SCRIPT} into Openbravo classic
+     * popup-message pages (identified by {@link #POPUP_MESSAGE_MARKER}) so the
+     * title/text/type of the dialog is forwarded to the parent window via
+     * {@code postMessage} and the iframe is closed afterwards. Pages that don't
+     * match the popup template are returned unchanged.
+     *
+     * @param responseString the HTML response after all previous injections
+     * @return the HTML with the forwarder script injected before {@code </HEAD>},
+     *         or the original HTML when the popup marker or close-tag is absent
+     */
+    private String injectPopupMessageForwarder(String responseString) {
+        if (!responseString.contains(POPUP_MESSAGE_MARKER) || !responseString.contains(HEAD_CLOSE_TAG)) {
+            return responseString;
+        }
+        return responseString.replace(HEAD_CLOSE_TAG, SHOW_PROCESS_MESSAGE_SCRIPT.concat(HEAD_CLOSE_TAG));
     }
 
     private String injectCodeAfterFunctionCall(String originalRes, String originalFunctionCall, String newFunctionCall,
@@ -877,6 +1245,27 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             String originalSubmitButtonAction = matcher.group(0);
             String modifiedSubmitButtonAction = originalSubmitButtonAction + newFunctionCall;
             matcher.appendReplacement(result, Matcher.quoteReplacement(modifiedSubmitButtonAction));
+        }
+        matcher.appendTail(result);
+        return result.toString();
+    }
+
+    /**
+     * Same as {@link #injectCodeAfterFunctionCall} but inserts {@code newFunctionCall}
+     * BEFORE the matched call. Used when the call itself triggers navigation
+     * (e.g. {@code submitThisPage}) and we need the side-effect (e.g. postMessage)
+     * to fire before the page can unload.
+     */
+    private String injectCodeBeforeFunctionCall(String originalRes, String originalFunctionCall,
+            String newFunctionCall, boolean isRegex) {
+        Pattern pattern = isRegex ? Pattern.compile(originalFunctionCall)
+                : Pattern.compile(Pattern.quote(originalFunctionCall));
+        Matcher matcher = pattern.matcher(originalRes);
+        StringBuilder result = new StringBuilder();
+        while (matcher.find()) {
+            String original = matcher.group(0);
+            String modified = newFunctionCall + original;
+            matcher.appendReplacement(result, Matcher.quoteReplacement(modified));
         }
         matcher.appendTail(result);
         return result.toString();
