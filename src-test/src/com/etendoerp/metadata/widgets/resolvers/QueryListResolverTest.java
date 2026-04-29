@@ -1,3 +1,20 @@
+/*
+ *************************************************************************
+ * The contents of this file are subject to the Etendo License
+ * (the "License"), you may not use this file except in compliance
+ * with the License.
+ * You may obtain a copy of the License at
+ * https://github.com/etendosoftware/etendo_core/blob/main/legal/Etendo_license.txt
+ * Software distributed under the License is distributed on an
+ * "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
+ * implied. See the License for the specific language governing rights
+ * and limitations under the License.
+ * All portions are Copyright (C) 2021-2026 FUTIT SERVICES, S.L
+ * All Rights Reserved.
+ * Contributor(s): Futit Services S.L.
+ *************************************************************************
+ */
+
 package com.etendoerp.metadata.widgets.resolvers;
 
 import com.etendoerp.metadata.widgets.WidgetDataContext;
@@ -37,6 +54,7 @@ class QueryListResolverTest {
         WidgetDataContext ctx = mock(WidgetDataContext.class);
         when(ctx.classString("4")).thenReturn("select o.documentNo, o.grandTotalAmount from Order o");
         when(ctx.param("columns")).thenReturn("docNo,total");
+        when(ctx.param("_pageSize")).thenReturn(null);
         when(ctx.param("rowsNumber")).thenReturn(null);
         when(ctx.getParams()).thenReturn(new HashMap<>());
 
