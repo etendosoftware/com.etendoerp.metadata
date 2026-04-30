@@ -592,7 +592,7 @@ class FieldBuilderTest {
     when(field.getName()).thenReturn(TEST_FIELD);
     when(field.getColumn()).thenThrow(new RuntimeException("Test exception"));
 
-    Method method = FieldBuilder.class.getDeclaredMethod("getHqlName", Field.class);
+    Method method = FieldBuilder.class.getDeclaredMethod(GET_HQL_NAME_METHOD, Field.class);
     method.setAccessible(true);
     String result = (String) method.invoke(null, field);
 

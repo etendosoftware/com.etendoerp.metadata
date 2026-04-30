@@ -66,6 +66,9 @@ public class MetadataFilterAdditionalTest extends WeldBaseTest {
     private static final String FORWARD_SALES_ORDER_HEADER_HTML = "/etendo/meta/forward/SalesOrder/Header.html";
     private static final String HANDLE_EXCEPTION = "handleException";
     private static final String TEXT_HTML_CHARSET_UTF8 = "text/html; charset=UTF-8";
+    private static final String TEST_PATH = "/test";
+    private static final String TEST_HTML_PATH = "/test.html";
+    private static final String DETERMINE_WANTS_HTML = "determineWantsHtml";
     private Method getPrivateMethod(String name, Class<?>... paramTypes) throws Exception {
         Method method = MetadataFilter.class.getDeclaredMethod(name, paramTypes);
         method.setAccessible(true);
@@ -240,7 +243,7 @@ public class MetadataFilterAdditionalTest extends WeldBaseTest {
         Method method = getPrivateMethod("buildHtmlError",
             String.class, int.class, String.class, String.class, String.class);
 
-        String result = (String) method.invoke(filter, CID_123, 500, "GET", "/test", null);
+        String result = (String) method.invoke(filter, CID_123, 500, "GET", TEST_PATH, null);
         assertNotNull(result);
         assertTrue(result.contains("Unexpected error"));
     }
@@ -330,7 +333,7 @@ public class MetadataFilterAdditionalTest extends WeldBaseTest {
     @Test
     public void testHandleExceptionCommittedResponse() throws Exception {
         when(response.isCommitted()).thenReturn(true);
-        when(request.getRequestURI()).thenReturn("/test");
+        when(request.getRequestURI()).thenReturn(TEST_PATH);
         when(request.getMethod()).thenReturn("GET");
 
         invokeHandleException(request, response, new RuntimeException("test"));
@@ -346,7 +349,7 @@ public class MetadataFilterAdditionalTest extends WeldBaseTest {
         StringWriter stringWriter = new StringWriter();
         when(response.isCommitted()).thenReturn(false);
         when(response.getWriter()).thenReturn(new PrintWriter(stringWriter));
-        when(request.getRequestURI()).thenReturn("/test.html");
+        when(request.getRequestURI()).thenReturn(TEST_HTML_PATH);
         when(request.getMethod()).thenReturn("GET");
         when(request.getHeader(ACCEPT_HEADER)).thenReturn(TEXT_HTML);
 
@@ -363,7 +366,7 @@ public class MetadataFilterAdditionalTest extends WeldBaseTest {
     public void testHandleExceptionIscJsonOverridesHtml() throws Exception {
         when(response.isCommitted()).thenReturn(false);
         when(response.getWriter()).thenReturn(new PrintWriter(new StringWriter()));
-        when(request.getRequestURI()).thenReturn("/test.html");
+        when(request.getRequestURI()).thenReturn(TEST_HTML_PATH);
         when(request.getMethod()).thenReturn("GET");
         when(request.getHeader(ACCEPT_HEADER)).thenReturn(TEXT_HTML);
         when(request.getParameter("isc_dataFormat")).thenReturn("json");
@@ -378,7 +381,7 @@ public class MetadataFilterAdditionalTest extends WeldBaseTest {
      */
     @Test
     public void testDetermineWantsHtmlNullInputs() throws Exception {
-        Method method = getPrivateMethod("determineWantsHtml",
+        Method method = getPrivateMethod(DETERMINE_WANTS_HTML,
             String.class, String.class, HttpServletRequest.class);
 
         assertFalse((Boolean) method.invoke(filter, null, null, null));
@@ -389,10 +392,10 @@ public class MetadataFilterAdditionalTest extends WeldBaseTest {
      */
     @Test
     public void testDetermineWantsHtmlWithHtmlUri() throws Exception {
-        Method method = getPrivateMethod("determineWantsHtml",
+        Method method = getPrivateMethod(DETERMINE_WANTS_HTML,
             String.class, String.class, HttpServletRequest.class);
 
-        assertTrue((Boolean) method.invoke(filter, "/test.html", null, null));
+        assertTrue((Boolean) method.invoke(filter, TEST_HTML_PATH, null, null));
     }
 
     /**
@@ -400,12 +403,12 @@ public class MetadataFilterAdditionalTest extends WeldBaseTest {
      */
     @Test
     public void testDetermineWantsHtmlIscJsonOverride() throws Exception {
-        Method method = getPrivateMethod("determineWantsHtml",
+        Method method = getPrivateMethod(DETERMINE_WANTS_HTML,
             String.class, String.class, HttpServletRequest.class);
 
         when(request.getParameter("isc_dataFormat")).thenReturn("json");
 
-        assertFalse((Boolean) method.invoke(filter, "/test.html", TEXT_HTML, request));
+        assertFalse((Boolean) method.invoke(filter, TEST_HTML_PATH, TEXT_HTML, request));
     }
 
     /**
@@ -413,10 +416,10 @@ public class MetadataFilterAdditionalTest extends WeldBaseTest {
      */
     @Test
     public void testDetermineWantsHtmlWithAcceptHeader() throws Exception {
-        Method method = getPrivateMethod("determineWantsHtml",
+        Method method = getPrivateMethod(DETERMINE_WANTS_HTML,
             String.class, String.class, HttpServletRequest.class);
 
-        assertTrue((Boolean) method.invoke(filter, "/test", "text/html", null));
+        assertTrue((Boolean) method.invoke(filter, TEST_PATH, TEXT_HTML, null));
     }
 
     /**

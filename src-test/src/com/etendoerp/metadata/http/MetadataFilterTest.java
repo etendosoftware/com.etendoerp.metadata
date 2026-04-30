@@ -56,6 +56,7 @@ public class MetadataFilterTest extends WeldBaseTest {
   private static final String ACCEPT_HEADER = "Accept";
   private static final String APPLICATION_JSON = "application/json";
   private static final String TEXT_HTML = "text/html";
+  private static final String TEST_PATH = "/test";
 
   private static final String META_API_TEST_URI = "/etendo/meta/api/test";
   private static final String META_API_PREFIX = "/etendo/meta/api/";
@@ -251,10 +252,10 @@ public class MetadataFilterTest extends WeldBaseTest {
     assertTrue((Boolean) method.invoke(filter, "/test.html", null, null));
 
     // Case 2: Accept header contains text/html
-    assertFalse((Boolean) method.invoke(filter, "/test", APPLICATION_JSON, null));
+    assertFalse((Boolean) method.invoke(filter, TEST_PATH, APPLICATION_JSON, null));
 
     // Case 3: text/html accept
-    assertTrue((Boolean) method.invoke(filter, "/test", "text/html,application/xhtml+xml", null));
+    assertTrue((Boolean) method.invoke(filter, TEST_PATH, "text/html,application/xhtml+xml", null));
 
     // Case 4: Nulls
     assertFalse((Boolean) method.invoke(filter, null, null, null));
@@ -266,7 +267,7 @@ public class MetadataFilterTest extends WeldBaseTest {
         String.class, int.class, String.class, String.class, String.class);
     method.setAccessible(true);
 
-    String result = (String) method.invoke(filter, "cid-1", 500, "GET", "/test", "error message");
+    String result = (String) method.invoke(filter, "cid-1", 500, "GET", TEST_PATH, "error message");
     assertTrue(result.contains("Etendo Meta Error"));
     assertTrue(result.contains("error message"));
     assertTrue(result.contains("cid-1"));
@@ -278,7 +279,7 @@ public class MetadataFilterTest extends WeldBaseTest {
         String.class, int.class, String.class, String.class, String.class);
     method.setAccessible(true);
 
-    String result = (String) method.invoke(filter, "cid-2", 500, "GET", "/test", null);
+    String result = (String) method.invoke(filter, "cid-2", 500, "GET", TEST_PATH, null);
     assertTrue(result.contains("Unexpected error"));
   }
 
