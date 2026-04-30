@@ -28,6 +28,7 @@ import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
+import org.openbravo.model.ad.access.Role;
 import org.openbravo.model.ad.access.User;
 import org.openbravo.model.ad.system.Client;
 
@@ -53,14 +54,15 @@ class DashboardLayoutResolverTest {
     @Mock Session mockSession;
     @Mock User mockUser;
     @Mock Client mockClient;
+    @Mock Role mockRole;
 
     @SuppressWarnings("unchecked")
     @Test
     void resolveUserLayerOverridesSystem() throws Exception {
         // SYSTEM row for widget class "wc1"
-        Object[] systemRow = { "sys-instance-id", "wc1", "SYSTEM", null, 0, 0, 2, 1, "Y", 10, null };
+        Object[] systemRow = { "sys-instance-id", "wc1", "SYSTEM", null, 0, 0, 2, 1, true, 10, null };
         // USER row for same widget class
-        Object[] userRow   = { "usr-instance-id", "wc1", "USER",   USER_123, 1, 0, 2, 1, "Y", 10, null };
+        Object[] userRow   = { "usr-instance-id", "wc1", "USER",   USER_123, 1, 0, 2, 1, true, 10, null };
 
         Query<Object[]> mockQuery = mock(Query.class);
         when(mockSession.createQuery(anyString(), eq(Object[].class))).thenReturn(mockQuery);
@@ -71,6 +73,8 @@ class DashboardLayoutResolverTest {
         when(mockUser.getId()).thenReturn(USER_123);
         when(mockContext.getCurrentClient()).thenReturn(mockClient);
         when(mockClient.getId()).thenReturn("client-123");
+        when(mockContext.getRole()).thenReturn(mockRole);
+        when(mockRole.getId()).thenReturn("role-123");
 
         try (MockedStatic<OBContext> ctxStatic = mockStatic(OBContext.class);
              MockedStatic<OBDal> dalStatic = mockStatic(OBDal.class)) {
@@ -91,7 +95,7 @@ class DashboardLayoutResolverTest {
 
     @Test
     void resolveSystemRowUsedWhenNoOverride() throws Exception {
-        Object[] systemRow = { "sys-id", "wc1", "SYSTEM", null, 0, 0, 2, 1, "Y", 10, null };
+        Object[] systemRow = { "sys-id", "wc1", "SYSTEM", null, 0, 0, 2, 1, true, 10, null };
 
         @SuppressWarnings("unchecked")
         Query<Object[]> mockQuery = mock(Query.class);
@@ -103,6 +107,8 @@ class DashboardLayoutResolverTest {
         when(mockUser.getId()).thenReturn(USER_123);
         when(mockContext.getCurrentClient()).thenReturn(mockClient);
         when(mockClient.getId()).thenReturn("client-123");
+        when(mockContext.getRole()).thenReturn(mockRole);
+        when(mockRole.getId()).thenReturn("role-123");
 
         try (MockedStatic<OBContext> ctxStatic = mockStatic(OBContext.class);
              MockedStatic<OBDal> dalStatic = mockStatic(OBDal.class)) {

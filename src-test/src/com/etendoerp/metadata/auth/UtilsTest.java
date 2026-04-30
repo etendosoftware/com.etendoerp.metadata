@@ -62,7 +62,7 @@ import com.smf.securewebservices.utils.SecureWebServicesUtils;
  * its interactions with OBContext and SWSConfig.
  * This class uses Mockito to mock dependencies and verify behavior.
  */
-@RunWith(MockitoJUnitRunner.class)
+@RunWith(MockitoJUnitRunner.Silent.class)
 public class UtilsTest extends OBBaseTest {
 
     @Mock

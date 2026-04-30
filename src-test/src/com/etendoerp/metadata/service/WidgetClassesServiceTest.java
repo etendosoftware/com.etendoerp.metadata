@@ -37,6 +37,8 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -62,14 +64,15 @@ class WidgetClassesServiceTest {
 
         Object[] classRow = { "classId1", "my-widget", "KPI", "My Widget",
                               "A test widget", 2, 1, 30 };
-        when(session.createQuery(argThat(s -> s != null && s.contains("EtmetaWidgetClass")), eq(Object[].class)))
+        when(session.createQuery(argThat(s -> s != null && s.contains("etmeta_Widget_Class")), eq(Object[].class)))
                 .thenReturn(query);
         when(query.list()).thenReturn(Collections.singletonList(classRow));
 
         // params query returns empty list
         Query<Object[]> paramQuery = mock();
-        when(session.createQuery(argThat(s -> s != null && s.contains("EtmetaWidgetParam")), eq(Object[].class)))
+        when(session.createQuery(argThat(s -> s != null && s.contains("etmeta_Widget_Param")), eq(Object[].class)))
                 .thenReturn(paramQuery);
+        when(paramQuery.setParameter(anyString(), any())).thenReturn(paramQuery);
         when(paramQuery.list()).thenReturn(Collections.emptyList());
 
         try (MockedStatic<OBContext> ctxStatic = mockStatic(OBContext.class);

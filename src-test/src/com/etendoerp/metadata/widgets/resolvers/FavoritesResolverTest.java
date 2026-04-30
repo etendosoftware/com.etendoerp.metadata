@@ -28,6 +28,7 @@ import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
+import org.openbravo.model.ad.access.Role;
 import org.openbravo.model.ad.access.User;
 
 import java.util.Collections;
@@ -47,12 +48,15 @@ class FavoritesResolverTest {
     @Mock Session  session;
     @Mock OBContext obContext;
     @Mock User     mockUser;
+    @Mock Role     mockRole;
 
     @SuppressWarnings("unchecked")
     @Test
     void resolveReturnsItemsArray() throws Exception {
         when(obContext.getUser()).thenReturn(mockUser);
         when(mockUser.getId()).thenReturn("userId1");
+        when(obContext.getRole()).thenReturn(mockRole);
+        when(mockRole.getId()).thenReturn("roleId1");
 
         Object[] row = { "Sales Orders", null, "window", "win-1" };
         Query<Object[]> query = mock(Query.class);

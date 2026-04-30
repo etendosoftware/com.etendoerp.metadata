@@ -111,15 +111,17 @@ public class Utils {
    * @param warehouse         The warehouse to evaluate.
    * @param selectedOrg       The selected organization.
    * @param defaultWarehouse  The default warehouse.
+   * @param selectedRole      The selected role.
    * @return The selected warehouse.
    */
-  private static Warehouse getWarehouse(Warehouse warehouse, Organization selectedOrg, Warehouse defaultWarehouse) {
+  private static Warehouse getWarehouse(Warehouse warehouse, Organization selectedOrg,
+      Warehouse defaultWarehouse, Role selectedRole) {
     try {
       Method method = SecureWebServicesUtils.class.getDeclaredMethod("getWarehouse", Warehouse.class,
-          Organization.class, Warehouse.class);
+          Organization.class, Warehouse.class, Role.class);
       method.setAccessible(true);
 
-      return (Warehouse) method.invoke(null, warehouse, selectedOrg, defaultWarehouse);
+      return (Warehouse) method.invoke(null, warehouse, selectedOrg, defaultWarehouse, selectedRole);
     } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
       throw new OBException(e);
     }
@@ -210,7 +212,7 @@ public class Utils {
 
       Role selectedRole = getRole(role, userRoleList, defaultWsRole, defaultRole);
       Organization selectedOrg = getOrganization(org, selectedRole, defaultRole, defaultOrg);
-      Warehouse selectedWarehouse = getWarehouse(warehouse, selectedOrg, warehouseFallback);
+      Warehouse selectedWarehouse = getWarehouse(warehouse, selectedOrg, warehouseFallback, selectedRole);
 
       if (SecureWebServicesUtils.isNewVersionPrivKey(privateKey)) {
         String algorithmUsed = getAlgorithmUsed();

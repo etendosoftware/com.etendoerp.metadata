@@ -24,7 +24,6 @@ import org.openbravo.base.weld.test.WeldBaseTest;
 import javax.servlet.FilterChain;
 import javax.servlet.FilterConfig;
 import javax.servlet.ServletContext;
-import javax.servlet.ServletOutputStream;
 import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
@@ -67,8 +66,6 @@ public class MetadataFilterAdditionalTest extends WeldBaseTest {
     private static final String FORWARD_SALES_ORDER_HEADER_HTML = "/etendo/meta/forward/SalesOrder/Header.html";
     private static final String HANDLE_EXCEPTION = "handleException";
     private static final String TEXT_HTML_CHARSET_UTF8 = "text/html; charset=UTF-8";
-    private static final String RELAY_CAPTURED_OUTPUT = "relayCapturedOutput";
-
     private Method getPrivateMethod(String name, Class<?>... paramTypes) throws Exception {
         Method method = MetadataFilter.class.getDeclaredMethod(name, paramTypes);
         method.setAccessible(true);
@@ -79,8 +76,8 @@ public class MetadataFilterAdditionalTest extends WeldBaseTest {
             String uri, String exClass, String message) throws Exception {
         Method method = getPrivateMethod(BUILD_HTML_ERROR_DETAILED,
             String.class, int.class, String.class, String.class,
-            String.class, String.class, HttpServletRequest.class);
-        return (String) method.invoke(filter, cid, status, httpMethod, uri, exClass, message, request);
+            String.class, String.class);
+        return (String) method.invoke(filter, cid, status, httpMethod, uri, exClass, message);
     }
 
     private void invokeHandleException(ServletRequest req, ServletResponse res,
@@ -377,63 +374,49 @@ public class MetadataFilterAdditionalTest extends WeldBaseTest {
     }
 
     /**
-     * Tests relayCapturedOutput with null content type.
+     * Tests determineWantsHtml with null URI and accept.
      */
     @Test
-    public void testRelayCapturedOutputNullContentType() throws Exception {
-        Method method = getPrivateMethod(RELAY_CAPTURED_OUTPUT,
-            HttpServletResponse.class, byte[].class, int.class, String.class);
+    public void testDetermineWantsHtmlNullInputs() throws Exception {
+        Method method = getPrivateMethod("determineWantsHtml",
+            String.class, String.class, HttpServletRequest.class);
 
-        ServletOutputStream mockOutput = mock(ServletOutputStream.class);
-        when(response.getOutputStream()).thenReturn(mockOutput);
-
-        byte[] body = "test content".getBytes();
-        method.invoke(filter, response, body, 200, null);
-
-        verify(response, never()).setContentType(anyString());
-        verify(response).setStatus(200);
+        assertFalse((Boolean) method.invoke(filter, null, null, null));
     }
 
     /**
-     * Tests relayCapturedOutput with status 0 (should not set status).
+     * Tests determineWantsHtml returns true for .html URI.
      */
     @Test
-    public void testRelayCapturedOutputZeroStatus() throws Exception {
-        Method method = getPrivateMethod(RELAY_CAPTURED_OUTPUT,
-            HttpServletResponse.class, byte[].class, int.class, String.class);
+    public void testDetermineWantsHtmlWithHtmlUri() throws Exception {
+        Method method = getPrivateMethod("determineWantsHtml",
+            String.class, String.class, HttpServletRequest.class);
 
-        byte[] body = "test".getBytes();
-        ServletOutputStream mockOutput = mock(ServletOutputStream.class);
-        when(response.getOutputStream()).thenReturn(mockOutput);
-
-        method.invoke(filter, response, body, 0, "text/plain");
-
-        verify(response, never()).setStatus(anyInt());
+        assertTrue((Boolean) method.invoke(filter, "/test.html", null, null));
     }
 
     /**
-     * Tests relayCapturedOutput with empty body.
+     * Tests determineWantsHtml returns false when isc_dataFormat=json.
      */
     @Test
-    public void testRelayCapturedOutputEmptyBody() throws Exception {
-        Method method = getPrivateMethod(RELAY_CAPTURED_OUTPUT,
-            HttpServletResponse.class, byte[].class, int.class, String.class);
+    public void testDetermineWantsHtmlIscJsonOverride() throws Exception {
+        Method method = getPrivateMethod("determineWantsHtml",
+            String.class, String.class, HttpServletRequest.class);
 
-        byte[] body = new byte[0];
-        method.invoke(filter, response, body, 200, "text/plain");
+        when(request.getParameter("isc_dataFormat")).thenReturn("json");
 
-        verify(response, never()).getOutputStream();
+        assertFalse((Boolean) method.invoke(filter, "/test.html", TEXT_HTML, request));
     }
 
     /**
-     * Tests shouldCaptureHtml with null response.
+     * Tests determineWantsHtml returns true for text/html accept header.
      */
     @Test
-    public void testShouldCaptureHtmlNullResponse() throws Exception {
-        Method method = getPrivateMethod("shouldCaptureHtml",
-            HttpServletRequest.class, HttpServletResponse.class);
+    public void testDetermineWantsHtmlWithAcceptHeader() throws Exception {
+        Method method = getPrivateMethod("determineWantsHtml",
+            String.class, String.class, HttpServletRequest.class);
 
-        assertFalse((Boolean) method.invoke(filter, request, null));
+        assertTrue((Boolean) method.invoke(filter, "/test", "text/html", null));
     }
 
     /**

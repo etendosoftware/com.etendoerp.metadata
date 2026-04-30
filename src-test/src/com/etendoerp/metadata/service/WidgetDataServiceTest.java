@@ -35,6 +35,7 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.Collections;
+import java.util.HashMap;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -60,7 +61,9 @@ class WidgetDataServiceTest {
         StringWriter sw = new StringWriter();
         when(response.getWriter()).thenReturn(new PrintWriter(sw));
         when(request.getPathInfo()).thenReturn("/widget/some-instance-id/data");
+        when(request.getMethod()).thenReturn("GET");
         when(request.getHeader("Authorization")).thenReturn("Bearer tok");
+        when(request.getParameterMap()).thenReturn(new HashMap<>());
 
         // Instance row: [id, classId, paramsJson]
         Object[] instanceRow = { "some-instance-id", "cls1", null };
@@ -80,11 +83,11 @@ class WidgetDataServiceTest {
         when(paramsQuery.setParameter(anyString(), any())).thenReturn(paramsQuery);
         when(paramsQuery.list()).thenReturn(Collections.emptyList());
 
-        when(session.createQuery(argThat(s -> s != null && s.contains("EtmetaDashboardWidget")), eq(Object[].class)))
+        when(session.createQuery(argThat(s -> s != null && s.contains("etmeta_Dashboard_Widget")), eq(Object[].class)))
                 .thenReturn(instanceQuery);
-        when(session.createQuery(argThat(s -> s != null && s.contains("EtmetaWidgetClass")), eq(Object[].class)))
+        when(session.createQuery(argThat(s -> s != null && s.contains("etmeta_Widget_Class")), eq(Object[].class)))
                 .thenReturn(classQuery);
-        when(session.createQuery(argThat(s -> s != null && s.contains("EtmetaWidgetParam")), eq(Object[].class)))
+        when(session.createQuery(argThat(s -> s != null && s.contains("etmeta_Widget_Param")), eq(Object[].class)))
                 .thenReturn(paramsQuery);
 
         WidgetDataResolver mockResolver = mock(WidgetDataResolver.class);
