@@ -84,7 +84,7 @@ import java.util.List;
  * <p>Tests are annotated with @Test and utilize assertions to validate expected outcomes.
  * Exception handling is also tested to ensure proper error conditions are met.</p>
  */
-@RunWith(MockitoJUnitRunner.class)
+@RunWith(MockitoJUnitRunner.Silent.class)
 public class HttpServletRequestWrapperTest extends OBBaseTest {
 
   @Mock

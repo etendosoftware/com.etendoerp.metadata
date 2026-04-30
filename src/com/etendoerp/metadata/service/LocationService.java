@@ -218,8 +218,19 @@ public class LocationService {
         private String countryId;
         private String regionId;
 
+        /** Creates an empty LocationData instance. */
         public LocationData() {}
 
+        /**
+         * Creates a LocationData instance with the given address fields.
+         *
+         * @param address1  primary address line
+         * @param address2  secondary address line
+         * @param postal    postal code
+         * @param city      city name
+         * @param countryId country identifier
+         * @param regionId  region identifier
+         */
         public LocationData(String address1, String address2, String postal, String city,
                             String countryId, String regionId) {
             this.address1 = address1;

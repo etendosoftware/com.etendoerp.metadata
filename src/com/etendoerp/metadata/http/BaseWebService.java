@@ -77,4 +77,12 @@ public abstract class BaseWebService implements WebService {
             throws Exception {
         process(request, response);
     }
+
+    /**
+     * Handles HTTP PATCH requests by delegating to the process method.
+     */
+    public void doPatch(String path, HttpServletRequest request, HttpServletResponse response)
+            throws Exception {
+        process(request, response);
+    }
 }

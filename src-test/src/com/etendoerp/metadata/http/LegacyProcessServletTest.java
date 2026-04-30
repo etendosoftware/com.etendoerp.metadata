@@ -76,6 +76,8 @@ public class LegacyProcessServletTest extends OBBaseTest {
     public static final String REDIRECT = "/redirect";
     public static final String LOCATION = "location";
     private static final String USER_ID_KEY = "userId";
+    private static final String COMMAND_KEY = "Command";
+    private static final String SET_COOKIE_HEADER = "Set-Cookie";
 
     @Mock
     private HttpServletRequest request;
@@ -509,7 +511,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
     // private/protected) ==========
 
     private Object invokePrivateMethod(Object obj, String methodName, Class<?>[] parameterTypes, Object... args)
-            throws Exception {
+            throws ReflectiveOperationException {
         Method method = obj.getClass().getDeclaredMethod(methodName, parameterTypes);
         method.setAccessible(true);
         return method.invoke(obj, args);
@@ -639,4 +641,6 @@ public class LegacyProcessServletTest extends OBBaseTest {
 
         assertTrue("Should contain injected code", result.contains("submitThisPage('action');extra();"));
     }
+
+
 }

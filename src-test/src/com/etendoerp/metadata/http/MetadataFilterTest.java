@@ -24,7 +24,6 @@ import javax.servlet.FilterChain;
 import javax.servlet.FilterConfig;
 import javax.servlet.ServletContext;
 import javax.servlet.ServletException;
-import javax.servlet.ServletOutputStream;
 import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
@@ -38,7 +37,6 @@ import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
-import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -58,7 +56,7 @@ public class MetadataFilterTest extends WeldBaseTest {
   private static final String ACCEPT_HEADER = "Accept";
   private static final String APPLICATION_JSON = "application/json";
   private static final String TEXT_HTML = "text/html";
-  private static final String TEXT_PLAIN = "text/plain";
+  private static final String TEST_PATH = "/test";
 
   private static final String META_API_TEST_URI = "/etendo/meta/api/test";
   private static final String META_API_PREFIX = "/etendo/meta/api/";
@@ -245,100 +243,65 @@ public class MetadataFilterTest extends WeldBaseTest {
   }
 
   @Test
-  public void testShouldCaptureHtml() throws Exception {
-    Method method = MetadataFilter.class.getDeclaredMethod("shouldCaptureHtml", HttpServletRequest.class,
-        HttpServletResponse.class);
+  public void testDetermineWantsHtml() throws Exception {
+    Method method = MetadataFilter.class.getDeclaredMethod("determineWantsHtml", String.class,
+        String.class, HttpServletRequest.class);
     method.setAccessible(true);
 
     // Case 1: URI ends with .html
-    when(request.getRequestURI()).thenReturn("/test.html");
-    assertTrue((Boolean) method.invoke(filter, request, response));
+    assertTrue((Boolean) method.invoke(filter, "/test.html", null, null));
 
     // Case 2: Accept header contains text/html
-    when(request.getRequestURI()).thenReturn("/test");
-    when(request.getHeader(ACCEPT_HEADER)).thenReturn("text/html,application/xhtml+xml");
-    assertTrue((Boolean) method.invoke(filter, request, response));
+    assertFalse((Boolean) method.invoke(filter, TEST_PATH, APPLICATION_JSON, null));
 
-    // Case 3: None
-    when(request.getRequestURI()).thenReturn("/test");
-    when(request.getHeader(ACCEPT_HEADER)).thenReturn(APPLICATION_JSON);
-    assertFalse((Boolean) method.invoke(filter, request, response));
+    // Case 3: text/html accept
+    assertTrue((Boolean) method.invoke(filter, TEST_PATH, "text/html,application/xhtml+xml", null));
 
     // Case 4: Nulls
-    assertFalse((Boolean) method.invoke(filter, null, response));
+    assertFalse((Boolean) method.invoke(filter, null, null, null));
   }
 
   @Test
-  public void testIsEmptySuccessfulHtml() throws Exception {
-    Method method = MetadataFilter.class.getDeclaredMethod("isEmptySuccessfulHtml", byte[].class, int.class);
+  public void testBuildHtmlError() throws Exception {
+    Method method = MetadataFilter.class.getDeclaredMethod("buildHtmlError",
+        String.class, int.class, String.class, String.class, String.class);
     method.setAccessible(true);
 
-    assertTrue((Boolean) method.invoke(filter, new byte[0], 200));
-    assertTrue((Boolean) method.invoke(filter, new byte[0], 0));
-    assertFalse((Boolean) method.invoke(filter, "test".getBytes(), 200));
-    assertFalse((Boolean) method.invoke(filter, new byte[0], 404));
+    String result = (String) method.invoke(filter, "cid-1", 500, "GET", TEST_PATH, "error message");
+    assertTrue(result.contains("Etendo Meta Error"));
+    assertTrue(result.contains("error message"));
+    assertTrue(result.contains("cid-1"));
   }
 
   @Test
-  public void testRelayCapturedOutput() throws Exception {
-    Method method = MetadataFilter.class.getDeclaredMethod("relayCapturedOutput", HttpServletResponse.class,
-        byte[].class, int.class, String.class);
+  public void testBuildHtmlErrorNullMessage() throws Exception {
+    Method method = MetadataFilter.class.getDeclaredMethod("buildHtmlError",
+        String.class, int.class, String.class, String.class, String.class);
     method.setAccessible(true);
 
-    ServletOutputStream mockOutput = mock(ServletOutputStream.class);
-    when(response.getOutputStream()).thenReturn(mockOutput);
-
-    byte[] body = "test content".getBytes();
-    method.invoke(filter, response, body, 200, TEXT_PLAIN);
-
-    verify(response).setContentType(TEXT_PLAIN);
-    verify(response).setStatus(200);
-    verify(mockOutput).write(body);
+    String result = (String) method.invoke(filter, "cid-2", 500, "GET", TEST_PATH, null);
+    assertTrue(result.contains("Unexpected error"));
   }
 
   @Test
-  public void testHandleEmptyHtmlResponse() throws Exception {
-    Method method = MetadataFilter.class.getDeclaredMethod("handleEmptyHtmlResponse", HttpServletRequest.class,
-        HttpServletResponse.class);
+  public void testGetRootCause() throws Exception {
+    Method method = MetadataFilter.class.getDeclaredMethod("getRootCause", Throwable.class);
     method.setAccessible(true);
 
-    StringWriter stringWriter = new StringWriter();
-    when(response.getWriter()).thenReturn(new PrintWriter(stringWriter));
+    RuntimeException root = new RuntimeException("root");
+    RuntimeException wrapper = new RuntimeException("wrapper", root);
 
-    method.invoke(filter, request, response);
-
-    verify(response).setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-    verify(response).setContentType("text/html; charset=UTF-8");
-    assertTrue(stringWriter.toString().contains("Empty response returned by downstream component"));
+    Throwable result = (Throwable) method.invoke(filter, wrapper);
+    assertTrue(result.getMessage().contains("root"));
   }
 
   @Test
-  public void testHandleCapturedResponse() throws Exception {
-    Method method = MetadataFilter.class.getDeclaredMethod("handleCapturedResponse", HttpServletRequest.class,
-        HttpServletResponse.class, HttpServletResponseLegacyWrapper.class);
+  public void testEscapeHtml() throws Exception {
+    Method method = MetadataFilter.class.getDeclaredMethod("escape", String.class);
     method.setAccessible(true);
 
-    HttpServletResponseLegacyWrapper captureWrapper = mock(HttpServletResponseLegacyWrapper.class);
-
-    // Case 1: Empty successful response
-    when(captureWrapper.getCapturedOutput()).thenReturn(new byte[0]);
-    when(captureWrapper.getStatus()).thenReturn(200);
-    when(response.getWriter()).thenReturn(new PrintWriter(new StringWriter()));
-
-    method.invoke(filter, request, response, captureWrapper);
-    verify(response, atLeastOnce()).setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-
-    // Case 2: Regular response
-    byte[] body = "content".getBytes();
-    when(captureWrapper.getCapturedOutput()).thenReturn(body);
-    when(captureWrapper.getStatus()).thenReturn(200);
-    when(captureWrapper.getContentType()).thenReturn(TEXT_PLAIN);
-    ServletOutputStream mockOutput = mock(ServletOutputStream.class);
-    when(response.getOutputStream()).thenReturn(mockOutput);
-
-    method.invoke(filter, request, response, captureWrapper);
-    verify(response).setContentType(TEXT_PLAIN);
-    verify(mockOutput).write(body);
+    String result = (String) method.invoke(filter, "<script>");
+    assertTrue(result.contains("&lt;script&gt;"));
   }
 
   private void setupJsonRequest(String uri, String method) {

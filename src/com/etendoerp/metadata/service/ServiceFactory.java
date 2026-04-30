@@ -25,6 +25,9 @@ import javax.servlet.http.HttpSession;
 
 import com.etendoerp.metadata.exceptions.InternalServerException;
 import com.etendoerp.metadata.exceptions.NotFoundException;
+import com.etendoerp.metadata.service.DashboardService;
+import com.etendoerp.metadata.service.WidgetClassesService;
+import com.etendoerp.metadata.service.WidgetDataService;
 import com.etendoerp.metadata.utils.LegacyPaths;
 import com.etendoerp.metadata.utils.LegacyUtils;
 
@@ -35,9 +38,7 @@ import java.util.function.BiFunction;
 
 import static com.etendoerp.metadata.utils.Constants.*;
 
-/**
- * @author luuchorocha
- */
+/** Routes incoming HTTP requests to the appropriate MetadataService implementation. */
 public class ServiceFactory {
 
     private static final Map<String, BiFunction<HttpServletRequest, HttpServletResponse, MetadataService>> EXACT_MATCH_SERVICES = new LinkedHashMap<>();
@@ -50,6 +51,10 @@ public class ServiceFactory {
         EXACT_MATCH_SERVICES.put(MESSAGE_PATH, MessageService::new);
         EXACT_MATCH_SERVICES.put(LABELS_PATH, LabelsService::new);
         EXACT_MATCH_SERVICES.put(PREFERENCES_PATH, PreferencesService::new);
+        EXACT_MATCH_SERVICES.put(EMAIL_SEND_PATH, EmailSendService::new);
+        EXACT_MATCH_SERVICES.put(EMAIL_CONFIG_PATH, EmailConfigService::new);
+        EXACT_MATCH_SERVICES.put(EMAIL_ATTACHMENTS_PATH, EmailAttachmentService::new);
+        EXACT_MATCH_SERVICES.put(WIDGET_CLASSES_PATH, WidgetClassesService::new);
 
         // Prefix match services (order matters for overlapping prefixes)
         PREFIX_MATCH_SERVICES.put(WINDOW_PATH, WindowService::new);
@@ -60,63 +65,97 @@ public class ServiceFactory {
         PREFIX_MATCH_SERVICES.put(REPORT_AND_PROCESS_PATH, ReportAndProcessService::new);
         PREFIX_MATCH_SERVICES.put(PROCESS_EXECUTION_PATH, ProcessExecutionService::new);
         PREFIX_MATCH_SERVICES.put(PROCESS_PATH, ProcessMetadataService::new);
+        PREFIX_MATCH_SERVICES.put(EMAIL_PATH, EmailService::new);
+        PREFIX_MATCH_SERVICES.put(DASHBOARD_PATH, DashboardService::new);
+        PREFIX_MATCH_SERVICES.put(FAVORITES_PATH, FavoritesService::new);
+        PREFIX_MATCH_SERVICES.put(WIDGET_DATA_PATH, WidgetDataService::new);
         PREFIX_MATCH_SERVICES.put(LEGACY_PATH, LegacyService::new);
     }
 
     private static MetadataService buildLegacyForwardService(HttpServletRequest req, HttpServletResponse res,
             String path) {
-        return new MetadataService(req, res) {
-
-            @Override
-            public void process() throws ServletException, IOException {
-                try {
-                    handleLegacySession(req, path);
-                    forwardRequest(req, res, path);
-                } catch (Exception e) {
-                    handleException(e);
-                }
-            }
-
-            private void handleLegacySession(HttpServletRequest req, String path) {
-                if (LegacyPaths.USED_BY_LINK.equals(path)) {
-                    String mutableSessionAttribute = "143|C_ORDER_ID";
-                    String recordId = req.getParameter("recordId");
-                    HttpSession session = req.getSession(true);
-
-                    if (!LegacyUtils.isMutableSessionAttribute(mutableSessionAttribute)) {
-                        throw new InternalServerException(
-                                "Attempt to set forbidden session key: " + mutableSessionAttribute);
-                    }
-
-                    session.setAttribute(mutableSessionAttribute, recordId);
-                }
-            }
-
-            private void forwardRequest(HttpServletRequest req, HttpServletResponse res, String path)
-                    throws ServletException, IOException {
-
-                RequestDispatcher dispatcher = req.getServletContext().getRequestDispatcher(path);
-
-                if (dispatcher == null) {
-                    throw new ServletException("No dispatcher found for path: " + path);
-                }
-
-                dispatcher.forward(req, res);
-            }
-
-            private void handleException(Exception e) throws ServletException, IOException {
-                if (e instanceof ServletException)
-                    throw (ServletException) e;
-                if (e instanceof IOException)
-                    throw (IOException) e;
-                throw new InternalServerException("Failed to forward legacy request: " + e.getMessage(), e);
-            }
-        };
+        return new LegacyForwardService(req, res, path);
     }
 
+    /** Named inner class extracted from anonymous MetadataService to reduce cognitive complexity. */
+    private static class LegacyForwardService extends MetadataService {
+        private final String path;
+
+        LegacyForwardService(HttpServletRequest req, HttpServletResponse res, String path) {
+            super(req, res);
+            this.path = path;
+        }
+
+        @Override
+        public void process() throws ServletException, IOException {
+            try {
+                handleLegacySession();
+                forwardRequest();
+            } catch (Exception e) {
+                rethrowOrWrap(e);
+            }
+        }
+
+        private void handleLegacySession() {
+            if (!LegacyPaths.USED_BY_LINK.equals(path)) {
+                return;
+            }
+            String windowId = getRequest().getParameter("windowId");
+            String entityName = getRequest().getParameter("entityName");
+            String recordId = getRequest().getParameter("recordId");
+
+            if (windowId == null || entityName == null || recordId == null) {
+                return;
+            }
+
+            Entity entity = ModelProvider.getInstance().getEntity(entityName);
+            if (entity == null) {
+                log.warn("Entity '{}' not found in ModelProvider, cannot set session for UsedByLink", entityName);
+                return;
+            }
+
+            java.util.List<Property> idProps = entity.getIdProperties();
+            if (idProps == null || idProps.size() != 1) {
+                log.warn("Expected exactly one ID property for entity '{}', got {}", entityName, idProps);
+                return;
+            }
+
+            String columnName = idProps.get(0).getColumnName();
+            HttpSession session = getRequest().getSession(true);
+            session.setAttribute(windowId + "|" + columnName, recordId);
+        }
+
+        private void forwardRequest() throws ServletException, IOException {
+            RequestDispatcher dispatcher = getRequest().getServletContext().getRequestDispatcher(path);
+
+            if (dispatcher == null) {
+                throw new ServletException("No dispatcher found for path: " + path);
+            }
+
+            dispatcher.forward(getRequest(), getResponse());
+        }
+
+        private void rethrowOrWrap(Exception e) throws ServletException, IOException {
+            if (e instanceof ServletException)
+                throw (ServletException) e;
+            if (e instanceof IOException)
+                throw (IOException) e;
+            throw new InternalServerException("Failed to forward legacy request: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Returns the MetadataService that handles the given request path.
+     *
+     * @param req the incoming HTTP request
+     * @param res the HTTP response
+     * @return the matching service instance
+     */
     public static MetadataService getService(final HttpServletRequest req, final HttpServletResponse res) {
         final String path = req.getPathInfo() != null
-                ? req.getPathInfo().replace("/com.etendoerp.metadata.meta/", "/")
+                ? req.getPathInfo()
+                    .replace("/com.etendoerp.metadata.meta/", "/")
+                    .replace("/com.etendoerp.metadata.sws/", "/")
                 : "";
 
         // Check exact matches first
