@@ -38,6 +38,7 @@ import org.openbravo.dal.core.OBContext;
  *
  * @author Generated Test
  */
+@SuppressWarnings("java:S1075")
 public class LanguageServiceTest extends BaseMetadataServiceTest {
     private static final String ENGLISH_META_PATH = "/meta/language/en_US";
     private static final String MOCK_LANGUAGE_IO_EXCEPTION_MESSAGE = "Mock IO Exception";

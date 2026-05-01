@@ -141,6 +141,7 @@ class FieldBuilderTest {
   private static final String DATASOURCE_FIELD_DOLLAR = "datasource$field";
   private static final String VALUE_PROPERTY = "valueProperty";
   private static final String SEARCH_FIELD = "searchField";
+  private static final String GET_HQL_NAME_METHOD = "getHqlName";
   private static final String TEST_TABLE = "TestTable";
 
   /**
@@ -572,7 +573,7 @@ class FieldBuilderTest {
       mockedDataSourceUtils.when(() -> DataSourceUtils.getHQLColumnName(true, "test_table", "test_column"))
           .thenReturn(new String[] { "hqlColumnName" });
 
-      Method method = FieldBuilder.class.getDeclaredMethod("getHqlName", Field.class);
+      Method method = FieldBuilder.class.getDeclaredMethod(GET_HQL_NAME_METHOD, Field.class);
       method.setAccessible(true);
       String result = (String) method.invoke(null, field);
 

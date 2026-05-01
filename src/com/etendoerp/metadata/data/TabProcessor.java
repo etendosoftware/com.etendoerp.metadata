@@ -109,6 +109,7 @@ public class TabProcessor {
    * @param cache            the concurrent map cache to store results
    * @return a JSON object mapping field names to their JSON representations
    */
+  @SuppressWarnings("java:S107")
   public static <T> JSONObject getFields(String id, String updated, List<T> data, Predicate<T> accessPredicate,
                                          Function<T, Column> columnExtractor, Function<T,String> customJsExtractor,
       Function<T, String> clientClassExtractor,

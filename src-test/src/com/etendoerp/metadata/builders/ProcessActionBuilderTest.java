@@ -132,7 +132,7 @@ class ProcessActionBuilderTest {
             converterField.setAccessible(true);
             converterField.set(processActionBuilder, mockConverter);
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            throw new IllegalStateException("Could not set converter field via reflection", e);
         }
     }
 
@@ -154,6 +154,7 @@ class ProcessActionBuilderTest {
         when(mockProcess.getADProcessParameterList()).thenReturn(Collections.emptyList());
     }
 
+    @SuppressWarnings("java:S107")
     private JSONObject getFieldProcess(String fieldId, String fieldName, String displayLogic,
         String columnId, String buttonText, String manualUrl,
         Consumer<DataToJsonConverter> converterConfigurer,
@@ -193,6 +194,7 @@ class ProcessActionBuilderTest {
             parserConfigurer);
     }
 
+    @SuppressWarnings("java:S107")
     private void mockProcessField(Field targetField, String fieldId, String fieldName, String displayLogic,
         Column targetColumn, String columnId, String buttonText, Reference targetReference, Tab targetTab) {
         when(targetField.getId()).thenReturn(fieldId);

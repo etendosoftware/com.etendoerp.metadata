@@ -48,6 +48,7 @@ import com.etendoerp.metadata.exceptions.NotFoundException;
  * including parameter handling and JSON response generation.
  */
 @RunWith(MockitoJUnitRunner.Silent.class)
+@SuppressWarnings("java:S1075")
 public class ReportAndProcessServiceTest {
 
     private static final String EXCEPTION_NOT_NULL_MESSAGE = "Exception should not be null";

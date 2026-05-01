@@ -332,7 +332,7 @@ public class MetadataFilterTest extends WeldBaseTest {
 
   private FilterChain createExceptionChain(String message) {
     return (ServletRequest r, ServletResponse s) -> {
-      throw new RuntimeException(message);
+      throw new IllegalStateException(message);
     };
   }
 }

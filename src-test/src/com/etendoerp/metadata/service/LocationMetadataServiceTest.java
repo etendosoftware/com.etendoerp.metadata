@@ -127,7 +127,7 @@ public class LocationMetadataServiceTest extends OBBaseTest {
       field.setAccessible(true);
       field.set(service, mockService);
     } catch (Exception e) {
-      throw new RuntimeException("Failed to inject mock LocationService", e);
+      throw new IllegalStateException("Failed to inject mock LocationService", e);
     }
   }
 
@@ -639,7 +639,7 @@ public class LocationMetadataServiceTest extends OBBaseTest {
       method.setAccessible(true);
       return (LocationData) method.invoke(locationMetadataService, jsonRequest);
     } catch (Exception e) {
-      throw new RuntimeException("Failed to invoke buildLocationData", e);
+      throw new IllegalStateException("Failed to invoke buildLocationData", e);
     }
   }
 
@@ -666,9 +666,9 @@ public class LocationMetadataServiceTest extends OBBaseTest {
       if (e.getCause() instanceof RuntimeException) {
         throw (RuntimeException) e.getCause();
       }
-      throw new RuntimeException("Failed to invoke validateLocationData", e);
+      throw new IllegalStateException("Failed to invoke validateLocationData", e);
     } catch (Exception e) {
-      throw new RuntimeException("Failed to invoke validateLocationData", e);
+      throw new IllegalStateException("Failed to invoke validateLocationData", e);
     }
   }
 
@@ -691,7 +691,7 @@ public class LocationMetadataServiceTest extends OBBaseTest {
       method.setAccessible(true);
       return (String) method.invoke(locationMetadataService, request);
     } catch (Exception e) {
-      throw new RuntimeException("Failed to invoke readRequestBody", e);
+      throw new IllegalStateException("Failed to invoke readRequestBody", e);
     }
   }
 
@@ -714,7 +714,7 @@ public class LocationMetadataServiceTest extends OBBaseTest {
       method.setAccessible(true);
       method.invoke(locationMetadataService, exception);
     } catch (Exception e) {
-      throw new RuntimeException("Failed to invoke handleError", e);
+      throw new IllegalStateException("Failed to invoke handleError", e);
     }
   }
 

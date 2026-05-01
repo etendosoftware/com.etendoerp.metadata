@@ -65,6 +65,7 @@ import static org.mockito.Mockito.*;
  * </p>
  */
 @RunWith(MockitoJUnitRunner.Silent.class)
+@SuppressWarnings("java:S1448")
 public class LegacyProcessServletTest extends OBBaseTest {
     private static final String PARAM_INP_KEY = "inpKey";
     private static final String PARAM_INP_WINDOW_ID = "inpwindowId";

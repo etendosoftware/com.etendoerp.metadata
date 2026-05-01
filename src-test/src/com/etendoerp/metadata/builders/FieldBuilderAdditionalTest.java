@@ -77,6 +77,7 @@ import com.etendoerp.metadata.utils.Constants;
  */
 @MockitoSettings(strictness = Strictness.LENIENT)
 @ExtendWith(MockitoExtension.class)
+@SuppressWarnings("java:S1448")
 class FieldBuilderAdditionalTest {
 
     @Mock
@@ -117,6 +118,7 @@ class FieldBuilderAdditionalTest {
     private static final String SEL_ID = "sel-id";
     private static final String PARENT_CHILD = "parent$child";
     private static final String MY_FIELD = "myField";
+    private static final String GET_HQL_NAME_METHOD = "getHqlName";
     private static final String GET_DOMAIN_TYPE = "getDomainType";
     private static final String CUSTOM_DISPLAY = "customDisplay";
 
@@ -293,7 +295,7 @@ class FieldBuilderAdditionalTest {
     }
 
     private void assertGetHqlName(String expected) throws Exception {
-        Method method = FieldBuilder.class.getDeclaredMethod("getHqlName", Field.class);
+        Method method = FieldBuilder.class.getDeclaredMethod(GET_HQL_NAME_METHOD, Field.class);
         method.setAccessible(true);
         String result = (String) method.invoke(null, field);
         assertEquals(expected, result);
@@ -610,7 +612,7 @@ class FieldBuilderAdditionalTest {
             mockedDataSourceUtils.when(() -> DataSourceUtils.getHQLColumnName(true, "test_table", "test_column"))
                 .thenReturn(new String[] {});
 
-            Method method = FieldBuilder.class.getDeclaredMethod("getHqlName", Field.class);
+            Method method = FieldBuilder.class.getDeclaredMethod(GET_HQL_NAME_METHOD, Field.class);
             method.setAccessible(true);
             String result = (String) method.invoke(null, field);
 

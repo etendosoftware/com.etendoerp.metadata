@@ -845,7 +845,7 @@
 <!--6C588D07853D49AFBE40BC3342089C40-->  <AD_CLIENT_ID><![CDATA[0]]></AD_CLIENT_ID>
 <!--6C588D07853D49AFBE40BC3342089C40-->  <AD_ORG_ID><![CDATA[0]]></AD_ORG_ID>
 <!--6C588D07853D49AFBE40BC3342089C40-->  <ISACTIVE><![CDATA[Y]]></ISACTIVE>
-<!--6C588D07853D49AFBE40BC3342089C40-->  <NAME><![CDATA[Name_Key]]></NAME>
+<!--6C588D07853D49AFBE40BC3342089C40-->  <NAME><![CDATA[Name Key]]></NAME>
 <!--6C588D07853D49AFBE40BC3342089C40-->  <DESCRIPTION><![CDATA[Unique identifier key for programmatic reference]]></DESCRIPTION>
 <!--6C588D07853D49AFBE40BC3342089C40-->  <HELP><![CDATA[A unique alphanumeric identifier used to reference this button programmatically. This key remains constant even if the display name changes, making it suitable for API calls, custom code integration, and configuration management. Should follow naming conventions using uppercase letters and underscores.]]></HELP>
 <!--6C588D07853D49AFBE40BC3342089C40-->  <COLUMNNAME><![CDATA[Name_Key]]></COLUMNNAME>

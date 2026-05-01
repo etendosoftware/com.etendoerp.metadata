@@ -392,6 +392,7 @@ public class CallAsyncProcessExtendedTest {
         return warehouse;
     }
 
+    @SuppressWarnings("java:S107")
     private void mockProcedureExecution(ProcessInstance pInstance, Process process,
             OBDal mockOBDal, Connection mockConnection, PreparedStatement mockPs,
             OBPropertiesProvider mockPropsProvider, Properties mockProps,

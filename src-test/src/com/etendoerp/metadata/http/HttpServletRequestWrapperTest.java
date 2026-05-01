@@ -85,6 +85,7 @@ import java.util.List;
  * Exception handling is also tested to ensure proper error conditions are met.</p>
  */
 @RunWith(MockitoJUnitRunner.Silent.class)
+@SuppressWarnings("java:S1448")
 public class HttpServletRequestWrapperTest extends OBBaseTest {
 
   @Mock

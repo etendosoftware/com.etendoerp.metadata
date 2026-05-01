@@ -67,6 +67,7 @@ import com.etendoerp.metadata.utils.Constants;
  * Tests all the functionality including readonly logic, selector references, list references, and window references.
  */
 @ExtendWith(MockitoExtension.class)
+@SuppressWarnings("java:S1450")
 class ParameterBuilderTest {
 
   private Parameter mockParameter;

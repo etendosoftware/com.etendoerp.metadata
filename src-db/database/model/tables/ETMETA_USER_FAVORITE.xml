@@ -64,6 +64,7 @@
       <foreign-key foreignTable="AD_USER" name="ETMETA_USER_FAV_USER_FK">
         <reference local="AD_USER_ID" foreign="AD_USER_ID"/>
       </foreign-key>
+      <check name="ETMETA_USER_FAV_ISACTIVE_CHK"><![CDATA[ISACTIVE IN ('Y', 'N')]]></check>
       <unique name="ETMETA_USER_FAV_UNIQUE">
         <unique-column name="AD_USER_ID"/>
         <unique-column name="AD_MENU_ID"/>

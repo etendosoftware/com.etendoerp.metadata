@@ -67,6 +67,7 @@ import org.openbravo.test.base.OBBaseTest;
  * SWS doGet, upload with description, and exception in upload.
  */
 @RunWith(MockitoJUnitRunner.class)
+@SuppressWarnings("java:S1448")
 public class AttachmentsServletCoverageTest extends OBBaseTest {
 
     private static final String COMMAND = "command";
