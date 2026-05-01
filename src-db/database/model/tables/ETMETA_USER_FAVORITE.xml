@@ -3,15 +3,15 @@
     <table name="ETMETA_USER_FAVORITE" primaryKey="ETMETA_USER_FAV_PK">
       <column name="ETMETA_USER_FAVORITE_ID" primaryKey="true" required="true" type="VARCHAR" size="32" autoIncrement="false">
         <default/>
-        <onCreateDefault/>
+        <onCreateDefault><![CDATA[09281A2244E146F69E8327BCB3716C80]]></onCreateDefault>
       </column>
       <column name="AD_CLIENT_ID" primaryKey="false" required="true" type="VARCHAR" size="32" autoIncrement="false">
-        <default/>
-        <onCreateDefault/>
+        <default><![CDATA[0]]></default>
+        <onCreateDefault><![CDATA['0']]></onCreateDefault>
       </column>
       <column name="AD_ORG_ID" primaryKey="false" required="true" type="VARCHAR" size="32" autoIncrement="false">
-        <default/>
-        <onCreateDefault/>
+        <default><![CDATA[0]]></default>
+        <onCreateDefault><![CDATA['0']]></onCreateDefault>
       </column>
       <column name="ISACTIVE" primaryKey="false" required="true" type="CHAR" size="1" autoIncrement="false">
         <default><![CDATA[Y]]></default>
@@ -33,11 +33,11 @@
         <default><![CDATA[0]]></default>
         <onCreateDefault/>
       </column>
-      <column name="AD_USER_ID" primaryKey="false" required="true" type="VARCHAR" size="32" autoIncrement="false">
+      <column name="AD_USER_ID" primaryKey="false" required="false" type="VARCHAR" size="32" autoIncrement="false">
         <default/>
         <onCreateDefault/>
       </column>
-      <column name="AD_MENU_ID" primaryKey="false" required="true" type="VARCHAR" size="32" autoIncrement="false">
+      <column name="AD_MENU_ID" primaryKey="false" required="false" type="VARCHAR" size="32" autoIncrement="false">
         <default/>
         <onCreateDefault/>
       </column>
@@ -45,7 +45,7 @@
         <default><![CDATA[10]]></default>
         <onCreateDefault/>
       </column>
-      <column name="AD_ROLE_ID" primaryKey="false" required="true" type="VARCHAR" size="32" autoIncrement="false">
+      <column name="AD_ROLE_ID" primaryKey="false" required="false" type="VARCHAR" size="32" autoIncrement="false">
         <default/>
         <onCreateDefault/>
       </column>
@@ -64,11 +64,11 @@
       <foreign-key foreignTable="AD_USER" name="ETMETA_USER_FAV_USER_FK">
         <reference local="AD_USER_ID" foreign="AD_USER_ID"/>
       </foreign-key>
-      <check name="ETMETA_USER_FAV_ISACTIVE_CHK"><![CDATA[ISACTIVE IN ('Y', 'N')]]></check>
       <unique name="ETMETA_USER_FAV_UNIQUE">
         <unique-column name="AD_USER_ID"/>
         <unique-column name="AD_MENU_ID"/>
         <unique-column name="AD_ROLE_ID"/>
       </unique>
+      <check name="ETMETA_USER_FAV_ISACTIVE_CHK"><![CDATA[ISACTIVE IN ('Y', 'N')]]></check>
     </table>
   </database>

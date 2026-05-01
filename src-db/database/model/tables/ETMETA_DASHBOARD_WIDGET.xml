@@ -3,7 +3,7 @@
     <table name="ETMETA_DASHBOARD_WIDGET" primaryKey="ETMETA_DASHBOARD_WIDGET_KEY">
       <column name="ETMETA_DASHBOARD_WIDGET_ID" primaryKey="true" required="true" type="VARCHAR" size="32" autoIncrement="false">
         <default/>
-        <onCreateDefault/>
+        <onCreateDefault><![CDATA[B735BC7B7AA34F85B61ACB69015CAC1F]]></onCreateDefault>
       </column>
       <column name="AD_CLIENT_ID" primaryKey="false" required="false" type="VARCHAR" size="32" autoIncrement="false">
         <default/>
@@ -33,7 +33,7 @@
         <default/>
         <onCreateDefault/>
       </column>
-      <column name="ETMETA_WIDGET_CLASS_ID" primaryKey="false" required="true" type="VARCHAR" size="32" autoIncrement="false">
+      <column name="ETMETA_WIDGET_CLASS_ID" primaryKey="false" required="false" type="VARCHAR" size="32" autoIncrement="false">
         <default/>
         <onCreateDefault/>
       </column>

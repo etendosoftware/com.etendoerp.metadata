@@ -3,7 +3,7 @@
     <table name="ETMETA_WIDGET_PARAM" primaryKey="ETMETA_WIDGET_PARAM_KEY">
       <column name="ETMETA_WIDGET_PARAM_ID" primaryKey="true" required="true" type="VARCHAR" size="32" autoIncrement="false">
         <default/>
-        <onCreateDefault/>
+        <onCreateDefault><![CDATA[ABE6A9088E964538920AFE722602DAAC]]></onCreateDefault>
       </column>
       <column name="AD_CLIENT_ID" primaryKey="false" required="false" type="VARCHAR" size="32" autoIncrement="false">
         <default/>
@@ -33,11 +33,11 @@
         <default/>
         <onCreateDefault/>
       </column>
-      <column name="ETMETA_WIDGET_CLASS_ID" primaryKey="false" required="true" type="VARCHAR" size="32" autoIncrement="false">
+      <column name="ETMETA_WIDGET_CLASS_ID" primaryKey="false" required="false" type="VARCHAR" size="32" autoIncrement="false">
         <default/>
         <onCreateDefault/>
       </column>
-      <column name="NAME" primaryKey="false" required="true" type="VARCHAR" size="60" autoIncrement="false">
+      <column name="NAME" primaryKey="false" required="false" type="VARCHAR" size="60" autoIncrement="false">
         <default/>
         <onCreateDefault/>
       </column>
@@ -45,7 +45,7 @@
         <default/>
         <onCreateDefault/>
       </column>
-      <column name="TYPE" primaryKey="false" required="true" type="VARCHAR" size="20" autoIncrement="false">
+      <column name="TYPE" primaryKey="false" required="false" type="VARCHAR" size="20" autoIncrement="false">
         <default/>
         <onCreateDefault/>
       </column>
