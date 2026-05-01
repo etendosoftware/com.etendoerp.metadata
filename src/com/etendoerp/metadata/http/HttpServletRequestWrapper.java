@@ -49,6 +49,7 @@ import java.util.Set;
  *
  * @author luuchorocha
  */
+@SuppressWarnings("java:S2176")
 public class HttpServletRequestWrapper extends RequestContext.HttpServletRequestWrapper {
   private String sessionId;
   private LegacyHttpSessionAdapter sessionAdapter;

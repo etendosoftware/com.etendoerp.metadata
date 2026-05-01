@@ -230,7 +230,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
      */
     @Test
     public void servletShouldIdentifyLegacyFollowupRequest() throws Exception {
-        when(request.getParameter("Command")).thenReturn("BUTTON_TEST");
+        when(request.getParameter(COMMAND_KEY)).thenReturn("BUTTON_TEST");
         when(request.getSession(false)).thenReturn(session);
         when(session.getAttribute("LEGACY_TOKEN")).thenReturn("test-token");
         when(session.getAttribute("LEGACY_SERVLET_DIR")).thenReturn("/dir");
@@ -241,7 +241,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
             // Expected due to framework dependencies
         }
 
-        verify(request, atLeastOnce()).getParameter("Command");
+        verify(request, atLeastOnce()).getParameter(COMMAND_KEY);
     }
 
     /**
@@ -523,13 +523,13 @@ public class LegacyProcessServletTest extends OBBaseTest {
      */
     @Test
     public void testSetSessionCookie() throws Exception {
-        when(response.getHeaders("Set-Cookie")).thenReturn(Collections.emptyList());
+        when(response.getHeaders(SET_COOKIE_HEADER)).thenReturn(Collections.emptyList());
 
         invokePrivateMethod(legacyProcessServlet, "setSessionCookie",
                 new Class<?>[] { HttpServletResponse.class, String.class },
                 response, "test-session-id");
 
-        verify(response).addHeader(eq("Set-Cookie"), contains("JSESSIONID=test-session-id"));
+        verify(response).addHeader(eq(SET_COOKIE_HEADER), contains("JSESSIONID=test-session-id"));
     }
 
     /**

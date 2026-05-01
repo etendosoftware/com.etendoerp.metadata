@@ -69,7 +69,7 @@ public class MetadataFilterAdditionalTest extends WeldBaseTest {
     private static final String TEST_PATH = "/test";
     private static final String TEST_HTML_PATH = "/test.html";
     private static final String DETERMINE_WANTS_HTML = "determineWantsHtml";
-    private Method getPrivateMethod(String name, Class<?>... paramTypes) throws Exception {
+    private Method getPrivateMethod(String name, Class<?>... paramTypes) throws ReflectiveOperationException {
         Method method = MetadataFilter.class.getDeclaredMethod(name, paramTypes);
         method.setAccessible(true);
         return method;

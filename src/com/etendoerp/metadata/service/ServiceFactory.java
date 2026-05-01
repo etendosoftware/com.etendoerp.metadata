@@ -36,9 +36,14 @@ import java.util.function.BiFunction;
 import static com.etendoerp.metadata.utils.Constants.*;
 
 /**
+ * Routes incoming HTTP requests to the appropriate MetadataService implementation.
+ *
  * @author luuchorocha
  */
-public class ServiceFactory {
+public final class ServiceFactory {
+
+    private ServiceFactory() {
+    }
 
     private static final Map<String, BiFunction<HttpServletRequest, HttpServletResponse, MetadataService>> EXACT_MATCH_SERVICES = new LinkedHashMap<>();
     private static final Map<String, BiFunction<HttpServletRequest, HttpServletResponse, MetadataService>> PREFIX_MATCH_SERVICES = new LinkedHashMap<>();

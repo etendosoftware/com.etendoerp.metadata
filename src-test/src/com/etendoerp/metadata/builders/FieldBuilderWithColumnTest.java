@@ -191,13 +191,13 @@ class FieldBuilderWithColumnTest {
     }
 
     private Object invokePrivate(Object target, String methodName, Class<?>[] parameterTypes, Object... args)
-            throws Exception {
+            throws ReflectiveOperationException {
         Method method = target.getClass().getDeclaredMethod(methodName, parameterTypes);
         method.setAccessible(true);
         return method.invoke(target, args);
     }
 
-    private void setJson(FieldBuilder builder, JSONObject json) throws Exception {
+    private void setJson(FieldBuilder builder, JSONObject json) throws ReflectiveOperationException {
         java.lang.reflect.Field jsonField = FieldBuilder.class.getDeclaredField("json");
         jsonField.setAccessible(true);
         jsonField.set(builder, json);
