@@ -61,7 +61,6 @@ class WidgetDataServiceTest {
         StringWriter sw = new StringWriter();
         when(response.getWriter()).thenReturn(new PrintWriter(sw));
         when(request.getPathInfo()).thenReturn("/widget/some-instance-id/data");
-        when(request.getMethod()).thenReturn("GET");
         when(request.getHeader("Authorization")).thenReturn("Bearer tok");
         when(request.getParameterMap()).thenReturn(new HashMap<>());
 
@@ -93,6 +92,7 @@ class WidgetDataServiceTest {
         WidgetDataResolver mockResolver = mock(WidgetDataResolver.class);
         JSONObject mockData = new JSONObject().put("value", 95);
         when(mockResolver.getType()).thenReturn("KPI");
+        when(mockResolver.isAvailable()).thenReturn(true);
         when(mockResolver.resolve(any())).thenReturn(mockData);
 
         try (MockedStatic<OBContext> ctxStatic = mockStatic(OBContext.class);

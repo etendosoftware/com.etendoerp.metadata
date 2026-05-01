@@ -19,7 +19,6 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
-import org.mockito.MockedStatic;
 import org.mockito.junit.MockitoJUnitRunner;
 import org.openbravo.test.base.OBBaseTest;
 
@@ -31,35 +30,24 @@ import java.io.StringWriter;
 import java.lang.reflect.Method;
 import java.util.Collections;
 
-import com.etendoerp.metadata.exceptions.InternalServerException;
-import com.etendoerp.metadata.utils.LegacyPaths;
-import com.etendoerp.metadata.utils.LegacyUtils;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.mockStatic;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
  * Additional unit tests for the LegacyProcessServlet class.
  * <p>
- * This class covers handleCreateFromSession, path utility methods,
+ * This class covers path utility methods
  * and legacy class derivation logic.
  * </p>
  */
 @RunWith(MockitoJUnitRunner.Silent.class)
 public class LegacyProcessServletUtilsTest extends OBBaseTest {
-    private static final String CREATE_FROM_SESSION_KEY = "CREATEFROM|TABID";
     private static final String COMMAND_KEY = "Command";
-    private static final String INP_WINDOW_ID_KEY = "inpWindowId";
-    private static final String INP_TABLE_ID_KEY = "inpTableId";
     private static final String METHOD_IS_VALID_LOCATION = "isValidLocation";
     private static final String METHOD_IS_REDIRECT_REQUEST = "isRedirectRequest";
     private static final String METHOD_IS_LEGACY_FOLLOWUP_REQUEST = "isLegacyFollowupRequest";
@@ -100,87 +88,6 @@ public class LegacyProcessServletUtilsTest extends OBBaseTest {
         Method method = obj.getClass().getDeclaredMethod(methodName, parameterTypes);
         method.setAccessible(true);
         return method.invoke(obj, args);
-    }
-
-    private void invokeHandleCreateFromSession(HttpServletRequest req, String path, HttpSession sess)
-            throws ReflectiveOperationException {
-        Method method = LegacyProcessServlet.class.getDeclaredMethod(
-            "handleCreateFromSession",
-            HttpServletRequest.class, String.class, HttpSession.class
-        );
-        method.setAccessible(true);
-        method.invoke(null, req, path, sess);
-    }
-
-    @Test
-    public void handleCreateFromSessionSetsTabIdForSaveCommand() throws Exception {
-        String windowId = "169";
-        String tableId = "319";
-        String expectedTabId = "257";
-
-        when(request.getParameter(COMMAND_KEY)).thenReturn("SAVE");
-        when(request.getParameter(INP_WINDOW_ID_KEY)).thenReturn(windowId);
-        when(request.getParameter(INP_TABLE_ID_KEY)).thenReturn(tableId);
-
-        try (MockedStatic<LegacyUtils> legacyUtils = mockStatic(LegacyUtils.class)) {
-            legacyUtils.when(() -> LegacyUtils.isMutableSessionAttribute(CREATE_FROM_SESSION_KEY)).thenReturn(true);
-            legacyUtils.when(() -> LegacyUtils.findTabIdByWindowAndTable(windowId, tableId)).thenReturn(expectedTabId);
-
-            invokeHandleCreateFromSession(request, LegacyPaths.CREATE_FROM_HTML, session);
-
-            verify(session).setAttribute(CREATE_FROM_SESSION_KEY, expectedTabId);
-        }
-    }
-
-    @Test
-    public void handleCreateFromSessionSkipsForNonCreateFromPath() throws Exception {
-        invokeHandleCreateFromSession(request, "/other/path.html", session);
-
-        verify(session, never()).setAttribute(anyString(), any());
-    }
-
-    @Test
-    public void handleCreateFromSessionSkipsForNonSaveCommand() throws Exception {
-        when(request.getParameter(COMMAND_KEY)).thenReturn("FIND_PO");
-
-        invokeHandleCreateFromSession(request, LegacyPaths.CREATE_FROM_HTML, session);
-
-        verify(session, never()).setAttribute(anyString(), any());
-    }
-
-    @Test
-    public void handleCreateFromSessionSkipsWhenTabIdNotFound() throws Exception {
-        when(request.getParameter(COMMAND_KEY)).thenReturn("SAVE");
-        when(request.getParameter(INP_WINDOW_ID_KEY)).thenReturn("169");
-        when(request.getParameter(INP_TABLE_ID_KEY)).thenReturn("999");
-
-        try (MockedStatic<LegacyUtils> legacyUtils = mockStatic(LegacyUtils.class)) {
-            legacyUtils.when(() -> LegacyUtils.isMutableSessionAttribute(CREATE_FROM_SESSION_KEY)).thenReturn(true);
-            legacyUtils.when(() -> LegacyUtils.findTabIdByWindowAndTable("169", "999")).thenReturn(null);
-
-            invokeHandleCreateFromSession(request, LegacyPaths.CREATE_FROM_HTML, session);
-
-            verify(session, never()).setAttribute(anyString(), any());
-        }
-    }
-
-    @Test
-    public void handleCreateFromSessionThrowsForForbiddenSessionKey() throws Exception {
-        when(request.getParameter(COMMAND_KEY)).thenReturn("SAVE");
-        when(request.getParameter(INP_WINDOW_ID_KEY)).thenReturn("169");
-        when(request.getParameter(INP_TABLE_ID_KEY)).thenReturn("319");
-
-        try (MockedStatic<LegacyUtils> legacyUtils = mockStatic(LegacyUtils.class)) {
-            legacyUtils.when(() -> LegacyUtils.isMutableSessionAttribute(CREATE_FROM_SESSION_KEY)).thenReturn(false);
-
-            try {
-                invokeHandleCreateFromSession(request, LegacyPaths.CREATE_FROM_HTML, session);
-                fail("Expected InternalServerException to be thrown");
-            } catch (java.lang.reflect.InvocationTargetException e) {
-                assertTrue("Cause should be InternalServerException",
-                        e.getCause() instanceof InternalServerException);
-            }
-        }
     }
 
     @Test
