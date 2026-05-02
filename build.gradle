@@ -14,20 +14,10 @@ sourceSets {
             srcDirs("etendo-resources")
         }
     }
-    test {
-        java {
-            srcDirs("src-test/src")
-        }
-    }
 }
 
-tasks.named('test') {
-    useJUnitPlatform()
-}
-
-compileTestJava {
-    destinationDirectory = file("${buildDir}/test-classes")
-    dependsOn ":compileJava", ":compileGroovy", ":compileTestJava", ":compileTestGroovy"
+tasks.named("compileTestJava") {
+    dependsOn("jar")
 }
 
 publishing {
@@ -66,11 +56,4 @@ dependencies {
     implementation('com.etendoerp.platform:etendo-core:[26.1.0,26.2.0)')
     implementation('com.etendoerp:metadata.template:1.0.1')
     implementation('com.etendoerp:etendorx:4.0.3')
-    testImplementation(sourceSets.main.output)
-    testImplementation(files("${rootProject.projectDir}/build/classes"))
-    testImplementation(files("${rootProject.projectDir}/src-test/build/classes"))
-    testImplementation('org.junit.jupiter:junit-jupiter:5.10.0')
-    testImplementation('org.mockito:mockito-core:5.5.0')
-    testImplementation('org.mockito:mockito-junit-jupiter:5.5.0')
-    testRuntimeOnly('org.junit.platform:junit-platform-launcher')
 }
