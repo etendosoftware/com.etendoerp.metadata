@@ -76,7 +76,7 @@ public class MetadataFilterAdditionalTest extends WeldBaseTest {
     }
 
     private String invokeBuildHtmlErrorDetailed(String cid, int status, String httpMethod,
-            String uri, String exClass, String message) throws Exception {
+            String uri, String exClass, String message) throws ReflectiveOperationException {
         Method method = getPrivateMethod(BUILD_HTML_ERROR_DETAILED,
             String.class, int.class, String.class, String.class,
             String.class, String.class);
@@ -84,7 +84,7 @@ public class MetadataFilterAdditionalTest extends WeldBaseTest {
     }
 
     private void invokeHandleException(ServletRequest req, ServletResponse res,
-            Throwable ex) throws Exception {
+            Throwable ex) throws ReflectiveOperationException {
         Method method = getPrivateMethod(HANDLE_EXCEPTION,
             ServletRequest.class, ServletResponse.class, Throwable.class);
         method.invoke(filter, req, res, ex);
