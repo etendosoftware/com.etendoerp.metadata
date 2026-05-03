@@ -28,6 +28,7 @@ class WidgetDataResponseTest {
 
     private static final String INSTANCE_ID = "inst-001";
     private static final String TYPE = "KPI";
+    private static final String TOTAL_ROWS = TOTAL_ROWS;
 
     @Test
     void buildWithTotalRowsReturnsCompleteEnvelope() throws Exception {
@@ -39,7 +40,7 @@ class WidgetDataResponseTest {
         assertEquals(95, result.getJSONObject("data").getInt("value"));
 
         JSONObject meta = result.getJSONObject("meta");
-        assertEquals(10, meta.getInt("totalRows"));
+        assertEquals(10, meta.getInt(TOTAL_ROWS));
         assertFalse(meta.getBoolean("hasMore"));
         assertTrue(meta.has("lastUpdate"));
     }
@@ -50,7 +51,7 @@ class WidgetDataResponseTest {
         JSONObject result = WidgetDataResponse.build(INSTANCE_ID, TYPE, data, null);
 
         JSONObject meta = result.getJSONObject("meta");
-        assertTrue(meta.isNull("totalRows"));
+        assertTrue(meta.isNull(TOTAL_ROWS));
     }
 
     @Test
@@ -59,7 +60,7 @@ class WidgetDataResponseTest {
         JSONObject result = WidgetDataResponse.build(INSTANCE_ID, TYPE, data);
 
         JSONObject meta = result.getJSONObject("meta");
-        assertTrue(meta.isNull("totalRows"));
+        assertTrue(meta.isNull(TOTAL_ROWS));
         assertFalse(meta.getBoolean("hasMore"));
     }
 

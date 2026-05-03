@@ -33,6 +33,7 @@ class WidgetDataContextTest {
 
     private static final String INSTANCE_ID = "inst-001";
     private static final String BEARER = "Bearer tok123";
+    private static final String COLOR = COLOR;
 
     private WidgetDataContext buildContext() {
         Map<String, Object> instanceData = new HashMap<>();
@@ -43,7 +44,7 @@ class WidgetDataContextTest {
         classData.put("4", "<p>desc</p>");
 
         Map<String, Object> params = new HashMap<>();
-        params.put("color", "blue");
+        params.put(COLOR, "blue");
         params.put("count", 42);
 
         OBContext ctx = mock(OBContext.class);
@@ -58,7 +59,7 @@ class WidgetDataContextTest {
         assertNotNull(ctx.getObContext());
         assertEquals("My Widget", ctx.getInstanceData().get("name"));
         assertEquals("KPI", ctx.getClassData().get("type"));
-        assertEquals("blue", ctx.getParams().get("color"));
+        assertEquals("blue", ctx.getParams().get(COLOR));
     }
 
     @Test
@@ -97,7 +98,7 @@ class WidgetDataContextTest {
     @Test
     void paramReturnsStringValue() {
         WidgetDataContext ctx = buildContext();
-        assertEquals("blue", ctx.param("color"));
+        assertEquals("blue", ctx.param(COLOR));
     }
 
     @Test

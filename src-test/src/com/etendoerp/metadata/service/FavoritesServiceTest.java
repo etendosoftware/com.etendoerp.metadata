@@ -66,6 +66,8 @@ class FavoritesServiceTest {
     private static final String USER_ID = "user-001";
     private static final String ROLE_ID = "role-001";
     private static final String MENU_ID = "menu-001";
+    private static final String FAVORITES_TOGGLE_PATH = FAVORITES_TOGGLE_PATH;
+    private static final String MENU_ID_JSON_PREFIX = MENU_ID_JSON_PREFIX;
 
     @Mock HttpServletRequest request;
     @Mock HttpServletResponse response;
@@ -158,7 +160,7 @@ class FavoritesServiceTest {
 
     @Test
     void processThrowsNotFoundForGetMethod() {
-        when(request.getPathInfo()).thenReturn("/favorites/toggle");
+        when(request.getPathInfo()).thenReturn(FAVORITES_TOGGLE_PATH);
         when(request.getMethod()).thenReturn("GET");
 
         FavoritesService svc = new FavoritesService(request, response);
@@ -167,9 +169,9 @@ class FavoritesServiceTest {
 
     @Test
     void processRemovesExistingFavorite() throws Exception {
-        when(request.getPathInfo()).thenReturn("/favorites/toggle");
+        when(request.getPathInfo()).thenReturn(FAVORITES_TOGGLE_PATH);
         when(request.getMethod()).thenReturn("POST");
-        setRequestBody("{\"menuId\":\"" + MENU_ID + "\"}");
+        setRequestBody(MENU_ID_JSON_PREFIX + MENU_ID + "\"}");
 
         setupExistsQuery(1L);
         setupDeleteQuery();
@@ -185,9 +187,9 @@ class FavoritesServiceTest {
 
     @Test
     void processAddsNewFavorite() throws Exception {
-        when(request.getPathInfo()).thenReturn("/favorites/toggle");
+        when(request.getPathInfo()).thenReturn(FAVORITES_TOGGLE_PATH);
         when(request.getMethod()).thenReturn("POST");
-        setRequestBody("{\"menuId\":\"" + MENU_ID + "\"}");
+        setRequestBody(MENU_ID_JSON_PREFIX + MENU_ID + "\"}");
 
         setupExistsQuery(0L);
 
@@ -222,9 +224,9 @@ class FavoritesServiceTest {
 
     @Test
     void processThrowsNotFoundWhenMenuDoesNotExist() throws Exception {
-        when(request.getPathInfo()).thenReturn("/favorites/toggle");
+        when(request.getPathInfo()).thenReturn(FAVORITES_TOGGLE_PATH);
         when(request.getMethod()).thenReturn("POST");
-        setRequestBody("{\"menuId\":\"" + MENU_ID + "\"}");
+        setRequestBody(MENU_ID_JSON_PREFIX + MENU_ID + "\"}");
 
         setupExistsQuery(0L);
         when(obDal.get(Menu.class, MENU_ID)).thenReturn(null);
@@ -243,7 +245,7 @@ class FavoritesServiceTest {
 
     @Test
     void processThrowsInternalServerOnInvalidJson() throws Exception {
-        when(request.getPathInfo()).thenReturn("/favorites/toggle");
+        when(request.getPathInfo()).thenReturn(FAVORITES_TOGGLE_PATH);
         when(request.getMethod()).thenReturn("POST");
         setRequestBody("not-valid-json");
 
