@@ -26,12 +26,20 @@ import org.openbravo.model.ad.system.Language;
 import org.openbravo.service.json.DataToJsonConverter;
 
 /**
- * @author luuchorocha
+ * Base class for metadata JSON builders that converts entities to JSON representations.
  */
 public abstract class Builder {
+    /** Shared logger instance for all builder subclasses. */
     protected static final Logger logger = LogManager.getLogger(Builder.class);
+    /** The current user's language, used for translatable properties. */
     public final Language language = OBContext.getOBContext().getLanguage();
     protected final DataToJsonConverter converter = new DataToJsonConverter();
 
+    /**
+     * Converts this builder's entity into a JSON representation.
+     *
+     * @return a {@link JSONObject} representing the entity
+     * @throws JSONException if there is an error during JSON construction
+     */
     public abstract JSONObject toJSON() throws JSONException;
 }

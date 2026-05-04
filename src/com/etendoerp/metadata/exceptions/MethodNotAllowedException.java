@@ -17,13 +17,17 @@
 
 package com.etendoerp.metadata.exceptions;
 
+/**
+ * Exception indicating that the HTTP method is not allowed (HTTP 405).
+ */
 public class MethodNotAllowedException extends RuntimeException {
-    private final static String DEFAULT_MESSAGE = "Method not allowed";
+    private static final String DEFAULT_MESSAGE = "Method not allowed";
 
     public MethodNotAllowedException(String message) {
         super(message.isEmpty() ? DEFAULT_MESSAGE : message);
     }
 
+    /** Creates a new MethodNotAllowedException with the default message. */
     public MethodNotAllowedException() {
         super(DEFAULT_MESSAGE);
     }

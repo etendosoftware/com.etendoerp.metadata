@@ -36,9 +36,14 @@ import java.util.function.BiFunction;
 import static com.etendoerp.metadata.utils.Constants.*;
 
 /**
+ * Routes incoming HTTP requests to the appropriate MetadataService implementation.
+ *
  * @author luuchorocha
  */
-public class ServiceFactory {
+public final class ServiceFactory {
+
+    private ServiceFactory() {
+    }
 
     private static final Map<String, BiFunction<HttpServletRequest, HttpServletResponse, MetadataService>> EXACT_MATCH_SERVICES = new LinkedHashMap<>();
     private static final Map<String, BiFunction<HttpServletRequest, HttpServletResponse, MetadataService>> PREFIX_MATCH_SERVICES = new LinkedHashMap<>();
@@ -50,6 +55,7 @@ public class ServiceFactory {
         EXACT_MATCH_SERVICES.put(MESSAGE_PATH, MessageService::new);
         EXACT_MATCH_SERVICES.put(LABELS_PATH, LabelsService::new);
         EXACT_MATCH_SERVICES.put(PREFERENCES_PATH, PreferencesService::new);
+        EXACT_MATCH_SERVICES.put(WIDGET_CLASSES_PATH, WidgetClassesService::new);
 
         // Prefix match services (order matters for overlapping prefixes)
         PREFIX_MATCH_SERVICES.put(WINDOW_PATH, WindowService::new);
@@ -60,6 +66,9 @@ public class ServiceFactory {
         PREFIX_MATCH_SERVICES.put(REPORT_AND_PROCESS_PATH, ReportAndProcessService::new);
         PREFIX_MATCH_SERVICES.put(PROCESS_EXECUTION_PATH, ProcessExecutionService::new);
         PREFIX_MATCH_SERVICES.put(PROCESS_PATH, ProcessMetadataService::new);
+        PREFIX_MATCH_SERVICES.put(DASHBOARD_PATH, DashboardService::new);
+        PREFIX_MATCH_SERVICES.put(FAVORITES_PATH, FavoritesService::new);
+        PREFIX_MATCH_SERVICES.put(WIDGET_DATA_PATH, WidgetDataService::new);
         PREFIX_MATCH_SERVICES.put(LEGACY_PATH, LegacyService::new);
     }
 
@@ -114,9 +123,18 @@ public class ServiceFactory {
         };
     }
 
+    /**
+     * Returns the MetadataService that handles the given request path.
+     *
+     * @param req the incoming HTTP request
+     * @param res the HTTP response
+     * @return the matching service instance
+     */
     public static MetadataService getService(final HttpServletRequest req, final HttpServletResponse res) {
         final String path = req.getPathInfo() != null
-                ? req.getPathInfo().replace("/com.etendoerp.metadata.meta/", "/")
+                ? req.getPathInfo()
+                    .replace("/com.etendoerp.metadata.meta/", "/")
+                    .replace("/com.etendoerp.metadata.sws/", "/")
                 : "";
 
         // Check exact matches first

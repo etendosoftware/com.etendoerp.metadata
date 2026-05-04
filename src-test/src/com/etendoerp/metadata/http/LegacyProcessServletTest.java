@@ -65,6 +65,7 @@ import static org.mockito.Mockito.*;
  * </p>
  */
 @RunWith(MockitoJUnitRunner.Silent.class)
+@SuppressWarnings("java:S1448")
 public class LegacyProcessServletTest extends OBBaseTest {
     private static final String HTML_UTF8_CONTENT_TYPE = "text/html; charset=UTF-8";
     private static final String PARAM_INP_KEY = "inpKey";
@@ -91,6 +92,8 @@ public class LegacyProcessServletTest extends OBBaseTest {
     private static final String MAP_MESSAGE_TYPE = "mapMessageType";
     private static final String WRITE_REQUEST_FAILED_FORWARDER = "writeRequestFailedForwarder";
     private static final String POST_MESSAGE_SCRIPT_KEY = "POST_MESSAGE_SCRIPT";
+    private static final String COMMAND_KEY = "Command";
+    private static final String SET_COOKIE_HEADER = "Set-Cookie";
 
     @Mock
     private HttpServletRequest request;
@@ -524,7 +527,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
     // private/protected) ==========
 
     private Object invokePrivateMethod(Object obj, String methodName, Class<?>[] parameterTypes, Object... args)
-            throws Exception {
+            throws ReflectiveOperationException {
         Method method = obj.getClass().getDeclaredMethod(methodName, parameterTypes);
         method.setAccessible(true);
         return method.invoke(obj, args);
@@ -535,13 +538,13 @@ public class LegacyProcessServletTest extends OBBaseTest {
      */
     @Test
     public void testSetSessionCookie() throws Exception {
-        when(response.getHeaders("Set-Cookie")).thenReturn(Collections.emptyList());
+        when(response.getHeaders(SET_COOKIE_HEADER)).thenReturn(Collections.emptyList());
 
         invokePrivateMethod(legacyProcessServlet, "setSessionCookie",
                 new Class<?>[] { HttpServletResponse.class, String.class },
                 response, "test-session-id");
 
-        verify(response).addHeader(eq("Set-Cookie"), contains("JSESSIONID=test-session-id"));
+        verify(response).addHeader(eq(SET_COOKIE_HEADER), contains("JSESSIONID=test-session-id"));
     }
 
     /**

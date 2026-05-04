@@ -23,6 +23,7 @@ import java.util.Date;
  * This class centralizes commonly used test values to improve maintainability
  * and consistency across all test cases.
  */
+@SuppressWarnings("java:S1075")
 public final class MetadataTestConstants {
 
   public static final String USERNAME = "username";
@@ -146,6 +147,7 @@ public final class MetadataTestConstants {
   public static final String TEST_TABLE_NAME = "testTable";
   public static final String TEST_PROPERTY_NAME = "testProperty";
   public static final String TEST_WINDOW_ID = "testWindowId";
+  @SuppressWarnings("java:S2386")
   public static final Date TEST_DATE = new Date();
 
   public static final String TEST_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test.token";

@@ -26,10 +26,14 @@ import org.openbravo.dal.core.OBContext;
 
 import com.etendoerp.metadata.builders.SessionBuilder;
 
-/**
- * @author luuchorocha
- */
+/** Serves GET /meta/session with current user session data. */
 public class SessionService extends MetadataService {
+    /**
+     * Creates a new SessionService for the given request/response pair.
+     *
+     * @param request  the HTTP request
+     * @param response the HTTP response
+     */
     public SessionService(HttpServletRequest request, HttpServletResponse response) {
         super(request, response);
     }

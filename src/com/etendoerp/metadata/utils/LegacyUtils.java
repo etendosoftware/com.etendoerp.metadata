@@ -28,7 +28,6 @@ import java.util.Set;
  * org.openbravo.model.ad.ui.Field)} and lives there exclusively.
  */
 public class LegacyUtils {
-
     /** Set of legacy paths used in the system. */
     private static final Set<String> LEGACY_PATHS = Set.of(
             LegacyPaths.USED_BY_LINK

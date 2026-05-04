@@ -67,6 +67,7 @@ import com.etendoerp.metadata.utils.Constants;
  * Tests all the functionality including readonly logic, selector references, list references, and window references.
  */
 @ExtendWith(MockitoExtension.class)
+@SuppressWarnings("java:S1450")
 class ParameterBuilderTest {
 
   private Parameter mockParameter;
@@ -449,11 +450,11 @@ class ParameterBuilderTest {
    */
   @Test
   void toJSONWithUnknownReferenceTypeDoesNotIncludeReferenceInfo() throws Exception {
-    Reference mockReference = mock(Reference.class);
+    Reference localMockReference = mock(Reference.class);
 
     when(mockParameter.getReadOnlyLogic()).thenReturn(null);
-    when(mockParameter.getReference()).thenReturn(mockReference);
-    when(mockReference.getId()).thenReturn("UNKNOWN_REFERENCE_ID");
+    when(mockParameter.getReference()).thenReturn(localMockReference);
+    when(localMockReference.getId()).thenReturn("UNKNOWN_REFERENCE_ID");
 
     JSONObject result = executeToJSON(null, null);
 

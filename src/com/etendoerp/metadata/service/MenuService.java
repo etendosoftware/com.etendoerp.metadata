@@ -28,10 +28,14 @@ import org.openbravo.dal.core.OBContext;
 import com.etendoerp.metadata.builders.MenuBuilder;
 import com.etendoerp.metadata.exceptions.InternalServerException;
 
-/**
- * @author luuchorocha
- */
+/** Serves GET /meta/menu with the navigation menu tree. */
 public class MenuService extends MetadataService {
+    /**
+     * Creates a new MenuService for the given request/response pair.
+     *
+     * @param request  the HTTP request
+     * @param response the HTTP response
+     */
     public MenuService(HttpServletRequest request, HttpServletResponse response) {
         super(request, response);
     }

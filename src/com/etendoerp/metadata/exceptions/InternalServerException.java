@@ -17,8 +17,11 @@
 
 package com.etendoerp.metadata.exceptions;
 
+/**
+ * Exception indicating an internal server error (HTTP 500).
+ */
 public class InternalServerException extends RuntimeException {
-    private final static String DEFAULT_MESSAGE = "Internal server error";
+    private static final String DEFAULT_MESSAGE = "Internal server error";
 
     public InternalServerException(String message) {
         super(message.isEmpty() ? DEFAULT_MESSAGE : message);
@@ -28,6 +31,7 @@ public class InternalServerException extends RuntimeException {
         super(message, cause);
     }
 
+    /** Creates a new InternalServerException with the default message. */
     public InternalServerException() {
         super(DEFAULT_MESSAGE);
     }

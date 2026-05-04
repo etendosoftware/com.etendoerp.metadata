@@ -60,6 +60,7 @@ import static com.etendoerp.metadata.utils.Constants.PUBLIC_JS_PATH;
  * It provides compatibility for WAD-generated windows and processes by wrapping
  * requests and responses to inject necessary scripts and handle authentication.
  */
+@SuppressWarnings("java:S1075")
 public class LegacyProcessServlet extends HttpSecureAppServlet {
     private static final Logger log = LogManager.getLogger();
     private static final String JWT_TOKEN = "#JWT_TOKEN";

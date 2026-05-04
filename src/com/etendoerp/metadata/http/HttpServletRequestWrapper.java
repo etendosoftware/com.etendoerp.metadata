@@ -49,9 +49,9 @@ import java.util.Set;
  *
  * @author luuchorocha
  */
+@SuppressWarnings("java:S2176")
 public class HttpServletRequestWrapper extends RequestContext.HttpServletRequestWrapper {
   private String sessionId;
-  private final String userId;
   private LegacyHttpSessionAdapter sessionAdapter;
   private final Map<String, List<String>> customHeaders;
 
@@ -75,7 +75,6 @@ public class HttpServletRequestWrapper extends RequestContext.HttpServletRequest
       }
     }
     if (token == null) {
-      this.userId = null;
       return;
     }
     DecodedJWT decodedJWT;
@@ -84,7 +83,6 @@ public class HttpServletRequestWrapper extends RequestContext.HttpServletRequest
     } catch (Exception e) {
       throw new OBException("Error decoding token", e);
     }
-    this.userId = decodedJWT.getClaim("user").asString();
     this.sessionId = decodedJWT.getClaim("jti").asString();
   }
 

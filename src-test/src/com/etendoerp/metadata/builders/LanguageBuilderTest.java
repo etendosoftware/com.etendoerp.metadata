@@ -165,7 +165,7 @@ class LanguageBuilderTest {
         when(converter.toJsonObject(language1, DataResolvingMode.FULL_TRANSLATABLE)).thenReturn(lang1Json);
         when(converter.toJsonObject(language2, DataResolvingMode.FULL_TRANSLATABLE)).thenReturn(lang2Json);
       } catch (Exception e) {
-        throw new RuntimeException("Could not set converter field: " + e.getMessage(), e);
+        throw new IllegalStateException("Could not set converter field: " + e.getMessage(), e);
       }
 
       JSONObject result = languageBuilder.toJSON();
@@ -261,7 +261,7 @@ class LanguageBuilderTest {
         
         when(converter.toJsonObject(language1, DataResolvingMode.FULL_TRANSLATABLE)).thenReturn(langJson);
       } catch (Exception e) {
-        throw new RuntimeException("Could not set converter field: " + e.getMessage(), e);
+        throw new IllegalStateException("Could not set converter field: " + e.getMessage(), e);
       }
 
       JSONObject result = languageBuilder.toJSON();

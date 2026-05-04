@@ -37,7 +37,7 @@ import org.openbravo.model.common.enterprise.Warehouse;
 import com.etendoerp.metadata.exceptions.InternalServerException;
 
 /**
- * @author luuchorocha
+ * Builds a JSON representation of the current user session including roles, organizations, and warehouses.
  */
 public class SessionBuilder extends Builder {
 

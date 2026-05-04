@@ -28,7 +28,14 @@ import org.openbravo.dal.core.OBContext;
 import com.etendoerp.metadata.builders.LabelsBuilder;
 import com.etendoerp.metadata.exceptions.InternalServerException;
 
+/** Serves GET /meta/labels with all I18N labels for the current language. */
 public class LabelsService extends MetadataService {
+    /**
+     * Creates a new LabelsService for the given request/response pair.
+     *
+     * @param request  the HTTP request
+     * @param response the HTTP response
+     */
     public LabelsService(HttpServletRequest request, HttpServletResponse response) {
         super(request, response);
     }

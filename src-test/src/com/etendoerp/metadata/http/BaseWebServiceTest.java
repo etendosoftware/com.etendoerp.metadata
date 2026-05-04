@@ -316,6 +316,50 @@ public class BaseWebServiceTest {
     }
 
     /**
+     * Tests that doPatch delegates to process method.
+     *
+     * @throws Exception if an error occurs during method invocation
+     */
+    @Test
+    public void testDoPatchDelegatesToProcess() throws Exception {
+        webService.doPatch(TEST_PATH, mockRequest, mockResponse);
+
+        assertTrue("doPatch should call process method", processWasCalled);
+        assertEquals(REQUEST_PASSED_TO_PROCESS, mockRequest, capturedRequest);
+        assertEquals(RESPONSE_PASSED_TO_PROCESS, mockResponse, capturedResponse);
+    }
+
+    /**
+     * Tests that path parameter is ignored in doPatch.
+     *
+     * @throws Exception if an error occurs during method invocation
+     */
+    @Test
+    public void testDoPatchIgnoresPathParameter() throws Exception {
+        webService.doPatch("/patch/path", mockRequest, mockResponse);
+
+        assertTrue(PROCESS_CALLED_REGARDLESS_OF_PATH, processWasCalled);
+    }
+
+    /**
+     * Tests that doPatch propagates exceptions from process method.
+     *
+     * @throws Exception if test fails unexpectedly
+     */
+    @Test
+    public void testDoPatchPropagatesException() throws Exception {
+        Exception expectedException = new RuntimeException(TEST_EXCEPTION_MESSAGE);
+        ExceptionThrowingWebService exceptionService = new ExceptionThrowingWebService(expectedException);
+
+        try {
+            exceptionService.doPatch(TEST_PATH, mockRequest, mockResponse);
+            fail(SHOULD_THROW_EXCEPTION);
+        } catch (Exception e) {
+            assertEquals(EXCEPTION_SHOULD_BE_PROPAGATED, expectedException, e);
+        }
+    }
+
+    /**
      * Tests that all HTTP methods can be called in sequence.
      *
      * @throws Exception if an error occurs during method invocation
@@ -340,6 +384,7 @@ public class BaseWebServiceTest {
         countingService.doPost(TEST_PATH, mockRequest, mockResponse);
         countingService.doPut(TEST_PATH, mockRequest, mockResponse);
         countingService.doDelete(TEST_PATH, mockRequest, mockResponse);
+        countingService.doPatch(TEST_PATH, mockRequest, mockResponse);
 
         // Verify all methods were called by checking process was invoked
         // We can't directly check the call count, but we verify no exceptions
