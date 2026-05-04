@@ -68,6 +68,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
     private static final String ACTION_JSON_SEPARATOR = "',action:";
     private static final String HTML_UTF8_CONTENT_TYPE = "text/html; charset=UTF-8";
     private static final String UTF8_CHARSET = "UTF-8";
+    private static final String JSON_CONTENT_TYPE_PREFIX = "application/json";
     private static final String TOKEN_PARAM = "token";
     private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String BEARER_PREFIX = "Bearer ";
@@ -82,6 +83,20 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             "}});</script>";
 
     /**
+     * JS-array literal listing the {@code Command} prefixes the legacy framework uses
+     * for form refreshes (combo onChange, response page reload, comparative-mode
+     * checkbox) — i.e. submissions that unload the iframe but do <strong>not</strong>
+     * represent a process execution. When {@code document.forms[0].Command.value}
+     * matches any of these prefixes at unload time, the iframe suppresses
+     * {@link LegacyMessageProtocol#ACTION_IFRAME_UNLOADED} so the new UI does not
+     * arm its fallback-warning countdown for a non-process navigation. Counterpart
+     * of {@link #PROCESS_COMMAND_PREFIX}; values audited against
+     * {@code erp/src/org/openbravo/erpCommon/ad_actionButton/} (27 templates) and
+     * {@code vars.commandIn(...)} call sites in the related Java servlets.
+     */
+    private static final String REFRESH_COMMAND_PREFIXES_JS = "['FIND','REFRESH','DEFAULT']";
+
+    /**
      * Script injected into legacy form pages to expose {@code window.sendMessage}
      * and to guarantee that the parent always receives a final notification even
      * when the page is unloaded mid-flight (redirect, navigation, browser-tab
@@ -89,9 +104,29 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
      * {@code closeModal}) was emitted; if not, on {@code pagehide}/{@code beforeunload}
      * it sends an {@code iframeUnloaded} action so the new UI can show the
      * fallback warning instead of leaving the user without feedback.
+     *
+     * <p>The {@code notifyUnload} guard reads the form's {@code Command} value
+     * before posting and short-circuits when it matches a refresh prefix from
+     * {@link #REFRESH_COMMAND_PREFIXES_JS} — this prevents the false warning that
+     * would otherwise appear when the user refreshes the popup contents (combo
+     * onChange firing {@code submitCommandForm('FIND_PO',...)} and similar).
      */
     private static final String POST_MESSAGE_SCRIPT = "<script>(function(){" +
             "var sent=false;" +
+            "var REFRESH_COMMAND_PREFIXES=" + REFRESH_COMMAND_PREFIXES_JS + ";" +
+            "function getSubmittedCommand(){" +
+            "var f=document.forms&&document.forms[0];" +
+            "if(!f||!f.Command)return null;" +
+            "return f.Command.value||null;" +
+            "}" +
+            "function isRefreshCommand(cmd){" +
+            "if(!cmd)return false;" +
+            "var upper=String(cmd).toUpperCase();" +
+            "for(var i=0;i<REFRESH_COMMAND_PREFIXES.length;i++){" +
+            "if(upper.indexOf(REFRESH_COMMAND_PREFIXES[i])===0)return true;" +
+            "}" +
+            "return false;" +
+            "}" +
             "window.sendMessage=function(action){" +
             "if(!window.parent)return;" +
             "window.parent.postMessage({type:'" + LegacyMessageProtocol.MESSAGE_TYPE + ACTION_JSON_SEPARATOR
@@ -101,6 +136,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             "};" +
             "function notifyUnload(){" +
             "if(sent||window.__etendoMessageSent)return;" +
+            "if(isRefreshCommand(getSubmittedCommand()))return;" +
             "if(!window.parent)return;" +
             "window.parent.postMessage({type:'" + LegacyMessageProtocol.MESSAGE_TYPE + ACTION_JSON_SEPARATOR
             + "'" + LegacyMessageProtocol.ACTION_IFRAME_UNLOADED + "'},'*');" +
@@ -679,11 +715,28 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             return;
         }
 
-        res.setContentType(HTML_UTF8_CONTENT_TYPE);
-        res.setCharacterEncoding(UTF8_CHARSET);
+        applyFinalContentType(res, wrapper);
         res.setStatus(wrapper.getStatus());
         res.getWriter().write(output);
         res.getWriter().flush();
+    }
+
+    /**
+     * Preserves the Content-Type declared by the wrapped legacy servlet when it
+     * is a JSON response (e.g. {@code UsedByLink} answering {@code JSONCategory}
+     * or {@code JSONLinkedItem}). For every other case the legacy WAD pipeline
+     * produces HTML, so the historical default is kept.
+     */
+    private void applyFinalContentType(HttpServletResponse res,
+            HttpServletResponseLegacyWrapper wrapper) {
+        String wrappedContentType = wrapper.getContentType();
+        if (wrappedContentType != null
+                && wrappedContentType.toLowerCase().contains(JSON_CONTENT_TYPE_PREFIX)) {
+            res.setContentType(wrappedContentType);
+            return;
+        }
+        res.setContentType(HTML_UTF8_CONTENT_TYPE);
+        res.setCharacterEncoding(UTF8_CHARSET);
     }
 
     /**

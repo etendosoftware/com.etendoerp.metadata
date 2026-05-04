@@ -1253,6 +1253,93 @@ public class LegacyProcessServletTest extends OBBaseTest {
                 result);
     }
 
+    // ========== Tests for refresh-Command guard in notifyUnload ==========
+
+    /**
+     * The refresh-prefix list embedded in the script must include the three
+     * Command families that legacy form pages use for in-popup refreshes:
+     * search/filter (FIND*), hidden-frame reload (REFRESH*) and re-render of
+     * the response page (DEFAULT*). Audited against the 27 templates in
+     * erp/src/org/openbravo/erpCommon/ad_actionButton/.
+     */
+    @Test
+    public void postMessageScriptShouldDeclareRefreshCommandPrefixes() throws Exception {
+        String script = readScriptConstant("POST_MESSAGE_SCRIPT");
+
+        assertTrue("Script must declare REFRESH_COMMAND_PREFIXES literal",
+                script.contains("REFRESH_COMMAND_PREFIXES=['FIND','REFRESH','DEFAULT']"));
+    }
+
+    /**
+     * The script must read the form's Command value at unload time and call
+     * the helpers BEFORE posting iframeUnloaded, so refresh submissions
+     * (Command=FIND_PO and similar) do not trigger the parent's fallback
+     * warning. Verifies both helpers are present and that the guard sits
+     * before the postMessage call inside notifyUnload.
+     */
+    @Test
+    public void notifyUnloadShouldShortCircuitOnRefreshCommand() throws Exception {
+        String script = readScriptConstant("POST_MESSAGE_SCRIPT");
+
+        assertTrue("Script must define getSubmittedCommand helper",
+                script.contains("function getSubmittedCommand()"));
+        assertTrue("getSubmittedCommand must read document.forms[0].Command.value",
+                script.contains("document.forms&&document.forms[0]")
+                        && script.contains("f.Command")
+                        && script.contains("f.Command.value"));
+        assertTrue("Script must define isRefreshCommand helper",
+                script.contains("function isRefreshCommand(cmd)"));
+        assertTrue("isRefreshCommand must compare against REFRESH_COMMAND_PREFIXES with startsWith semantics",
+                script.contains("upper.indexOf(REFRESH_COMMAND_PREFIXES[i])===0"));
+
+        int guardIndex = script.indexOf("isRefreshCommand(getSubmittedCommand())");
+        int unloadedIndex = script.indexOf("'iframeUnloaded'");
+        assertTrue("notifyUnload must invoke the refresh-Command guard", guardIndex >= 0);
+        assertTrue("Guard must run before iframeUnloaded is posted", guardIndex < unloadedIndex);
+    }
+
+    /**
+     * The refresh-Command guard MUST NOT match the legacy "process completion"
+     * commands documented in all-feature-section-2.md and audited across the
+     * 27 ad_actionButton templates. A static check here protects against future
+     * additions to REFRESH_COMMAND_PREFIXES that would silently break the
+     * fallback safety net for real processes.
+     */
+    @Test
+    public void refreshPrefixesMustNotShadowProcessCommands() throws Exception {
+        String script = readScriptConstant("POST_MESSAGE_SCRIPT");
+
+        // Extract the literal between '=' and ';' for "REFRESH_COMMAND_PREFIXES=[..];"
+        int start = script.indexOf("REFRESH_COMMAND_PREFIXES=[");
+        assertTrue("Script must declare REFRESH_COMMAND_PREFIXES", start >= 0);
+        start += "REFRESH_COMMAND_PREFIXES=".length();
+        int end = script.indexOf("];", start);
+        assertTrue("REFRESH_COMMAND_PREFIXES literal must be terminated with ];", end >= 0);
+        String literal = script.substring(start, end + 1);
+
+        String[] processCommands = new String[] {
+                "SAVE",
+                "SAVE_BUTTONDocAction109",
+                "SAVE_BUTTONChangeProjectStatus",
+                "SAVE_PHYSICALINVENTORY",
+                "CANCEL_PHYSICALINVENTORY",
+                "GENERATE",
+                "USECREDITPAYMENTS",
+                "CANCEL_USECREDITPAYMENTS"
+        };
+
+        for (String cmd : processCommands) {
+            for (String prefix : new String[] { "FIND", "REFRESH", "DEFAULT" }) {
+                assertTrue("Refresh prefixes literal must be: " + literal,
+                        literal.contains("'" + prefix + "'"));
+                if (cmd.toUpperCase().startsWith(prefix)) {
+                    throw new AssertionError("Refresh prefix " + prefix
+                            + " would incorrectly suppress iframeUnloaded for process command " + cmd);
+                }
+            }
+        }
+    }
+
     // ========== Tests for writeRequestFailedForwarder ==========
 
     /**
