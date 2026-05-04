@@ -102,6 +102,7 @@ public class HttpServletRequestWrapperTest extends OBBaseTest {
   private static final String LOWER_FIRST_CUSTOM_HEADER = "first-custom";
   private static final String LOWER_SECOND_CUSTOM_HEADER = "second-custom";
   private static final String UPDATED_SESSION_ID = "updated-session-id";
+  private static final String EXCEPTION_HEADER_NAME = "Exception should include header name";
 
   @Mock
   private HttpServletRequest mockRequest;
@@ -564,7 +565,7 @@ public class HttpServletRequestWrapperTest extends OBBaseTest {
       wrapper.getIntHeader(LOWER_NUMERIC_HEADER);
       throw new AssertionError("Should throw NumberFormatException for invalid custom integer header");
     } catch (NumberFormatException e) {
-      assertTrue("Exception should include header name", e.getMessage().contains(LOWER_NUMERIC_HEADER));
+      assertTrue(EXCEPTION_HEADER_NAME, e.getMessage().contains(LOWER_NUMERIC_HEADER));
       assertTrue("Exception should include invalid value", e.getMessage().contains(INVALID_INTEGER));
     }
   }
@@ -583,7 +584,7 @@ public class HttpServletRequestWrapperTest extends OBBaseTest {
       wrapper.getIntHeader(NUMERIC_HEADER);
       throw new AssertionError("Should throw NumberFormatException for invalid original integer header");
     } catch (NumberFormatException e) {
-      assertTrue("Exception should include header name", e.getMessage().contains(NUMERIC_HEADER));
+      assertTrue(EXCEPTION_HEADER_NAME, e.getMessage().contains(NUMERIC_HEADER));
       assertTrue("Exception should include invalid value", e.getMessage().contains(INVALID_INTEGER));
     }
   }
@@ -613,7 +614,7 @@ public class HttpServletRequestWrapperTest extends OBBaseTest {
       wrapper.getDateHeader(LOWER_CUSTOM_DATE_HEADER);
       throw new AssertionError("Should throw UnsupportedOperationException for custom date header");
     } catch (UnsupportedOperationException e) {
-      assertTrue("Exception should include header name", e.getMessage().contains(LOWER_CUSTOM_DATE_HEADER));
+      assertTrue(EXCEPTION_HEADER_NAME, e.getMessage().contains(LOWER_CUSTOM_DATE_HEADER));
     }
   }
 
