@@ -90,6 +90,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
     private static final String IS_PROCESS_COMMAND_POPUP = "isProcessCommandPopup";
     private static final String MAP_MESSAGE_TYPE = "mapMessageType";
     private static final String WRITE_REQUEST_FAILED_FORWARDER = "writeRequestFailedForwarder";
+    private static final String POST_MESSAGE_SCRIPT_KEY = "POST_MESSAGE_SCRIPT";
 
     @Mock
     private HttpServletRequest request;
@@ -1164,7 +1165,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
      */
     @Test
     public void postMessageScriptShouldIncludePagehideListener() throws Exception {
-        String script = readScriptConstant("POST_MESSAGE_SCRIPT");
+        String script = readScriptConstant(POST_MESSAGE_SCRIPT_KEY);
 
         assertTrue("Script must register pagehide listener",
                 script.contains("addEventListener('pagehide'"));
@@ -1264,7 +1265,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
      */
     @Test
     public void postMessageScriptShouldDeclareRefreshCommandPrefixes() throws Exception {
-        String script = readScriptConstant("POST_MESSAGE_SCRIPT");
+        String script = readScriptConstant(POST_MESSAGE_SCRIPT_KEY);
 
         assertTrue("Script must declare REFRESH_COMMAND_PREFIXES literal",
                 script.contains("REFRESH_COMMAND_PREFIXES=['FIND','REFRESH','DEFAULT']"));
@@ -1279,7 +1280,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
      */
     @Test
     public void notifyUnloadShouldShortCircuitOnRefreshCommand() throws Exception {
-        String script = readScriptConstant("POST_MESSAGE_SCRIPT");
+        String script = readScriptConstant(POST_MESSAGE_SCRIPT_KEY);
 
         assertTrue("Script must define getSubmittedCommand helper",
                 script.contains("function getSubmittedCommand()"));
@@ -1307,7 +1308,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
      */
     @Test
     public void refreshPrefixesMustNotShadowProcessCommands() throws Exception {
-        String script = readScriptConstant("POST_MESSAGE_SCRIPT");
+        String script = readScriptConstant(POST_MESSAGE_SCRIPT_KEY);
 
         // Extract the literal between '=' and ';' for "REFRESH_COMMAND_PREFIXES=[..];"
         int start = script.indexOf("REFRESH_COMMAND_PREFIXES=[");
