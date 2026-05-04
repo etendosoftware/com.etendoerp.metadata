@@ -36,6 +36,10 @@ public class RequestVariablesTest {
     private static final String TEST_ATTRIBUTES = "testAttribute";
     private static final String VALUE_1 = "value1";
     private static final String VALUE_2 = "value2";
+    private static final String CASED_ATTRIBUTE = "TestAttribute";
+    private static final String LOWER_CASE_ATTRIBUTE = "testattribute";
+    private static final String EXTERNAL_ATTRIBUTE = "externalAttribute";
+    private static final String ATTRIBUTES_KEY = "attributesKey";
 
     @Mock
     private HttpServletRequest mockRequest;
@@ -146,5 +150,58 @@ public class RequestVariablesTest {
         Map<String, Object> casedAttributes = requestVariables.getCasedSessionAttributes();
         assertTrue("Cased attributes should contain the attribute", casedAttributes.containsKey(attribute));
         assertEquals("Cased attribute value should be empty string", value, casedAttributes.get(attribute));
+    }
+
+    /**
+     * Tests that cased attributes preserve keys that only differ by case.
+     */
+    @Test
+    public void testSetSessionValuePreservesAttributeCase() {
+        requestVariables.setSessionValue(CASED_ATTRIBUTE, VALUE_1);
+        requestVariables.setSessionValue(LOWER_CASE_ATTRIBUTE, VALUE_2);
+
+        Map<String, Object> casedAttributes = requestVariables.getCasedSessionAttributes();
+
+        assertEquals("Should keep both case-sensitive attributes", 2, casedAttributes.size());
+        assertEquals("Cased attribute should keep its value", VALUE_1, casedAttributes.get(CASED_ATTRIBUTE));
+        assertEquals("Lowercase attribute should keep its value", VALUE_2, casedAttributes.get(LOWER_CASE_ATTRIBUTE));
+    }
+
+    /**
+     * Tests that getCasedSessionAttributes returns the same backing map instance.
+     */
+    @Test
+    public void testGetCasedSessionAttributesReturnsSameInstance() {
+        Map<String, Object> firstMap = requestVariables.getCasedSessionAttributes();
+        Map<String, Object> secondMap = requestVariables.getCasedSessionAttributes();
+
+        assertSame("Cased session attributes should use one backing map", firstMap, secondMap);
+    }
+
+    /**
+     * Tests that values added through the returned map remain visible.
+     */
+    @Test
+    public void testReturnedCasedSessionAttributesMapIsLive() {
+        Map<String, Object> casedAttributes = requestVariables.getCasedSessionAttributes();
+
+        casedAttributes.put(EXTERNAL_ATTRIBUTE, VALUE_1);
+
+        assertEquals("Externally added attribute should remain visible", VALUE_1,
+                requestVariables.getCasedSessionAttributes().get(EXTERNAL_ATTRIBUTE));
+    }
+
+    /**
+     * Tests that setSessionValue overrides a value previously added to the cased map.
+     */
+    @Test
+    public void testSetSessionValueOverridesValueAddedThroughReturnedMap() {
+        requestVariables.getCasedSessionAttributes().put(ATTRIBUTES_KEY, VALUE_1);
+
+        requestVariables.setSessionValue(ATTRIBUTES_KEY, VALUE_2);
+
+        Map<String, Object> casedAttributes = requestVariables.getCasedSessionAttributes();
+        assertEquals("Session value should override the value added through the map", VALUE_2,
+                casedAttributes.get(ATTRIBUTES_KEY));
     }
 }
