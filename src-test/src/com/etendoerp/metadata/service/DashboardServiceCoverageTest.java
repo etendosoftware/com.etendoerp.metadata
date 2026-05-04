@@ -97,7 +97,11 @@ class DashboardServiceCoverageTest {
 
     @FunctionalInterface
     interface MockedAction {
-        /** Executes the test action, allowing checked exceptions for test convenience. */
+        /**
+         * Executes the test action, allowing checked exceptions for test convenience.
+         *
+         * @throws Exception if the test action fails
+         */
         @SuppressWarnings("java:S112")
         void run() throws Exception;
     }
