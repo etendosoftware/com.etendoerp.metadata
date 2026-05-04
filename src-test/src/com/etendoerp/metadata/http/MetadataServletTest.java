@@ -28,6 +28,7 @@ import java.io.StringWriter;
 
 import static org.mockito.Mockito.*;
 
+/** Unit tests for {@link MetadataServlet} request routing and error handling. */
 public class MetadataServletTest extends WeldBaseTest {
 
   private MetadataServlet servlet;

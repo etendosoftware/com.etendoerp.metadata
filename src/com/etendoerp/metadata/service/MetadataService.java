@@ -30,19 +30,24 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.codehaus.jettison.json.JSONObject;
 
-/**
- * @author luuchorocha
- */
+/** Base class for all metadata endpoint services. */
 public abstract class MetadataService {
     private static final ThreadLocal<HttpServletRequest> requestThreadLocal = new ThreadLocal<>();
     private static final ThreadLocal<HttpServletResponse> responseThreadLocal = new ThreadLocal<>();
     protected final Logger logger = LogManager.getLogger(this.getClass());
 
-    public MetadataService(HttpServletRequest request, HttpServletResponse response) {
+    /**
+     * Creates a new MetadataService binding the given request and response to the current thread.
+     *
+     * @param request  the HTTP request
+     * @param response the HTTP response
+     */
+    protected MetadataService(HttpServletRequest request, HttpServletResponse response) {
         requestThreadLocal.set(request);
         responseThreadLocal.set(response);
     }
 
+    /** Removes the request and response references from the current thread. */
     public static void clear() {
         requestThreadLocal.remove();
         responseThreadLocal.remove();

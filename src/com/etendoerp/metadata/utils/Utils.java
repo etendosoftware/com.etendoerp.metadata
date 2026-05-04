@@ -72,6 +72,8 @@ import com.etendoerp.metadata.exceptions.UnprocessableContentException;
  * @author luuchorocha
  */
 public class Utils {
+    private Utils() { }
+
     private static final Logger logger = LogManager.getLogger(Utils.class);
     private static final MessageFactory messageFactory = new ParameterizedMessageFactory();
     private static final Map<String, Integer> exceptionStatusMap = buildExceptionMap();

@@ -38,6 +38,9 @@ import com.etendoerp.metadata.data.TabProcessor;
 import com.etendoerp.metadata.exceptions.InternalServerException;
 import com.etendoerp.metadata.utils.Constants;
 
+/**
+ * Builds a JSON representation of a tab including its fields, parent columns, and access permissions.
+ */
 public class TabBuilder extends Builder {
   private static final String[] AUDIT_FIELDS = {
           Constants.CREATION_DATE, Constants.CREATED_BY, Constants.UPDATED, Constants.UPDATED_BY

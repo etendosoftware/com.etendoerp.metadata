@@ -47,6 +47,8 @@ class ServiceFactoryTest {
 
   private static final String EXAMPLE_MUTABLE_SESSION_ATTRIBUTE = "143|C_ORDER_ID";
   private static final String SERVICE_NOT_NULL = "Service should not be null";
+  @SuppressWarnings("java:S1075")
+  private static final String NON_USED_BY_LINK_PATH = "/some/legacy/path";
 
   @Mock
   private HttpServletRequest mockRequest;

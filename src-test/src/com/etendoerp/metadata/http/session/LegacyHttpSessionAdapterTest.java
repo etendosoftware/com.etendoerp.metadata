@@ -64,6 +64,7 @@ import org.openbravo.test.base.OBBaseTest;
  * Exception handling is also tested to ensure proper error conditions are met.</p>
  */
 @RunWith(MockitoJUnitRunner.class)
+@SuppressWarnings("java:S1448")
 public class LegacyHttpSessionAdapterTest extends OBBaseTest {
 
   @Mock

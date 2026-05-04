@@ -72,6 +72,7 @@ public class ForwarderServletTest {
     @Mock
     private DataSourceServlet dataSourceServlet;
 
+    /** Initializes the servlet under test. */
     @Before
     public void setUp() {
         forwarderServlet = new ForwarderServlet();

@@ -535,9 +535,9 @@ class TabBuilderTest {
         when(ctx.tab.getTabLevel()).thenReturn(1L);
         when(ctx.kernelUtils.getParentTab(ctx.tab)).thenReturn(null);
 
-        executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), false, null, mockedProcessor -> {
-            mockedProcessor.when(() -> TabProcessor.getEntityColumnName(any())).thenReturn(columnName);
-        }, result -> {
+        executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), false, null,
+            mockedProcessor -> mockedProcessor.when(() -> TabProcessor.getEntityColumnName(any())).thenReturn(columnName),
+            result -> {
             try {
                 JSONArray parentColumns = result.getJSONArray(PARENT_COLUMN_KEY);
                 assertEquals(1, parentColumns.length());
@@ -593,6 +593,7 @@ class TabBuilderTest {
                 assertions);
     }
 
+    @SuppressWarnings("java:S107")
     private void executeTabBuilderTest(OBContext mockContext, KernelUtils mockKernelUtils,
             Tab mockTab, JSONObject tabFields,
             boolean isWindowReadOnly, TabAccess tabAccess,

@@ -32,11 +32,16 @@ import static com.etendoerp.metadata.builders.FieldBuilder.getSelectorInfo;
 import static com.etendoerp.metadata.utils.Constants.*;
 
 /**
- * @author luuchorocha
+ * Builds a JSON representation of a process definition parameter including selector and list info.
  */
 public class ParameterBuilder extends Builder {
     private final Parameter parameter;
 
+    /**
+     * Creates a new ParameterBuilder for the given parameter.
+     *
+     * @param parameter the process definition parameter to build JSON for
+     */
     public ParameterBuilder(Parameter parameter) {
         this.parameter = parameter;
     }

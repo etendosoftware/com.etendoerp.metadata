@@ -30,11 +30,12 @@ import org.openbravo.model.ad.system.Language;
 import org.openbravo.service.json.DataResolvingMode;
 
 /**
- * @author luuchorocha
+ * Builds a JSON object containing all active system languages.
  */
 public class LanguageBuilder extends Builder {
     private static final String PROPERTIES = String.join(",", PROPERTY_ID, PROPERTY_LANGUAGE, PROPERTY_NAME);
 
+    /** Creates a new LanguageBuilder and configures the converter with language properties. */
     public LanguageBuilder() {
         converter.setSelectedProperties(PROPERTIES);
     }

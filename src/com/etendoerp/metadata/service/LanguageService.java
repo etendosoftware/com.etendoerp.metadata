@@ -26,10 +26,14 @@ import org.openbravo.dal.core.OBContext;
 
 import com.etendoerp.metadata.builders.LanguageBuilder;
 
-/**
- * @author luuchorocha
- */
+/** Serves GET /meta/language with available system languages. */
 public class LanguageService extends MetadataService {
+    /**
+     * Creates a new LanguageService for the given request/response pair.
+     *
+     * @param request  the HTTP request
+     * @param response the HTTP response
+     */
     public LanguageService(HttpServletRequest request, HttpServletResponse response) {
         super(request, response);
     }

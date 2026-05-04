@@ -106,14 +106,7 @@ public class TabServiceTest extends BaseMetadataServiceTest {
             String responseContent = responseWriter.toString();
             assertNotNull("Response content should not be null", responseContent);
             assertFalse("Response should not be empty", responseContent.trim().isEmpty());
-
-            try {
-                JSONObject jsonResponse = new JSONObject(responseContent);
-                assertNotNull("JSON response should be parseable", jsonResponse);
-            } catch (Exception e) {
-                // If JSON parsing fails, the process still completed successfully
-                assertTrue("Process should complete without throwing exceptions", true);
-            }
+            validateJsonResponse(responseContent);
         } catch (NotFoundException e) {
             // This is expected if the tab doesn't exist in the test database
             assertTrue("NotFoundException is expected for non-existent tabs", true);
@@ -127,6 +120,16 @@ public class TabServiceTest extends BaseMetadataServiceTest {
         }
     }
 
+
+    private void validateJsonResponse(String responseContent) {
+        try {
+            JSONObject jsonResponse = new JSONObject(responseContent);
+            assertNotNull("JSON response should be parseable", jsonResponse);
+        } catch (Exception e) {
+            // If JSON parsing fails, the process still completed successfully
+            assertTrue("Process should complete without throwing exceptions", true);
+        }
+    }
 
     /**
      * Verifies that processing a request with an invalid tab identifier fails.
