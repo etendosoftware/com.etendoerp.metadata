@@ -16,10 +16,6 @@ sourceSets {
     }
 }
 
-tasks.named("compileTestJava") {
-    dependsOn("jar")
-}
-
 publishing {
     publications {
         "com.etendoerp.metadata"(MavenPublication) {
