@@ -153,6 +153,7 @@ class QueryListResolverCoverageTest {
      */
     @FunctionalInterface
     private interface ResolverTestAction {
+        @SuppressWarnings("java:S112")
         void execute() throws Exception;
     }
 

@@ -58,6 +58,7 @@ class DashboardLayoutResolverTest {
 
     @FunctionalInterface
     private interface ResolverAction {
+        @SuppressWarnings("java:S112")
         void execute(DashboardLayoutResolver resolver) throws Exception;
     }
 

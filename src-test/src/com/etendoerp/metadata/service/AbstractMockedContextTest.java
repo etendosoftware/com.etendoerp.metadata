@@ -71,6 +71,8 @@ abstract class AbstractMockedContextTest {
 
     @FunctionalInterface
     interface ThrowingRunnable {
+        /** Executes the test action, allowing checked exceptions for test convenience. */
+        @SuppressWarnings("java:S112")
         void run() throws Exception;
     }
 }

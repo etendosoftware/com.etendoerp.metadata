@@ -59,6 +59,7 @@ class CopilotResolverCoverageTest {
 
     @FunctionalInterface
     private interface ThrowingRunnable {
+        @SuppressWarnings("java:S112")
         void run() throws Exception;
     }
 

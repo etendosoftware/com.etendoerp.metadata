@@ -97,6 +97,8 @@ class DashboardServiceCoverageTest {
 
     @FunctionalInterface
     interface MockedAction {
+        /** Executes the test action, allowing checked exceptions for test convenience. */
+        @SuppressWarnings("java:S112")
         void run() throws Exception;
     }
 
@@ -157,27 +159,6 @@ class DashboardServiceCoverageTest {
         return nq;
     }
 
-    @SuppressWarnings("unchecked")
-    private void mockDeleteShadowQuery() {
-        Query<Object> deleteQ = mock(Query.class);
-        doReturn(deleteQ).when(session).createQuery((String) argThat(s -> s != null && ((String) s).contains("delete from etmeta_Dashboard_Widget")));
-        when(deleteQ.setParameter(anyString(), any())).thenReturn(deleteQ);
-        when(deleteQ.executeUpdate()).thenReturn(0);
-    }
-
-    @SuppressWarnings("unchecked")
-    private void mockExistsCountQuery(long count) {
-        Query<Long> existsQ = mock(Query.class);
-        doReturn(existsQ).when(session).createQuery((String) argThat(s -> s != null && ((String) s).contains("select count(dw)")),
-                eq(Long.class));
-        when(existsQ.setParameter(anyString(), any())).thenReturn(existsQ);
-        when(existsQ.uniqueResult()).thenReturn(count);
-    }
-
-    private void mockPostWidgetQueries(long existsCount) {
-        mockDeleteShadowQuery();
-        mockExistsCountQuery(existsCount);
-    }
 
     @SuppressWarnings("unchecked")
     private void mockUpdateLayoutQuery(int updateCount) {
@@ -408,6 +389,28 @@ class DashboardServiceCoverageTest {
 
     @Nested
     class PostWidgetTests {
+
+        @SuppressWarnings("unchecked")
+        private void mockDeleteShadowQuery() {
+            Query<Object> deleteQ = mock(Query.class);
+            doReturn(deleteQ).when(session).createQuery((String) argThat(s -> s != null && ((String) s).contains("delete from etmeta_Dashboard_Widget")));
+            when(deleteQ.setParameter(anyString(), any())).thenReturn(deleteQ);
+            when(deleteQ.executeUpdate()).thenReturn(0);
+        }
+
+        @SuppressWarnings("unchecked")
+        private void mockExistsCountQuery(long count) {
+            Query<Long> existsQ = mock(Query.class);
+            doReturn(existsQ).when(session).createQuery((String) argThat(s -> s != null && ((String) s).contains("select count(dw)")),
+                    eq(Long.class));
+            when(existsQ.setParameter(anyString(), any())).thenReturn(existsQ);
+            when(existsQ.uniqueResult()).thenReturn(count);
+        }
+
+        private void mockPostWidgetQueries(long existsCount) {
+            mockDeleteShadowQuery();
+            mockExistsCountQuery(existsCount);
+        }
 
         private StringWriter setupPostWidget(String classId, JSONObject params, boolean isAdmin) throws Exception {
             StringWriter sw = prepareWriter();
