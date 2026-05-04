@@ -28,7 +28,7 @@ class WidgetDataResponseTest {
 
     private static final String INSTANCE_ID = "inst-001";
     private static final String TYPE = "KPI";
-    private static final String TOTAL_ROWS = TOTAL_ROWS;
+    private static final String TOTAL_ROWS = "totalRows";
 
     @Test
     void buildWithTotalRowsReturnsCompleteEnvelope() throws Exception {

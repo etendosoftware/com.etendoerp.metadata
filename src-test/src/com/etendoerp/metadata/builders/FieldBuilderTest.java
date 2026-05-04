@@ -151,8 +151,8 @@ class FieldBuilderTest {
   private static final String SELECTOR_ID = "selector-id";
   private static final String STARTS_WITH = "startsWith";
   private static final String EXACT = "exact";
-  private static final String TEST_DB_TABLE = TEST_DB_TABLE;
-  private static final String TEST_DB_COLUMN = TEST_DB_COLUMN;
+  private static final String TEST_DB_TABLE = "test_table";
+  private static final String TEST_DB_COLUMN = "test_column";
   private static final String ALIAS_FIELD = "aliasField";
   private static final String PROP_FIELD = "propField";
   private static final String SEL_ID = "sel-id";

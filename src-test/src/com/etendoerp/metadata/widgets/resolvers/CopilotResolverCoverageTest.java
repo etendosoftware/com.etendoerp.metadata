@@ -26,20 +26,21 @@ import org.apache.http.impl.client.HttpClients;
 import org.codehaus.jettison.json.JSONObject;
 import org.hibernate.Session;
 import org.hibernate.query.NativeQuery;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-import org.openbravo.base.structure.BaseOBObject;
+import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.access.User;
 import org.openbravo.model.ad.system.Client;
-import org.openbravo.dal.core.OBContext;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -56,57 +57,88 @@ class CopilotResolverCoverageTest {
 
     private static final String MESSAGES = "messages";
 
+    @FunctionalInterface
+    private interface ThrowingRunnable {
+        void run() throws Exception;
+    }
+
+    private CopilotResolver resolver;
+
+    @BeforeEach
+    void setUp() {
+        resolver = new CopilotResolver();
+    }
+
+    /**
+     * Sets up OBDal/Session/NativeQuery mocks with the given query result,
+     * then executes the assertion within a MockedStatic scope.
+     */
+    private void withDalQueryReturning(Object queryResult, Consumer<CopilotResolver> assertion) {
+        OBDal mockDal = mock(OBDal.class);
+        Session mockSession = mock(Session.class);
+        NativeQuery<?> mockQuery = mock(NativeQuery.class);
+        when(mockDal.getSession()).thenReturn(mockSession);
+        when(mockSession.createNativeQuery(anyString())).thenReturn(mockQuery);
+        when(mockQuery.uniqueResult()).thenReturn(queryResult);
+
+        try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class)) {
+            dalMock.when(OBDal::getInstance).thenReturn(mockDal);
+            assertion.accept(resolver);
+        }
+    }
+
+    /**
+     * Configures the WidgetDataContext with OBContext user/client mocks.
+     */
+    private void setupCtxWithObContext(WidgetDataContext ctx, String userId, String clientId) {
+        OBContext mockObContext = mock(OBContext.class);
+        User mockUser = mock(User.class);
+        Client mockOBClient = mock(Client.class);
+        when(ctx.getObContext()).thenReturn(mockObContext);
+        when(mockObContext.getUser()).thenReturn(mockUser);
+        when(mockUser.getId()).thenReturn(userId);
+        when(mockObContext.getCurrentClient()).thenReturn(mockOBClient);
+        when(mockOBClient.getId()).thenReturn(clientId);
+    }
+
+    /**
+     * Sets up HTTP client mocks for a given response body and executes the
+     * assertion within a MockedStatic scope for HttpClients.
+     */
+    private void withHttpPostReturning(String responseBody, ThrowingRunnable assertion) throws Exception {
+        CloseableHttpClient mockHttpClient = mock(CloseableHttpClient.class);
+        CloseableHttpResponse mockResponse = mock(CloseableHttpResponse.class);
+        HttpEntity mockEntity = mock(HttpEntity.class);
+        when(mockHttpClient.execute(any(HttpPost.class))).thenReturn(mockResponse);
+        when(mockResponse.getEntity()).thenReturn(mockEntity);
+        when(mockEntity.getContent()).thenReturn(
+                new ByteArrayInputStream(responseBody.getBytes(StandardCharsets.UTF_8)));
+        when(mockEntity.getContentLength()).thenReturn((long) responseBody.length());
+
+        try (MockedStatic<HttpClients> httpMock = mockStatic(HttpClients.class)) {
+            httpMock.when(HttpClients::createDefault).thenReturn(mockHttpClient);
+            assertion.run();
+        }
+    }
+
     @Test
     void getTypeReturnsCopilot() {
-        assertEquals("COPILOT", new CopilotResolver().getType());
+        assertEquals("COPILOT", resolver.getType());
     }
 
     @Test
     void isAvailableReturnsTrueWhenCopilotModuleExists() {
-        OBDal mockDal = mock(OBDal.class);
-        Session mockSession = mock(Session.class);
-        NativeQuery<?> mockQuery = mock(NativeQuery.class);
-
-        when(mockDal.getSession()).thenReturn(mockSession);
-        when(mockSession.createNativeQuery(anyString())).thenReturn(mockQuery);
-        when(mockQuery.uniqueResult()).thenReturn(1L);
-
-        try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class)) {
-            dalMock.when(OBDal::getInstance).thenReturn(mockDal);
-            assertTrue(new CopilotResolver().isAvailable());
-        }
+        withDalQueryReturning(1L, r -> assertTrue(r.isAvailable()));
     }
 
     @Test
     void isAvailableReturnsFalseWhenCountIsZero() {
-        OBDal mockDal = mock(OBDal.class);
-        Session mockSession = mock(Session.class);
-        NativeQuery<?> mockQuery = mock(NativeQuery.class);
-
-        when(mockDal.getSession()).thenReturn(mockSession);
-        when(mockSession.createNativeQuery(anyString())).thenReturn(mockQuery);
-        when(mockQuery.uniqueResult()).thenReturn(0L);
-
-        try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class)) {
-            dalMock.when(OBDal::getInstance).thenReturn(mockDal);
-            assertFalse(new CopilotResolver().isAvailable());
-        }
+        withDalQueryReturning(0L, r -> assertFalse(r.isAvailable()));
     }
 
     @Test
     void isAvailableReturnsFalseWhenCountIsNull() {
-        OBDal mockDal = mock(OBDal.class);
-        Session mockSession = mock(Session.class);
-        NativeQuery<?> mockQuery = mock(NativeQuery.class);
-
-        when(mockDal.getSession()).thenReturn(mockSession);
-        when(mockSession.createNativeQuery(anyString())).thenReturn(mockQuery);
-        when(mockQuery.uniqueResult()).thenReturn(null);
-
-        try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class)) {
-            dalMock.when(OBDal::getInstance).thenReturn(mockDal);
-            assertFalse(new CopilotResolver().isAvailable());
-        }
+        withDalQueryReturning(null, r -> assertFalse(r.isAvailable()));
     }
 
     @Test
@@ -114,7 +146,7 @@ class CopilotResolverCoverageTest {
         WidgetDataContext ctx = mock(WidgetDataContext.class);
         when(ctx.classString("3")).thenReturn(null);
 
-        JSONObject result = new CopilotResolver().resolve(ctx);
+        JSONObject result = resolver.resolve(ctx);
         assertTrue(result.has(MESSAGES));
         assertEquals(0, result.getJSONArray(MESSAGES).length());
     }
@@ -124,37 +156,17 @@ class CopilotResolverCoverageTest {
         WidgetDataContext ctx = mock(WidgetDataContext.class);
         when(ctx.classString("3")).thenReturn("http://copilot.example.com/api/suggest");
         when(ctx.getBearerToken()).thenReturn("Bearer test-token-123");
-
-        OBContext mockObContext = mock(OBContext.class);
-        User mockUser = mock(User.class);
-        Client mockOBClient = mock(Client.class);
-        when(ctx.getObContext()).thenReturn(mockObContext);
-        when(mockObContext.getUser()).thenReturn(mockUser);
-        when(mockUser.getId()).thenReturn("user-1");
-        when(mockObContext.getCurrentClient()).thenReturn(mockOBClient);
-        when(mockOBClient.getId()).thenReturn("client-1");
+        setupCtxWithObContext(ctx, "user-1", "client-1");
 
         String responseBody = "{\"messages\":[{\"role\":\"assistant\",\"content\":\"Hello\"}]}";
 
-        CloseableHttpClient mockHttpClient = mock(CloseableHttpClient.class);
-        CloseableHttpResponse mockResponse = mock(CloseableHttpResponse.class);
-        HttpEntity mockEntity = mock(HttpEntity.class);
-
-        when(mockHttpClient.execute(any(HttpPost.class))).thenReturn(mockResponse);
-        when(mockResponse.getEntity()).thenReturn(mockEntity);
-        when(mockEntity.getContent()).thenReturn(
-                new ByteArrayInputStream(responseBody.getBytes(StandardCharsets.UTF_8)));
-        when(mockEntity.getContentLength()).thenReturn((long) responseBody.length());
-
-        try (MockedStatic<HttpClients> httpMock = mockStatic(HttpClients.class)) {
-            httpMock.when(HttpClients::createDefault).thenReturn(mockHttpClient);
-
-            JSONObject result = new CopilotResolver().resolve(ctx);
+        withHttpPostReturning(responseBody, () -> {
+            JSONObject result = resolver.resolve(ctx);
             assertTrue(result.has(MESSAGES));
             assertEquals(1, result.getJSONArray(MESSAGES).length());
             assertEquals("Hello",
                     result.getJSONArray(MESSAGES).getJSONObject(0).getString("content"));
-        }
+        });
     }
 
     @Test
@@ -162,33 +174,13 @@ class CopilotResolverCoverageTest {
         WidgetDataContext ctx = mock(WidgetDataContext.class);
         when(ctx.classString("3")).thenReturn("http://copilot.example.com/api/suggest");
         when(ctx.getBearerToken()).thenReturn(null);
-
-        OBContext mockObContext = mock(OBContext.class);
-        User mockUser = mock(User.class);
-        Client mockOBClient = mock(Client.class);
-        when(ctx.getObContext()).thenReturn(mockObContext);
-        when(mockObContext.getUser()).thenReturn(mockUser);
-        when(mockUser.getId()).thenReturn("user-2");
-        when(mockObContext.getCurrentClient()).thenReturn(mockOBClient);
-        when(mockOBClient.getId()).thenReturn("client-2");
+        setupCtxWithObContext(ctx, "user-2", "client-2");
 
         String responseBody = "{\"status\":\"ok\"}";
 
-        CloseableHttpClient mockHttpClient = mock(CloseableHttpClient.class);
-        CloseableHttpResponse mockResponse = mock(CloseableHttpResponse.class);
-        HttpEntity mockEntity = mock(HttpEntity.class);
-
-        when(mockHttpClient.execute(any(HttpPost.class))).thenReturn(mockResponse);
-        when(mockResponse.getEntity()).thenReturn(mockEntity);
-        when(mockEntity.getContent()).thenReturn(
-                new ByteArrayInputStream(responseBody.getBytes(StandardCharsets.UTF_8)));
-        when(mockEntity.getContentLength()).thenReturn((long) responseBody.length());
-
-        try (MockedStatic<HttpClients> httpMock = mockStatic(HttpClients.class)) {
-            httpMock.when(HttpClients::createDefault).thenReturn(mockHttpClient);
-
-            JSONObject result = new CopilotResolver().resolve(ctx);
+        withHttpPostReturning(responseBody, () -> {
+            JSONObject result = resolver.resolve(ctx);
             assertEquals("ok", result.getString("status"));
-        }
+        });
     }
 }

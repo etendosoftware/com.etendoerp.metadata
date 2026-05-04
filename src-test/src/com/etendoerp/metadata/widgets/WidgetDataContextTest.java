@@ -33,7 +33,7 @@ class WidgetDataContextTest {
 
     private static final String INSTANCE_ID = "inst-001";
     private static final String BEARER = "Bearer tok123";
-    private static final String COLOR = COLOR;
+    private static final String COLOR = "color";
 
     private WidgetDataContext buildContext() {
         Map<String, Object> instanceData = new HashMap<>();

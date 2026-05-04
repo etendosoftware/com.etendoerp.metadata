@@ -36,7 +36,7 @@ public class NotificationResolver implements WidgetDataResolver {
     @Override
     public boolean isAvailable() {
         try {
-            org.openbravo.dal.service.OBDal.getInstance().getSession()
+            OBDal.getInstance().getSession()
                 .createQuery("select 1 from AN_Note n where 1=0", Integer.class);
             return true;
         } catch (Exception e) {
@@ -52,23 +52,45 @@ public class NotificationResolver implements WidgetDataResolver {
     private static final String COUNT_HQL =
         "select count(n) from AN_Note n where n.userContact.id = :userId and n.isactive = 'Y'";
 
+    private static final String PARAM_USER_ID = "userId";
+
     @Override
     public JSONObject resolve(WidgetDataContext ctx) throws Exception {
         try {
+            return fetchNotifications(ctx);
+        } catch (Exception e) {
+            // AN_Note may not be mapped if the notifications module is not installed
+            return emptyResult();
+        }
+    }
+
+    private JSONObject fetchNotifications(WidgetDataContext ctx) throws Exception {
         String userId = ctx.getObContext().getUser().getId();
         int limit = parseIntParam(ctx.param("rowsNumber"), 10);
 
+        List<Object[]> rows = executeItemsQuery(userId, limit);
+        Long total = executeCountQuery(userId);
+
+        JSONArray items = buildItemsArray(rows);
+        return new JSONObject().put("items", items).put("totalCount", total != null ? total : 0);
+    }
+
+    private List<Object[]> executeItemsQuery(String userId, int limit) {
         Query<Object[]> q = OBDal.getInstance().getSession()
                 .createQuery(ITEMS_HQL, Object[].class);
-        q.setParameter("userId", userId);
+        q.setParameter(PARAM_USER_ID, userId);
         q.setMaxResults(limit);
-        List<Object[]> rows = q.list();
+        return q.list();
+    }
 
+    private Long executeCountQuery(String userId) {
         Query<Long> countQ = OBDal.getInstance().getSession()
                 .createQuery(COUNT_HQL, Long.class);
-        countQ.setParameter("userId", userId);
-        Long total = countQ.uniqueResult();
+        countQ.setParameter(PARAM_USER_ID, userId);
+        return countQ.uniqueResult();
+    }
 
+    private JSONArray buildItemsArray(List<Object[]> rows) throws Exception {
         JSONArray items = new JSONArray();
         for (Object[] row : rows) {
             items.put(new JSONObject()
@@ -76,11 +98,11 @@ public class NotificationResolver implements WidgetDataResolver {
                     .put("priority", mapPriority(row[1]))
                     .put("time",     row[2] != null ? row[2].toString() : null));
         }
-        return new JSONObject().put("items", items).put("totalCount", total != null ? total : 0);
-        } catch (Exception e) {
-            // AN_Note may not be mapped if the notifications module is not installed
-            return new JSONObject().put("items", new JSONArray()).put("totalCount", 0);
-        }
+        return items;
+    }
+
+    private JSONObject emptyResult() throws Exception {
+        return new JSONObject().put("items", new JSONArray()).put("totalCount", 0);
     }
 
     private String mapPriority(Object raw) {

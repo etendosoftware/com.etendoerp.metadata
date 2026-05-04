@@ -20,20 +20,11 @@ package com.etendoerp.metadata.service;
 import com.etendoerp.metadata.widgets.WidgetDataResolver;
 import com.etendoerp.metadata.widgets.WidgetResolverRegistry;
 import org.codehaus.jettison.json.JSONObject;
-import org.hibernate.Session;
 import org.hibernate.query.Query;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.openbravo.dal.core.OBContext;
-import org.openbravo.dal.service.OBDal;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.util.Collections;
 import java.util.HashMap;
 
@@ -43,44 +34,35 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class WidgetDataServiceTest {
-
-    @Mock HttpServletRequest  request;
-    @Mock HttpServletResponse response;
-    @Mock OBContext obContext;
-    @Mock OBDal     obDal;
-    @Mock Session   session;
+class WidgetDataServiceTest extends AbstractMockedContextTest {
 
     @SuppressWarnings("unchecked")
+    private Query<Object[]> createStubQuery(Object result, boolean isList) {
+        Query<Object[]> q = mock(Query.class);
+        when(q.setParameter(anyString(), any())).thenReturn(q);
+        if (isList) {
+            when(q.list()).thenReturn(result == null ? Collections.emptyList() : (java.util.List<Object[]>) result);
+        } else {
+            when(q.uniqueResult()).thenReturn((Object[]) result);
+        }
+        return q;
+    }
+
     @Test
     void processDelegatesToRegistryResolver() throws Exception {
-        StringWriter sw = new StringWriter();
-        when(response.getWriter()).thenReturn(new PrintWriter(sw));
         when(request.getPathInfo()).thenReturn("/widget/some-instance-id/data");
         when(request.getHeader("Authorization")).thenReturn("Bearer tok");
         when(request.getParameterMap()).thenReturn(new HashMap<>());
 
-        // Instance row: [id, classId, paramsJson]
         Object[] instanceRow = { "some-instance-id", "cls1", null };
-        // Class row: [id, type, resolverClass, externalDataUrl, hqlQuery]
         Object[] classRow    = { "cls1", "KPI", null, null, null };
 
-        Query<Object[]> instanceQuery = mock(Query.class);
-        Query<Object[]> classQuery    = mock(Query.class);
-        Query<Object[]> paramsQuery   = mock(Query.class);
-
-        when(instanceQuery.setParameter(anyString(), any())).thenReturn(instanceQuery);
-        when(instanceQuery.uniqueResult()).thenReturn(instanceRow);
-
-        when(classQuery.setParameter(anyString(), any())).thenReturn(classQuery);
-        when(classQuery.uniqueResult()).thenReturn(classRow);
-
-        when(paramsQuery.setParameter(anyString(), any())).thenReturn(paramsQuery);
-        when(paramsQuery.list()).thenReturn(Collections.emptyList());
+        Query<Object[]> instanceQuery = createStubQuery(instanceRow, false);
+        Query<Object[]> classQuery    = createStubQuery(classRow, false);
+        Query<Object[]> paramsQuery   = createStubQuery(null, true);
 
         when(session.createQuery(argThat(s -> s != null && s.contains("etmeta_Dashboard_Widget")), eq(Object[].class)))
                 .thenReturn(instanceQuery);
@@ -95,21 +77,16 @@ class WidgetDataServiceTest {
         when(mockResolver.isAvailable()).thenReturn(true);
         when(mockResolver.resolve(any())).thenReturn(mockData);
 
-        try (MockedStatic<OBContext> ctxStatic = mockStatic(OBContext.class);
-             MockedStatic<OBDal>     dalStatic = mockStatic(OBDal.class)) {
-            ctxStatic.when(OBContext::getOBContext).thenReturn(obContext);
-            dalStatic.when(OBDal::getInstance).thenReturn(obDal);
-            when(obDal.getSession()).thenReturn(session);
-
+        runWithMockedContext(() -> {
             WidgetDataService svc = new WidgetDataService(request, response);
             WidgetResolverRegistry registry = new WidgetResolverRegistry();
             registry.register(mockResolver);
             svc.setRegistry(registry);
             svc.process();
 
-            String out = sw.toString();
-            assertTrue(out.contains("widgetInstanceId"));
-            assertTrue(out.contains("95"));
-        }
+            String output = responseCapture.toString();
+            assertTrue(output.contains("widgetInstanceId"));
+            assertTrue(output.contains("95"));
+        });
     }
 }

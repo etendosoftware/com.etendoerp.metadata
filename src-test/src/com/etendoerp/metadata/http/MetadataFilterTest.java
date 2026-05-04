@@ -71,9 +71,9 @@ public class MetadataFilterTest extends WeldBaseTest {
   private static final String FORWARD_SALES_ORDER_HEADER_HTML = "/etendo/meta/forward/SalesOrder/Header.html";
   private static final String HANDLE_EXCEPTION = "handleException";
   private static final String DETERMINE_WANTS_HTML = "determineWantsHtml";
-  private static final String ISC_DATA_FORMAT = ISC_DATA_FORMAT;
-  private static final String ETENDO_META_ERROR = ETENDO_META_ERROR;
-  private static final String BUILD_HTML_ERROR = BUILD_HTML_ERROR;
+  private static final String ISC_DATA_FORMAT = "isc_dataFormat";
+  private static final String ETENDO_META_ERROR = "Etendo Meta Error";
+  private static final String BUILD_HTML_ERROR = "buildHtmlError";
 
   @Override
   @Before

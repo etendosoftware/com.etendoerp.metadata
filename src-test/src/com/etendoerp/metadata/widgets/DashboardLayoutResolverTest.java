@@ -56,71 +56,67 @@ class DashboardLayoutResolverTest {
     @Mock Client mockClient;
     @Mock Role mockRole;
 
-    @SuppressWarnings("unchecked")
-    @Test
-    void resolveUserLayerOverridesSystem() throws Exception {
-        // SYSTEM row for widget class "wc1"
-        Object[] systemRow = { "sys-instance-id", "wc1", "SYSTEM", null, 0, 0, 2, 1, true, 10, null };
-        // USER row for same widget class
-        Object[] userRow   = { "usr-instance-id", "wc1", "USER",   USER_123, 1, 0, 2, 1, true, 10, null };
+    @FunctionalInterface
+    private interface ResolverAction {
+        void execute(DashboardLayoutResolver resolver) throws Exception;
+    }
 
+    @SuppressWarnings("unchecked")
+    private void setupQueryMock(List<Object[]> rows) {
         Query<Object[]> mockQuery = mock(Query.class);
         when(mockSession.createQuery(anyString(), eq(Object[].class))).thenReturn(mockQuery);
         when(mockQuery.setParameter(anyString(), any())).thenReturn(mockQuery);
-        when(mockQuery.list()).thenReturn(Arrays.asList(systemRow, userRow));
+        when(mockQuery.list()).thenReturn(rows);
+    }
 
+    private void setupContextMocks() {
         when(mockContext.getUser()).thenReturn(mockUser);
         when(mockUser.getId()).thenReturn(USER_123);
         when(mockContext.getCurrentClient()).thenReturn(mockClient);
         when(mockClient.getId()).thenReturn("client-123");
         when(mockContext.getRole()).thenReturn(mockRole);
         when(mockRole.getId()).thenReturn("role-123");
+    }
 
+    private void executeWithStaticMocks(ResolverAction action) throws Exception {
         try (MockedStatic<OBContext> ctxStatic = mockStatic(OBContext.class);
              MockedStatic<OBDal> dalStatic = mockStatic(OBDal.class)) {
             ctxStatic.when(OBContext::getOBContext).thenReturn(mockContext);
             dalStatic.when(OBDal::getInstance).thenReturn(mockOBDal);
             when(mockOBDal.getSession()).thenReturn(mockSession);
+            action.execute(new DashboardLayoutResolver());
+        }
+    }
 
-            DashboardLayoutResolver resolver = new DashboardLayoutResolver();
+    private void runResolveTest(List<Object[]> rows, ResolverAction assertions) throws Exception {
+        setupQueryMock(rows);
+        setupContextMocks();
+        executeWithStaticMocks(assertions);
+    }
+
+    @Test
+    void resolveUserLayerOverridesSystem() throws Exception {
+        Object[] systemRow = { "sys-instance-id", "wc1", "SYSTEM", null, 0, 0, 2, 1, true, 10, null };
+        Object[] userRow   = { "usr-instance-id", "wc1", "USER",   USER_123, 1, 0, 2, 1, true, 10, null };
+
+        runResolveTest(Arrays.asList(systemRow, userRow), resolver -> {
             JSONArray result = resolver.resolve();
-
             // Only 1 entry per widget class — USER layer wins
             assertEquals(1, result.length());
             JSONObject entry = result.getJSONObject(0);
             assertEquals("usr-instance-id", entry.getString("instanceId"));
             assertEquals("USER", entry.getString("layer"));
-        }
+        });
     }
 
     @Test
     void resolveSystemRowUsedWhenNoOverride() throws Exception {
         Object[] systemRow = { "sys-id", "wc1", "SYSTEM", null, 0, 0, 2, 1, true, 10, null };
 
-        @SuppressWarnings("unchecked")
-        Query<Object[]> mockQuery = mock(Query.class);
-        when(mockSession.createQuery(anyString(), eq(Object[].class))).thenReturn(mockQuery);
-        when(mockQuery.setParameter(anyString(), any())).thenReturn(mockQuery);
-        when(mockQuery.list()).thenReturn(Collections.singletonList(systemRow));
-
-        when(mockContext.getUser()).thenReturn(mockUser);
-        when(mockUser.getId()).thenReturn(USER_123);
-        when(mockContext.getCurrentClient()).thenReturn(mockClient);
-        when(mockClient.getId()).thenReturn("client-123");
-        when(mockContext.getRole()).thenReturn(mockRole);
-        when(mockRole.getId()).thenReturn("role-123");
-
-        try (MockedStatic<OBContext> ctxStatic = mockStatic(OBContext.class);
-             MockedStatic<OBDal> dalStatic = mockStatic(OBDal.class)) {
-            ctxStatic.when(OBContext::getOBContext).thenReturn(mockContext);
-            dalStatic.when(OBDal::getInstance).thenReturn(mockOBDal);
-            when(mockOBDal.getSession()).thenReturn(mockSession);
-
-            DashboardLayoutResolver resolver = new DashboardLayoutResolver();
+        runResolveTest(Collections.singletonList(systemRow), resolver -> {
             JSONArray result = resolver.resolve();
-
             assertEquals(1, result.length());
             assertEquals("sys-id", result.getJSONObject(0).getString("instanceId"));
-        }
+        });
     }
 }

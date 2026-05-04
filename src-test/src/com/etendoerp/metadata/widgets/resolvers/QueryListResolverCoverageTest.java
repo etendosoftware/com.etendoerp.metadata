@@ -18,7 +18,6 @@
 package com.etendoerp.metadata.widgets.resolvers;
 
 import com.etendoerp.metadata.widgets.WidgetDataContext;
-import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONObject;
 import org.hibernate.Session;
 import org.hibernate.query.Query;
@@ -46,7 +45,6 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -80,6 +78,8 @@ class QueryListResolverCoverageTest {
     private static final String TEST_ORDER = "Test Order";
     private static final String ORGANIZATION_LIST = "organizationList";
     private static final String CLIENT_1 = "client-1";
+    private static final String ROWS = "rows";
+    private static final String NAME = "name";
 
     private QueryListResolver resolver;
 
@@ -94,7 +94,7 @@ class QueryListResolverCoverageTest {
     }
 
     // -------------------------------------------------------
-    // Helper: build a WidgetDataContext using real constructor
+    // Helpers
     // -------------------------------------------------------
 
     private WidgetDataContext buildCtx(String hql,
@@ -132,6 +132,69 @@ class QueryListResolverCoverageTest {
         return q;
     }
 
+    @SuppressWarnings("unchecked")
+    private Query<Object[]> mockQueryWithNamedParams(List<Object[]> rows, String... paramNames) {
+        Query<Object[]> q = mock(Query.class);
+        when(q.list()).thenReturn(rows);
+        when(q.setFirstResult(anyInt())).thenReturn(q);
+        when(q.setMaxResults(anyInt())).thenReturn(q);
+        Set<Parameter<?>> paramSet = new HashSet<>();
+        for (String name : paramNames) {
+            Parameter<?> qp = mock(Parameter.class);
+            when(qp.getName()).thenReturn(name);
+            paramSet.add(qp);
+        }
+        doReturn(paramSet).when(q).getParameters();
+        return q;
+    }
+
+    /**
+     * Functional interface for test logic that runs inside the OBDal mock scope.
+     */
+    @FunctionalInterface
+    private interface ResolverTestAction {
+        void execute() throws Exception;
+    }
+
+    /**
+     * Sets up the OBDal static mock, registers the row query on the session,
+     * then runs the given test action inside the mock scope.
+     */
+    private void withMockedDal(String hql, Query<Object[]> rowQuery, ResolverTestAction action) throws Exception {
+        when(session.createQuery(eq(hql), eq(Object[].class))).thenReturn(rowQuery);
+        try (MockedStatic<OBDal> dalStatic = mockStatic(OBDal.class)) {
+            dalStatic.when(OBDal::getInstance).thenReturn(obDal);
+            when(obDal.getSession()).thenReturn(session);
+            action.execute();
+        }
+    }
+
+    /**
+     * Overload that also registers a count query for pagination tests.
+     */
+    private void withMockedDal(String hql, Query<Object[]> rowQuery,
+                               Query<Long> countQuery, ResolverTestAction action) throws Exception {
+        when(session.createQuery(eq(hql), eq(Object[].class))).thenReturn(rowQuery);
+        when(session.createQuery(anyString(), eq(Long.class))).thenReturn(countQuery);
+        try (MockedStatic<OBDal> dalStatic = mockStatic(OBDal.class)) {
+            dalStatic.when(OBDal::getInstance).thenReturn(obDal);
+            when(obDal.getSession()).thenReturn(session);
+            action.execute();
+        }
+    }
+
+    private OBContext buildMockOBContext(String clientId, String userId, String[] readableOrgs) {
+        OBContext obContext = mock(OBContext.class);
+        Client client = mock(Client.class);
+        User user = mock(User.class);
+        when(client.getId()).thenReturn(clientId);
+        when(user.getId()).thenReturn(userId);
+        when(obContext.getCurrentClient()).thenReturn(client);
+        when(obContext.getUser()).thenReturn(user);
+        when(obContext.getReadableOrganizations()).thenReturn(readableOrgs);
+        return obContext;
+    }
+
     // -------------------------------------------------------
     // 1. Null HQL returns empty rows
     // -------------------------------------------------------
@@ -141,43 +204,35 @@ class QueryListResolverCoverageTest {
         JSONObject result = resolver.resolve(ctx);
 
         assertEquals(0, result.getInt(TOTAL_ROWS));
-        assertEquals(0, result.getJSONArray("rows").length());
+        assertEquals(0, result.getJSONArray(ROWS).length());
         assertFalse(result.has(COLUMNS));
     }
 
     // -------------------------------------------------------
     // 2. With explicit columns param
     // -------------------------------------------------------
-    @SuppressWarnings("unchecked")
     @Test
     void resolveWithExplicitColumnsParam() throws Exception {
         String hql = "select o.documentNo, o.grandTotalAmount from Order o";
         Map<String, Object> params = new HashMap<>();
         params.put(COLUMNS, "docNo,total");
-
         WidgetDataContext ctx = buildCtx(hql, params, null);
 
-        Object[] row = {SO_001, 500.0};
-        Query<Object[]> mockQuery = mockRowQuery(Collections.singletonList(row));
-        when(session.createQuery(eq(hql), eq(Object[].class))).thenReturn(mockQuery);
+        Query<Object[]> mockQuery = mockRowQuery(Collections.singletonList(new Object[]{SO_001, 500.0}));
 
-        try (MockedStatic<OBDal> dalStatic = mockStatic(OBDal.class)) {
-            dalStatic.when(OBDal::getInstance).thenReturn(obDal);
-            when(obDal.getSession()).thenReturn(session);
-
+        withMockedDal(hql, mockQuery, () -> {
             JSONObject result = resolver.resolve(ctx);
 
             assertEquals(1, result.getInt(TOTAL_ROWS));
-            JSONObject firstRow = result.getJSONArray("rows").getJSONObject(0);
+            JSONObject firstRow = result.getJSONArray(ROWS).getJSONObject(0);
             assertEquals(SO_001, firstRow.getString(DOC_NO));
             assertEquals(500.0, firstRow.getDouble(TOTAL));
 
-            // Column defs should have both columns
-            JSONArray colDefs = result.getJSONArray(COLUMNS);
+            var colDefs = result.getJSONArray(COLUMNS);
             assertEquals(2, colDefs.length());
-            assertEquals(DOC_NO, colDefs.getJSONObject(0).getString("name"));
+            assertEquals(DOC_NO, colDefs.getJSONObject(0).getString(NAME));
             assertEquals("Doc No", colDefs.getJSONObject(0).getString(LABEL));
-        }
+        });
     }
 
     // -------------------------------------------------------
@@ -186,24 +241,16 @@ class QueryListResolverCoverageTest {
     @Test
     void resolveWithoutColumnsExtractsAliases() throws Exception {
         String hql = "select a.documentNo as docNo, b.totalAmount as total from Order a, Line b";
-        Map<String, Object> params = new HashMap<>();
+        WidgetDataContext ctx = buildCtx(hql, new HashMap<>(), null);
 
-        WidgetDataContext ctx = buildCtx(hql, params, null);
+        Query<Object[]> mockQuery = mockRowQuery(Collections.singletonList(new Object[]{"SO-002", 750.0}));
 
-        Object[] row = {"SO-002", 750.0};
-        Query<Object[]> mockQuery = mockRowQuery(Collections.singletonList(row));
-        when(session.createQuery(eq(hql), eq(Object[].class))).thenReturn(mockQuery);
-
-        try (MockedStatic<OBDal> dalStatic = mockStatic(OBDal.class)) {
-            dalStatic.when(OBDal::getInstance).thenReturn(obDal);
-            when(obDal.getSession()).thenReturn(session);
-
+        withMockedDal(hql, mockQuery, () -> {
             JSONObject result = resolver.resolve(ctx);
-
-            JSONObject firstRow = result.getJSONArray("rows").getJSONObject(0);
+            JSONObject firstRow = result.getJSONArray(ROWS).getJSONObject(0);
             assertEquals("SO-002", firstRow.getString(DOC_NO));
             assertEquals(750.0, firstRow.getDouble(TOTAL));
-        }
+        });
     }
 
     // -------------------------------------------------------
@@ -215,28 +262,17 @@ class QueryListResolverCoverageTest {
         Map<String, Object> params = new HashMap<>();
         params.put(PAGE_SIZE, "10");
         params.put("_page", "2");
-
         WidgetDataContext ctx = buildCtx(hql, params, null);
 
-        Object[] row = {"SO-011"};
-        Query<Object[]> mockQuery = mockRowQuery(Collections.singletonList(row));
-        when(session.createQuery(eq(hql), eq(Object[].class))).thenReturn(mockQuery);
-
-        // Count query
+        Query<Object[]> mockQuery = mockRowQuery(Collections.singletonList(new Object[]{"SO-011"}));
         Query<Long> countQ = mockCountQuery(25L);
-        when(session.createQuery(anyString(), eq(Long.class))).thenReturn(countQ);
 
-        try (MockedStatic<OBDal> dalStatic = mockStatic(OBDal.class)) {
-            dalStatic.when(OBDal::getInstance).thenReturn(obDal);
-            when(obDal.getSession()).thenReturn(session);
-
+        withMockedDal(hql, mockQuery, countQ, () -> {
             JSONObject result = resolver.resolve(ctx);
-
             assertEquals(25, result.getInt(TOTAL_ROWS));
-            // page 2, pageSize 10 -> firstResult = 10
             verify(mockQuery).setFirstResult(10);
             verify(mockQuery).setMaxResults(10);
-        }
+        });
     }
 
     // -------------------------------------------------------
@@ -244,26 +280,18 @@ class QueryListResolverCoverageTest {
     // -------------------------------------------------------
     @Test
     void resolveWithRowsNumberSetsMaxResults() throws Exception {
-        String hql = HQL_SELECT_NAME;
         Map<String, Object> params = new HashMap<>();
         params.put("rowsNumber", "5");
+        WidgetDataContext ctx = buildCtx(HQL_SELECT_NAME, params, null);
 
-        WidgetDataContext ctx = buildCtx(hql, params, null);
+        Query<Object[]> mockQuery = mockRowQuery(Collections.singletonList(new Object[]{ORDER_1}));
 
-        Object[] row = {ORDER_1};
-        Query<Object[]> mockQuery = mockRowQuery(Collections.singletonList(row));
-        when(session.createQuery(eq(hql), eq(Object[].class))).thenReturn(mockQuery);
-
-        try (MockedStatic<OBDal> dalStatic = mockStatic(OBDal.class)) {
-            dalStatic.when(OBDal::getInstance).thenReturn(obDal);
-            when(obDal.getSession()).thenReturn(session);
-
+        withMockedDal(HQL_SELECT_NAME, mockQuery, () -> {
             JSONObject result = resolver.resolve(ctx);
-
             assertEquals(1, result.getInt(TOTAL_ROWS));
             verify(mockQuery).setMaxResults(5);
             verify(mockQuery, never()).setFirstResult(anyInt());
-        }
+        });
     }
 
     // -------------------------------------------------------
@@ -274,26 +302,17 @@ class QueryListResolverCoverageTest {
         String hql = "select o.documentNo, o.name, o.total from Order o";
         Map<String, Object> params = new HashMap<>();
         params.put(COLUMNS, "docNo,name");
-
         WidgetDataContext ctx = buildCtx(hql, params, null);
 
-        // Result has 3 columns but only 2 named
-        Object[] row = {SO_001, TEST_ORDER, 100.0};
-        Query<Object[]> mockQuery = mockRowQuery(Collections.singletonList(row));
-        when(session.createQuery(eq(hql), eq(Object[].class))).thenReturn(mockQuery);
+        Query<Object[]> mockQuery = mockRowQuery(Collections.singletonList(new Object[]{SO_001, TEST_ORDER, 100.0}));
 
-        try (MockedStatic<OBDal> dalStatic = mockStatic(OBDal.class)) {
-            dalStatic.when(OBDal::getInstance).thenReturn(obDal);
-            when(obDal.getSession()).thenReturn(session);
-
+        withMockedDal(hql, mockQuery, () -> {
             JSONObject result = resolver.resolve(ctx);
-
-            JSONObject firstRow = result.getJSONArray("rows").getJSONObject(0);
+            JSONObject firstRow = result.getJSONArray(ROWS).getJSONObject(0);
             assertEquals(SO_001, firstRow.getString(DOC_NO));
-            assertEquals(TEST_ORDER, firstRow.getString("name"));
-            // Third column falls back to "col2"
+            assertEquals(TEST_ORDER, firstRow.getString(NAME));
             assertEquals(100.0, firstRow.getDouble("col2"));
-        }
+        });
     }
 
     // -------------------------------------------------------
@@ -304,96 +323,52 @@ class QueryListResolverCoverageTest {
         String hql = "select o.id, o.name from Order o";
         Map<String, Object> params = new HashMap<>();
         params.put(COLUMNS, "orderId,name");
-
         WidgetDataContext ctx = buildCtx(hql, params, null);
 
-        Object[] row = {"123", "Test"};
-        Query<Object[]> mockQuery = mockRowQuery(Collections.singletonList(row));
-        when(session.createQuery(eq(hql), eq(Object[].class))).thenReturn(mockQuery);
+        Query<Object[]> mockQuery = mockRowQuery(Collections.singletonList(new Object[]{"123", "Test"}));
 
-        try (MockedStatic<OBDal> dalStatic = mockStatic(OBDal.class)) {
-            dalStatic.when(OBDal::getInstance).thenReturn(obDal);
-            when(obDal.getSession()).thenReturn(session);
-
+        withMockedDal(hql, mockQuery, () -> {
             JSONObject result = resolver.resolve(ctx);
-
-            JSONArray colDefs = result.getJSONArray(COLUMNS);
-            // "orderId" should be skipped, only "name" remains
+            var colDefs = result.getJSONArray(COLUMNS);
             assertEquals(1, colDefs.length());
-            assertEquals("name", colDefs.getJSONObject(0).getString("name"));
+            assertEquals(NAME, colDefs.getJSONObject(0).getString(NAME));
             assertEquals("Name", colDefs.getJSONObject(0).getString(LABEL));
-        }
+        });
     }
 
     // -------------------------------------------------------
     // 8. bindParams with Collection param -> setParameterList
     // -------------------------------------------------------
-    @SuppressWarnings("unchecked")
     @Test
     void bindParamsUsesSetParameterListForCollections() throws Exception {
         String hql = "select o.name as name from Order o where o.organization.id in (:organizationList)";
         Map<String, Object> params = new HashMap<>();
         params.put(ORGANIZATION_LIST, Arrays.asList("org1", "org2"));
-
         WidgetDataContext ctx = buildCtx(hql, params, null);
 
-        Query<Object[]> mockQuery = mock(Query.class);
-        when(mockQuery.list()).thenReturn(Collections.emptyList());
-        when(mockQuery.setFirstResult(anyInt())).thenReturn(mockQuery);
-        when(mockQuery.setMaxResults(anyInt())).thenReturn(mockQuery);
-
-        // Set up a query parameter named "organizationList"
-        Parameter<?> qp = mock(Parameter.class);
-        when(qp.getName()).thenReturn(ORGANIZATION_LIST);
-        Set<Parameter<?>> paramSet = new HashSet<>();
-        paramSet.add(qp);
-        doReturn(paramSet).when(mockQuery).getParameters();
-
+        Query<Object[]> mockQuery = mockQueryWithNamedParams(Collections.emptyList(), ORGANIZATION_LIST);
         when(session.createQuery(eq(hql), eq(Object[].class))).thenReturn(mockQuery);
 
-        try (MockedStatic<OBDal> dalStatic = mockStatic(OBDal.class)) {
-            dalStatic.when(OBDal::getInstance).thenReturn(obDal);
-            when(obDal.getSession()).thenReturn(session);
-
+        withMockedDal(hql, mockQuery, () -> {
             resolver.resolve(ctx);
-
             verify(mockQuery).setParameterList(eq(ORGANIZATION_LIST), anyCollection());
-        }
+        });
     }
 
     // -------------------------------------------------------
     // 9. bindParams with null param -> uses "%" as default
     // -------------------------------------------------------
-    @SuppressWarnings("unchecked")
     @Test
     void bindParamsUsesPercentForNullValue() throws Exception {
         String hql = "select o.name as name from Order o where o.name like :filter";
-        Map<String, Object> params = new HashMap<>();
-        // "filter" is not in params, so it is null
+        WidgetDataContext ctx = buildCtx(hql, new HashMap<>(), null);
 
-        WidgetDataContext ctx = buildCtx(hql, params, null);
+        Query<Object[]> mockQuery = mockQueryWithNamedParams(Collections.emptyList(), "filter");
 
-        Query<Object[]> mockQuery = mock(Query.class);
-        when(mockQuery.list()).thenReturn(Collections.emptyList());
-        when(mockQuery.setFirstResult(anyInt())).thenReturn(mockQuery);
-        when(mockQuery.setMaxResults(anyInt())).thenReturn(mockQuery);
-
-        Parameter<?> qp = mock(Parameter.class);
-        when(qp.getName()).thenReturn("filter");
-        Set<Parameter<?>> paramSet = new HashSet<>();
-        paramSet.add(qp);
-        doReturn(paramSet).when(mockQuery).getParameters();
-
-        when(session.createQuery(eq(hql), eq(Object[].class))).thenReturn(mockQuery);
-
-        try (MockedStatic<OBDal> dalStatic = mockStatic(OBDal.class)) {
-            dalStatic.when(OBDal::getInstance).thenReturn(obDal);
-            when(obDal.getSession()).thenReturn(session);
-
+        withMockedDal(hql, mockQuery, () -> {
             resolver.resolve(ctx);
-
             verify(mockQuery).setParameter("filter", "%");
-        }
+        });
     }
 
     // -------------------------------------------------------
@@ -401,25 +376,16 @@ class QueryListResolverCoverageTest {
     // -------------------------------------------------------
     @Test
     void resolveWithNullOBContextDoesNotAddContextParams() throws Exception {
-        String hql = HQL_SELECT_NAME;
         Map<String, Object> params = new HashMap<>();
         params.put("customParam", "value1");
+        WidgetDataContext ctx = buildCtx(HQL_SELECT_NAME, params, null);
 
-        WidgetDataContext ctx = buildCtx(hql, params, null);
+        Query<Object[]> mockQuery = mockRowQuery(Collections.singletonList(new Object[]{"Test"}));
 
-        Object[] row = {"Test"};
-        Query<Object[]> mockQuery = mockRowQuery(Collections.singletonList(row));
-        when(session.createQuery(eq(hql), eq(Object[].class))).thenReturn(mockQuery);
-
-        try (MockedStatic<OBDal> dalStatic = mockStatic(OBDal.class)) {
-            dalStatic.when(OBDal::getInstance).thenReturn(obDal);
-            when(obDal.getSession()).thenReturn(session);
-
+        withMockedDal(HQL_SELECT_NAME, mockQuery, () -> {
             JSONObject result = resolver.resolve(ctx);
-
             assertEquals(1, result.getInt(TOTAL_ROWS));
-            // No exception means buildResolvedParams handled null OBContext gracefully
-        }
+        });
     }
 
     // -------------------------------------------------------
@@ -427,76 +393,33 @@ class QueryListResolverCoverageTest {
     // -------------------------------------------------------
     @Test
     void resolveWithOBContextNullReadableOrgs() throws Exception {
-        String hql = HQL_SELECT_NAME;
-        Map<String, Object> params = new HashMap<>();
+        OBContext obContext = buildMockOBContext(CLIENT_1, "user-1", null);
+        WidgetDataContext ctx = buildCtx(HQL_SELECT_NAME, new HashMap<>(), obContext);
 
-        OBContext obContext = mock(OBContext.class);
-        Client client = mock(Client.class);
-        User user = mock(User.class);
-        when(client.getId()).thenReturn(CLIENT_1);
-        when(user.getId()).thenReturn("user-1");
-        when(obContext.getCurrentClient()).thenReturn(client);
-        when(obContext.getUser()).thenReturn(user);
-        when(obContext.getReadableOrganizations()).thenReturn(null);
+        Query<Object[]> mockQuery = mockRowQuery(Collections.singletonList(new Object[]{"Test"}));
 
-        WidgetDataContext ctx = buildCtx(hql, params, obContext);
-
-        Object[] row = {"Test"};
-        Query<Object[]> mockQuery = mockRowQuery(Collections.singletonList(row));
-        when(session.createQuery(eq(hql), eq(Object[].class))).thenReturn(mockQuery);
-
-        try (MockedStatic<OBDal> dalStatic = mockStatic(OBDal.class)) {
-            dalStatic.when(OBDal::getInstance).thenReturn(obDal);
-            when(obDal.getSession()).thenReturn(session);
-
+        withMockedDal(HQL_SELECT_NAME, mockQuery, () -> {
             JSONObject result = resolver.resolve(ctx);
-
             assertEquals(1, result.getInt(TOTAL_ROWS));
-        }
+        });
     }
 
     // -------------------------------------------------------
     // 12. OBContext with valid readableOrganizations
     // -------------------------------------------------------
-    @SuppressWarnings("unchecked")
     @Test
     void resolveWithOBContextAddsClientUserAndOrgs() throws Exception {
         String hql = "select o.name as name from Order o where o.client.id = :client";
-        Map<String, Object> params = new HashMap<>();
+        OBContext obContext = buildMockOBContext(CLIENT_1, "user-1", new String[]{"org-1", "org-2"});
+        WidgetDataContext ctx = buildCtx(hql, new HashMap<>(), obContext);
 
-        OBContext obContext = mock(OBContext.class);
-        Client client = mock(Client.class);
-        User user = mock(User.class);
-        when(client.getId()).thenReturn(CLIENT_1);
-        when(user.getId()).thenReturn("user-1");
-        when(obContext.getCurrentClient()).thenReturn(client);
-        when(obContext.getUser()).thenReturn(user);
-        when(obContext.getReadableOrganizations()).thenReturn(new String[]{"org-1", "org-2"});
+        Query<Object[]> mockQuery = mockQueryWithNamedParams(
+                Collections.singletonList(new Object[]{"Test"}), "client");
 
-        WidgetDataContext ctx = buildCtx(hql, params, obContext);
-
-        Query<Object[]> mockQuery = mock(Query.class);
-        when(mockQuery.list()).thenReturn(Collections.singletonList(new Object[]{"Test"}));
-        when(mockQuery.setFirstResult(anyInt())).thenReturn(mockQuery);
-        when(mockQuery.setMaxResults(anyInt())).thenReturn(mockQuery);
-
-        Parameter<?> qp = mock(Parameter.class);
-        when(qp.getName()).thenReturn("client");
-        Set<Parameter<?>> paramSet = new HashSet<>();
-        paramSet.add(qp);
-        doReturn(paramSet).when(mockQuery).getParameters();
-
-        when(session.createQuery(eq(hql), eq(Object[].class))).thenReturn(mockQuery);
-
-        try (MockedStatic<OBDal> dalStatic = mockStatic(OBDal.class)) {
-            dalStatic.when(OBDal::getInstance).thenReturn(obDal);
-            when(obDal.getSession()).thenReturn(session);
-
+        withMockedDal(hql, mockQuery, () -> {
             resolver.resolve(ctx);
-
-            // Should bind "client" param with CLIENT_1 from OBContext
             verify(mockQuery).setParameter("client", CLIENT_1);
-        }
+        });
     }
 
     // -------------------------------------------------------
@@ -509,25 +432,15 @@ class QueryListResolverCoverageTest {
         Map<String, Object> params = new HashMap<>();
         params.put(PAGE_SIZE, "10");
         params.put(COLUMNS, "status,cnt");
-
         WidgetDataContext ctx = buildCtx(hql, params, null);
 
-        Object[] row = {"COMPLETED", 5L};
-        Query<Object[]> mockQuery = mockRowQuery(Collections.singletonList(row));
-        when(session.createQuery(eq(hql), eq(Object[].class))).thenReturn(mockQuery);
-
-        // The count query should strip group by, having, order by
+        Query<Object[]> mockQuery = mockRowQuery(Collections.singletonList(new Object[]{"COMPLETED", 5L}));
         Query<Long> countQ = mockCountQuery(3L);
-        when(session.createQuery(anyString(), eq(Long.class))).thenReturn(countQ);
 
-        try (MockedStatic<OBDal> dalStatic = mockStatic(OBDal.class)) {
-            dalStatic.when(OBDal::getInstance).thenReturn(obDal);
-            when(obDal.getSession()).thenReturn(session);
-
+        withMockedDal(hql, mockQuery, countQ, () -> {
             JSONObject result = resolver.resolve(ctx);
-
             assertEquals(3, result.getInt(TOTAL_ROWS));
-        }
+        });
     }
 
     // -------------------------------------------------------
@@ -535,27 +448,18 @@ class QueryListResolverCoverageTest {
     // -------------------------------------------------------
     @Test
     void resolveWithPageSizeAndNoFromKeywordReturnsTotalZero() throws Exception {
-        // A degenerate HQL with no FROM keyword at top level
         String hql = "select 1";
         Map<String, Object> params = new HashMap<>();
         params.put(PAGE_SIZE, "10");
         params.put(COLUMNS, "val");
-
         WidgetDataContext ctx = buildCtx(hql, params, null);
 
-        Object[] row = {1};
-        Query<Object[]> mockQuery = mockRowQuery(Collections.singletonList(row));
-        when(session.createQuery(eq(hql), eq(Object[].class))).thenReturn(mockQuery);
+        Query<Object[]> mockQuery = mockRowQuery(Collections.singletonList(new Object[]{1}));
 
-        try (MockedStatic<OBDal> dalStatic = mockStatic(OBDal.class)) {
-            dalStatic.when(OBDal::getInstance).thenReturn(obDal);
-            when(obDal.getSession()).thenReturn(session);
-
+        withMockedDal(hql, mockQuery, () -> {
             JSONObject result = resolver.resolve(ctx);
-
-            // countQuery returns 0 because there is no FROM
             assertEquals(0, result.getInt(TOTAL_ROWS));
-        }
+        });
     }
 
     // -------------------------------------------------------
@@ -564,25 +468,16 @@ class QueryListResolverCoverageTest {
     @Test
     void resolveWithoutColumnsAndNoAliasesUsesColIndex() throws Exception {
         String hql = "select o.documentNo, o.grandTotalAmount from Order o";
-        Map<String, Object> params = new HashMap<>();
+        WidgetDataContext ctx = buildCtx(hql, new HashMap<>(), null);
 
-        WidgetDataContext ctx = buildCtx(hql, params, null);
+        Query<Object[]> mockQuery = mockRowQuery(Collections.singletonList(new Object[]{"SO-003", 300.0}));
 
-        Object[] row = {"SO-003", 300.0};
-        Query<Object[]> mockQuery = mockRowQuery(Collections.singletonList(row));
-        when(session.createQuery(eq(hql), eq(Object[].class))).thenReturn(mockQuery);
-
-        try (MockedStatic<OBDal> dalStatic = mockStatic(OBDal.class)) {
-            dalStatic.when(OBDal::getInstance).thenReturn(obDal);
-            when(obDal.getSession()).thenReturn(session);
-
+        withMockedDal(hql, mockQuery, () -> {
             JSONObject result = resolver.resolve(ctx);
-
-            JSONObject firstRow = result.getJSONArray("rows").getJSONObject(0);
-            // No AS aliases, so should use col0, col1
+            JSONObject firstRow = result.getJSONArray(ROWS).getJSONObject(0);
             assertEquals("SO-003", firstRow.getString("col0"));
             assertEquals(300.0, firstRow.getDouble("col1"));
-        }
+        });
     }
 
     // -------------------------------------------------------
@@ -593,25 +488,18 @@ class QueryListResolverCoverageTest {
         String hql = "select o.x from Order o";
         Map<String, Object> params = new HashMap<>();
         params.put(COLUMNS, "grandTotalAmount,documentNo,x");
-
         WidgetDataContext ctx = buildCtx(hql, params, null);
 
-        Object[] row = {100.0, "SO-1", "val"};
-        Query<Object[]> mockQuery = mockRowQuery(Collections.singletonList(row));
-        when(session.createQuery(eq(hql), eq(Object[].class))).thenReturn(mockQuery);
+        Query<Object[]> mockQuery = mockRowQuery(Collections.singletonList(new Object[]{100.0, "SO-1", "val"}));
 
-        try (MockedStatic<OBDal> dalStatic = mockStatic(OBDal.class)) {
-            dalStatic.when(OBDal::getInstance).thenReturn(obDal);
-            when(obDal.getSession()).thenReturn(session);
-
+        withMockedDal(hql, mockQuery, () -> {
             JSONObject result = resolver.resolve(ctx);
-
-            JSONArray colDefs = result.getJSONArray(COLUMNS);
+            var colDefs = result.getJSONArray(COLUMNS);
             assertEquals(3, colDefs.length());
             assertEquals("Grand Total Amount", colDefs.getJSONObject(0).getString(LABEL));
             assertEquals("Document No", colDefs.getJSONObject(1).getString(LABEL));
             assertEquals("X", colDefs.getJSONObject(2).getString(LABEL));
-        }
+        });
     }
 
     // -------------------------------------------------------
@@ -620,24 +508,16 @@ class QueryListResolverCoverageTest {
     @Test
     void resolveWithSubqueryInSelectExtractsAliasesCorrectly() throws Exception {
         String hql = "select o.name as name, (select count(*) from Line l where l.order = o) as lineCount from Order o";
-        Map<String, Object> params = new HashMap<>();
+        WidgetDataContext ctx = buildCtx(hql, new HashMap<>(), null);
 
-        WidgetDataContext ctx = buildCtx(hql, params, null);
+        Query<Object[]> mockQuery = mockRowQuery(Collections.singletonList(new Object[]{TEST_ORDER, 3L}));
 
-        Object[] row = {TEST_ORDER, 3L};
-        Query<Object[]> mockQuery = mockRowQuery(Collections.singletonList(row));
-        when(session.createQuery(eq(hql), eq(Object[].class))).thenReturn(mockQuery);
-
-        try (MockedStatic<OBDal> dalStatic = mockStatic(OBDal.class)) {
-            dalStatic.when(OBDal::getInstance).thenReturn(obDal);
-            when(obDal.getSession()).thenReturn(session);
-
+        withMockedDal(hql, mockQuery, () -> {
             JSONObject result = resolver.resolve(ctx);
-
-            JSONObject firstRow = result.getJSONArray("rows").getJSONObject(0);
-            assertEquals(TEST_ORDER, firstRow.getString("name"));
+            JSONObject firstRow = result.getJSONArray(ROWS).getJSONObject(0);
+            assertEquals(TEST_ORDER, firstRow.getString(NAME));
             assertEquals(3L, firstRow.getLong("lineCount"));
-        }
+        });
     }
 
     // -------------------------------------------------------
@@ -645,29 +525,18 @@ class QueryListResolverCoverageTest {
     // -------------------------------------------------------
     @Test
     void resolveWithPageSizeDefaultsToPageOne() throws Exception {
-        String hql = HQL_SELECT_NAME;
         Map<String, Object> params = new HashMap<>();
         params.put(PAGE_SIZE, "5");
-        // _page not set -> defaults to 1
-
-        WidgetDataContext ctx = buildCtx(hql, params, null);
+        WidgetDataContext ctx = buildCtx(HQL_SELECT_NAME, params, null);
 
         Query<Object[]> mockQuery = mockRowQuery(Collections.emptyList());
-        when(session.createQuery(eq(hql), eq(Object[].class))).thenReturn(mockQuery);
-
         Query<Long> countQ = mockCountQuery(0L);
-        when(session.createQuery(anyString(), eq(Long.class))).thenReturn(countQ);
 
-        try (MockedStatic<OBDal> dalStatic = mockStatic(OBDal.class)) {
-            dalStatic.when(OBDal::getInstance).thenReturn(obDal);
-            when(obDal.getSession()).thenReturn(session);
-
+        withMockedDal(HQL_SELECT_NAME, mockQuery, countQ, () -> {
             resolver.resolve(ctx);
-
-            // (1 - 1) * 5 = 0
             verify(mockQuery).setFirstResult(0);
             verify(mockQuery).setMaxResults(5);
-        }
+        });
     }
 
     // -------------------------------------------------------
@@ -675,59 +544,35 @@ class QueryListResolverCoverageTest {
     // -------------------------------------------------------
     @Test
     void resolveWithEmptyResultReturnsZeroRows() throws Exception {
-        String hql = HQL_SELECT_NAME;
         Map<String, Object> params = new HashMap<>();
-        params.put(COLUMNS, "name");
-
-        WidgetDataContext ctx = buildCtx(hql, params, null);
+        params.put(COLUMNS, NAME);
+        WidgetDataContext ctx = buildCtx(HQL_SELECT_NAME, params, null);
 
         Query<Object[]> mockQuery = mockRowQuery(Collections.emptyList());
-        when(session.createQuery(eq(hql), eq(Object[].class))).thenReturn(mockQuery);
 
-        try (MockedStatic<OBDal> dalStatic = mockStatic(OBDal.class)) {
-            dalStatic.when(OBDal::getInstance).thenReturn(obDal);
-            when(obDal.getSession()).thenReturn(session);
-
+        withMockedDal(HQL_SELECT_NAME, mockQuery, () -> {
             JSONObject result = resolver.resolve(ctx);
-
             assertEquals(0, result.getInt(TOTAL_ROWS));
-            assertEquals(0, result.getJSONArray("rows").length());
-        }
+            assertEquals(0, result.getJSONArray(ROWS).length());
+        });
     }
 
     // -------------------------------------------------------
     // 20. bindParams skips parameter with null name
     // -------------------------------------------------------
-    @SuppressWarnings("unchecked")
     @Test
     void bindParamsSkipsParameterWithNullName() throws Exception {
-        String hql = HQL_SELECT_NAME;
-        Map<String, Object> params = new HashMap<>();
+        WidgetDataContext ctx = buildCtx(HQL_SELECT_NAME, new HashMap<>(), null);
 
-        WidgetDataContext ctx = buildCtx(hql, params, null);
+        Query<Object[]> mockQuery = mockQueryWithNamedParams(
+                Collections.singletonList(new Object[]{"Test"}), (String) null);
 
-        Query<Object[]> mockQuery = mock(Query.class);
-        when(mockQuery.list()).thenReturn(Collections.singletonList(new Object[]{"Test"}));
-
-        Parameter<?> nullNameParam = mock(Parameter.class);
-        when(nullNameParam.getName()).thenReturn(null);
-        Set<Parameter<?>> paramSet = new HashSet<>();
-        paramSet.add(nullNameParam);
-        doReturn(paramSet).when(mockQuery).getParameters();
-
-        when(session.createQuery(eq(hql), eq(Object[].class))).thenReturn(mockQuery);
-
-        try (MockedStatic<OBDal> dalStatic = mockStatic(OBDal.class)) {
-            dalStatic.when(OBDal::getInstance).thenReturn(obDal);
-            when(obDal.getSession()).thenReturn(session);
-
+        withMockedDal(HQL_SELECT_NAME, mockQuery, () -> {
             JSONObject result = resolver.resolve(ctx);
-
-            // Should complete without calling setParameter or setParameterList
             verify(mockQuery, never()).setParameter(anyString(), any());
             verify(mockQuery, never()).setParameterList(anyString(), anyCollection());
             assertEquals(1, result.getInt(TOTAL_ROWS));
-        }
+        });
     }
 
     // -------------------------------------------------------
@@ -736,26 +581,17 @@ class QueryListResolverCoverageTest {
     @Test
     void resolveExtractsPartialAliases() throws Exception {
         String hql = "select o.documentNo as docNo, o.name, o.total as total from Order o";
-        Map<String, Object> params = new HashMap<>();
+        WidgetDataContext ctx = buildCtx(hql, new HashMap<>(), null);
 
-        WidgetDataContext ctx = buildCtx(hql, params, null);
+        Query<Object[]> mockQuery = mockRowQuery(Collections.singletonList(new Object[]{SO_001, "Test", 100.0}));
 
-        Object[] row = {SO_001, "Test", 100.0};
-        Query<Object[]> mockQuery = mockRowQuery(Collections.singletonList(row));
-        when(session.createQuery(eq(hql), eq(Object[].class))).thenReturn(mockQuery);
-
-        try (MockedStatic<OBDal> dalStatic = mockStatic(OBDal.class)) {
-            dalStatic.when(OBDal::getInstance).thenReturn(obDal);
-            when(obDal.getSession()).thenReturn(session);
-
+        withMockedDal(hql, mockQuery, () -> {
             JSONObject result = resolver.resolve(ctx);
-
-            JSONObject firstRow = result.getJSONArray("rows").getJSONObject(0);
+            JSONObject firstRow = result.getJSONArray(ROWS).getJSONObject(0);
             assertEquals(SO_001, firstRow.getString(DOC_NO));
-            // Second column has no alias -> falls back to col1
             assertEquals("Test", firstRow.getString("col1"));
             assertEquals(100.0, firstRow.getDouble(TOTAL));
-        }
+        });
     }
 
     // -------------------------------------------------------
@@ -763,11 +599,9 @@ class QueryListResolverCoverageTest {
     // -------------------------------------------------------
     @Test
     void resolveReturnsMultipleRows() throws Exception {
-        String hql = HQL_SELECT_NAME;
         Map<String, Object> params = new HashMap<>();
-        params.put(COLUMNS, "name");
-
-        WidgetDataContext ctx = buildCtx(hql, params, null);
+        params.put(COLUMNS, NAME);
+        WidgetDataContext ctx = buildCtx(HQL_SELECT_NAME, params, null);
 
         List<Object[]> rows = Arrays.asList(
                 new Object[]{ORDER_1},
@@ -775,21 +609,16 @@ class QueryListResolverCoverageTest {
                 new Object[]{"Order-3"}
         );
         Query<Object[]> mockQuery = mockRowQuery(rows);
-        when(session.createQuery(eq(hql), eq(Object[].class))).thenReturn(mockQuery);
 
-        try (MockedStatic<OBDal> dalStatic = mockStatic(OBDal.class)) {
-            dalStatic.when(OBDal::getInstance).thenReturn(obDal);
-            when(obDal.getSession()).thenReturn(session);
-
+        withMockedDal(HQL_SELECT_NAME, mockQuery, () -> {
             JSONObject result = resolver.resolve(ctx);
-
             assertEquals(3, result.getInt(TOTAL_ROWS));
-            JSONArray rowsArr = result.getJSONArray("rows");
+            var rowsArr = result.getJSONArray(ROWS);
             assertEquals(3, rowsArr.length());
-            assertEquals(ORDER_1, rowsArr.getJSONObject(0).getString("name"));
-            assertEquals("Order-2", rowsArr.getJSONObject(1).getString("name"));
-            assertEquals("Order-3", rowsArr.getJSONObject(2).getString("name"));
-        }
+            assertEquals(ORDER_1, rowsArr.getJSONObject(0).getString(NAME));
+            assertEquals("Order-2", rowsArr.getJSONObject(1).getString(NAME));
+            assertEquals("Order-3", rowsArr.getJSONObject(2).getString(NAME));
+        });
     }
 
     // -------------------------------------------------------
@@ -798,29 +627,21 @@ class QueryListResolverCoverageTest {
     @SuppressWarnings("unchecked")
     @Test
     void resolveWithPageSizeAndNullCountReturnsZero() throws Exception {
-        String hql = HQL_SELECT_NAME;
         Map<String, Object> params = new HashMap<>();
         params.put(PAGE_SIZE, "10");
-        params.put(COLUMNS, "name");
-
-        WidgetDataContext ctx = buildCtx(hql, params, null);
+        params.put(COLUMNS, NAME);
+        WidgetDataContext ctx = buildCtx(HQL_SELECT_NAME, params, null);
 
         Query<Object[]> mockQuery = mockRowQuery(Collections.emptyList());
-        when(session.createQuery(eq(hql), eq(Object[].class))).thenReturn(mockQuery);
 
         Query<Long> countQ = mock(Query.class);
         when(countQ.getParameters()).thenReturn(Collections.emptySet());
         when(countQ.uniqueResult()).thenReturn(null);
-        when(session.createQuery(anyString(), eq(Long.class))).thenReturn(countQ);
 
-        try (MockedStatic<OBDal> dalStatic = mockStatic(OBDal.class)) {
-            dalStatic.when(OBDal::getInstance).thenReturn(obDal);
-            when(obDal.getSession()).thenReturn(session);
-
+        withMockedDal(HQL_SELECT_NAME, mockQuery, countQ, () -> {
             JSONObject result = resolver.resolve(ctx);
-
             assertEquals(0, result.getInt(TOTAL_ROWS));
-        }
+        });
     }
 
     // -------------------------------------------------------
@@ -828,26 +649,14 @@ class QueryListResolverCoverageTest {
     // -------------------------------------------------------
     @Test
     void resolveWithNoPaginationParamsUsesListSize() throws Exception {
-        String hql = HQL_SELECT_NAME;
-        Map<String, Object> params = new HashMap<>();
+        WidgetDataContext ctx = buildCtx(HQL_SELECT_NAME, new HashMap<>(), null);
 
-        WidgetDataContext ctx = buildCtx(hql, params, null);
-
-        List<Object[]> rows = Arrays.asList(
-                new Object[]{"A"},
-                new Object[]{"B"}
-        );
+        List<Object[]> rows = Arrays.asList(new Object[]{"A"}, new Object[]{"B"});
         Query<Object[]> mockQuery = mockRowQuery(rows);
-        when(session.createQuery(eq(hql), eq(Object[].class))).thenReturn(mockQuery);
 
-        try (MockedStatic<OBDal> dalStatic = mockStatic(OBDal.class)) {
-            dalStatic.when(OBDal::getInstance).thenReturn(obDal);
-            when(obDal.getSession()).thenReturn(session);
-
+        withMockedDal(HQL_SELECT_NAME, mockQuery, () -> {
             JSONObject result = resolver.resolve(ctx);
-
-            // totalRows is set from rawRows.size() since totalRows was -1
             assertEquals(2, result.getInt(TOTAL_ROWS));
-        }
+        });
     }
 }

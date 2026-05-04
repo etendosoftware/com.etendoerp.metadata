@@ -90,7 +90,7 @@ public class CalendarResolver implements WidgetDataResolver {
     @Override
     public boolean isAvailable() {
         try {
-            org.openbravo.dal.service.OBDal.getInstance().getSession()
+            OBDal.getInstance().getSession()
                 .createQuery("select 1 from FinancialMgmtPeriod p where 1=0", Integer.class);
             return true;
         } catch (Exception e) {
@@ -144,38 +144,47 @@ public class CalendarResolver implements WidgetDataResolver {
     private JSONArray buildEntries(String client, Date dateFrom, Date dateTo,
                                    boolean includePeriods, boolean includeNbd,
                                    SimpleDateFormat sdf) throws Exception {
-        // ── collect period entries
-        List<JSONObject> periodEntries = new ArrayList<>();
-        if (includePeriods) {
-            Query<Object[]> q = OBDal.getInstance().getSession()
-                    .createQuery(PERIODS_HQL, Object[].class);
-            q.setParameter(PARAM_CLIENT,   client);
-            q.setParameter(PARAM_DATE_FROM, dateFrom);
-            q.setParameter(PARAM_DATE_TO,   dateTo);
-            for (Object[] row : q.list()) {
-                JSONObject e = periodToJson(row, sdf);
-                e.put("type", "PERIOD");
-                periodEntries.add(e);
-            }
-        }
+        List<JSONObject> periodEntries = includePeriods
+                ? queryPeriodEntries(client, dateFrom, dateTo, sdf)
+                : new ArrayList<>();
 
-        // ── collect non-business-day entries
-        List<JSONObject> nbdEntries = new ArrayList<>();
-        if (includeNbd) {
-            Query<Object[]> q = OBDal.getInstance().getSession()
-                    .createQuery(NBD_HQL, Object[].class);
-            q.setParameter(PARAM_CLIENT,   client);
-            q.setParameter(PARAM_DATE_FROM, dateFrom);
-            q.setParameter(PARAM_DATE_TO,   dateTo);
-            for (Object[] row : q.list()) {
-                nbdEntries.add(new JSONObject()
-                        .put("type", "NON_BUSINESS_DAY")
-                        .put("name", row[0])
-                        .put("date", sdf.format((Date) row[1])));
-            }
-        }
+        List<JSONObject> nbdEntries = includeNbd
+                ? queryNbdEntries(client, dateFrom, dateTo, sdf)
+                : new ArrayList<>();
 
         return mergeSortedEntries(periodEntries, nbdEntries);
+    }
+
+    private List<Object[]> executeRangeQuery(String hql, String client, Date dateFrom, Date dateTo) {
+        Query<Object[]> q = OBDal.getInstance().getSession()
+                .createQuery(hql, Object[].class);
+        q.setParameter(PARAM_CLIENT, client);
+        q.setParameter(PARAM_DATE_FROM, dateFrom);
+        q.setParameter(PARAM_DATE_TO, dateTo);
+        return q.list();
+    }
+
+    private List<JSONObject> queryPeriodEntries(String client, Date dateFrom, Date dateTo,
+                                                SimpleDateFormat sdf) throws Exception {
+        List<JSONObject> entries = new ArrayList<>();
+        for (Object[] row : executeRangeQuery(PERIODS_HQL, client, dateFrom, dateTo)) {
+            JSONObject e = periodToJson(row, sdf);
+            e.put("type", "PERIOD");
+            entries.add(e);
+        }
+        return entries;
+    }
+
+    private List<JSONObject> queryNbdEntries(String client, Date dateFrom, Date dateTo,
+                                             SimpleDateFormat sdf) throws Exception {
+        List<JSONObject> entries = new ArrayList<>();
+        for (Object[] row : executeRangeQuery(NBD_HQL, client, dateFrom, dateTo)) {
+            entries.add(new JSONObject()
+                    .put("type", "NON_BUSINESS_DAY")
+                    .put("name", row[0])
+                    .put("date", sdf.format((Date) row[1])));
+        }
+        return entries;
     }
 
     /** Merges two pre-sorted lists, placing PERIOD entries before NBD entries on the same date. */
@@ -213,24 +222,24 @@ public class CalendarResolver implements WidgetDataResolver {
     }
 
     private Date firstDayOfMonth(Date ref) {
-        Calendar cal = Calendar.getInstance();
-        cal.setTime(ref);
-        cal.set(Calendar.DAY_OF_MONTH, 1);
-        cal.set(Calendar.HOUR_OF_DAY, 0);
-        cal.set(Calendar.MINUTE, 0);
-        cal.set(Calendar.SECOND, 0);
-        cal.set(Calendar.MILLISECOND, 0);
-        return cal.getTime();
+        return adjustMonth(ref, 1, 0, 0, 0, 0);
     }
 
     private Date lastDayOfMonth(Date ref) {
         Calendar cal = Calendar.getInstance();
         cal.setTime(ref);
-        cal.set(Calendar.DAY_OF_MONTH, cal.getActualMaximum(Calendar.DAY_OF_MONTH));
-        cal.set(Calendar.HOUR_OF_DAY, 23);
-        cal.set(Calendar.MINUTE, 59);
-        cal.set(Calendar.SECOND, 59);
-        cal.set(Calendar.MILLISECOND, 999);
+        int lastDay = cal.getActualMaximum(Calendar.DAY_OF_MONTH);
+        return adjustMonth(ref, lastDay, 23, 59, 59, 999);
+    }
+
+    private Date adjustMonth(Date ref, int day, int hour, int minute, int second, int millis) {
+        Calendar cal = Calendar.getInstance();
+        cal.setTime(ref);
+        cal.set(Calendar.DAY_OF_MONTH, day);
+        cal.set(Calendar.HOUR_OF_DAY, hour);
+        cal.set(Calendar.MINUTE, minute);
+        cal.set(Calendar.SECOND, second);
+        cal.set(Calendar.MILLISECOND, millis);
         return cal.getTime();
     }
 }

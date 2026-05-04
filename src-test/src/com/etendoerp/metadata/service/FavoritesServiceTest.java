@@ -66,8 +66,8 @@ class FavoritesServiceTest {
     private static final String USER_ID = "user-001";
     private static final String ROLE_ID = "role-001";
     private static final String MENU_ID = "menu-001";
-    private static final String FAVORITES_TOGGLE_PATH = FAVORITES_TOGGLE_PATH;
-    private static final String MENU_ID_JSON_PREFIX = MENU_ID_JSON_PREFIX;
+    private static final String FAVORITES_TOGGLE_PATH = "/favorites/toggle";
+    private static final String MENU_ID_JSON_PREFIX = "{\"menuId\":\"";
 
     @Mock HttpServletRequest request;
     @Mock HttpServletResponse response;
