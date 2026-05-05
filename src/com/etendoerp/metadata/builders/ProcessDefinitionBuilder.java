@@ -48,7 +48,7 @@ public class ProcessDefinitionBuilder extends Builder {
         }
 
         processJSON.put("parameters", parameters);
-        processJSON.put("onLoad", process.getEtmetaOnload());
+        processJSON.put("onLoad", process.getETMETAOnload());
         processJSON.put("onProcess", process.getEtmetaOnprocess());
 
         return processJSON;
