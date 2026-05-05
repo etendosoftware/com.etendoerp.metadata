@@ -269,6 +269,52 @@ class WindowBuilderTest {
   }
 
   /**
+   * Builds a {@link DataToJsonConverter} mock that emits a JSON containing the
+   * {@code windowType} field with the supplied value. Mirrors the production
+   * behaviour of {@code DataToJsonConverter.toJsonObject(window, FULL_TRANSLATABLE)}.
+   *
+   * @param windowType The window type value the converter should expose.
+   * @return A MockedConstruction of DataToJsonConverter pre-wired with the field.
+   */
+  private MockedConstruction<DataToJsonConverter> createConverterMockWithWindowType(String windowType) {
+    return mockConstruction(DataToJsonConverter.class, (mock, context) -> {
+      JSONObject windowJson = new JSONObject();
+      windowJson.put("id", WINDOW_ID);
+      windowJson.put("name", "Test Window");
+      windowJson.put("windowType", windowType);
+      when(mock.toJsonObject(any(), any())).thenReturn(windowJson);
+    });
+  }
+
+  /**
+   * Defensive regression test: when the {@link DataToJsonConverter} exposes the
+   * {@code windowType} property of the window, the {@link WindowBuilder} output
+   * must preserve it. This guarantees that the client can read
+   * {@code windowType} from {@code /meta/window/{id}} for any window type.
+   *
+   * @throws Exception if any unexpected error occurs during the test execution.
+   */
+  @Test
+  void toJSONExposesWindowTypeWhenConverterEmitsIt() throws Exception {
+    setupWindowAccess(true, true);
+    WindowBuilder windowBuilder;
+    JSONObject result;
+    try (MockedStatic<OBContext> ignored1 = createOBContextMock();
+         MockedConstruction<DataToJsonConverter> ignored2 = createConverterMockWithWindowType("OBUIAPP_PickAndExecute")) {
+      windowBuilder = new WindowBuilder(WINDOW_ID);
+    }
+    try (MockedStatic<OBContext> ignored1 = createOBContextMock();
+         MockedStatic<OBDal> ignored2 = createOBDalMock();
+         MockedConstruction<DataToJsonConverter> ignored3 = createConverterMockWithWindowType("OBUIAPP_PickAndExecute")) {
+      result = windowBuilder.toJSON();
+    }
+
+    assertNotNull(result);
+    assertTrue(result.has("windowType"));
+    assertEquals("OBUIAPP_PickAndExecute", result.getString("windowType"));
+  }
+
+  /**
    * Tests that the toJSON method returns valid JSON with tabs when the user has authorized access.
    * This test mocks the OBDal, OBContext, and DataToJsonConverter to simulate a scenario
    * where the current role is authorized for the specified window and tabs.

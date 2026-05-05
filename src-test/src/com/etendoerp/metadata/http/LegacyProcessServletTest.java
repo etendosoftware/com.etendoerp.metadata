@@ -676,9 +676,6 @@ public class LegacyProcessServletTest extends OBBaseTest {
         assertTrue("Should contain injected code", result.contains("submitThisPage('action');extra();"));
     }
 
-<<<<<<< HEAD
-
-=======
     // --- Tests for handleCreateFromSession ---
 
     @Test
@@ -956,5 +953,4 @@ public class LegacyProcessServletTest extends OBBaseTest {
         verify(response).setStatus(HttpServletResponse.SC_OK);
         assertTrue("Writer should contain HTML", sw.toString().contains("<html>test</html>"));
     }
->>>>>>> origin/develop
 }

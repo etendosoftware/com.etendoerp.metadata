@@ -111,4 +111,7 @@ public class Constants {
     // Color
     public static final String COLOR_REFERENCE_ID = "27";
     public static final String COLOR_FIELD_NAME = "colorFieldName";
+
+    // Window types
+    public static final String JSON_WINDOW_TYPE_KEY = "windowType";
 }

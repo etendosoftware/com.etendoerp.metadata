@@ -97,7 +97,6 @@ public class ProcessDefinitionBuilderTest {
     when(mockProcess.getOBUIAPPParameterList()).thenReturn(parameterList);
     when(mockParameter1.getDBColumnName()).thenReturn(PARAM1_COLUMN);
     when(mockParameter2.getDBColumnName()).thenReturn(PARAM2_COLUMN);
-    when(mockProcess.getEtmetaOnload()).thenReturn("onLoadScript");
     when(mockProcess.getEtmetaOnprocess()).thenReturn("onProcessScript");
   }
 
@@ -184,7 +183,6 @@ public class ProcessDefinitionBuilderTest {
   @Test
   void testToJSONWithEmptyParameterList() throws JSONException {
     when(mockProcess.getOBUIAPPParameterList()).thenReturn(new ArrayList<>());
-    when(mockProcess.getEtmetaOnload()).thenReturn(null);
     when(mockProcess.getEtmetaOnprocess()).thenReturn(null);
 
     JSONObject mockProcessJSON = new JSONObject();
@@ -224,7 +222,6 @@ public class ProcessDefinitionBuilderTest {
    */
   @Test
   void testToJSONWithNullScripts() throws JSONException {
-    when(mockProcess.getEtmetaOnload()).thenReturn(null);
     when(mockProcess.getEtmetaOnprocess()).thenReturn(null);
 
     JSONObject mockProcessJSON = new JSONObject();
