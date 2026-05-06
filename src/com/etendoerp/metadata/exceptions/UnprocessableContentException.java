@@ -9,7 +9,7 @@
  * "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
  * implied. See the License for the specific language governing rights
  * and limitations under the License.
- * All portions are Copyright © 2021–2025 FUTIT SERVICES, S.L
+ * All portions are Copyright © 2021-2026 FUTIT SERVICES, S.L
  * All Rights Reserved.
  * Contributor(s): Futit Services S.L.
  *************************************************************************
@@ -17,13 +17,17 @@
 
 package com.etendoerp.metadata.exceptions;
 
+/**
+ * Exception indicating that the request content could not be processed (HTTP 422).
+ */
 public class UnprocessableContentException extends RuntimeException {
-    private final static String DEFAULT_MESSAGE = "Unprocessable content";
+    private static final String DEFAULT_MESSAGE = "Unprocessable content";
 
     public UnprocessableContentException(String message) {
         super(message.isEmpty() ? DEFAULT_MESSAGE : message);
     }
 
+    /** Creates a new UnprocessableContentException with the default message. */
     public UnprocessableContentException() {
         super(DEFAULT_MESSAGE);
     }

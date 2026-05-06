@@ -9,7 +9,7 @@
  * "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
  * implied. See the License for the specific language governing rights
  * and limitations under the License.
- * All portions are Copyright © 2021–2025 FUTIT SERVICES, S.L
+ * All portions are Copyright © 2021-2026 FUTIT SERVICES, S.L
  * All Rights Reserved.
  * Contributor(s): Futit Services S.L.
  *************************************************************************
@@ -23,9 +23,17 @@ import org.openbravo.client.application.Parameter;
 import org.openbravo.client.application.Process;
 import org.openbravo.service.json.DataResolvingMode;
 
+/**
+ * Builds a JSON representation of an OBUIAPP process definition and its parameters.
+ */
 public class ProcessDefinitionBuilder extends Builder {
     private final Process process;
 
+    /**
+     * Creates a new ProcessDefinitionBuilder for the given process definition.
+     *
+     * @param process the OBUIAPP process definition to build JSON for
+     */
     public ProcessDefinitionBuilder(Process process) {
         this.process = process;
     }
@@ -40,7 +48,7 @@ public class ProcessDefinitionBuilder extends Builder {
         }
 
         processJSON.put("parameters", parameters);
-        processJSON.put("onLoad", process.getEtmetaOnload());
+        processJSON.put("onLoad", process.getETMETAOnload());
         processJSON.put("onProcess", process.getEtmetaOnprocess());
 
         return processJSON;

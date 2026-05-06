@@ -9,7 +9,7 @@
  * "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
  * implied. See the License for the specific language governing rights
  * and limitations under the License.
- * All portions are Copyright © 2021–2025 FUTIT SERVICES, S.L
+ * All portions are Copyright © 2021-2026 FUTIT SERVICES, S.L
  * All Rights Reserved.
  * Contributor(s): Futit Services S.L.
  *************************************************************************
@@ -37,7 +37,7 @@ import org.openbravo.model.common.enterprise.Warehouse;
 import com.etendoerp.metadata.exceptions.InternalServerException;
 
 /**
- * @author luuchorocha
+ * Builds a JSON representation of the current user session including roles, organizations, and warehouses.
  */
 public class SessionBuilder extends Builder {
 

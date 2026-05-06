@@ -3,7 +3,7 @@
     <table name="ETMETA_TOOLBAR_BUTTON" primaryKey="ETMETA_TOOLBAR_BUTTON_KEY">
       <column name="ETMETA_TOOLBAR_BUTTON_ID" primaryKey="true" required="true" type="VARCHAR" size="32" autoIncrement="false">
         <default/>
-        <onCreateDefault/>
+        <onCreateDefault><![CDATA[05BA47DF6E7E4E529EC10513BBCF9577]]></onCreateDefault>
       </column>
       <column name="AD_CLIENT_ID" primaryKey="false" required="false" type="VARCHAR" size="32" autoIncrement="false">
         <default/>
