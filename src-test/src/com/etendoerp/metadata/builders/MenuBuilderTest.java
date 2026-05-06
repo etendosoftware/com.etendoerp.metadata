@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
@@ -34,11 +35,14 @@ import static org.mockito.Mockito.when;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
+import org.hibernate.Session;
+import org.hibernate.query.NativeQuery;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -50,6 +54,7 @@ import org.openbravo.client.application.GlobalMenu;
 import org.openbravo.client.application.MenuManager;
 import org.openbravo.client.application.MenuManager.MenuOption;
 import org.openbravo.dal.core.OBContext;
+import org.openbravo.dal.service.OBDal;
 import org.openbravo.erpCommon.utility.Utility;
 import org.openbravo.model.ad.domain.ModelImplementation;
 import org.openbravo.model.ad.domain.ModelImplementationMapping;
@@ -86,6 +91,10 @@ class MenuBuilderTest {
   private static final String AD_REPORT_ID = "AD_REPORT_ID";
   private static final String AD_PENTAHO_ID = "AD_PENTAHO_ID";
   private static final String P_ACTION = "P";
+  private static final String VIEW_ICON = "view-icon";
+  private static final String VIEW_MENU = "View Menu";
+  private static final String VIEW_DESC = "View Desc";
+  private static final String VIEW_ID = "viewId";
 
   @AfterEach
   void tearDown() throws NoSuchFieldException, IllegalAccessException {
@@ -387,6 +396,148 @@ class MenuBuilderTest {
 
       JSONObject pentahoMenu = result.getJSONArray("menu").getJSONObject(0);
       assertEquals(PENTAHO_URL + AD_PENTAHO_ID, pentahoMenu.getString(PROCESS_URL));
+    }
+  }
+
+  /**
+   * Tests addViewInfo with a fully qualified classname.
+   * The simple name (after the last dot) must be used as viewId.
+   *
+   * @throws JSONException if there is an error during JSON construction
+   */
+  @SuppressWarnings("unchecked")
+  @Test
+  void testAddViewInfoWithFullyQualifiedClassname() throws JSONException {
+    MenuOption childOption = mock(MenuOption.class);
+    Menu childMenu = mock(Menu.class);
+    String menuId = "VIEW_MENU_ID";
+    Session session = mock(Session.class);
+    NativeQuery mockQuery = mock(NativeQuery.class);
+    OBDal obDal = mock(OBDal.class);
+
+    when(rootMenuOption.getChildren()).thenReturn(List.of(childOption));
+    when(childOption.getMenu()).thenReturn(childMenu);
+    when(childOption.getType()).thenReturn(MenuManager.MenuEntryType.View);
+    when(childMenu.getId()).thenReturn(menuId);
+    when(childMenu.get(Menu.PROPERTY_ETMETAICON, language, menuId)).thenReturn(VIEW_ICON);
+    when(childMenu.get(Menu.PROPERTY_NAME, language, menuId)).thenReturn(VIEW_MENU);
+    when(childMenu.get(Menu.PROPERTY_DESCRIPTION, language, menuId)).thenReturn(VIEW_DESC);
+    when(childOption.getChildren()).thenReturn(new ArrayList<>());
+
+    Object[] viewRow = { "com.example.MyViewClassName", "MyViewName" };
+    when(session.createNativeQuery(anyString())).thenReturn(mockQuery);
+    when(mockQuery.setParameter(anyString(), any())).thenReturn(mockQuery);
+    when(mockQuery.list()).thenReturn(List.of(viewRow));
+    when(obDal.getSession()).thenReturn(session);
+
+    try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
+        MockedStatic<OBDal> dalStatic = mockStatic(OBDal.class);
+        MockedConstruction<MenuManager> ignored = mockConstruction(MenuManager.class,
+            (mock, context) -> when(mock.getMenu()).thenReturn(rootMenuOption))) {
+
+      obContextStatic.when(OBContext::getOBContext).thenReturn(obContext);
+      when(obContext.getLanguage()).thenReturn(language);
+      dalStatic.when(OBDal::getInstance).thenReturn(obDal);
+
+      MenuBuilder builder = new MenuBuilder();
+      JSONObject result = builder.toJSON();
+
+      JSONObject viewMenu = result.getJSONArray("menu").getJSONObject(0);
+      assertEquals("View", viewMenu.getString("type"));
+      assertEquals("MyViewClassName", viewMenu.getString(VIEW_ID));
+    }
+  }
+
+  /**
+   * Tests addViewInfo when classname is null: falls back to the view name.
+   *
+   * @throws JSONException if there is an error during JSON construction
+   */
+  @SuppressWarnings("unchecked")
+  @Test
+  void testAddViewInfoFallsBackToNameWhenClassnameIsNull() throws JSONException {
+    MenuOption childOption = mock(MenuOption.class);
+    Menu childMenu = mock(Menu.class);
+    String menuId = "VIEW_MENU_ID_2";
+    Session session = mock(Session.class);
+    NativeQuery mockQuery = mock(NativeQuery.class);
+    OBDal obDal = mock(OBDal.class);
+
+    when(rootMenuOption.getChildren()).thenReturn(List.of(childOption));
+    when(childOption.getMenu()).thenReturn(childMenu);
+    when(childOption.getType()).thenReturn(MenuManager.MenuEntryType.View);
+    when(childMenu.getId()).thenReturn(menuId);
+    when(childMenu.get(Menu.PROPERTY_ETMETAICON, language, menuId)).thenReturn(VIEW_ICON);
+    when(childMenu.get(Menu.PROPERTY_NAME, language, menuId)).thenReturn(VIEW_MENU);
+    when(childMenu.get(Menu.PROPERTY_DESCRIPTION, language, menuId)).thenReturn(VIEW_DESC);
+    when(childOption.getChildren()).thenReturn(new ArrayList<>());
+
+    Object[] viewRow = { null, "SimpleViewName" };
+    when(session.createNativeQuery(anyString())).thenReturn(mockQuery);
+    when(mockQuery.setParameter(anyString(), any())).thenReturn(mockQuery);
+    when(mockQuery.list()).thenReturn(List.of(viewRow));
+    when(obDal.getSession()).thenReturn(session);
+
+    try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
+        MockedStatic<OBDal> dalStatic = mockStatic(OBDal.class);
+        MockedConstruction<MenuManager> ignored = mockConstruction(MenuManager.class,
+            (mock, context) -> when(mock.getMenu()).thenReturn(rootMenuOption))) {
+
+      obContextStatic.when(OBContext::getOBContext).thenReturn(obContext);
+      when(obContext.getLanguage()).thenReturn(language);
+      dalStatic.when(OBDal::getInstance).thenReturn(obDal);
+
+      MenuBuilder builder = new MenuBuilder();
+      JSONObject result = builder.toJSON();
+
+      JSONObject viewMenu = result.getJSONArray("menu").getJSONObject(0);
+      assertEquals("SimpleViewName", viewMenu.getString(VIEW_ID));
+    }
+  }
+
+  /**
+   * Tests addViewInfo when no view data is found: viewId must not be set.
+   *
+   * @throws JSONException if there is an error during JSON construction
+   */
+  @SuppressWarnings("unchecked")
+  @Test
+  void testAddViewInfoWithEmptyResultDoesNotSetViewId() throws JSONException {
+    MenuOption childOption = mock(MenuOption.class);
+    Menu childMenu = mock(Menu.class);
+    String menuId = "VIEW_MENU_ID_3";
+    Session session = mock(Session.class);
+    NativeQuery mockQuery = mock(NativeQuery.class);
+    OBDal obDal = mock(OBDal.class);
+
+    when(rootMenuOption.getChildren()).thenReturn(List.of(childOption));
+    when(childOption.getMenu()).thenReturn(childMenu);
+    when(childOption.getType()).thenReturn(MenuManager.MenuEntryType.View);
+    when(childMenu.getId()).thenReturn(menuId);
+    when(childMenu.get(Menu.PROPERTY_ETMETAICON, language, menuId)).thenReturn(VIEW_ICON);
+    when(childMenu.get(Menu.PROPERTY_NAME, language, menuId)).thenReturn(VIEW_MENU);
+    when(childMenu.get(Menu.PROPERTY_DESCRIPTION, language, menuId)).thenReturn(VIEW_DESC);
+    when(childOption.getChildren()).thenReturn(new ArrayList<>());
+
+    when(session.createNativeQuery(anyString())).thenReturn(mockQuery);
+    when(mockQuery.setParameter(anyString(), any())).thenReturn(mockQuery);
+    when(mockQuery.list()).thenReturn(Collections.emptyList());
+    when(obDal.getSession()).thenReturn(session);
+
+    try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
+        MockedStatic<OBDal> dalStatic = mockStatic(OBDal.class);
+        MockedConstruction<MenuManager> ignored = mockConstruction(MenuManager.class,
+            (mock, context) -> when(mock.getMenu()).thenReturn(rootMenuOption))) {
+
+      obContextStatic.when(OBContext::getOBContext).thenReturn(obContext);
+      when(obContext.getLanguage()).thenReturn(language);
+      dalStatic.when(OBDal::getInstance).thenReturn(obDal);
+
+      MenuBuilder builder = new MenuBuilder();
+      JSONObject result = builder.toJSON();
+
+      JSONObject viewMenu = result.getJSONArray("menu").getJSONObject(0);
+      assertFalse(viewMenu.has(VIEW_ID));
     }
   }
 
