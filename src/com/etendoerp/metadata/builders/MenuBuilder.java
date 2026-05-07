@@ -27,6 +27,7 @@ import org.openbravo.client.application.MenuManager;
 import org.openbravo.client.application.MenuManager.MenuOption;
 import org.openbravo.client.application.Process;
 import org.openbravo.dal.core.OBContext;
+import org.openbravo.dal.service.OBDal;
 import org.openbravo.erpCommon.utility.Utility;
 import org.openbravo.model.ad.domain.ModelImplementation;
 import org.openbravo.model.ad.domain.ModelImplementationMapping;
@@ -156,6 +157,60 @@ public class MenuBuilder extends Builder {
     }
 
     /**
+     * Adds view identifier information to the provided JSON object.
+     * Queries the obuiapp_view_impl table to resolve the JS class name for the view,
+     * falling back to the view's name when classname is not set.
+     *
+     * @param json   The JSONObject to populate.
+     * @param menuId The ID of the menu entry.
+     * @throws JSONException If an error occurs while adding data to the JSON object.
+     */
+    @SuppressWarnings("unchecked")
+    private void addViewInfo(JSONObject json, String menuId) throws JSONException {
+        List<Object[]> viewData = OBDal.getInstance().getSession()
+            .createNativeQuery(
+                "select vi.classname, vi.name from ad_menu m"
+                    + " inner join obuiapp_view_impl vi"
+                    + " on m.em_obuiapp_view_impl_id = vi.obuiapp_view_impl_id"
+                    + " where m.ad_menu_id = :menuId")
+            .setParameter("menuId", menuId)
+            .list();
+        if (viewData.isEmpty()) {
+            return;
+        }
+        Object[] row = viewData.get(0);
+        String classname = (String) row[0];
+        String name = (String) row[1];
+        String identifier = classname != null ? classname : name;
+        if (identifier == null) {
+            return;
+        }
+        String simpleViewName = identifier.contains(".")
+            ? identifier.substring(identifier.lastIndexOf('.') + 1)
+            : identifier;
+        json.put("viewId", simpleViewName);
+    }
+
+    /**
+     * Adds form URL information to the provided JSON object.
+     *
+     * @param json The JSONObject to populate.
+     * @param form The Form associated with the menu entry.
+     * @throws JSONException If an error occurs while adding data to the JSON object.
+     */
+    private void addFormInfo(JSONObject json, Form form) throws JSONException {
+        json.put("formId", form.getId());
+        String javaClassName = form.getJavaClassName();
+        if (javaClassName == null || javaClassName.isEmpty()) {
+            return;
+        }
+        String simpleClassName = javaClassName.contains(".")
+            ? javaClassName.substring(javaClassName.lastIndexOf('.') + 1)
+            : javaClassName;
+        json.put("formUrl", "/ad_forms/" + simpleClassName + ".html");
+    }
+
+    /**
      * Converts a MenuOption entry to its JSON representation.
      *
      * @param entry The MenuOption entry to convert.
@@ -186,9 +241,13 @@ public class MenuBuilder extends Builder {
                 json.put("processDefinitionId", processDefinition.getId());
             }
 
+            if (entry.getType() == MenuManager.MenuEntryType.View) {
+                addViewInfo(json, menu.getId());
+            }
+
             Form form = menu.getSpecialForm();
             if (null != form) {
-                json.put("formId", form.getId());
+                addFormInfo(json, form);
             }
 
             List<MenuOption> children = entry.getChildren();
