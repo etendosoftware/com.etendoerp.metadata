@@ -25,14 +25,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
-
-import javax.servlet.RequestDispatcher;
-import javax.servlet.ServletContext;
-import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSession;
-import java.io.IOException;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -45,10 +39,7 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class ServiceFactoryTest {
 
-  private static final String EXAMPLE_MUTABLE_SESSION_ATTRIBUTE = "143|C_ORDER_ID";
   private static final String SERVICE_NOT_NULL = "Service should not be null";
-  @SuppressWarnings("java:S1075")
-  private static final String NON_USED_BY_LINK_PATH = "/some/legacy/path";
 
   @Mock
   private HttpServletRequest mockRequest;
@@ -120,10 +111,73 @@ class ServiceFactoryTest {
   }
 
   @Test
+  void getServiceReturnsSavedViewService() {
+    MetadataService service = ServiceFactory.getService(mockRequestWithPath("/com.etendoerp.metadata.meta/saved-views/abc-123"), mockResponse);
+    assertNotNull(service, SERVICE_NOT_NULL);
+    assertInstanceOf(SavedViewService.class, service);
+  }
+
+  @Test
+  void getServiceReturnsSavedViewServiceForBasePathWithoutId() {
+    MetadataService service = ServiceFactory.getService(mockRequestWithPath("/com.etendoerp.metadata.meta/saved-views"), mockResponse);
+    assertNotNull(service, SERVICE_NOT_NULL);
+    assertInstanceOf(SavedViewService.class, service);
+  }
+
+  @Test
   void getServiceReturnsProcessMetadataService() {
     MetadataService service = ServiceFactory.getService(mockRequestWithPath("/com.etendoerp.metadata.meta/process/123"), mockResponse);
     assertNotNull(service, SERVICE_NOT_NULL);
     assertInstanceOf(ProcessMetadataService.class, service);
+  }
+
+  @Test
+  void getServiceReturnsPreferencesService() {
+    MetadataService service = ServiceFactory.getService(mockRequestWithPath("/com.etendoerp.metadata.meta/preferences"), mockResponse);
+    assertNotNull(service, SERVICE_NOT_NULL);
+    assertInstanceOf(PreferencesService.class, service);
+  }
+
+  @Test
+  void getServiceReturnsEmailSendService() {
+    MetadataService service = ServiceFactory.getService(mockRequestWithPath("/com.etendoerp.metadata.meta/email/send"), mockResponse);
+    assertNotNull(service, SERVICE_NOT_NULL);
+    assertInstanceOf(EmailSendService.class, service);
+  }
+
+  @Test
+  void getServiceReturnsEmailConfigService() {
+    MetadataService service = ServiceFactory.getService(mockRequestWithPath("/com.etendoerp.metadata.meta/email/config"), mockResponse);
+    assertNotNull(service, SERVICE_NOT_NULL);
+    assertInstanceOf(EmailConfigService.class, service);
+  }
+
+  @Test
+  void getServiceReturnsEmailAttachmentService() {
+    MetadataService service = ServiceFactory.getService(mockRequestWithPath("/com.etendoerp.metadata.meta/email/attachments"), mockResponse);
+    assertNotNull(service, SERVICE_NOT_NULL);
+    assertInstanceOf(EmailAttachmentService.class, service);
+  }
+
+  @Test
+  void getServiceReturnsEmailService() {
+    MetadataService service = ServiceFactory.getService(mockRequestWithPath("/com.etendoerp.metadata.meta/email/other"), mockResponse);
+    assertNotNull(service, SERVICE_NOT_NULL);
+    assertInstanceOf(EmailService.class, service);
+  }
+
+  @Test
+  void getServiceReturnsReportAndProcessService() {
+    MetadataService service = ServiceFactory.getService(mockRequestWithPath("/com.etendoerp.metadata.meta/report-and-process/123"), mockResponse);
+    assertNotNull(service, SERVICE_NOT_NULL);
+    assertInstanceOf(ReportAndProcessService.class, service);
+  }
+
+  @Test
+  void getServiceReturnsProcessExecutionService() {
+    MetadataService service = ServiceFactory.getService(mockRequestWithPath("/com.etendoerp.metadata.meta/process-execution"), mockResponse);
+    assertNotNull(service, SERVICE_NOT_NULL);
+    assertInstanceOf(ProcessExecutionService.class, service);
   }
 
   @Test
@@ -166,90 +220,6 @@ class ServiceFactoryTest {
     );
   }
 
-  // -------- Tests for buildLegacyForwardService --------
-
-  @Test
-  void buildLegacyForwardServiceForwardsSuccessfully() throws Exception {
-    HttpServletRequest req = mock(HttpServletRequest.class);
-    HttpServletResponse res = mock(HttpServletResponse.class);
-    HttpSession session = mock(HttpSession.class);
-    RequestDispatcher dispatcher = mock(RequestDispatcher.class);
-    ServletContext context = mock(ServletContext.class);
-
-    when(req.getServletContext()).thenReturn(context);
-    when(req.getSession(true)).thenReturn(session);
-    when(req.getParameter("recordId")).thenReturn("A123");
-    when(context.getRequestDispatcher(LegacyPaths.USED_BY_LINK)).thenReturn(dispatcher);
-
-    try (MockedStatic<LegacyUtils> legacy = mockStatic(LegacyUtils.class)) {
-      legacy.when(() -> LegacyUtils.isMutableSessionAttribute(EXAMPLE_MUTABLE_SESSION_ATTRIBUTE)).thenReturn(true);
-
-      MetadataService service = invokeBuildLegacyForwardService(req, res, LegacyPaths.USED_BY_LINK);
-      assertNotNull(service);
-
-      service.process();
-
-      verify(session).setAttribute(EXAMPLE_MUTABLE_SESSION_ATTRIBUTE, "A123");
-      verify(dispatcher).forward(req, res);
-    }
-  }
-
-  @Test
-  void buildLegacyForwardServiceThrowsWhenAttributeNotAllowed() {
-    HttpServletRequest req = mock(HttpServletRequest.class);
-    HttpServletResponse res = mock(HttpServletResponse.class);
-    HttpSession session = mock(HttpSession.class);
-
-    when(req.getSession(true)).thenReturn(session);
-    when(req.getParameter("recordId")).thenReturn("A123");
-
-    try (MockedStatic<LegacyUtils> legacy = mockStatic(LegacyUtils.class)) {
-      legacy.when(() -> LegacyUtils.isMutableSessionAttribute(EXAMPLE_MUTABLE_SESSION_ATTRIBUTE)).thenReturn(false);
-
-      MetadataService service = invokeBuildLegacyForwardService(req, res, LegacyPaths.USED_BY_LINK);
-      assertThrows(InternalServerException.class, service::process);
-    }
-  }
-
-  @Test
-  void buildLegacyForwardServiceThrowsWhenDispatcherIsNull() {
-    HttpServletRequest req = mock(HttpServletRequest.class);
-    HttpServletResponse res = mock(HttpServletResponse.class);
-    HttpSession session = mock(HttpSession.class);
-    ServletContext context = mock(ServletContext.class);
-
-    when(req.getServletContext()).thenReturn(context);
-    when(context.getRequestDispatcher(LegacyPaths.USED_BY_LINK)).thenReturn(null);
-    when(req.getSession(true)).thenReturn(session);
-
-    try (MockedStatic<LegacyUtils> legacy = mockStatic(LegacyUtils.class)) {
-      legacy.when(() -> LegacyUtils.isMutableSessionAttribute(EXAMPLE_MUTABLE_SESSION_ATTRIBUTE)).thenReturn(true);
-
-      MetadataService service = invokeBuildLegacyForwardService(req, res, LegacyPaths.USED_BY_LINK);
-      assertThrows(ServletException.class, service::process);
-    }
-  }
-
-  @Test
-  void buildLegacyForwardServiceCatchesExceptionFromDispatcher() throws Exception {
-    HttpServletRequest req = mock(HttpServletRequest.class);
-    HttpServletResponse res = mock(HttpServletResponse.class);
-    HttpSession session = mock(HttpSession.class);
-    ServletContext context = mock(ServletContext.class);
-    RequestDispatcher dispatcher = mock(RequestDispatcher.class);
-
-    when(req.getServletContext()).thenReturn(context);
-    when(context.getRequestDispatcher(LegacyPaths.USED_BY_LINK)).thenReturn(dispatcher);
-    when(req.getSession(true)).thenReturn(session);
-    doThrow(new IOException("fail")).when(dispatcher).forward(req, res);
-
-    try (MockedStatic<LegacyUtils> legacy = mockStatic(LegacyUtils.class)) {
-      legacy.when(() -> LegacyUtils.isMutableSessionAttribute(EXAMPLE_MUTABLE_SESSION_ATTRIBUTE)).thenReturn(true);
-
-      MetadataService service = invokeBuildLegacyForwardService(req, res, LegacyPaths.USED_BY_LINK);
-      assertThrows(IOException.class, service::process);
-    }
-  }
 
 
   /** Helper to create a mock HttpServletRequest with the specified path info. */
@@ -259,16 +229,4 @@ class ServiceFactoryTest {
     return req;
   }
 
-  /**
-   * Invokes the private static method buildLegacyForwardService using reflection.
-   */
-  private MetadataService invokeBuildLegacyForwardService(HttpServletRequest req, HttpServletResponse res, String path) {
-    try {
-      var method = ServiceFactory.class.getDeclaredMethod("buildLegacyForwardService", HttpServletRequest.class, HttpServletResponse.class, String.class);
-      method.setAccessible(true);
-      return (MetadataService) method.invoke(null, req, res, path);
-    } catch (Exception e) {
-      throw new InternalServerException("Failed to invoke buildLegacyForwardService" + e.getMessage());
-    }
-  }
 }
