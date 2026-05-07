@@ -110,8 +110,11 @@ public class LegacyProcessServletReportForwarderTest {
 
     @Test
     public void extractReportsFromBody_handlesUrlWithEmbeddedAmpersandsAndCommas() throws Exception {
+        // Uses a non-journal-entries URL so multi-schema expansion is not triggered;
+        // the intent is to verify that commas and ampersands inside query params do
+        // not incorrectly split the URL into multiple reports.
         String url = "/etendo/ad_reports/ReportGeneralLedgerJournal.html?Command=DIRECT"
-                + "&inpTable=318&inpRecord=ABC&inpAccSchemas=A,B,C&posted=Y";
+                + "&inpTable=318&inpRecord=ABC&inpAccSchemas=A,B,C";
         String body = newTabParams("Journal Entries Report")
                 + "submitThisPage('" + url + "');";
 
@@ -119,7 +122,7 @@ public class LegacyProcessServletReportForwarderTest {
 
         assertEquals(1, reports.size());
         assertEquals("/ad_reports/ReportGeneralLedgerJournal.html", reports.get(0).processUrl);
-        assertEquals("Command=DIRECT&inpTable=318&inpRecord=ABC&inpAccSchemas=A,B,C&posted=Y",
+        assertEquals("Command=DIRECT&inpTable=318&inpRecord=ABC&inpAccSchemas=A,B,C",
                 reports.get(0).params);
     }
 
@@ -321,7 +324,8 @@ public class LegacyProcessServletReportForwarderTest {
         assertTrue("Should contain processUrl", html.contains("\"processUrl\""));
         assertTrue("Should contain tabTitle", html.contains("\"tabTitle\""));
         assertTrue("Should contain params", html.contains("\"params\""));
-        assertTrue("Should contain the report URL", html.contains("/ad_reports/R.html"));
+        // Jettison escapes forward slashes as \/ in JSON strings
+        assertTrue("Should contain the report URL", html.contains("\\/ad_reports\\/R.html"));
         assertTrue("Should contain the params value", html.contains("Command=DIRECT"));
         assertTrue("Should contain the title value", html.contains("Title"));
         assertFalse("Should not embed closeModal", html.contains("'closeModal'"));
@@ -340,9 +344,10 @@ public class LegacyProcessServletReportForwarderTest {
         invokeWrite(response, Arrays.asList(r1, r2));
         printWriter.flush();
 
+        // Jettison escapes forward slashes as \/ in JSON strings
         String html = stringWriter.toString();
-        assertTrue(html.contains("/ad_reports/A.html"));
-        assertTrue(html.contains("/ad_reports/B.html"));
+        assertTrue(html.contains("\\/ad_reports\\/A.html"));
+        assertTrue(html.contains("\\/ad_reports\\/B.html"));
         assertTrue(html.contains("x=1"));
         assertTrue(html.contains("x=2"));
     }
@@ -362,6 +367,181 @@ public class LegacyProcessServletReportForwarderTest {
 
         String html = stringWriter.toString();
         assertTrue("Quote in tabTitle should be JSON-escaped (\\\\\")", html.contains("\\\""));
+    }
+
+    // -----------------------------------------------------------------
+    //  Multi-schema expansion (Journal Entries Report)
+    // -----------------------------------------------------------------
+
+    private static final String JOURNAL_ENTRIES_REPORT = "/ad_reports/ReportGeneralLedgerJournal.html";
+    private static final String OTHER_REPORT = "/ad_reports/OtherReport.html";
+
+    /**
+     * Default fake resolver: returns "Schema-<id>" so each id maps to a
+     * deterministic, unique name without hitting the DAL.
+     */
+    private static final java.util.function.Function<String, String> FAKE_NAME_RESOLVER =
+            id -> "Schema-" + id;
+
+    @Test
+    public void expandMultiSchemaReports_doesNotExpand_whenSingleSchema() throws Exception {
+        Object report = newReportInfo(JOURNAL_ENTRIES_REPORT, "Journal Entries Report - X",
+                "Command=DIRECT&inpAccSchemas=A&posted=Y");
+
+        List<ReportSnapshot> result = invokeExpand(Collections.singletonList(report), FAKE_NAME_RESOLVER);
+
+        assertEquals(1, result.size());
+        assertEquals("Command=DIRECT&inpAccSchemas=A&posted=Y", result.get(0).params);
+    }
+
+    @Test
+    public void expandMultiSchemaReports_doesNotExpand_whenPostedFlagAbsent() throws Exception {
+        Object report = newReportInfo(JOURNAL_ENTRIES_REPORT, "Journal Entries Report - X",
+                "Command=DIRECT&inpAccSchemas=A,B,C");
+
+        List<ReportSnapshot> result = invokeExpand(Collections.singletonList(report), FAKE_NAME_RESOLVER);
+
+        assertEquals(1, result.size());
+    }
+
+    @Test
+    public void expandMultiSchemaReports_doesNotExpand_whenReportIsNotJournalEntries() throws Exception {
+        Object report = newReportInfo(OTHER_REPORT, "Other - X",
+                "Command=DIRECT&inpAccSchemas=A,B&posted=Y");
+
+        List<ReportSnapshot> result = invokeExpand(Collections.singletonList(report), FAKE_NAME_RESOLVER);
+
+        assertEquals(1, result.size());
+        assertEquals(OTHER_REPORT, result.get(0).processUrl);
+    }
+
+    @Test
+    public void expandMultiSchemaReports_expandsIntoNReports_whenJournalEntriesWithMultipleSchemasAndPosted()
+            throws Exception {
+        Object report = newReportInfo(JOURNAL_ENTRIES_REPORT, "Journal Entries Report - Main USA",
+                "Command=DIRECT&inpTable=318&inpRecord=R&inpOrg=O&inpAccSchemas=A,B,C&posted=Y");
+
+        List<ReportSnapshot> result = invokeExpand(Collections.singletonList(report), FAKE_NAME_RESOLVER);
+
+        assertEquals(3, result.size());
+        // Entry 0: clone of the original WITHOUT posted=Y (the popup's
+        // openTabWhenPost JS would otherwise spawn an in-popup Smartclient
+        // tab for schema B and override this popup's own content).
+        assertEquals("Journal Entries Report - Main USA", result.get(0).tabTitle);
+        assertEquals("Command=DIRECT&inpTable=318&inpRecord=R&inpOrg=O&inpAccSchemas=A,B,C",
+                result.get(0).params);
+        // Entry 1: schema B
+        assertEquals(JOURNAL_ENTRIES_REPORT, result.get(1).processUrl);
+        assertEquals("Command=DIRECT&inpTable=318&inpRecord=R&inpOrg=O&inpParamschemas=B",
+                result.get(1).params);
+        assertEquals("Journal Entries Report - Schema-B", result.get(1).tabTitle);
+        // Entry 2: schema C
+        assertEquals("Command=DIRECT&inpTable=318&inpRecord=R&inpOrg=O&inpParamschemas=C",
+                result.get(2).params);
+        assertEquals("Journal Entries Report - Schema-C", result.get(2).tabTitle);
+    }
+
+    @Test
+    public void expandMultiSchemaReports_omitsEmptyFiltersInExpansion() throws Exception {
+        // Posted variants without invoice context (defensive — the catalogued
+        // Posted always emits inpTable/inpRecord/inpOrg, but the helper must
+        // not produce stray "&inpTable=" pairs for missing keys).
+        Object report = newReportInfo(JOURNAL_ENTRIES_REPORT, "Journal Entries Report - X",
+                "Command=DIRECT&inpAccSchemas=A,B&posted=Y");
+
+        List<ReportSnapshot> result = invokeExpand(Collections.singletonList(report), FAKE_NAME_RESOLVER);
+
+        assertEquals(2, result.size());
+        assertEquals("Command=DIRECT&inpParamschemas=B", result.get(1).params);
+    }
+
+    @Test
+    public void expandMultiSchemaReports_keepsTitlePrefix_whenOriginalContainsSeparator() throws Exception {
+        Object report = newReportInfo(JOURNAL_ENTRIES_REPORT, "Journal Entries Report - Main USA",
+                "Command=DIRECT&inpAccSchemas=A,B&posted=Y");
+
+        List<ReportSnapshot> result = invokeExpand(Collections.singletonList(report), FAKE_NAME_RESOLVER);
+
+        assertEquals(2, result.size());
+        // Prefix kept = everything before the LAST " - "
+        assertEquals("Journal Entries Report - Schema-B", result.get(1).tabTitle);
+    }
+
+    @Test
+    public void expandMultiSchemaReports_appendsToTitle_whenOriginalLacksSeparator() throws Exception {
+        Object report = newReportInfo(JOURNAL_ENTRIES_REPORT, "PlainTitle",
+                "Command=DIRECT&inpAccSchemas=A,B&posted=Y");
+
+        List<ReportSnapshot> result = invokeExpand(Collections.singletonList(report), FAKE_NAME_RESOLVER);
+
+        assertEquals(2, result.size());
+        // No " - " in the original → prefix = the whole title; suffix appended
+        assertEquals("PlainTitle - Schema-B", result.get(1).tabTitle);
+    }
+
+    @Test
+    public void expandMultiSchemaReports_fallsBackToSchemaIdWhenResolverReturnsId() throws Exception {
+        // Mirrors what the real resolveAcctSchemaName does on lookup failure:
+        // it returns the raw schemaId so the popup can still open with the
+        // UUID instead of a localised name.
+        java.util.function.Function<String, String> idEcho = id -> id;
+        Object report = newReportInfo(JOURNAL_ENTRIES_REPORT, "Journal Entries Report - Main",
+                "Command=DIRECT&inpAccSchemas=A,UNKNOWN&posted=Y");
+
+        List<ReportSnapshot> result = invokeExpand(Collections.singletonList(report), idEcho);
+
+        assertEquals(2, result.size());
+        assertEquals("Journal Entries Report - UNKNOWN", result.get(1).tabTitle);
+    }
+
+    @Test
+    public void expandMultiSchemaReports_removesPostedFlagFromFirstReport_whenExpanding() throws Exception {
+        // Once the backend has emitted N entries for the additional schemas,
+        // keeping posted=Y on the first entry would make the popup's
+        // openTabWhenPost JS open an extra Smartclient tab inside that popup
+        // for schema B and override the visible schema A.
+        Object report = newReportInfo(JOURNAL_ENTRIES_REPORT, "Journal Entries Report - X",
+                "Command=DIRECT&inpAccSchemas=A,B&posted=Y");
+
+        List<ReportSnapshot> result = invokeExpand(Collections.singletonList(report), FAKE_NAME_RESOLVER);
+
+        assertEquals(2, result.size());
+        assertFalse("First entry must not carry posted=Y once expanded",
+                result.get(0).params.contains("posted=Y"));
+        assertFalse("First entry must not carry posted= at all",
+                result.get(0).params.contains("posted="));
+        assertTrue("First entry must keep the rest of the original query",
+                result.get(0).params.contains("inpAccSchemas=A,B"));
+    }
+
+    @Test
+    public void expandMultiSchemaReports_keepsPostedFlag_whenSingleSchema() throws Exception {
+        // Single-schema does not expand; keeping posted=Y is harmless because
+        // openTabWhenPost iterates over inpParamschemas="" and the empty entry
+        // is filtered out before the in-popup tab spawn.
+        Object report = newReportInfo(JOURNAL_ENTRIES_REPORT, "Journal Entries Report - X",
+                "Command=DIRECT&inpAccSchemas=A&posted=Y");
+
+        List<ReportSnapshot> result = invokeExpand(Collections.singletonList(report), FAKE_NAME_RESOLVER);
+
+        assertEquals(1, result.size());
+        assertTrue("Single-schema entry must preserve posted=Y (no expansion path taken)",
+                result.get(0).params.contains("posted=Y"));
+    }
+
+    @Test
+    public void expandMultiSchemaReports_skipsEmptyEntries_whenCsvHasTrailingComma() throws Exception {
+        // The classic Java loop that builds the schemas variable in
+        // ReportGeneralLedgerJournal.java appends an extra "," to each id
+        // (`schemas + accSchemas[i] + ","`). If that artefact ever leaks into
+        // inpAccSchemas, the split must not produce a phantom empty entry.
+        Object report = newReportInfo(JOURNAL_ENTRIES_REPORT, "Journal Entries Report - X",
+                "Command=DIRECT&inpAccSchemas=A,B,&posted=Y");
+
+        List<ReportSnapshot> result = invokeExpand(Collections.singletonList(report), FAKE_NAME_RESOLVER);
+
+        assertEquals("Trailing-comma should not produce a third report: " + result, 2, result.size());
+        assertEquals("Command=DIRECT&inpParamschemas=B", result.get(1).params);
     }
 
     /**
@@ -430,5 +610,25 @@ public class LegacyProcessServletReportForwarderTest {
                 List.class);
         method.setAccessible(true);
         method.invoke(servlet, response, reports);
+    }
+
+    /**
+     * Calls {@code expandMultiSchemaReports(reports, resolver)} via reflection
+     * and converts the resulting {@code ReportInfo} list into snapshots. Used
+     * by the multi-schema tests to inject a deterministic name resolver
+     * instead of hitting DAL.
+     */
+    @SuppressWarnings("unchecked")
+    private List<ReportSnapshot> invokeExpand(List<Object> reports,
+            java.util.function.Function<String, String> resolver) throws Exception {
+        Method method = LegacyProcessServlet.class.getDeclaredMethod(
+                "expandMultiSchemaReports", List.class, java.util.function.Function.class);
+        method.setAccessible(true);
+        List<Object> raw = (List<Object>) method.invoke(servlet, reports, resolver);
+        List<ReportSnapshot> snapshots = new ArrayList<>(raw.size());
+        for (Object r : raw) {
+            snapshots.add(toSnapshot(r));
+        }
+        return snapshots;
     }
 }

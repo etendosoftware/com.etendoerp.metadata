@@ -36,6 +36,7 @@ import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.erpCommon.security.SessionLogin;
 import org.openbravo.model.ad.access.User;
+import org.openbravo.model.financialmgmt.accounting.coa.AcctSchema;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.Cookie;
@@ -44,11 +45,15 @@ import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -290,6 +295,29 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
      * (success/error message + parent table refresh).
      */
     private static final String REPORT_PATH_MARKER = "/ad_reports/";
+
+    /**
+     * Path of the General Ledger Journal report — the only confirmed AD report
+     * that the classic UI explodes into N popups when the posted invoice has
+     * multiple accounting schemas. The expansion logic lives in the report's
+     * own JS ({@code openTabWhenPost} in
+     * {@code ReportGeneralLedgerJournal.html}) and depends on the SmartClient
+     * shell ({@code LayoutMDI}, {@code OB.Layout.ViewManager}) which the new
+     * UI does not provide. We replicate it server-side so each schema gets
+     * its own browser popup driven by the {@code openLegacyReport} forwarder.
+     */
+    private static final String JOURNAL_ENTRIES_REPORT_PATH = "/ad_reports/ReportGeneralLedgerJournal.html";
+
+    private static final String INP_ACCSCHEMAS_KEY = "inpAccSchemas";
+    private static final String INP_PARAMSCHEMAS_KEY = "inpParamschemas";
+    private static final String POSTED_FLAG_KEY = "posted";
+    private static final String POSTED_FLAG_YES = "Y";
+    private static final String COMMAND_KEY = "Command";
+    private static final String COMMAND_DIRECT = "DIRECT";
+    private static final String INP_TABLE_KEY = "inpTable";
+    private static final String INP_RECORD_KEY = "inpRecord";
+    private static final String INP_ORG_KEY = "inpOrg";
+    private static final String TAB_TITLE_SEPARATOR = " - ";
 
     /**
      * Captures the {@code tabTitle} value embedded in the {@code newTabParams}
@@ -966,7 +994,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             String[] split = splitReportUrl(rawUrl, contextPath);
             reports.add(new ReportInfo(split[0], tabTitle, split[1]));
         }
-        return reports;
+        return expandMultiSchemaReports(reports, this::resolveAcctSchemaName);
     }
 
     /**
@@ -1022,6 +1050,208 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             return path.substring(contextPath.length());
         }
         return path;
+    }
+
+    /**
+     * Replicates the behaviour of {@code openTabWhenPost} in
+     * {@code ReportGeneralLedgerJournal.html} server-side: when a report URL
+     * targets the General Ledger Journal report, carries {@code posted=Y} and
+     * a CSV {@code inpAccSchemas} with multiple values, the original
+     * {@link ReportInfo} is followed by one extra entry per additional schema.
+     * Each extra entry uses {@code inpParamschemas=<single_id>} (the same
+     * shape the classic JS feeds {@code OB.Layout.ViewManager.openView}) and
+     * keeps the invoice filters explicit so the popups don't rely on session
+     * state shared with the first popup (they open in parallel from the new UI).
+     *
+     * @param reports         the reports as extracted from the popup body
+     * @param schemaNameResolver function that maps an accounting-schema id to its
+     *                        display name; tests inject a stub to avoid hitting DAL
+     * @return the (possibly expanded) report list, in the order they will be opened
+     */
+    List<ReportInfo> expandMultiSchemaReports(List<ReportInfo> reports,
+            Function<String, String> schemaNameResolver) {
+        List<ReportInfo> out = new ArrayList<>(reports.size());
+        for (ReportInfo r : reports) {
+            if (!shouldExpandMultiSchema(r)) {
+                out.add(r);
+                continue;
+            }
+            out.addAll(expandJournalEntriesReport(r, schemaNameResolver));
+        }
+        return out;
+    }
+
+    private boolean shouldExpandMultiSchema(ReportInfo r) {
+        if (!JOURNAL_ENTRIES_REPORT_PATH.equals(r.processUrl)) {
+            return false;
+        }
+        Map<String, String> kv = parseQueryParams(r.params);
+        if (!POSTED_FLAG_YES.equals(kv.get(POSTED_FLAG_KEY))) {
+            return false;
+        }
+        String csv = kv.get(INP_ACCSCHEMAS_KEY);
+        return csv != null && csv.contains(",");
+    }
+
+    private List<ReportInfo> expandJournalEntriesReport(ReportInfo original,
+            Function<String, String> schemaNameResolver) {
+        Map<String, String> kv = parseQueryParams(original.params);
+        String[] schemas = kv.get(INP_ACCSCHEMAS_KEY).split(",");
+        String table = kv.getOrDefault(INP_TABLE_KEY, "");
+        String record = kv.getOrDefault(INP_RECORD_KEY, "");
+        String org = kv.getOrDefault(INP_ORG_KEY, "");
+        String titlePrefix = extractTitlePrefix(original.tabTitle);
+
+        List<ReportInfo> result = new ArrayList<>();
+        // Entry 0: clone of the original with `posted=Y` stripped. The popup's
+        // openTabWhenPost JS only spawns extra in-popup Smartclient tabs when
+        // the flag is present; with N additional popups already opened from
+        // the parent UI, that in-popup spawn would override the first popup's
+        // own content and make every popup display the same schema.
+        String firstParams = removePostedFlag(original.params);
+        result.add(new ReportInfo(original.processUrl, original.tabTitle, firstParams));
+        for (int i = 1; i < schemas.length; i++) {
+            String schemaId = schemas[i].trim();
+            if (schemaId.isEmpty()) {
+                continue;
+            }
+            String params = buildSingleSchemaParams(table, record, org, schemaId);
+            String title = buildSchemaTabTitle(titlePrefix, schemaId, schemaNameResolver);
+            result.add(new ReportInfo(original.processUrl, title, params));
+        }
+        return result;
+    }
+
+    /**
+     * Decodes a query string ({@code k1=v1&k2=v2}) into a Map preserving the
+     * insertion order. Each pair is URL-decoded so we recover the original
+     * value (the source string was extracted from a quoted URL inside the
+     * popup body and may have been percent-encoded). Malformed pairs (no
+     * {@code =} or empty key) are skipped.
+     */
+    Map<String, String> parseQueryParams(String params) {
+        Map<String, String> map = new LinkedHashMap<>();
+        if (params == null || params.isEmpty()) {
+            return map;
+        }
+        for (String pair : params.split("&")) {
+            int eq = pair.indexOf('=');
+            if (eq <= 0) {
+                continue;
+            }
+            String key = pair.substring(0, eq);
+            String val = pair.substring(eq + 1);
+            try {
+                key = URLDecoder.decode(key, UTF8_CHARSET);
+                val = URLDecoder.decode(val, UTF8_CHARSET);
+            } catch (Exception ignore) {
+                // Keep raw values when decoding fails — defensive, should not
+                // happen with well-formed legacy URLs.
+            }
+            map.put(key, val);
+        }
+        return map;
+    }
+
+    /**
+     * Strips the {@code posted=<value>} pair from a query string, preserving
+     * the order and decoding of the remaining pairs. Applied to the first
+     * {@link ReportInfo} of a multi-schema expansion so the popup's
+     * {@code openTabWhenPost} JS (in {@code ReportGeneralLedgerJournal.html})
+     * does NOT detect the flag and call {@code OB.Layout.ViewManager.openView}
+     * inside the popup's own SmartClient — the parent UI already opens
+     * separate popups for the additional schemas, so the in-popup tab spawn
+     * would override the first popup's own content.
+     */
+    private String removePostedFlag(String params) {
+        if (params == null || params.isEmpty()) {
+            return params;
+        }
+        StringBuilder sb = new StringBuilder();
+        for (String pair : params.split("&")) {
+            if (pair.startsWith(POSTED_FLAG_KEY + "=")) {
+                continue;
+            }
+            if (sb.length() > 0) {
+                sb.append('&');
+            }
+            sb.append(pair);
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Builds the query string for a multi-schema follow-up popup. Order matters:
+     * {@code Command=DIRECT} comes first so it wins over the {@code Command=DEFAULT}
+     * that {@code OBClassicWindow} appends at the end of the iframe URL —
+     * {@code vars.getCommand()} reads the first occurrence.
+     */
+    private String buildSingleSchemaParams(String table, String record, String org, String schemaId) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(COMMAND_KEY).append('=').append(COMMAND_DIRECT);
+        if (!table.isEmpty()) {
+            sb.append('&').append(INP_TABLE_KEY).append('=').append(table);
+        }
+        if (!record.isEmpty()) {
+            sb.append('&').append(INP_RECORD_KEY).append('=').append(record);
+        }
+        if (!org.isEmpty()) {
+            sb.append('&').append(INP_ORG_KEY).append('=').append(org);
+        }
+        sb.append('&').append(INP_PARAMSCHEMAS_KEY).append('=').append(schemaId);
+        return sb.toString();
+    }
+
+    /**
+     * Returns the prefix portion of a tab title (everything before the last
+     * {@value #TAB_TITLE_SEPARATOR}). The classic flow renders
+     * {@code "Journal Entries Report - <firstSchemaName>"} as the popup title;
+     * we strip the schema-name suffix so the additional popups can build their
+     * own title with the same prefix and their own schema name.
+     */
+    String extractTitlePrefix(String tabTitle) {
+        if (tabTitle == null || tabTitle.isEmpty()) {
+            return "";
+        }
+        int sep = tabTitle.lastIndexOf(TAB_TITLE_SEPARATOR);
+        if (sep < 0) {
+            return tabTitle;
+        }
+        return tabTitle.substring(0, sep);
+    }
+
+    private String buildSchemaTabTitle(String prefix, String schemaId,
+            Function<String, String> schemaNameResolver) {
+        String name = schemaNameResolver.apply(schemaId);
+        if (prefix.isEmpty()) {
+            return name;
+        }
+        return prefix + TAB_TITLE_SEPARATOR + name;
+    }
+
+    /**
+     * Resolves the display name of an accounting schema via the DAL. Falls
+     * back to the raw {@code schemaId} when the entity is missing or the
+     * lookup throws — defensive, the report popup is still openable with the
+     * UUID in the title (better than a 500 swallowed by the forwarder).
+     * Uses {@code setAdminMode} because additional schemas may belong to
+     * organisations the current user cannot see directly.
+     */
+    private String resolveAcctSchemaName(String schemaId) {
+        try {
+            OBContext.setAdminMode(true);
+            try {
+                AcctSchema schema = OBDal.getInstance().get(AcctSchema.class, schemaId);
+                if (schema != null && schema.getName() != null) {
+                    return schema.getName();
+                }
+            } finally {
+                OBContext.restorePreviousMode();
+            }
+        } catch (Exception e) {
+            log.warn("Could not resolve AcctSchema name for id {}: {}", schemaId, e.getMessage());
+        }
+        return schemaId;
     }
 
     /**
