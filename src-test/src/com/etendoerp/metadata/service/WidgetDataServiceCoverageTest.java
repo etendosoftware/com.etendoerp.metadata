@@ -47,10 +47,18 @@ import static org.mockito.Mockito.when;
 @MockitoSettings(strictness = Strictness.LENIENT)
 class WidgetDataServiceCoverageTest extends AbstractMockedContextTest {
 
-    private static final String WIDGET_DATA_PATH = "/widget/inst1/data";
     private static final String INSTANCE_ID = "inst1";
+    private static final String CLASS_ID = "cls1";
     private static final String VALUE_KEY = "value";
     private static final String COLOR_KEY = "color";
+    private static final String KPI_TYPE = "KPI";
+    private static final String AUTH_HEADER = "Authorization";
+    private static final String AUTH_TOKEN = "Bearer tok";
+    private static final String EXTERNAL_URL = "https://api.example.com/data";
+
+    private static String widgetDataPath(String instanceId) {
+        return "/widget/" + instanceId + "/data";
+    }
 
     @SuppressWarnings("unchecked")
     private Query<Object[]> stubQuery(Object result, boolean isList) {
@@ -74,22 +82,26 @@ class WidgetDataServiceCoverageTest extends AbstractMockedContextTest {
                 .when(session).createQuery((String) argThat(s -> s != null && ((String) s).contains("etmeta_Widget_Param")), eq(Object[].class));
     }
 
-    private void setupRequestDefaults() {
-        when(request.getHeader("Authorization")).thenReturn("Bearer tok");
+    private void setupWidgetDataPath() {
+        when(request.getPathInfo()).thenReturn(widgetDataPath(INSTANCE_ID));
+        when(request.getHeader(AUTH_HEADER)).thenReturn(AUTH_TOKEN);
         when(request.getParameterMap()).thenReturn(new HashMap<>());
     }
 
-    private void setupWidgetDataPath() {
-        when(request.getPathInfo()).thenReturn(WIDGET_DATA_PATH);
-        setupRequestDefaults();
+    private Object[] defaultInstanceRow() {
+        return defaultInstanceRow(null);
     }
 
-    private Object[] defaultInstanceRow() {
-        return new Object[]{INSTANCE_ID, "cls1", null};
+    private Object[] defaultInstanceRow(String paramsJson) {
+        return new Object[]{INSTANCE_ID, CLASS_ID, paramsJson};
     }
 
     private Object[] defaultClassRow(String type) {
-        return new Object[]{"cls1", type, null, null, null};
+        return defaultClassRow(type, null);
+    }
+
+    private Object[] defaultClassRow(String type, String externalUrl) {
+        return new Object[]{CLASS_ID, type, null, externalUrl, null};
     }
 
     private WidgetDataService createServiceWithEmptyRegistry() {
@@ -98,9 +110,9 @@ class WidgetDataServiceCoverageTest extends AbstractMockedContextTest {
         return svc;
     }
 
-    private WidgetDataService createServiceWithResolver(String type, boolean available, JSONObject resolveResult) throws Exception {
+    private WidgetDataService createServiceWithResolver(boolean available, JSONObject resolveResult) throws Exception {
         WidgetDataResolver mockResolver = mock(WidgetDataResolver.class);
-        when(mockResolver.getType()).thenReturn(type);
+        when(mockResolver.getType()).thenReturn(KPI_TYPE);
         when(mockResolver.isAvailable()).thenReturn(available);
         if (resolveResult != null) {
             when(mockResolver.resolve(any())).thenReturn(resolveResult);
@@ -112,24 +124,53 @@ class WidgetDataServiceCoverageTest extends AbstractMockedContextTest {
         return svc;
     }
 
-    @Test
-    void processThrowsNotFoundForNullPathInfo() {
-        when(request.getPathInfo()).thenReturn(null);
+    private void processAndAssertContains(WidgetDataService svc, String expected) throws Exception {
+        svc.process();
+        assertTrue(responseCapture.toString().contains(expected));
+    }
+
+    private void runResolverTest(Object[] instanceRow, Object[] classRow,
+                                 java.util.List<Object[]> paramRows,
+                                 JSONObject resolveResult, String expectedContent) throws Exception {
+        setupWidgetDataPath();
+        runWithMockedContext(() -> {
+            setupQueries(instanceRow, classRow, paramRows);
+            WidgetDataService svc = createServiceWithResolver(true, resolveResult);
+            processAndAssertContains(svc, expectedContent);
+        });
+    }
+
+    private void runEmptyRegistryExpectingException(Object[] instanceRow, Object[] classRow,
+                                                    Class<? extends Exception> expectedException) throws Exception {
+        setupWidgetDataPath();
+        runWithMockedContext(() -> {
+            setupQueries(instanceRow, classRow, instanceRow != null ? Collections.emptyList() : null);
+            WidgetDataService svc = createServiceWithEmptyRegistry();
+            assertThrows(expectedException, svc::process);
+        });
+    }
+
+    private void assertNotFoundForPath(String path) {
+        when(request.getPathInfo()).thenReturn(path);
         WidgetDataService svc = new WidgetDataService(request, response);
         assertThrows(NotFoundException.class, svc::process);
+    }
+
+    @Test
+    void processThrowsNotFoundForNullPathInfo() {
+        assertNotFoundForPath(null);
     }
 
     @Test
     void processThrowsNotFoundForPathWithoutWidgetSegment() {
-        when(request.getPathInfo()).thenReturn("/something/else");
-        WidgetDataService svc = new WidgetDataService(request, response);
-        assertThrows(NotFoundException.class, svc::process);
+        assertNotFoundForPath("/something/else");
     }
 
     @Test
     void processThrowsNotFoundWhenInstanceNotFound() throws Exception {
-        when(request.getPathInfo()).thenReturn("/widget/missing-id/data");
-        setupRequestDefaults();
+        when(request.getPathInfo()).thenReturn(widgetDataPath("missing-id"));
+        when(request.getHeader(AUTH_HEADER)).thenReturn(AUTH_TOKEN);
+        when(request.getParameterMap()).thenReturn(new HashMap<>());
         runWithMockedContext(() -> {
             setupQueries(null, null, null);
             WidgetDataService svc = createServiceWithEmptyRegistry();
@@ -139,44 +180,29 @@ class WidgetDataServiceCoverageTest extends AbstractMockedContextTest {
 
     @Test
     void processThrowsNotFoundWhenClassNotFound() throws Exception {
-        setupWidgetDataPath();
-        Object[] instanceRow = defaultInstanceRow();
-        runWithMockedContext(() -> {
-            setupQueries(instanceRow, null, null);
-            WidgetDataService svc = createServiceWithEmptyRegistry();
-            assertThrows(InternalServerException.class, svc::process);
-        });
+        runEmptyRegistryExpectingException(defaultInstanceRow(), null, InternalServerException.class);
     }
 
     @Test
     void processReturnsUnavailableWhenResolverNotAvailable() throws Exception {
         setupWidgetDataPath();
-        Object[] instanceRow = defaultInstanceRow();
-        Object[] classRow = defaultClassRow("KPI");
         runWithMockedContext(() -> {
-            setupQueries(instanceRow, classRow, Collections.emptyList());
-            WidgetDataService svc = createServiceWithResolver("KPI", false, null);
-            svc.process();
-            assertTrue(responseCapture.toString().contains("\"available\":false"));
+            setupQueries(defaultInstanceRow(), defaultClassRow(KPI_TYPE), Collections.emptyList());
+            WidgetDataService svc = createServiceWithResolver(false, null);
+            processAndAssertContains(svc, "\"available\":false");
         });
     }
 
     @Test
     void processThrowsWhenNoResolverAndNoExternalUrl() throws Exception {
-        setupWidgetDataPath();
-        Object[] instanceRow = defaultInstanceRow();
-        Object[] classRow = defaultClassRow("UNKNOWN_TYPE");
-        runWithMockedContext(() -> {
-            setupQueries(instanceRow, classRow, Collections.emptyList());
-            WidgetDataService svc = createServiceWithEmptyRegistry();
-            assertThrows(InternalServerException.class, svc::process);
-        });
+        runEmptyRegistryExpectingException(defaultInstanceRow(), defaultClassRow("UNKNOWN_TYPE"),
+                InternalServerException.class);
     }
 
     @Test
     void processAppliesRequestParamsPageAndPageSize() throws Exception {
-        when(request.getPathInfo()).thenReturn(WIDGET_DATA_PATH);
-        when(request.getHeader("Authorization")).thenReturn("Bearer tok");
+        when(request.getPathInfo()).thenReturn(widgetDataPath(INSTANCE_ID));
+        when(request.getHeader(AUTH_HEADER)).thenReturn(AUTH_TOKEN);
         when(request.getParameter("page")).thenReturn("2");
         when(request.getParameter("pageSize")).thenReturn("25");
         Map<String, String[]> paramMap = new HashMap<>();
@@ -184,40 +210,30 @@ class WidgetDataServiceCoverageTest extends AbstractMockedContextTest {
         paramMap.put("pageSize", new String[]{"25"});
         paramMap.put("customFilter", new String[]{"abc"});
         when(request.getParameterMap()).thenReturn(paramMap);
-        Object[] instanceRow = defaultInstanceRow();
-        Object[] classRow = defaultClassRow("KPI");
         runWithMockedContext(() -> {
-            setupQueries(instanceRow, classRow, Collections.emptyList());
-            WidgetDataService svc = createServiceWithResolver("KPI", true, new JSONObject().put(VALUE_KEY, 42));
-            svc.process();
-            assertTrue(responseCapture.toString().contains("42"));
+            setupQueries(defaultInstanceRow(), defaultClassRow(KPI_TYPE), Collections.emptyList());
+            WidgetDataService svc = createServiceWithResolver(true, new JSONObject().put(VALUE_KEY, 42));
+            processAndAssertContains(svc, "42");
         });
     }
 
     @Test
     void processMergesParamDefaultsAndInstanceOverrides() throws Exception {
-        setupWidgetDataPath();
-        Object[] instanceRow = {INSTANCE_ID, "cls1", "{\"color\":\"red\",\"fixedKey\":\"override\"}"};
-        Object[] classRow = defaultClassRow("KPI");
         java.util.List<Object[]> paramRows = new java.util.ArrayList<>();
         paramRows.add(new Object[]{COLOR_KEY, "blue", false});
         paramRows.add(new Object[]{"size", "10", false});
         paramRows.add(new Object[]{"fixedKey", "fixedValue", true});
-        runWithMockedContext(() -> {
-            setupQueries(instanceRow, classRow, paramRows);
-            WidgetDataService svc = createServiceWithResolver("KPI", true, new JSONObject().put(VALUE_KEY, 99));
-            svc.process();
-            assertTrue(responseCapture.toString().contains("99"));
-        });
+        runResolverTest(
+                defaultInstanceRow("{\"color\":\"red\",\"fixedKey\":\"override\"}"),
+                defaultClassRow(KPI_TYPE), paramRows,
+                new JSONObject().put(VALUE_KEY, 99), "99");
     }
 
     @Test
     void processWithNullRegistryFallsBackToProxyResolverWhenExternalUrlSet() throws Exception {
         setupWidgetDataPath();
-        Object[] instanceRow = defaultInstanceRow();
-        Object[] classRow = {"cls1", "CUSTOM", null, "https://api.example.com/data", null};
         runWithMockedContext(() -> {
-            setupQueries(instanceRow, classRow, Collections.emptyList());
+            setupQueries(defaultInstanceRow(), defaultClassRow("CUSTOM", EXTERNAL_URL), Collections.emptyList());
             WidgetDataService svc = new WidgetDataService(request, response);
             svc.setRegistry(null);
             assertThrows(Exception.class, svc::process);
@@ -227,51 +243,34 @@ class WidgetDataServiceCoverageTest extends AbstractMockedContextTest {
     @Test
     void processWithProxyTypeFallsBackToProxyResolver() throws Exception {
         setupWidgetDataPath();
-        Object[] instanceRow = defaultInstanceRow();
-        Object[] classRow = defaultClassRow("PROXY");
         runWithMockedContext(() -> {
-            setupQueries(instanceRow, classRow, Collections.emptyList());
+            setupQueries(defaultInstanceRow(), defaultClassRow("PROXY"), Collections.emptyList());
             WidgetDataService svc = createServiceWithEmptyRegistry();
-            svc.process();
-            assertTrue(responseCapture.toString().contains("no_external_url"));
+            processAndAssertContains(svc, "no_external_url");
         });
     }
 
     @Test
     void processWithBlankInstanceParamsJsonSkipsOverrides() throws Exception {
-        setupWidgetDataPath();
-        Object[] instanceRow = {INSTANCE_ID, "cls1", "   "};
-        Object[] classRow = defaultClassRow("KPI");
         java.util.List<Object[]> paramRows = new java.util.ArrayList<>();
         paramRows.add(new Object[]{COLOR_KEY, "blue", false});
-        runWithMockedContext(() -> {
-            setupQueries(instanceRow, classRow, paramRows);
-            WidgetDataService svc = createServiceWithResolver("KPI", true, new JSONObject().put(VALUE_KEY, 77));
-            svc.process();
-            assertTrue(responseCapture.toString().contains("77"));
-        });
+        runResolverTest(
+                defaultInstanceRow("   "), defaultClassRow(KPI_TYPE), paramRows,
+                new JSONObject().put(VALUE_KEY, 77), "77");
     }
 
     @Test
     void extractInstanceIdSkipsClassesSegment() {
-        when(request.getPathInfo()).thenReturn("/widget/classes");
-        WidgetDataService svc = new WidgetDataService(request, response);
-        assertThrows(NotFoundException.class, svc::process);
+        assertNotFoundForPath("/widget/classes");
     }
 
     @Test
     void processWithNullParamDefaultsSkipsNullValues() throws Exception {
-        setupWidgetDataPath();
-        Object[] instanceRow = defaultInstanceRow();
-        Object[] classRow = defaultClassRow("KPI");
         java.util.List<Object[]> paramRows = new java.util.ArrayList<>();
         paramRows.add(new Object[]{COLOR_KEY, null, false});
         paramRows.add(new Object[]{"size", "10", false});
-        runWithMockedContext(() -> {
-            setupQueries(instanceRow, classRow, paramRows);
-            WidgetDataService svc = createServiceWithResolver("KPI", true, new JSONObject().put("ok", true));
-            svc.process();
-            assertTrue(responseCapture.toString().contains("ok"));
-        });
+        runResolverTest(
+                defaultInstanceRow(), defaultClassRow(KPI_TYPE), paramRows,
+                new JSONObject().put("ok", true), "ok");
     }
 }

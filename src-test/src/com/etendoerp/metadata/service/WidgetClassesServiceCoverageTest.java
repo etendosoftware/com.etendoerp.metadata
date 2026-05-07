@@ -75,13 +75,20 @@ class WidgetClassesServiceCoverageTest extends AbstractMockedContextTest {
         return list;
     }
 
-    private void runWithRegistryAndNullResolver(ThrowingRunnable action) throws Exception {
+    private void runWithRegistry(java.util.function.Consumer<WidgetResolverRegistry> registrySetup,
+                                 ThrowingRunnable action) throws Exception {
         try (MockedStatic<WidgetResolverRegistryHolder> regS = mockStatic(WidgetResolverRegistryHolder.class)) {
             WidgetResolverRegistry registry = mock(WidgetResolverRegistry.class);
             regS.when(WidgetResolverRegistryHolder::getInstance).thenReturn(registry);
-            when(registry.getResolver(anyString())).thenReturn(null);
+            if (registrySetup != null) {
+                registrySetup.accept(registry);
+            }
             runWithMockedContext(action);
         }
+    }
+
+    private void runWithRegistryAndNullResolver(ThrowingRunnable action) throws Exception {
+        runWithRegistry(reg -> when(reg.getResolver(anyString())).thenReturn(null), action);
     }
 
     private JSONObject processAndParse(List<Object[]> classRows, List<Object[]> paramRows) throws Exception {
@@ -135,35 +142,25 @@ class WidgetClassesServiceCoverageTest extends AbstractMockedContextTest {
 
     @Test
     void processWithEmptyClassListReturnsEmptyArray() throws Exception {
-        try (MockedStatic<WidgetResolverRegistryHolder> regS = mockStatic(WidgetResolverRegistryHolder.class)) {
-            WidgetResolverRegistry registry = mock(WidgetResolverRegistry.class);
-            regS.when(WidgetResolverRegistryHolder::getInstance).thenReturn(registry);
-
-            runWithMockedContext(() -> {
-                JSONObject result = processAndParse(Collections.emptyList(), Collections.emptyList());
-                assertEquals(0, result.getJSONArray(CLASSES_KEY).length());
-            });
-        }
+        runWithRegistry(null, () -> {
+            JSONObject result = processAndParse(Collections.emptyList(), Collections.emptyList());
+            assertEquals(0, result.getJSONArray(CLASSES_KEY).length());
+        });
     }
 
     @Test
     void processWithUnavailableResolverSetsAvailableFalse() throws Exception {
         Object[] classRow = {CLASS_ID_1, "copilot-widget", "COPILOT", "Copilot", "desc", 2, 1, 30};
 
-        try (MockedStatic<WidgetResolverRegistryHolder> regS = mockStatic(WidgetResolverRegistryHolder.class)) {
-            WidgetResolverRegistry registry = mock(WidgetResolverRegistry.class);
-            regS.when(WidgetResolverRegistryHolder::getInstance).thenReturn(registry);
-
+        runWithRegistry(registry -> {
             WidgetDataResolver mockResolver = mock(WidgetDataResolver.class);
             when(mockResolver.isAvailable()).thenReturn(false);
             when(registry.getResolver("COPILOT")).thenReturn(mockResolver);
-
-            runWithMockedContext(() -> {
-                JSONObject result = processAndParse(asRowList(classRow), Collections.emptyList());
-                JSONObject cls = result.getJSONArray(CLASSES_KEY).getJSONObject(0);
-                assertFalse(cls.getBoolean("available"));
-            });
-        }
+        }, () -> {
+            JSONObject result = processAndParse(asRowList(classRow), Collections.emptyList());
+            JSONObject cls = result.getJSONArray(CLASSES_KEY).getJSONObject(0);
+            assertFalse(cls.getBoolean("available"));
+        });
     }
 
     @Test

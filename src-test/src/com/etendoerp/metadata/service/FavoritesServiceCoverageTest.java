@@ -19,10 +19,7 @@ package com.etendoerp.metadata.service;
 
 import com.etendoerp.metadata.data.UserFavorite;
 import com.etendoerp.metadata.exceptions.InternalServerException;
-import org.hibernate.Session;
 import org.hibernate.query.Query;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -31,20 +28,14 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.openbravo.base.provider.OBProvider;
-import org.openbravo.dal.core.OBContext;
-import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.access.Role;
 import org.openbravo.model.ad.access.User;
 import org.openbravo.model.ad.system.Client;
 import org.openbravo.model.ad.ui.Menu;
 import org.openbravo.model.common.enterprise.Organization;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import java.io.BufferedReader;
-import java.io.PrintWriter;
 import java.io.StringReader;
-import java.io.StringWriter;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -61,59 +52,34 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
-class FavoritesServiceCoverageTest {
+class FavoritesServiceCoverageTest extends AbstractMockedContextTest {
 
     private static final String USER_ID = "user-001";
     private static final String ROLE_ID = "role-001";
     private static final String MENU_ID = "menu-001";
     private static final String FAVORITES_TOGGLE_PATH = "/favorites/toggle";
 
-    @Mock HttpServletRequest request;
-    @Mock HttpServletResponse response;
-    @Mock OBDal obDal;
-    @Mock OBContext obContext;
-    @Mock Session session;
     @Mock OBProvider obProvider;
 
-    private MockedStatic<OBDal> dalStatic;
-    private MockedStatic<OBContext> ctxStatic;
-    private MockedStatic<OBProvider> providerStatic;
-    private StringWriter outputWriter;
+    private void runWithFavoritesContext(ThrowingRunnable action) throws Exception {
+        try (MockedStatic<OBProvider> providerStatic = mockStatic(OBProvider.class)) {
+            providerStatic.when(OBProvider::getInstance).thenReturn(obProvider);
 
-    @BeforeEach
-    void setUp() throws Exception {
-        dalStatic = mockStatic(OBDal.class);
-        ctxStatic = mockStatic(OBContext.class);
-        providerStatic = mockStatic(OBProvider.class);
+            runWithMockedContext(() -> {
+                lenient().when(obContext.getCurrentClient()).thenReturn(mock(Client.class));
+                lenient().when(obContext.getCurrentOrganization()).thenReturn(mock(Organization.class));
 
-        dalStatic.when(OBDal::getInstance).thenReturn(obDal);
-        ctxStatic.when(OBContext::getOBContext).thenReturn(obContext);
-        ctxStatic.when(() -> OBContext.setAdminMode(anyBoolean())).thenAnswer(inv -> null);
-        ctxStatic.when(OBContext::restorePreviousMode).thenAnswer(inv -> null);
-        providerStatic.when(OBProvider::getInstance).thenReturn(obProvider);
+                User mockUser = mock(User.class);
+                lenient().when(mockUser.getId()).thenReturn(USER_ID);
+                lenient().when(obContext.getUser()).thenReturn(mockUser);
 
-        when(obDal.getSession()).thenReturn(session);
+                Role mockRole = mock(Role.class);
+                lenient().when(mockRole.getId()).thenReturn(ROLE_ID);
+                lenient().when(obContext.getRole()).thenReturn(mockRole);
 
-        User mockUser = mock(User.class);
-        lenient().when(mockUser.getId()).thenReturn(USER_ID);
-        lenient().when(obContext.getUser()).thenReturn(mockUser);
-
-        Role mockRole = mock(Role.class);
-        lenient().when(mockRole.getId()).thenReturn(ROLE_ID);
-        lenient().when(obContext.getRole()).thenReturn(mockRole);
-
-        lenient().when(obContext.getCurrentClient()).thenReturn(mock(Client.class));
-        lenient().when(obContext.getCurrentOrganization()).thenReturn(mock(Organization.class));
-
-        outputWriter = new StringWriter();
-        lenient().when(response.getWriter()).thenReturn(new PrintWriter(outputWriter));
-    }
-
-    @AfterEach
-    void tearDown() {
-        if (dalStatic != null) dalStatic.close();
-        if (ctxStatic != null) ctxStatic.close();
-        if (providerStatic != null) providerStatic.close();
+                action.run();
+            });
+        }
     }
 
     private void setRequestBody(String body) throws Exception {
@@ -121,106 +87,73 @@ class FavoritesServiceCoverageTest {
     }
 
     @SuppressWarnings("unchecked")
-    private void setupExistsQuery(long count) {
-        Query<Long> existsQuery = mock(Query.class);
+    private UserFavorite setupToggleAddScenario(Long maxSeqResult) throws Exception {
+        when(request.getPathInfo()).thenReturn(FAVORITES_TOGGLE_PATH);
+        when(request.getMethod()).thenReturn("POST");
+        setRequestBody("{\"menuId\":\"" + MENU_ID + "\"}");
+
+        when(obDal.get(Menu.class, MENU_ID)).thenReturn(mock(Menu.class));
+
+        Query<Long> seqQuery = mock(Query.class);
         when(session.createQuery(any(String.class), eq(Long.class)))
-                .thenReturn(existsQuery);
-        when(existsQuery.setParameter(anyString(), anyString())).thenReturn(existsQuery);
-        when(existsQuery.uniqueResult()).thenReturn(count);
+                .thenReturn(seqQuery);
+        when(seqQuery.setParameter(anyString(), anyString())).thenReturn(seqQuery);
+        when(seqQuery.uniqueResult()).thenReturn(0L).thenReturn(maxSeqResult);
+
+        UserFavorite mockFav = mock(UserFavorite.class);
+        when(obProvider.get(UserFavorite.class)).thenReturn(mockFav);
+
+        when(obDal.get(User.class, USER_ID)).thenReturn(mock(User.class));
+        when(obDal.get(Role.class, ROLE_ID)).thenReturn(mock(Role.class));
+
+        return mockFav;
+    }
+
+    private void assertNotFoundForMethodAndPath(String method, String path) {
+        when(request.getPathInfo()).thenReturn(path);
+        when(request.getMethod()).thenReturn(method);
+        FavoritesService svc = new FavoritesService(request, response);
+        assertThrows(com.etendoerp.metadata.exceptions.NotFoundException.class, svc::process);
     }
 
     @Test
     void saveExceptionEvictsEntityAndRethrows() throws Exception {
-        when(request.getPathInfo()).thenReturn(FAVORITES_TOGGLE_PATH);
-        when(request.getMethod()).thenReturn("POST");
-        setRequestBody("{\"menuId\":\"" + MENU_ID + "\"}");
+        runWithFavoritesContext(() -> {
+            UserFavorite mockFav = setupToggleAddScenario(10L);
+            doThrow(new RuntimeException("constraint violation")).when(session).save(any());
 
-        setupExistsQuery(0L);
+            FavoritesService svc = new FavoritesService(request, response);
+            assertThrows(InternalServerException.class, svc::process);
 
-        Menu mockMenu = mock(Menu.class);
-        when(obDal.get(Menu.class, MENU_ID)).thenReturn(mockMenu);
-
-        @SuppressWarnings("unchecked")
-        Query<Long> seqQuery = mock(Query.class);
-        when(session.createQuery(any(String.class), eq(Long.class)))
-                .thenReturn(seqQuery);
-        when(seqQuery.setParameter(anyString(), anyString())).thenReturn(seqQuery);
-        when(seqQuery.uniqueResult()).thenReturn(0L).thenReturn(10L);
-
-        UserFavorite mockFav = mock(UserFavorite.class);
-        when(obProvider.get(UserFavorite.class)).thenReturn(mockFav);
-
-        when(obDal.get(User.class, USER_ID)).thenReturn(mock(User.class));
-        when(obDal.get(Role.class, ROLE_ID)).thenReturn(mock(Role.class));
-
-        // Make save throw to trigger the catch block with evict
-        doThrow(new RuntimeException("constraint violation")).when(session).save(any());
-
-        FavoritesService svc = new FavoritesService(request, response);
-        assertThrows(InternalServerException.class, svc::process);
-
-        verify(session).evict(mockFav);
+            verify(session).evict(mockFav);
+        });
     }
 
     @Test
     void addFavoriteWithNullMaxSeqnoDefaultsToTen() throws Exception {
-        when(request.getPathInfo()).thenReturn(FAVORITES_TOGGLE_PATH);
-        when(request.getMethod()).thenReturn("POST");
-        setRequestBody("{\"menuId\":\"" + MENU_ID + "\"}");
+        runWithFavoritesContext(() -> {
+            UserFavorite mockFav = setupToggleAddScenario(null);
 
-        setupExistsQuery(0L);
+            FavoritesService svc = new FavoritesService(request, response);
+            svc.process();
 
-        Menu mockMenu = mock(Menu.class);
-        when(obDal.get(Menu.class, MENU_ID)).thenReturn(mockMenu);
-
-        @SuppressWarnings("unchecked")
-        Query<Long> seqQuery = mock(Query.class);
-        when(session.createQuery(any(String.class), eq(Long.class)))
-                .thenReturn(seqQuery);
-        when(seqQuery.setParameter(anyString(), anyString())).thenReturn(seqQuery);
-        // First call: exists check returns 0, second call: max seqno returns null
-        when(seqQuery.uniqueResult()).thenReturn(0L).thenReturn(null);
-
-        UserFavorite mockFav = mock(UserFavorite.class);
-        when(obProvider.get(UserFavorite.class)).thenReturn(mockFav);
-
-        when(obDal.get(User.class, USER_ID)).thenReturn(mock(User.class));
-        when(obDal.get(Role.class, ROLE_ID)).thenReturn(mock(Role.class));
-
-        FavoritesService svc = new FavoritesService(request, response);
-        svc.process();
-
-        // When maxSeq is null, sequenceNo should be 10
-        verify(mockFav).setSequenceNo(10L);
-
-        String output = outputWriter.toString();
-        assertTrue(output.contains("added"));
+            verify(mockFav).setSequenceNo(10L);
+            assertTrue(responseCapture.toString().contains("added"));
+        });
     }
 
     @Test
     void processThrowsNotFoundForPutMethod() {
-        when(request.getPathInfo()).thenReturn(FAVORITES_TOGGLE_PATH);
-        when(request.getMethod()).thenReturn("PUT");
-
-        FavoritesService svc = new FavoritesService(request, response);
-        assertThrows(com.etendoerp.metadata.exceptions.NotFoundException.class, svc::process);
+        assertNotFoundForMethodAndPath("PUT", FAVORITES_TOGGLE_PATH);
     }
 
     @Test
     void processThrowsNotFoundForDeleteMethod() {
-        when(request.getPathInfo()).thenReturn(FAVORITES_TOGGLE_PATH);
-        when(request.getMethod()).thenReturn("DELETE");
-
-        FavoritesService svc = new FavoritesService(request, response);
-        assertThrows(com.etendoerp.metadata.exceptions.NotFoundException.class, svc::process);
+        assertNotFoundForMethodAndPath("DELETE", FAVORITES_TOGGLE_PATH);
     }
 
     @Test
     void processThrowsNotFoundForWrongPathSuffix() {
-        when(request.getPathInfo()).thenReturn("/favorites/list");
-        when(request.getMethod()).thenReturn("POST");
-
-        FavoritesService svc = new FavoritesService(request, response);
-        assertThrows(com.etendoerp.metadata.exceptions.NotFoundException.class, svc::process);
+        assertNotFoundForMethodAndPath("POST", "/favorites/list");
     }
 }
