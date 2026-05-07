@@ -139,7 +139,7 @@ public class QueryListResolver implements WidgetDataResolver {
                 String entityName = entry.getString("entity");
 
                 Object[] windowTab = resolveWindowTab(entityName);
-                if (windowTab != null) {
+                if (windowTab.length >= 2) {
                     result.put(colName, new LinkDef(idCol,
                         (String) windowTab[1], (String) windowTab[0]));
                 }
@@ -161,10 +161,11 @@ public class QueryListResolver implements WidgetDataResolver {
                 .createQuery(TAB_LOOKUP_HQL, Object[].class);
             q.setParameter("tn", entity.getTableName());
             q.setMaxResults(1);
-            return q.uniqueResult();
+            Object[] result = q.uniqueResult();
+            return result != null ? result : new Object[0];
         } catch (Exception e) {
             log.warn("Could not resolve window/tab for entity: {}", entityName, e);
-            return null;
+            return new Object[0];
         }
     }
 

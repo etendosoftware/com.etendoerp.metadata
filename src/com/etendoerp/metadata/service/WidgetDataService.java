@@ -167,6 +167,13 @@ public class WidgetDataService extends MetadataService {
     private Map<String, Object> mergeParams(String classId, String instanceParamsJson) throws Exception {
         Map<String, Object> merged = new HashMap<>();
         java.util.Set<String> fixedNames = new java.util.HashSet<>();
+        loadParamDefaults(classId, merged, fixedNames);
+        applyInstanceOverrides(instanceParamsJson, merged, fixedNames);
+        return merged;
+    }
+
+    private void loadParamDefaults(String classId, Map<String, Object> merged,
+                                   java.util.Set<String> fixedNames) {
         Query<Object[]> q = OBDal.getInstance().getSession()
                 .createQuery(PARAM_DEFAULTS_HQL, Object[].class);
         q.setParameter("classId", classId);
@@ -175,17 +182,19 @@ public class WidgetDataService extends MetadataService {
             if (row[1] != null) merged.put(name, row[1]);
             if (Boolean.TRUE.equals(row[2])) fixedNames.add(name);
         }
-        if (instanceParamsJson != null && !instanceParamsJson.isBlank()) {
-            JSONObject overrides = new JSONObject(instanceParamsJson);
-            java.util.Iterator<?> keys = overrides.keys();
-            while (keys.hasNext()) {
-                String k = (String) keys.next();
-                if (!fixedNames.contains(k)) {
-                    try { merged.put(k, overrides.get(k)); } catch (Exception ignored) { /* skip unparseable override */ }
-                }
+    }
+
+    private void applyInstanceOverrides(String instanceParamsJson, Map<String, Object> merged,
+                                        java.util.Set<String> fixedNames) throws Exception {
+        if (instanceParamsJson == null || instanceParamsJson.isBlank()) return;
+        JSONObject overrides = new JSONObject(instanceParamsJson);
+        java.util.Iterator<?> keys = overrides.keys();
+        while (keys.hasNext()) {
+            String k = (String) keys.next();
+            if (!fixedNames.contains(k)) {
+                try { merged.put(k, overrides.get(k)); } catch (Exception ignored) { /* skip unparseable */ }
             }
         }
-        return merged;
     }
 
     private Map<String, Object> toMap(Object[] row) {
