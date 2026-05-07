@@ -56,8 +56,8 @@ public class WidgetDataService extends MetadataService {
         "from etmeta_Widget_Class wc where wc.id = :id";
 
     private static final String PARAM_DEFAULTS_HQL =
-        "select p.name, p.defaultValue from etmeta_Widget_Param p " +
-        "where p.widgetClass.id = :classId and p.active = true and p.isFixed = false";
+        "select p.name, p.defaultValue, p.isFixed from etmeta_Widget_Param p " +
+        "where p.widgetClass.id = :classId and p.active = true";
 
     // Injected in tests; in production resolved via the static holder
     private WidgetResolverRegistry registry;
@@ -166,18 +166,23 @@ public class WidgetDataService extends MetadataService {
 
     private Map<String, Object> mergeParams(String classId, String instanceParamsJson) throws Exception {
         Map<String, Object> merged = new HashMap<>();
+        java.util.Set<String> fixedNames = new java.util.HashSet<>();
         Query<Object[]> q = OBDal.getInstance().getSession()
                 .createQuery(PARAM_DEFAULTS_HQL, Object[].class);
         q.setParameter("classId", classId);
         for (Object[] row : q.list()) {
-            if (row[1] != null) merged.put((String) row[0], row[1]);
+            String name = (String) row[0];
+            if (row[1] != null) merged.put(name, row[1]);
+            if (Boolean.TRUE.equals(row[2])) fixedNames.add(name);
         }
         if (instanceParamsJson != null && !instanceParamsJson.isBlank()) {
             JSONObject overrides = new JSONObject(instanceParamsJson);
             java.util.Iterator<?> keys = overrides.keys();
             while (keys.hasNext()) {
                 String k = (String) keys.next();
-                try { merged.put(k, overrides.get(k)); } catch (Exception ignored) { /* skip unparseable override */ }
+                if (!fixedNames.contains(k)) {
+                    try { merged.put(k, overrides.get(k)); } catch (Exception ignored) { /* skip unparseable override */ }
+                }
             }
         }
         return merged;
