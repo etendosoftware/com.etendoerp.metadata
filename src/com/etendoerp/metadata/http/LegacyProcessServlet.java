@@ -23,6 +23,7 @@ import com.smf.securewebservices.utils.SecureWebServicesUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.base.HttpBaseUtils;
@@ -44,8 +45,10 @@ import javax.servlet.http.HttpSession;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -244,6 +247,74 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
                     "(function(){if(!window.parent)return;" +
                     "window.parent.postMessage({type:'" + LegacyMessageProtocol.MESSAGE_TYPE + ACTION_JSON_SEPARATOR
                     + "'" + LegacyMessageProtocol.ACTION_REQUEST_FAILED + "'},'*');" +
+                    "window.__etendoMessageSent=true;" +
+                    "})();</script></head><body></body></html>";
+
+    /**
+     * Matches the {@code submitThisPage('<url>');} call emitted by the
+     * {@code PopUp_Response.html} template (rendered by
+     * {@code HttpSecureAppServlet.printPageClosePopUp(response, vars, path, ...)}).
+     * The captured group is any URL-shaped argument — relative path
+     * ({@code /...}) or absolute http(s) URL. This deliberately excludes:
+     * <ul>
+     *   <li>the no-URL branch ({@code submitThisPage(null);}) — no quotes;</li>
+     *   <li>action codes used by the form-render HTML
+     *       ({@code 'SAVE'}, {@code 'OK'}, {@code 'EDIT'}, {@code 'REFRESH'}, ...)
+     *       which are passed to the same JS helper but identify a button command,
+     *       not a URL.</li>
+     * </ul>
+     * Without this URL-shape check, the very first GET on an action button
+     * (which renders the confirmation form) would short-circuit before the user
+     * even submits.
+     * <p>
+     * Whether the matched URL must trigger an {@code openLegacyReport} forwarder
+     * is decided separately by {@link #REPORT_PATH_MARKER}: the regex on its own
+     * does NOT imply "is a report" — many callers of {@code printPageClosePopUp}
+     * pass parent-tab URLs built from {@code Utility.getTabURL(...)} that just
+     * refresh the source tab in the classic UI.
+     */
+    private static final Pattern SUBMIT_THIS_PAGE_HREF =
+            Pattern.compile("submitThisPage\\(\\s*'(/[^']+|https?://[^']+)'\\s*\\);");
+
+    /**
+     * Path marker that identifies a classic Openbravo AD report URL. Posted
+     * ({@code org.openbravo.erpCommon.ad_actionButton.Posted}) is the only
+     * confirmed action button that returns a report — its URL is built from
+     * {@code AcctServer.getDocumentPaths()} and always contains
+     * {@code /ad_reports/}. All other callers of
+     * {@code printPageClosePopUp(response, vars, path, ...)} (Reactivate via
+     * {@code ProcessInvoice}, the {@code CopyFrom*} family, {@code ProjectClose},
+     * etc.) pass window URLs from {@code Utility.getTabURL(strTabId, "R", true)}
+     * — those must NOT short-circuit the pipeline; the existing
+     * {@code processOrder}/{@code showProcessMessage} flow already handles them
+     * (success/error message + parent table refresh).
+     */
+    private static final String REPORT_PATH_MARKER = "/ad_reports/";
+
+    /**
+     * Captures the {@code tabTitle} value embedded in the {@code newTabParams}
+     * JSON literal that {@code printPageClosePopUp(response, vars, path, title)}
+     * writes to the popup body. The classic UI uses this title for the new
+     * SmartClient tab; the new UI forwards it as {@code obManualURL} bookmark
+     * metadata. Tolerates JSON-style escaped quotes ({@code \"}).
+     */
+    private static final Pattern TAB_TITLE_PATTERN =
+            Pattern.compile("\"tabTitle\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"");
+
+    /**
+     * Self-contained HTML served when the captured legacy response is a
+     * {@code PopUp_Response} with one or more report URLs. Posts an
+     * {@code openLegacyReport} action with a payload of the shape
+     * {@code {reports: [{processUrl, tabTitle, params}, ...]}} to the parent
+     * window so the new UI can rebuild each Etendo Classic bookmark URL (via
+     * {@code buildEtendoClassicBookmarkUrl}) and open it in a browser popup,
+     * then close the iframe modal. The placeholder is the JSON payload.
+     */
+    private static final String OPEN_LEGACY_REPORT_FORWARDER_HTML =
+            "<!DOCTYPE html>\n<html><head><meta charset=\"" + UTF8_CHARSET + "\"><script>" +
+                    "(function(){if(!window.parent)return;" +
+                    "window.parent.postMessage({type:'" + LegacyMessageProtocol.MESSAGE_TYPE + ACTION_JSON_SEPARATOR
+                    + "'" + LegacyMessageProtocol.ACTION_OPEN_LEGACY_REPORT + "',payload:%s},'*');" +
                     "window.__etendoMessageSent=true;" +
                     "})();</script></head><body></body></html>";
 
@@ -684,6 +755,12 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
 
         String output = wrapper.getCapturedOutputAsString();
 
+        List<ReportInfo> reports = extractReportsFromBody(output, contextPath);
+        if (!reports.isEmpty()) {
+            writeOpenLegacyReportForwarder(res, reports);
+            return;
+        }
+
         if (wrapper.isRedirected()) {
             writeRedirect(res, wrapper, contextPath);
             return;
@@ -824,6 +901,168 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         } catch (JSONException e) {
             log.warn("Could not build forwarder payload, using fallback: {}", e.getMessage());
             return "{\"type\":\"info\",\"title\":\"\",\"text\":\"\"}";
+        }
+    }
+
+    /**
+     * Immutable triple describing a report ready to be opened by the new UI as
+     * an Etendo Classic bookmark popup. The {@link #processUrl} is the
+     * context-relative path of the report (e.g. {@code /ad_reports/Report.html})
+     * that lands in {@code obManualURL}; {@link #params} is the query string
+     * from the original URL ({@code Command=DIRECT&inpRecord=...}, without the
+     * leading {@code ?}); {@link #tabTitle} is the title the popup tab will
+     * display, extracted from the {@code newTabParams} literal in the popup
+     * body.
+     */
+    static final class ReportInfo {
+        final String processUrl;
+        final String tabTitle;
+        final String params;
+
+        ReportInfo(String processUrl, String tabTitle, String params) {
+            this.processUrl = processUrl;
+            this.tabTitle = tabTitle;
+            this.params = params;
+        }
+    }
+
+    /**
+     * Scans the captured legacy HTML for every {@code submitThisPage('<url>');}
+     * call emitted by {@code PopUp_Response.html} and returns one
+     * {@link ReportInfo} per URL that points at a real report (filtered by
+     * {@link #REPORT_PATH_MARKER}). An empty list means the response is not a
+     * popup that should open browser-level reports — the regular injection
+     * pipeline handles everything else.
+     *
+     * <p>For each match the URL is split into its context-relative path and
+     * its query string; the host (when present) and {@code contextPath} (when
+     * matching) are stripped. The {@code tabTitle} is read once from the
+     * shared {@code newTabParams} literal and applied to every report in the
+     * body — {@code printPageClosePopUp(response, vars, path, title)} only
+     * emits a single title per response.
+     *
+     * @param body        the captured legacy response body, may be {@code null}
+     * @param contextPath the servlet context path (e.g. {@code /etendo}); {@code null} or empty disables the strip
+     * @return the list of {@link ReportInfo}, never {@code null}
+     */
+    private List<ReportInfo> extractReportsFromBody(String body, String contextPath) {
+        if (body == null) {
+            return Collections.emptyList();
+        }
+        Matcher matcher = SUBMIT_THIS_PAGE_HREF.matcher(body);
+        List<String> rawUrls = new ArrayList<>();
+        while (matcher.find()) {
+            String url = matcher.group(1);
+            if (url.contains(REPORT_PATH_MARKER)) {
+                rawUrls.add(url);
+            }
+        }
+        if (rawUrls.isEmpty()) {
+            return Collections.emptyList();
+        }
+        String tabTitle = extractTabTitle(body);
+        List<ReportInfo> reports = new ArrayList<>(rawUrls.size());
+        for (String rawUrl : rawUrls) {
+            String[] split = splitReportUrl(rawUrl, contextPath);
+            reports.add(new ReportInfo(split[0], tabTitle, split[1]));
+        }
+        return reports;
+    }
+
+    /**
+     * Returns the {@code tabTitle} value from the {@code newTabParams} JSON
+     * literal that {@code printPageClosePopUp} writes to the popup body, or
+     * an empty string when the literal is absent (defensive — {@code
+     * printPageClosePopUp(response, vars, url, title)} always emits it).
+     */
+    private String extractTabTitle(String body) {
+        Matcher m = TAB_TITLE_PATTERN.matcher(body);
+        if (m.find()) {
+            return m.group(1);
+        }
+        return "";
+    }
+
+    /**
+     * Strips the host (when the URL is absolute) and the context path (when it
+     * matches), then splits the remainder on the first {@code ?}. Returns a
+     * two-element array: {@code [processUrl, params]}. {@code params} is empty
+     * when the URL has no query string.
+     */
+    private String[] splitReportUrl(String rawUrl, String contextPath) {
+        String pathAndQuery = stripHost(rawUrl);
+        String pathAndQueryNoContext = stripContextPath(pathAndQuery, contextPath);
+        int q = pathAndQueryNoContext.indexOf('?');
+        if (q < 0) {
+            return new String[] { pathAndQueryNoContext, "" };
+        }
+        return new String[] {
+                pathAndQueryNoContext.substring(0, q),
+                pathAndQueryNoContext.substring(q + 1)
+        };
+    }
+
+    private String stripHost(String url) {
+        int scheme = url.indexOf("://");
+        if (scheme < 0) {
+            return url;
+        }
+        int firstSlash = url.indexOf('/', scheme + 3);
+        if (firstSlash < 0) {
+            return "/";
+        }
+        return url.substring(firstSlash);
+    }
+
+    private String stripContextPath(String path, String contextPath) {
+        if (contextPath == null || contextPath.isEmpty() || "/".equals(contextPath)) {
+            return path;
+        }
+        if (path.startsWith(contextPath)) {
+            return path.substring(contextPath.length());
+        }
+        return path;
+    }
+
+    /**
+     * Writes the short-circuit response for legacy popups that carry one or more
+     * report URLs (e.g. the page rendered by {@code printPageClosePopUp(res, vars,
+     * url, title)} after a {@code Posted} action succeeds). Like
+     * {@link #writeProcessCommandForwarder(HttpServletResponse, String)}, the
+     * body is a tiny self-contained HTML that posts the {@code openLegacyReport}
+     * action to the parent window with the {@link ReportInfo} list as payload.
+     *
+     * @param res     the real response
+     * @param reports the reports extracted by {@link #extractReportsFromBody(String, String)}
+     * @throws IOException if the response writer fails
+     */
+    private void writeOpenLegacyReportForwarder(HttpServletResponse res, List<ReportInfo> reports) throws IOException {
+        String payload = buildOpenLegacyReportPayload(reports);
+        String html = String.format(OPEN_LEGACY_REPORT_FORWARDER_HTML, payload);
+
+        res.setContentType(HTML_UTF8_CONTENT_TYPE);
+        res.setCharacterEncoding(UTF8_CHARSET);
+        res.setStatus(HttpServletResponse.SC_OK);
+        res.getWriter().write(html);
+        res.getWriter().flush();
+    }
+
+    private String buildOpenLegacyReportPayload(List<ReportInfo> reports) {
+        try {
+            JSONArray reportsJson = new JSONArray();
+            for (ReportInfo r : reports) {
+                JSONObject obj = new JSONObject();
+                obj.put("processUrl", r.processUrl);
+                obj.put("tabTitle", r.tabTitle);
+                obj.put("params", r.params);
+                reportsJson.put(obj);
+            }
+            JSONObject payload = new JSONObject();
+            payload.put("reports", reportsJson);
+            return payload.toString();
+        } catch (JSONException e) {
+            log.warn("Could not build open-legacy-report payload, using fallback: {}", e.getMessage());
+            return "{\"reports\":[]}";
         }
     }
 

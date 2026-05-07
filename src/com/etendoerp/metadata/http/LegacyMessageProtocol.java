@@ -45,6 +45,12 @@ public final class LegacyMessageProtocol {
     /** Signals that the legacy request itself failed (surface generic error overlay). */
     public static final String ACTION_REQUEST_FAILED = "requestFailed";
 
+    /**
+     * Tells the parent to open one or more report URLs in browser popup windows
+     * and close the iframe modal. Payload shape: {@code {urls: string[]}}.
+     */
+    public static final String ACTION_OPEN_LEGACY_REPORT = "openLegacyReport";
+
     private LegacyMessageProtocol() {
     }
 }
