@@ -58,33 +58,55 @@ public class LegacyProcessServletReportForwarderTest {
     private static final String DEFAULT_CONTEXT_PATH = "/etendo";
     private static final String NEW_TAB_PARAMS_TEMPLATE =
             "<script id=\"newTabParams\">var newTabParams={\"tabTitle\":\"%s\",\"addToRecents\":false};</script>";
+    private static final String JOURNAL_ENTRIES_REPORT_TITLE = "Journal Entries Report";
+    private static final String TAB_TITLE = "Title";
+    private static final String REPORT_HTML = "/ad_reports/Report.html";
+    private static final String COMMAND_DIRECT = "Command=DIRECT";
+    private static final String SUBMIT_R_HTML = "submitThisPage('/etendo/ad_reports/R.html');";
+    private static final String REPORT_R_HTML = "/ad_reports/R.html";
+    private static final String SHARED_TITLE = "Shared Title";
 
     private LegacyProcessServlet servlet;
 
+    /**
+     * Creates a fresh {@link LegacyProcessServlet} instance for each test.
+     */
     @Before
     public void setUp() {
         servlet = new LegacyProcessServlet();
     }
 
+    /**
+     * Tests that a single quoted submitThisPage call surfaces one report with
+     * the host/context stripped and the query split into params.
+     *
+     * @throws Exception if the underlying reflection call fails
+     */
     @Test
-    public void extractReportsFromBody_returnsSingleReport_whenSubmitThisPageHasQuotedHref() throws Exception {
+    public void extractReportsFromBodyReturnsSingleReportWhenSubmitThisPageHasQuotedHref() throws Exception {
         String url = "/etendo/ad_reports/ReportGeneralLedgerJournal.html?Command=DIRECT&inpRecord=42";
-        String body = newTabParams("Journal Entries Report")
+        String body = newTabParams(JOURNAL_ENTRIES_REPORT_TITLE)
                 + "<body onload=\"submitThisPage('" + url + "');\">";
 
         List<ReportSnapshot> reports = invokeExtract(body, DEFAULT_CONTEXT_PATH);
 
         assertEquals(1, reports.size());
-        assertEquals("/ad_reports/ReportGeneralLedgerJournal.html", reports.get(0).processUrl);
+        assertEquals(JOURNAL_ENTRIES_REPORT, reports.get(0).processUrl);
         assertEquals("Command=DIRECT&inpRecord=42", reports.get(0).params);
-        assertEquals("Journal Entries Report", reports.get(0).tabTitle);
+        assertEquals(JOURNAL_ENTRIES_REPORT_TITLE, reports.get(0).tabTitle);
     }
 
+    /**
+     * Tests that multiple submitThisPage calls in the body each surface as
+     * separate report entries with their own processUrl and params.
+     *
+     * @throws Exception if the underlying reflection call fails
+     */
     @Test
-    public void extractReportsFromBody_returnsAllReports_whenMultipleSubmitThisPageCalls() throws Exception {
+    public void extractReportsFromBodyReturnsAllReportsWhenMultipleSubmitThisPageCalls() throws Exception {
         String url1 = "/etendo/ad_reports/Report1.html?inpRecord=1";
         String url2 = "/etendo/ad_reports/Report2.html?inpRecord=2";
-        String body = newTabParams("Title")
+        String body = newTabParams(TAB_TITLE)
                 + "first: submitThisPage('" + url1 + "'); then: submitThisPage('" + url2 + "');";
 
         List<ReportSnapshot> reports = invokeExtract(body, DEFAULT_CONTEXT_PATH);
@@ -96,38 +118,60 @@ public class LegacyProcessServletReportForwarderTest {
         assertEquals("inpRecord=2", reports.get(1).params);
     }
 
+    /**
+     * Tests that {@code submitThisPage(null)} does not produce a report entry.
+     *
+     * @throws Exception if the underlying reflection call fails
+     */
     @Test
-    public void extractReportsFromBody_returnsEmpty_whenSubmitThisPageNull() throws Exception {
+    public void extractReportsFromBodyReturnsEmptyWhenSubmitThisPageNull() throws Exception {
         String body = "<body onload=\"submitThisPage(null);\" id=\"paramHref\">";
 
         assertTrue(invokeExtract(body, DEFAULT_CONTEXT_PATH).isEmpty());
     }
 
+    /**
+     * Tests that a {@code null} body returns an empty list (defensive guard).
+     *
+     * @throws Exception if the underlying reflection call fails
+     */
     @Test
-    public void extractReportsFromBody_returnsEmpty_whenBodyIsNull() throws Exception {
+    public void extractReportsFromBodyReturnsEmptyWhenBodyIsNull() throws Exception {
         assertTrue(invokeExtract(null, DEFAULT_CONTEXT_PATH).isEmpty());
     }
 
+    /**
+     * Tests that ampersands and commas inside the query string do not split
+     * the URL into multiple reports.
+     *
+     * @throws Exception if the underlying reflection call fails
+     */
     @Test
-    public void extractReportsFromBody_handlesUrlWithEmbeddedAmpersandsAndCommas() throws Exception {
+    public void extractReportsFromBodyHandlesUrlWithEmbeddedAmpersandsAndCommas() throws Exception {
         // Uses a non-journal-entries URL so multi-schema expansion is not triggered;
         // the intent is to verify that commas and ampersands inside query params do
         // not incorrectly split the URL into multiple reports.
         String url = "/etendo/ad_reports/ReportGeneralLedgerJournal.html?Command=DIRECT"
                 + "&inpTable=318&inpRecord=ABC&inpAccSchemas=A,B,C";
-        String body = newTabParams("Journal Entries Report")
+        String body = newTabParams(JOURNAL_ENTRIES_REPORT_TITLE)
                 + "submitThisPage('" + url + "');";
 
         List<ReportSnapshot> reports = invokeExtract(body, DEFAULT_CONTEXT_PATH);
 
         assertEquals(1, reports.size());
-        assertEquals("/ad_reports/ReportGeneralLedgerJournal.html", reports.get(0).processUrl);
+        assertEquals(JOURNAL_ENTRIES_REPORT, reports.get(0).processUrl);
         assertEquals("Command=DIRECT&inpTable=318&inpRecord=ABC&inpAccSchemas=A,B,C",
                 reports.get(0).params);
     }
 
+    /**
+     * Tests that the popup pattern only accepts single-quoted URLs (the
+     * classic template emits single quotes; double-quoted args must not match).
+     *
+     * @throws Exception if the underlying reflection call fails
+     */
     @Test
-    public void extractReportsFromBody_returnsEmpty_whenSubmitThisPageHasDoubleQuotes() throws Exception {
+    public void extractReportsFromBodyReturnsEmptyWhenSubmitThisPageHasDoubleQuotes() throws Exception {
         // Defensive: the popup template emits single-quoted args; double-quoted should NOT match
         // and the regular pipeline should keep handling that body.
         String body = "submitThisPage(\"/etendo/ad_reports/X.html\");";
@@ -135,8 +179,14 @@ public class LegacyProcessServletReportForwarderTest {
         assertTrue(invokeExtract(body, DEFAULT_CONTEXT_PATH).isEmpty());
     }
 
+    /**
+     * Tests that {@code submitThisPage('SAVE'/'OK'/'EDIT'/'REFRESH')} command
+     * tokens are not surfaced as report URLs.
+     *
+     * @throws Exception if the underlying reflection call fails
+     */
     @Test
-    public void extractReportsFromBody_returnsEmpty_whenArgIsActionCode() throws Exception {
+    public void extractReportsFromBodyReturnsEmptyWhenArgIsActionCode() throws Exception {
         // The form-render HTML of an action button (the GET that prepares the
         // confirmation page, before the user submits) wires its OK button to
         // submitThisPage('SAVE') / 'OK' / 'EDIT' / etc. These are command tokens
@@ -151,8 +201,14 @@ public class LegacyProcessServletReportForwarderTest {
         assertTrue("Action codes must not be treated as URLs: " + reports, reports.isEmpty());
     }
 
+    /**
+     * Tests that when a body mixes action codes and a URL, only the URL-shaped
+     * value is surfaced as a report.
+     *
+     * @throws Exception if the underlying reflection call fails
+     */
     @Test
-    public void extractReportsFromBody_extractsOnlyUrlShapedValues_whenMixedWithActionCodes() throws Exception {
+    public void extractReportsFromBodyExtractsOnlyUrlShapedValuesWhenMixedWithActionCodes() throws Exception {
         // Defensive: even if a popup body somehow mixes both, only the URL-shaped
         // value should surface as a report URL.
         String url = "/etendo/ad_reports/Report.html?Command=DIRECT";
@@ -162,50 +218,74 @@ public class LegacyProcessServletReportForwarderTest {
         List<ReportSnapshot> reports = invokeExtract(body, DEFAULT_CONTEXT_PATH);
 
         assertEquals(1, reports.size());
-        assertEquals("/ad_reports/Report.html", reports.get(0).processUrl);
-        assertEquals("Command=DIRECT", reports.get(0).params);
+        assertEquals(REPORT_HTML, reports.get(0).processUrl);
+        assertEquals(COMMAND_DIRECT, reports.get(0).params);
     }
 
+    /**
+     * Tests that an absolute URL has the host and context path stripped, and
+     * the remainder split on the first {@code ?}.
+     *
+     * @throws Exception if the underlying reflection call fails
+     */
     @Test
-    public void extractReportsFromBody_splitsAbsoluteUrlIntoProcessUrlAndParams() throws Exception {
+    public void extractReportsFromBodySplitsAbsoluteUrlIntoProcessUrlAndParams() throws Exception {
         // Realistic Posted flow: backend builds the URL with strDireccion + "/ad_reports/...".
         String url = "http://localhost:8080/etendo/ad_reports/Report.html?Command=DIRECT&inpRecord=42";
-        String body = newTabParams("Title") + "submitThisPage('" + url + "');";
+        String body = newTabParams(TAB_TITLE) + "submitThisPage('" + url + "');";
 
         List<ReportSnapshot> reports = invokeExtract(body, DEFAULT_CONTEXT_PATH);
 
         assertEquals(1, reports.size());
-        assertEquals("/ad_reports/Report.html", reports.get(0).processUrl);
+        assertEquals(REPORT_HTML, reports.get(0).processUrl);
         assertEquals("Command=DIRECT&inpRecord=42", reports.get(0).params);
     }
 
+    /**
+     * Tests that a URL without a query string yields an empty {@code params}
+     * field on the resulting report.
+     *
+     * @throws Exception if the underlying reflection call fails
+     */
     @Test
-    public void extractReportsFromBody_returnsEmptyParams_whenUrlHasNoQuery() throws Exception {
-        String body = newTabParams("Title") + "submitThisPage('/etendo/ad_reports/R.html');";
+    public void extractReportsFromBodyReturnsEmptyParamsWhenUrlHasNoQuery() throws Exception {
+        String body = newTabParams(TAB_TITLE) + SUBMIT_R_HTML;
 
         List<ReportSnapshot> reports = invokeExtract(body, DEFAULT_CONTEXT_PATH);
 
         assertEquals(1, reports.size());
-        assertEquals("/ad_reports/R.html", reports.get(0).processUrl);
+        assertEquals(REPORT_R_HTML, reports.get(0).processUrl);
         assertEquals("", reports.get(0).params);
     }
 
+    /**
+     * Tests that the {@code tabTitle} field is read from the {@code newTabParams}
+     * JSON literal embedded in the popup body.
+     *
+     * @throws Exception if the underlying reflection call fails
+     */
     @Test
-    public void extractReportsFromBody_extractsTabTitleFromNewTabParams() throws Exception {
-        String body = newTabParams("Journal Entries Report")
-                + "submitThisPage('/etendo/ad_reports/R.html');";
+    public void extractReportsFromBodyExtractsTabTitleFromNewTabParams() throws Exception {
+        String body = newTabParams(JOURNAL_ENTRIES_REPORT_TITLE)
+                + SUBMIT_R_HTML;
 
         List<ReportSnapshot> reports = invokeExtract(body, DEFAULT_CONTEXT_PATH);
 
         assertEquals(1, reports.size());
-        assertEquals("Journal Entries Report", reports.get(0).tabTitle);
+        assertEquals(JOURNAL_ENTRIES_REPORT_TITLE, reports.get(0).tabTitle);
     }
 
+    /**
+     * Tests that a missing {@code newTabParams} literal still surfaces the
+     * report with an empty {@code tabTitle}.
+     *
+     * @throws Exception if the underlying reflection call fails
+     */
     @Test
-    public void extractReportsFromBody_returnsEmptyTabTitle_whenNewTabParamsAbsent() throws Exception {
+    public void extractReportsFromBodyReturnsEmptyTabTitleWhenNewTabParamsAbsent() throws Exception {
         // Defensive: a popup body without newTabParams should still surface the
         // report (older callers / overload of printPageClosePopUp without title).
-        String body = "submitThisPage('/etendo/ad_reports/R.html');";
+        String body = SUBMIT_R_HTML;
 
         List<ReportSnapshot> reports = invokeExtract(body, DEFAULT_CONTEXT_PATH);
 
@@ -213,12 +293,18 @@ public class LegacyProcessServletReportForwarderTest {
         assertEquals("", reports.get(0).tabTitle);
     }
 
+    /**
+     * Tests that JSON-escaped quotes inside the {@code tabTitle} value do not
+     * stop the extraction at the first {@code "}.
+     *
+     * @throws Exception if the underlying reflection call fails
+     */
     @Test
-    public void extractReportsFromBody_extractsTabTitle_whenJsonHasEscapedQuote() throws Exception {
+    public void extractReportsFromBodyExtractsTabTitleWhenJsonHasEscapedQuote() throws Exception {
         // The newTabParams literal is rendered by JSONObject.toString() and may
         // contain JSON-escaped quotes. The regex must not stop at the first \".
         String body = "<script>var newTabParams={\"tabTitle\":\"He said \\\"hi\\\"\",\"addToRecents\":false};</script>"
-                + "submitThisPage('/etendo/ad_reports/R.html');";
+                + SUBMIT_R_HTML;
 
         List<ReportSnapshot> reports = invokeExtract(body, DEFAULT_CONTEXT_PATH);
 
@@ -226,21 +312,33 @@ public class LegacyProcessServletReportForwarderTest {
         assertEquals("He said \\\"hi\\\"", reports.get(0).tabTitle);
     }
 
+    /**
+     * Tests that when multiple URLs are present, the same {@code tabTitle} is
+     * applied to every report (one tabTitle per popup body).
+     *
+     * @throws Exception if the underlying reflection call fails
+     */
     @Test
-    public void extractReportsFromBody_appliesTabTitleToAllReports_whenMultipleSubmitThisPage() throws Exception {
-        String body = newTabParams("Shared Title")
+    public void extractReportsFromBodyAppliesTabTitleToAllReportsWhenMultipleSubmitThisPage() throws Exception {
+        String body = newTabParams(SHARED_TITLE)
                 + "submitThisPage('/etendo/ad_reports/A.html');"
                 + "submitThisPage('/etendo/ad_reports/B.html');";
 
         List<ReportSnapshot> reports = invokeExtract(body, DEFAULT_CONTEXT_PATH);
 
         assertEquals(2, reports.size());
-        assertEquals("Shared Title", reports.get(0).tabTitle);
-        assertEquals("Shared Title", reports.get(1).tabTitle);
+        assertEquals(SHARED_TITLE, reports.get(0).tabTitle);
+        assertEquals(SHARED_TITLE, reports.get(1).tabTitle);
     }
 
+    /**
+     * Tests that the context path is only stripped when it actually matches
+     * the URL prefix.
+     *
+     * @throws Exception if the underlying reflection call fails
+     */
     @Test
-    public void extractReportsFromBody_keepsContextPath_whenContextPathDoesNotMatch() throws Exception {
+    public void extractReportsFromBodyKeepsContextPathWhenContextPathDoesNotMatch() throws Exception {
         String body = newTabParams("T") + "submitThisPage('/other/ad_reports/R.html?x=1');";
 
         List<ReportSnapshot> reports = invokeExtract(body, DEFAULT_CONTEXT_PATH);
@@ -250,8 +348,13 @@ public class LegacyProcessServletReportForwarderTest {
         assertEquals("x=1", reports.get(0).params);
     }
 
+    /**
+     * Tests that a {@code null} context path leaves the URL unchanged.
+     *
+     * @throws Exception if the underlying reflection call fails
+     */
     @Test
-    public void extractReportsFromBody_handlesNullContextPath() throws Exception {
+    public void extractReportsFromBodyHandlesNullContextPath() throws Exception {
         String body = newTabParams("T") + "submitThisPage('/etendo/ad_reports/R.html?x=1');";
 
         List<ReportSnapshot> reports = invokeExtract(body, null);
@@ -261,8 +364,14 @@ public class LegacyProcessServletReportForwarderTest {
         assertEquals("x=1", reports.get(0).params);
     }
 
+    /**
+     * Tests that window-refresh URLs (Reactivate-style {@code submitThisPage}
+     * on a tab path) do not short-circuit as report URLs.
+     *
+     * @throws Exception if the underlying reflection call fails
+     */
     @Test
-    public void extractReportsFromBody_returnsEmpty_whenUrlIsParentTabRefresh() throws Exception {
+    public void extractReportsFromBodyReturnsEmptyWhenUrlIsParentTabRefresh() throws Exception {
         // Reactivate (and other non-Posted action buttons) call printPageClosePopUp
         // with a path obtained from Utility.getTabURL(strTabId, "R", true) — a window
         // URL meant to refresh the parent tab in the classic UI, NOT a report. The
@@ -275,8 +384,14 @@ public class LegacyProcessServletReportForwarderTest {
         assertTrue("Window-refresh URLs must not be treated as report URLs: " + reports, reports.isEmpty());
     }
 
+    /**
+     * Tests that an absolute window-refresh URL is also filtered out of the
+     * report list.
+     *
+     * @throws Exception if the underlying reflection call fails
+     */
     @Test
-    public void extractReportsFromBody_returnsEmpty_whenAbsoluteUrlIsParentTabRefresh() throws Exception {
+    public void extractReportsFromBodyReturnsEmptyWhenAbsoluteUrlIsParentTabRefresh() throws Exception {
         // Exact reproduction of the QA repro: Sales Invoice → Reactivate emits the
         // absolute window URL of its own tab.
         String body = "submitThisPage('http://localhost:8080/etendo/SalesInvoice/Header_Relation.html');";
@@ -286,8 +401,14 @@ public class LegacyProcessServletReportForwarderTest {
         assertTrue("Absolute window-refresh URLs must not be treated as report URLs: " + reports, reports.isEmpty());
     }
 
+    /**
+     * Tests that when a body contains both a window-refresh URL and a report
+     * URL, only the report surfaces.
+     *
+     * @throws Exception if the underlying reflection call fails
+     */
     @Test
-    public void extractReportsFromBody_filtersOutWindowUrls_whenMixedWithReportUrls() throws Exception {
+    public void extractReportsFromBodyFiltersOutWindowUrlsWhenMixedWithReportUrls() throws Exception {
         // Defensive: a popup body that contains both a window-refresh URL and a
         // report URL (e.g. a hypothetical compound action) must surface only the
         // report; the window URL is handled by the regular pipeline.
@@ -299,18 +420,25 @@ public class LegacyProcessServletReportForwarderTest {
         List<ReportSnapshot> reports = invokeExtract(body, DEFAULT_CONTEXT_PATH);
 
         assertEquals(1, reports.size());
-        assertEquals("/ad_reports/Report.html", reports.get(0).processUrl);
-        assertEquals("Command=DIRECT", reports.get(0).params);
+        assertEquals(REPORT_HTML, reports.get(0).processUrl);
+        assertEquals(COMMAND_DIRECT, reports.get(0).params);
     }
 
+    /**
+     * Tests that the forwarder writes an HTML response carrying the
+     * {@code openLegacyReport} payload with {@code reports/processUrl/tabTitle/params}
+     * keys and the expected content type/charset/status.
+     *
+     * @throws Exception if the underlying reflection call fails
+     */
     @Test
-    public void writeOpenLegacyReportForwarder_writesPayloadAsReportsArray() throws Exception {
+    public void writeOpenLegacyReportForwarderWritesPayloadAsReportsArray() throws Exception {
         HttpServletResponse response = mock(HttpServletResponse.class);
         StringWriter stringWriter = new StringWriter();
         PrintWriter printWriter = new PrintWriter(stringWriter);
         when(response.getWriter()).thenReturn(printWriter);
 
-        Object report = newReportInfo("/ad_reports/R.html", "Title", "Command=DIRECT");
+        Object report = newReportInfo(REPORT_R_HTML, TAB_TITLE, COMMAND_DIRECT);
         invokeWrite(response, Collections.singletonList(report));
         printWriter.flush();
 
@@ -326,13 +454,19 @@ public class LegacyProcessServletReportForwarderTest {
         assertTrue("Should contain params", html.contains("\"params\""));
         // Jettison escapes forward slashes as \/ in JSON strings
         assertTrue("Should contain the report URL", html.contains("\\/ad_reports\\/R.html"));
-        assertTrue("Should contain the params value", html.contains("Command=DIRECT"));
-        assertTrue("Should contain the title value", html.contains("Title"));
+        assertTrue("Should contain the params value", html.contains(COMMAND_DIRECT));
+        assertTrue("Should contain the title value", html.contains(TAB_TITLE));
         assertFalse("Should not embed closeModal", html.contains("'closeModal'"));
     }
 
+    /**
+     * Tests that every report in the input list appears in the emitted JSON
+     * payload.
+     *
+     * @throws Exception if the underlying reflection call fails
+     */
     @Test
-    public void writeOpenLegacyReportForwarder_writesAllReports_whenMultiple() throws Exception {
+    public void writeOpenLegacyReportForwarderWritesAllReportsWhenMultiple() throws Exception {
         HttpServletResponse response = mock(HttpServletResponse.class);
         StringWriter stringWriter = new StringWriter();
         PrintWriter printWriter = new PrintWriter(stringWriter);
@@ -352,15 +486,21 @@ public class LegacyProcessServletReportForwarderTest {
         assertTrue(html.contains("x=2"));
     }
 
+    /**
+     * Tests that quotes embedded in {@code tabTitle} are JSON-escaped in the
+     * emitted payload.
+     *
+     * @throws Exception if the underlying reflection call fails
+     */
     @Test
-    public void writeOpenLegacyReportForwarder_jsonEscapesQuotesInTabTitle() throws Exception {
+    public void writeOpenLegacyReportForwarderJsonEscapesQuotesInTabTitle() throws Exception {
         HttpServletResponse response = mock(HttpServletResponse.class);
         StringWriter stringWriter = new StringWriter();
         PrintWriter printWriter = new PrintWriter(stringWriter);
         when(response.getWriter()).thenReturn(printWriter);
 
         // Defensive: any embedded quote/backslash must be JSON-escaped via JSONObject/JSONArray.
-        Object report = newReportInfo("/ad_reports/R.html", "He said \"hi\"", "x=1");
+        Object report = newReportInfo(REPORT_R_HTML, "He said \"hi\"", "x=1");
 
         invokeWrite(response, Collections.singletonList(report));
         printWriter.flush();
@@ -382,21 +522,37 @@ public class LegacyProcessServletReportForwarderTest {
      */
     private static final java.util.function.Function<String, String> FAKE_NAME_RESOLVER =
             id -> "Schema-" + id;
+    private static final String JOURNAL_ENTRIES_TITLE_X = "Journal Entries Report - X";
+    private static final String JOURNAL_ENTRIES_TITLE_MAIN_USA = "Journal Entries Report - Main USA";
+    private static final String PARAMS_SINGLE_SCHEMA_POSTED = "Command=DIRECT&inpAccSchemas=A&posted=Y";
+    private static final String PARAMS_TWO_SCHEMAS_POSTED = "Command=DIRECT&inpAccSchemas=A,B&posted=Y";
 
+    /**
+     * Tests that a single accounting schema in {@code inpAccSchemas} does not
+     * trigger multi-schema expansion.
+     *
+     * @throws Exception if the underlying reflection call fails
+     */
     @Test
-    public void expandMultiSchemaReports_doesNotExpand_whenSingleSchema() throws Exception {
-        Object report = newReportInfo(JOURNAL_ENTRIES_REPORT, "Journal Entries Report - X",
-                "Command=DIRECT&inpAccSchemas=A&posted=Y");
+    public void expandMultiSchemaReportsDoesNotExpandWhenSingleSchema() throws Exception {
+        Object report = newReportInfo(JOURNAL_ENTRIES_REPORT, JOURNAL_ENTRIES_TITLE_X,
+                PARAMS_SINGLE_SCHEMA_POSTED);
 
         List<ReportSnapshot> result = invokeExpand(Collections.singletonList(report), FAKE_NAME_RESOLVER);
 
         assertEquals(1, result.size());
-        assertEquals("Command=DIRECT&inpAccSchemas=A&posted=Y", result.get(0).params);
+        assertEquals(PARAMS_SINGLE_SCHEMA_POSTED, result.get(0).params);
     }
 
+    /**
+     * Tests that the absence of {@code posted=Y} prevents expansion even when
+     * multiple schemas are present.
+     *
+     * @throws Exception if the underlying reflection call fails
+     */
     @Test
-    public void expandMultiSchemaReports_doesNotExpand_whenPostedFlagAbsent() throws Exception {
-        Object report = newReportInfo(JOURNAL_ENTRIES_REPORT, "Journal Entries Report - X",
+    public void expandMultiSchemaReportsDoesNotExpandWhenPostedFlagAbsent() throws Exception {
+        Object report = newReportInfo(JOURNAL_ENTRIES_REPORT, JOURNAL_ENTRIES_TITLE_X,
                 "Command=DIRECT&inpAccSchemas=A,B,C");
 
         List<ReportSnapshot> result = invokeExpand(Collections.singletonList(report), FAKE_NAME_RESOLVER);
@@ -404,10 +560,16 @@ public class LegacyProcessServletReportForwarderTest {
         assertEquals(1, result.size());
     }
 
+    /**
+     * Tests that expansion only applies to the Journal Entries Report path,
+     * not other reports.
+     *
+     * @throws Exception if the underlying reflection call fails
+     */
     @Test
-    public void expandMultiSchemaReports_doesNotExpand_whenReportIsNotJournalEntries() throws Exception {
+    public void expandMultiSchemaReportsDoesNotExpandWhenReportIsNotJournalEntries() throws Exception {
         Object report = newReportInfo(OTHER_REPORT, "Other - X",
-                "Command=DIRECT&inpAccSchemas=A,B&posted=Y");
+                PARAMS_TWO_SCHEMAS_POSTED);
 
         List<ReportSnapshot> result = invokeExpand(Collections.singletonList(report), FAKE_NAME_RESOLVER);
 
@@ -415,10 +577,18 @@ public class LegacyProcessServletReportForwarderTest {
         assertEquals(OTHER_REPORT, result.get(0).processUrl);
     }
 
+    /**
+     * Tests that N schemas combined with {@code posted=Y} yield N report
+     * entries: entry 0 keeps the original schema list (with {@code posted=Y}
+     * stripped) and entries 1..N-1 use {@code inpParamschemas} with one
+     * schema each plus a tab title suffixed with the schema name.
+     *
+     * @throws Exception if the underlying reflection call fails
+     */
     @Test
-    public void expandMultiSchemaReports_expandsIntoNReports_whenJournalEntriesWithMultipleSchemasAndPosted()
+    public void expandMultiSchemaReportsExpandsIntoNReportsWhenJournalEntriesWithMultipleSchemasAndPosted()
             throws Exception {
-        Object report = newReportInfo(JOURNAL_ENTRIES_REPORT, "Journal Entries Report - Main USA",
+        Object report = newReportInfo(JOURNAL_ENTRIES_REPORT, JOURNAL_ENTRIES_TITLE_MAIN_USA,
                 "Command=DIRECT&inpTable=318&inpRecord=R&inpOrg=O&inpAccSchemas=A,B,C&posted=Y");
 
         List<ReportSnapshot> result = invokeExpand(Collections.singletonList(report), FAKE_NAME_RESOLVER);
@@ -427,7 +597,7 @@ public class LegacyProcessServletReportForwarderTest {
         // Entry 0: clone of the original WITHOUT posted=Y (the popup's
         // openTabWhenPost JS would otherwise spawn an in-popup Smartclient
         // tab for schema B and override this popup's own content).
-        assertEquals("Journal Entries Report - Main USA", result.get(0).tabTitle);
+        assertEquals(JOURNAL_ENTRIES_TITLE_MAIN_USA, result.get(0).tabTitle);
         assertEquals("Command=DIRECT&inpTable=318&inpRecord=R&inpOrg=O&inpAccSchemas=A,B,C",
                 result.get(0).params);
         // Entry 1: schema B
@@ -441,13 +611,19 @@ public class LegacyProcessServletReportForwarderTest {
         assertEquals("Journal Entries Report - Schema-C", result.get(2).tabTitle);
     }
 
+    /**
+     * Tests that the helper does not emit stray {@code &inpTable=}/{@code &inpRecord=}/{@code &inpOrg=}
+     * pairs when those keys are missing from the original query.
+     *
+     * @throws Exception if the underlying reflection call fails
+     */
     @Test
-    public void expandMultiSchemaReports_omitsEmptyFiltersInExpansion() throws Exception {
+    public void expandMultiSchemaReportsOmitsEmptyFiltersInExpansion() throws Exception {
         // Posted variants without invoice context (defensive — the catalogued
         // Posted always emits inpTable/inpRecord/inpOrg, but the helper must
         // not produce stray "&inpTable=" pairs for missing keys).
-        Object report = newReportInfo(JOURNAL_ENTRIES_REPORT, "Journal Entries Report - X",
-                "Command=DIRECT&inpAccSchemas=A,B&posted=Y");
+        Object report = newReportInfo(JOURNAL_ENTRIES_REPORT, JOURNAL_ENTRIES_TITLE_X,
+                PARAMS_TWO_SCHEMAS_POSTED);
 
         List<ReportSnapshot> result = invokeExpand(Collections.singletonList(report), FAKE_NAME_RESOLVER);
 
@@ -455,10 +631,16 @@ public class LegacyProcessServletReportForwarderTest {
         assertEquals("Command=DIRECT&inpParamschemas=B", result.get(1).params);
     }
 
+    /**
+     * Tests that the schema name appended to the tab title replaces the
+     * suffix after the LAST {@code  - } separator in the original title.
+     *
+     * @throws Exception if the underlying reflection call fails
+     */
     @Test
-    public void expandMultiSchemaReports_keepsTitlePrefix_whenOriginalContainsSeparator() throws Exception {
-        Object report = newReportInfo(JOURNAL_ENTRIES_REPORT, "Journal Entries Report - Main USA",
-                "Command=DIRECT&inpAccSchemas=A,B&posted=Y");
+    public void expandMultiSchemaReportsKeepsTitlePrefixWhenOriginalContainsSeparator() throws Exception {
+        Object report = newReportInfo(JOURNAL_ENTRIES_REPORT, JOURNAL_ENTRIES_TITLE_MAIN_USA,
+                PARAMS_TWO_SCHEMAS_POSTED);
 
         List<ReportSnapshot> result = invokeExpand(Collections.singletonList(report), FAKE_NAME_RESOLVER);
 
@@ -467,10 +649,16 @@ public class LegacyProcessServletReportForwarderTest {
         assertEquals("Journal Entries Report - Schema-B", result.get(1).tabTitle);
     }
 
+    /**
+     * Tests that when the original title has no {@code  - }, the schema name
+     * is appended (with a fresh separator).
+     *
+     * @throws Exception if the underlying reflection call fails
+     */
     @Test
-    public void expandMultiSchemaReports_appendsToTitle_whenOriginalLacksSeparator() throws Exception {
+    public void expandMultiSchemaReportsAppendsToTitleWhenOriginalLacksSeparator() throws Exception {
         Object report = newReportInfo(JOURNAL_ENTRIES_REPORT, "PlainTitle",
-                "Command=DIRECT&inpAccSchemas=A,B&posted=Y");
+                PARAMS_TWO_SCHEMAS_POSTED);
 
         List<ReportSnapshot> result = invokeExpand(Collections.singletonList(report), FAKE_NAME_RESOLVER);
 
@@ -479,8 +667,14 @@ public class LegacyProcessServletReportForwarderTest {
         assertEquals("PlainTitle - Schema-B", result.get(1).tabTitle);
     }
 
+    /**
+     * Tests that when the resolver returns the raw schema id (lookup miss),
+     * the title still carries that id instead of failing.
+     *
+     * @throws Exception if the underlying reflection call fails
+     */
     @Test
-    public void expandMultiSchemaReports_fallsBackToSchemaIdWhenResolverReturnsId() throws Exception {
+    public void expandMultiSchemaReportsFallsBackToSchemaIdWhenResolverReturnsId() throws Exception {
         // Mirrors what the real resolveAcctSchemaName does on lookup failure:
         // it returns the raw schemaId so the popup can still open with the
         // UUID instead of a localised name.
@@ -494,14 +688,21 @@ public class LegacyProcessServletReportForwarderTest {
         assertEquals("Journal Entries Report - UNKNOWN", result.get(1).tabTitle);
     }
 
+    /**
+     * Tests that {@code posted=Y} is stripped from entry 0 when expanding so
+     * the popup's {@code openTabWhenPost} JS does not spawn extra in-popup
+     * Smartclient tabs that would override the visible schema.
+     *
+     * @throws Exception if the underlying reflection call fails
+     */
     @Test
-    public void expandMultiSchemaReports_removesPostedFlagFromFirstReport_whenExpanding() throws Exception {
+    public void expandMultiSchemaReportsRemovesPostedFlagFromFirstReportWhenExpanding() throws Exception {
         // Once the backend has emitted N entries for the additional schemas,
         // keeping posted=Y on the first entry would make the popup's
         // openTabWhenPost JS open an extra Smartclient tab inside that popup
         // for schema B and override the visible schema A.
-        Object report = newReportInfo(JOURNAL_ENTRIES_REPORT, "Journal Entries Report - X",
-                "Command=DIRECT&inpAccSchemas=A,B&posted=Y");
+        Object report = newReportInfo(JOURNAL_ENTRIES_REPORT, JOURNAL_ENTRIES_TITLE_X,
+                PARAMS_TWO_SCHEMAS_POSTED);
 
         List<ReportSnapshot> result = invokeExpand(Collections.singletonList(report), FAKE_NAME_RESOLVER);
 
@@ -514,13 +715,19 @@ public class LegacyProcessServletReportForwarderTest {
                 result.get(0).params.contains("inpAccSchemas=A,B"));
     }
 
+    /**
+     * Tests that {@code posted=Y} is preserved when there is only one schema
+     * (no expansion path is taken).
+     *
+     * @throws Exception if the underlying reflection call fails
+     */
     @Test
-    public void expandMultiSchemaReports_keepsPostedFlag_whenSingleSchema() throws Exception {
+    public void expandMultiSchemaReportsKeepsPostedFlagWhenSingleSchema() throws Exception {
         // Single-schema does not expand; keeping posted=Y is harmless because
         // openTabWhenPost iterates over inpParamschemas="" and the empty entry
         // is filtered out before the in-popup tab spawn.
-        Object report = newReportInfo(JOURNAL_ENTRIES_REPORT, "Journal Entries Report - X",
-                "Command=DIRECT&inpAccSchemas=A&posted=Y");
+        Object report = newReportInfo(JOURNAL_ENTRIES_REPORT, JOURNAL_ENTRIES_TITLE_X,
+                PARAMS_SINGLE_SCHEMA_POSTED);
 
         List<ReportSnapshot> result = invokeExpand(Collections.singletonList(report), FAKE_NAME_RESOLVER);
 
@@ -529,13 +736,19 @@ public class LegacyProcessServletReportForwarderTest {
                 result.get(0).params.contains("posted=Y"));
     }
 
+    /**
+     * Tests that a trailing comma in {@code inpAccSchemas} does not produce a
+     * phantom empty schema entry.
+     *
+     * @throws Exception if the underlying reflection call fails
+     */
     @Test
-    public void expandMultiSchemaReports_skipsEmptyEntries_whenCsvHasTrailingComma() throws Exception {
+    public void expandMultiSchemaReportsSkipsEmptyEntriesWhenCsvHasTrailingComma() throws Exception {
         // The classic Java loop that builds the schemas variable in
         // ReportGeneralLedgerJournal.java appends an extra "," to each id
         // (`schemas + accSchemas[i] + ","`). If that artefact ever leaks into
         // inpAccSchemas, the split must not produce a phantom empty entry.
-        Object report = newReportInfo(JOURNAL_ENTRIES_REPORT, "Journal Entries Report - X",
+        Object report = newReportInfo(JOURNAL_ENTRIES_REPORT, JOURNAL_ENTRIES_TITLE_X,
                 "Command=DIRECT&inpAccSchemas=A,B,&posted=Y");
 
         List<ReportSnapshot> result = invokeExpand(Collections.singletonList(report), FAKE_NAME_RESOLVER);
@@ -565,10 +778,22 @@ public class LegacyProcessServletReportForwarderTest {
         }
     }
 
+    /**
+     * Builds the {@code newTabParams} script literal for a given tabTitle.
+     */
     private static String newTabParams(String tabTitle) {
         return String.format(NEW_TAB_PARAMS_TEMPLATE, tabTitle);
     }
 
+    /**
+     * Invokes {@code extractReportsFromBody(body, contextPath)} via reflection
+     * and converts the resulting {@code ReportInfo} list into snapshots.
+     *
+     * @param body        the popup HTML body to parse
+     * @param contextPath the servlet context path used to strip URL prefixes
+     * @return list of {@link ReportSnapshot} extracted from the body
+     * @throws Exception if the method cannot be found or invoked via reflection
+     */
     @SuppressWarnings("unchecked")
     private List<ReportSnapshot> invokeExtract(String body, String contextPath) throws Exception {
         Method method = LegacyProcessServlet.class.getDeclaredMethod(EXTRACT_REPORTS, String.class, String.class);
@@ -581,6 +806,14 @@ public class LegacyProcessServletReportForwarderTest {
         return snapshots;
     }
 
+    /**
+     * Reads the {@code processUrl}/{@code tabTitle}/{@code params} fields from
+     * a {@code ReportInfo} via reflection and wraps them in a {@link ReportSnapshot}.
+     *
+     * @param reportInfo a {@code ReportInfo} instance obtained from the servlet
+     * @return a {@link ReportSnapshot} with the three field values
+     * @throws Exception if a field cannot be read via reflection
+     */
     private ReportSnapshot toSnapshot(Object reportInfo) throws Exception {
         Class<?> klass = reportInfo.getClass();
         return new ReportSnapshot(
@@ -589,6 +822,15 @@ public class LegacyProcessServletReportForwarderTest {
                 readField(klass, reportInfo, "params"));
     }
 
+    /**
+     * Reads a String field by name via reflection, asserting non-null.
+     *
+     * @param klass    the class that declares the field
+     * @param instance the object to read the field from
+     * @param name     the field name
+     * @return the field value as a string
+     * @throws Exception if the named field cannot be found or accessed via reflection
+     */
     private String readField(Class<?> klass, Object instance, String name) throws Exception {
         Field field = klass.getDeclaredField(name);
         field.setAccessible(true);
@@ -597,6 +839,16 @@ public class LegacyProcessServletReportForwarderTest {
         return value.toString();
     }
 
+    /**
+     * Constructs a {@code ReportInfo} via reflection (the inner class is
+     * package-private and not exposed to the test package directly).
+     *
+     * @param processUrl the report path (e.g. {@code /ad_reports/Report.html})
+     * @param tabTitle   the tab title to associate with the report
+     * @param params     the query-string parameters (without leading {@code ?})
+     * @return a {@code ReportInfo} instance
+     * @throws Exception if the {@code ReportInfo} constructor cannot be found or invoked via reflection
+     */
     private Object newReportInfo(String processUrl, String tabTitle, String params) throws Exception {
         Class<?> klass = Class.forName("com.etendoerp.metadata.http.LegacyProcessServlet$ReportInfo");
         java.lang.reflect.Constructor<?> ctor =
@@ -605,6 +857,14 @@ public class LegacyProcessServletReportForwarderTest {
         return ctor.newInstance(processUrl, tabTitle, params);
     }
 
+    /**
+     * Invokes {@code writeOpenLegacyReportForwarder(response, reports)} via
+     * reflection.
+     *
+     * @param response the mocked {@link HttpServletResponse} to write to
+     * @param reports  list of {@code ReportInfo} objects to serialize
+     * @throws Exception if the method cannot be found or invoked via reflection
+     */
     private void invokeWrite(HttpServletResponse response, List<Object> reports) throws Exception {
         Method method = LegacyProcessServlet.class.getDeclaredMethod(WRITE_FORWARDER, HttpServletResponse.class,
                 List.class);
@@ -617,6 +877,11 @@ public class LegacyProcessServletReportForwarderTest {
      * and converts the resulting {@code ReportInfo} list into snapshots. Used
      * by the multi-schema tests to inject a deterministic name resolver
      * instead of hitting DAL.
+     *
+     * @param reports  list of {@code ReportInfo} objects to expand
+     * @param resolver function mapping an accounting-schema ID to its display name
+     * @return list of {@link ReportSnapshot} after expansion
+     * @throws Exception if the method cannot be found or invoked via reflection
      */
     @SuppressWarnings("unchecked")
     private List<ReportSnapshot> invokeExpand(List<Object> reports,

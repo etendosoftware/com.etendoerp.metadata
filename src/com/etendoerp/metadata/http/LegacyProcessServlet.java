@@ -228,6 +228,10 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
     private static final Pattern POPUP_TYPE_PATTERN = Pattern.compile(
             "id=\"paramTipo\"[^>]*class=\"MessageBox([A-Z]+)\"", Pattern.CASE_INSENSITIVE);
 
+    /** Shared HTML preamble for all postMessage forwarder pages. */
+    private static final String HTML_DOCTYPE_HEAD =
+            "<!DOCTYPE html>\n<html><head><meta charset=\"" + UTF8_CHARSET + "\"><script>";
+
     /**
      * Minimal self-contained HTML served for {@code Command=PROCESS} popups.
      * Bypasses the legacy HTML pipeline entirely: a tiny (~500 B) response
@@ -235,7 +239,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
      * The payload placeholder is a JSON object with {@code type}/{@code title}/{@code text}.
      */
     private static final String MINIMAL_FORWARDER_HTML =
-            "<!DOCTYPE html>\n<html><head><meta charset=\"" + UTF8_CHARSET + "\"><script>" +
+            HTML_DOCTYPE_HEAD +
                     "(function(){if(!window.parent)return;" +
                     "window.parent.postMessage({type:'" + LegacyMessageProtocol.MESSAGE_TYPE + ACTION_JSON_SEPARATOR
                     + "'" + LegacyMessageProtocol.ACTION_SHOW_PROCESS_MESSAGE + "',payload:%s},'*');" +
@@ -251,7 +255,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
      * is loaded and the script runs.
      */
     private static final String REQUEST_FAILED_FORWARDER_HTML =
-            "<!DOCTYPE html>\n<html><head><meta charset=\"" + UTF8_CHARSET + "\"><script>" +
+            HTML_DOCTYPE_HEAD +
                     "(function(){if(!window.parent)return;" +
                     "window.parent.postMessage({type:'" + LegacyMessageProtocol.MESSAGE_TYPE + ACTION_JSON_SEPARATOR
                     + "'" + LegacyMessageProtocol.ACTION_REQUEST_FAILED + "'},'*');" +
@@ -330,7 +334,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
      * metadata. Tolerates JSON-style escaped quotes ({@code \"}).
      */
     private static final Pattern TAB_TITLE_PATTERN =
-            Pattern.compile("\"tabTitle\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"");
+            Pattern.compile("\"tabTitle\"\\s*+:\\s*+\"((?:[^\"\\\\]|\\\\.)*+)\"");
 
     /**
      * Self-contained HTML served when the captured legacy response is a
@@ -342,7 +346,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
      * then close the iframe modal. The placeholder is the JSON payload.
      */
     private static final String OPEN_LEGACY_REPORT_FORWARDER_HTML =
-            "<!DOCTYPE html>\n<html><head><meta charset=\"" + UTF8_CHARSET + "\"><script>" +
+            HTML_DOCTYPE_HEAD +
                     "(function(){if(!window.parent)return;" +
                     "window.parent.postMessage({type:'" + LegacyMessageProtocol.MESSAGE_TYPE + ACTION_JSON_SEPARATOR
                     + "'" + LegacyMessageProtocol.ACTION_OPEN_LEGACY_REPORT + "',payload:%s},'*');" +
@@ -1102,7 +1106,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         Map<String, String> kv = parseQueryParams(original.params);
         String[] schemas = kv.get(INP_ACCSCHEMAS_KEY).split(",");
         String table = kv.getOrDefault(INP_TABLE_KEY, "");
-        String record = kv.getOrDefault(INP_RECORD_KEY, "");
+        String currentRecord = kv.getOrDefault(INP_RECORD_KEY, "");
         String org = kv.getOrDefault(INP_ORG_KEY, "");
         String titlePrefix = extractTitlePrefix(original.tabTitle);
 
@@ -1119,7 +1123,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             if (schemaId.isEmpty()) {
                 continue;
             }
-            String params = buildSingleSchemaParams(table, record, org, schemaId);
+            String params = buildSingleSchemaParams(table, currentRecord, org, schemaId);
             String title = buildSchemaTabTitle(titlePrefix, schemaId, schemaNameResolver);
             result.add(new ReportInfo(original.processUrl, title, params));
         }
@@ -1190,14 +1194,14 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
      * that {@code OBClassicWindow} appends at the end of the iframe URL —
      * {@code vars.getCommand()} reads the first occurrence.
      */
-    private String buildSingleSchemaParams(String table, String record, String org, String schemaId) {
+    private String buildSingleSchemaParams(String table, String currentRecord, String org, String schemaId) {
         StringBuilder sb = new StringBuilder();
         sb.append(COMMAND_KEY).append('=').append(COMMAND_DIRECT);
         if (!table.isEmpty()) {
             sb.append('&').append(INP_TABLE_KEY).append('=').append(table);
         }
-        if (!record.isEmpty()) {
-            sb.append('&').append(INP_RECORD_KEY).append('=').append(record);
+        if (!currentRecord.isEmpty()) {
+            sb.append('&').append(INP_RECORD_KEY).append('=').append(currentRecord);
         }
         if (!org.isEmpty()) {
             sb.append('&').append(INP_ORG_KEY).append('=').append(org);

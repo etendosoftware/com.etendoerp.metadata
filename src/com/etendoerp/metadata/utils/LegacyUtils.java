@@ -43,12 +43,13 @@ public class LegacyUtils {
     );
 
     /**
-     * Checks if the provided process ID belongs to the list of legacy-defined
-     * processes.
+     * Creates a stub {@link Process} with the given {@code fieldId} as its ID.
+     * Used when a legacy process definition cannot be resolved from the
+     * Application Dictionary.
      *
-     * @param processId The ID of the process definition to check
-     * @return true if the ID is part of the legacy process definitions; false
-     *         otherwise
+     * @param fieldId the ID to assign to the stub process
+     * @return a new {@link Process} instance with the given id, a fixed placeholder
+     *         name, and active set to {@code true}
      */
     public static Process getLegacyProcess(String fieldId) {
         Process legacyProcess = (Process) OBProvider.getInstance().get(Process.class);
