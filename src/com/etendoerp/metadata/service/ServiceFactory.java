@@ -9,7 +9,7 @@
  * "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
  * implied. See the License for the specific language governing rights
  * and limitations under the License.
- * All portions are Copyright © 2021–2025 FUTIT SERVICES, S.L
+ * All portions are Copyright © 2021-2026 FUTIT SERVICES, S.L
  * All Rights Reserved.
  * Contributor(s): Futit Services S.L.
  *************************************************************************
@@ -42,9 +42,14 @@ import java.util.function.BiFunction;
 import static com.etendoerp.metadata.utils.Constants.*;
 
 /**
+ * Routes incoming HTTP requests to the appropriate MetadataService implementation.
+ *
  * @author luuchorocha
  */
-public class ServiceFactory {
+public final class ServiceFactory {
+
+    private ServiceFactory() {
+    }
 
     private static final Logger log = LogManager.getLogger(ServiceFactory.class);
 
@@ -58,6 +63,7 @@ public class ServiceFactory {
         EXACT_MATCH_SERVICES.put(MESSAGE_PATH, MessageService::new);
         EXACT_MATCH_SERVICES.put(LABELS_PATH, LabelsService::new);
         EXACT_MATCH_SERVICES.put(PREFERENCES_PATH, PreferencesService::new);
+        EXACT_MATCH_SERVICES.put(WIDGET_CLASSES_PATH, WidgetClassesService::new);
         EXACT_MATCH_SERVICES.put(EMAIL_SEND_PATH, EmailSendService::new);
         EXACT_MATCH_SERVICES.put(EMAIL_CONFIG_PATH, EmailConfigService::new);
         EXACT_MATCH_SERVICES.put(EMAIL_ATTACHMENTS_PATH, EmailAttachmentService::new);
@@ -68,9 +74,13 @@ public class ServiceFactory {
         PREFIX_MATCH_SERVICES.put(LANGUAGE_PATH, LanguageService::new);
         PREFIX_MATCH_SERVICES.put(LOCATION_PATH, LocationMetadataService::new);
         PREFIX_MATCH_SERVICES.put(TOOLBAR_PATH, ToolbarService::new);
+        PREFIX_MATCH_SERVICES.put(SAVED_VIEW_PATH, SavedViewService::new);
         PREFIX_MATCH_SERVICES.put(REPORT_AND_PROCESS_PATH, ReportAndProcessService::new);
         PREFIX_MATCH_SERVICES.put(PROCESS_EXECUTION_PATH, ProcessExecutionService::new);
         PREFIX_MATCH_SERVICES.put(PROCESS_PATH, ProcessMetadataService::new);
+        PREFIX_MATCH_SERVICES.put(DASHBOARD_PATH, DashboardService::new);
+        PREFIX_MATCH_SERVICES.put(FAVORITES_PATH, FavoritesService::new);
+        PREFIX_MATCH_SERVICES.put(WIDGET_DATA_PATH, WidgetDataService::new);
         PREFIX_MATCH_SERVICES.put(EMAIL_PATH, EmailService::new);
         PREFIX_MATCH_SERVICES.put(LEGACY_PATH, LegacyService::new);
     }
@@ -136,9 +146,18 @@ public class ServiceFactory {
         throw new InternalServerException("Failed to forward legacy request: " + e.getMessage(), e);
     }
 
+    /**
+     * Returns the MetadataService that handles the given request path.
+     *
+     * @param req the incoming HTTP request
+     * @param res the HTTP response
+     * @return the matching service instance
+     */
     public static MetadataService getService(final HttpServletRequest req, final HttpServletResponse res) {
         final String path = req.getPathInfo() != null
-                ? req.getPathInfo().replace("/com.etendoerp.metadata.meta/", "/")
+                ? req.getPathInfo()
+                    .replace("/com.etendoerp.metadata.meta/", "/")
+                    .replace("/com.etendoerp.metadata.sws/", "/")
                 : "";
 
         // Check exact matches first

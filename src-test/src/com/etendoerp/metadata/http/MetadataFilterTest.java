@@ -1,3 +1,19 @@
+/*
+ *************************************************************************
+ * The contents of this file are subject to the Etendo License
+ * (the "License"), you may not use this file except in compliance with
+ * the License.
+ * You may obtain a copy of the License at
+ * https://github.com/etendosoftware/etendo_core/blob/main/legal/Etendo_license.txt
+ * Software distributed under the License is distributed on an
+ * "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
+ * implied. See the License for the specific language governing rights
+ * and limitations under the License.
+ * All portions are Copyright © 2021-2026 FUTIT SERVICES, S.L
+ * All Rights Reserved.
+ * Contributor(s): Futit Services S.L.
+ *************************************************************************
+ */
 package com.etendoerp.metadata.http;
 
 import org.junit.Before;
@@ -8,7 +24,6 @@ import javax.servlet.FilterChain;
 import javax.servlet.FilterConfig;
 import javax.servlet.ServletContext;
 import javax.servlet.ServletException;
-import javax.servlet.ServletOutputStream;
 import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
@@ -17,20 +32,21 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.lang.reflect.Method;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
-import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/**
- * Unit tests for the MetadataFilter class.
- */
+/** Tests for {@link MetadataFilter}. */
+@SuppressWarnings("java:S1448")
 public class MetadataFilterTest extends WeldBaseTest {
 
   private MetadataFilter filter;
@@ -42,10 +58,22 @@ public class MetadataFilterTest extends WeldBaseTest {
   private static final String ACCEPT_HEADER = "Accept";
   private static final String APPLICATION_JSON = "application/json";
   private static final String TEXT_HTML = "text/html";
-  private static final String TEXT_PLAIN = "text/plain";
-
+  private static final String TEXT_HTML_CHARSET_UTF8 = "text/html; charset=UTF-8";
+  private static final String TEST_PATH = "/test";
+  private static final String TEST_HTML_PATH = "/test.html";
   private static final String META_API_TEST_URI = "/etendo/meta/api/test";
   private static final String META_API_PREFIX = "/etendo/meta/api/";
+  private static final String GET_ROOT_CAUSE = "getRootCause";
+  private static final String ESCAPE = "escape";
+  private static final String DERIVE_LEGACY_CLASS = "deriveLegacyClass";
+  private static final String CID_123 = "cid-123";
+  private static final String BUILD_HTML_ERROR_DETAILED = "buildHtmlErrorDetailed";
+  private static final String FORWARD_SALES_ORDER_HEADER_HTML = "/etendo/meta/forward/SalesOrder/Header.html";
+  private static final String HANDLE_EXCEPTION = "handleException";
+  private static final String DETERMINE_WANTS_HTML = "determineWantsHtml";
+  private static final String ISC_DATA_FORMAT = "isc_dataFormat";
+  private static final String ETENDO_META_ERROR = "Etendo Meta Error";
+  private static final String BUILD_HTML_ERROR = "buildHtmlError";
 
   @Override
   @Before
@@ -55,6 +83,66 @@ public class MetadataFilterTest extends WeldBaseTest {
     request = mock(HttpServletRequest.class);
     response = mock(HttpServletResponse.class);
     chain = mock(FilterChain.class);
+
+    FilterConfig config = mock(FilterConfig.class);
+    ServletContext servletContext = mock(ServletContext.class);
+    when(config.getServletContext()).thenReturn(servletContext);
+    when(config.getInitParameter(FORWARD_PATH)).thenReturn(null);
+    filter.init(config);
+  }
+
+  private Method getPrivateMethod(String name,
+      Class<?>... paramTypes) throws ReflectiveOperationException {
+    Method method = MetadataFilter.class.getDeclaredMethod(name, paramTypes);
+    method.setAccessible(true);
+    return method;
+  }
+
+  private String invokeBuildHtmlErrorDetailed(String cid, int status, String httpMethod,
+      String uri, String exClass, String message) throws ReflectiveOperationException {
+    Method method = getPrivateMethod(BUILD_HTML_ERROR_DETAILED,
+        String.class, int.class, String.class, String.class,
+        String.class, String.class);
+    return (String) method.invoke(filter, cid, status, httpMethod, uri, exClass, message);
+  }
+
+  private void invokeHandleException(ServletRequest req, ServletResponse res,
+      Throwable ex) throws ReflectiveOperationException {
+    Method method = getPrivateMethod(HANDLE_EXCEPTION,
+        ServletRequest.class, ServletResponse.class, Throwable.class);
+    method.invoke(filter, req, res, ex);
+  }
+
+  private void setupJsonRequest(String uri, String httpMethod) {
+    when(request.getRequestURI()).thenReturn(uri);
+    when(request.getMethod()).thenReturn(httpMethod);
+    when(request.getHeader(ACCEPT_HEADER)).thenReturn(APPLICATION_JSON);
+  }
+
+  private void setupJsonResponse() throws Exception {
+    when(response.isCommitted()).thenReturn(false);
+    when(response.getWriter()).thenReturn(new PrintWriter(new StringWriter()));
+  }
+
+  private StringWriter setupHtmlResponse() throws Exception {
+    StringWriter stringWriter = new StringWriter();
+    when(response.isCommitted()).thenReturn(false);
+    when(response.getWriter()).thenReturn(new PrintWriter(stringWriter));
+    return stringWriter;
+  }
+
+  private void setupHtmlRequest(String path) {
+    when(request.getPathInfo()).thenReturn(path);
+    when(request.getRequestURI()).thenReturn("/etendo/meta" + path);
+    when(request.getMethod()).thenReturn("GET");
+    when(request.getSession()).thenReturn(mock(javax.servlet.http.HttpSession.class));
+    when(request.getSession(true)).thenReturn(mock(javax.servlet.http.HttpSession.class));
+  }
+
+  private FilterChain createExceptionChain(String message) {
+    return (ServletRequest r, ServletResponse s) -> {
+      throw new IllegalStateException(message);
+    };
   }
 
   @Test
@@ -129,7 +217,7 @@ public class MetadataFilterTest extends WeldBaseTest {
   @Test
   public void returnsJsonWhenIscDataFormatJsonOnException() throws Exception {
     setupJsonRequest("/etendo/meta/window/foo", "GET");
-    when(request.getParameter("isc_dataFormat")).thenReturn("json");
+    when(request.getParameter(ISC_DATA_FORMAT)).thenReturn("json");
     setupJsonResponse();
 
     FilterChain exceptionChain = createExceptionChain("boom");
@@ -151,9 +239,9 @@ public class MetadataFilterTest extends WeldBaseTest {
 
     filter.doFilter(request, response, exceptionChain);
 
-    verify(response).setContentType("text/html; charset=UTF-8");
+    verify(response).setContentType(TEXT_HTML_CHARSET_UTF8);
     verify(response).setStatus(anyInt());
-    assertTrue(stringWriter.toString().contains("Etendo Meta Error"));
+    assertTrue(stringWriter.toString().contains(ETENDO_META_ERROR));
   }
 
   @Test
@@ -229,131 +317,374 @@ public class MetadataFilterTest extends WeldBaseTest {
   }
 
   @Test
-  public void testShouldCaptureHtml() throws Exception {
-    Method method = MetadataFilter.class.getDeclaredMethod("shouldCaptureHtml", HttpServletRequest.class,
-        HttpServletResponse.class);
+  public void testDetermineWantsHtml() throws Exception {
+    Method method = MetadataFilter.class.getDeclaredMethod(DETERMINE_WANTS_HTML, String.class,
+        String.class, HttpServletRequest.class);
     method.setAccessible(true);
 
-    // Case 1: URI ends with .html
-    when(request.getRequestURI()).thenReturn("/test.html");
-    assertTrue((Boolean) method.invoke(filter, request, response));
+    assertTrue((Boolean) method.invoke(filter, TEST_HTML_PATH, null, null));
 
-    // Case 2: Accept header contains text/html
-    when(request.getRequestURI()).thenReturn("/test");
-    when(request.getHeader(ACCEPT_HEADER)).thenReturn("text/html,application/xhtml+xml");
-    assertTrue((Boolean) method.invoke(filter, request, response));
+    assertFalse((Boolean) method.invoke(filter, TEST_PATH, APPLICATION_JSON, null));
 
-    // Case 3: None
-    when(request.getRequestURI()).thenReturn("/test");
-    when(request.getHeader(ACCEPT_HEADER)).thenReturn(APPLICATION_JSON);
-    assertFalse((Boolean) method.invoke(filter, request, response));
+    assertTrue((Boolean) method.invoke(filter, TEST_PATH, "text/html,application/xhtml+xml", null));
 
-    // Case 4: Nulls
-    assertFalse((Boolean) method.invoke(filter, null, response));
+    assertFalse((Boolean) method.invoke(filter, null, null, null));
   }
 
   @Test
-  public void testIsEmptySuccessfulHtml() throws Exception {
-    Method method = MetadataFilter.class.getDeclaredMethod("isEmptySuccessfulHtml", byte[].class, int.class);
+  public void testBuildHtmlError() throws Exception {
+    Method method = MetadataFilter.class.getDeclaredMethod(BUILD_HTML_ERROR,
+        String.class, int.class, String.class, String.class, String.class);
     method.setAccessible(true);
 
-    assertTrue((Boolean) method.invoke(filter, new byte[0], 200));
-    assertTrue((Boolean) method.invoke(filter, new byte[0], 0));
-    assertFalse((Boolean) method.invoke(filter, "test".getBytes(), 200));
-    assertFalse((Boolean) method.invoke(filter, new byte[0], 404));
+    String result = (String) method.invoke(filter, "cid-1", 500, "GET", TEST_PATH, "error message");
+    assertTrue(result.contains(ETENDO_META_ERROR));
+    assertTrue(result.contains("error message"));
+    assertTrue(result.contains("cid-1"));
   }
 
   @Test
-  public void testRelayCapturedOutput() throws Exception {
-    Method method = MetadataFilter.class.getDeclaredMethod("relayCapturedOutput", HttpServletResponse.class,
-        byte[].class, int.class, String.class);
+  public void testBuildHtmlErrorNullMessage() throws Exception {
+    Method method = MetadataFilter.class.getDeclaredMethod(BUILD_HTML_ERROR,
+        String.class, int.class, String.class, String.class, String.class);
     method.setAccessible(true);
 
-    ServletOutputStream mockOutput = mock(ServletOutputStream.class);
-    when(response.getOutputStream()).thenReturn(mockOutput);
-
-    byte[] body = "test content".getBytes();
-    method.invoke(filter, response, body, 200, TEXT_PLAIN);
-
-    verify(response).setContentType(TEXT_PLAIN);
-    verify(response).setStatus(200);
-    verify(mockOutput).write(body);
+    String result = (String) method.invoke(filter, "cid-2", 500, "GET", TEST_PATH, null);
+    assertTrue(result.contains("Unexpected error"));
   }
 
   @Test
-  public void testHandleEmptyHtmlResponse() throws Exception {
-    Method method = MetadataFilter.class.getDeclaredMethod("handleEmptyHtmlResponse", HttpServletRequest.class,
-        HttpServletResponse.class);
+  public void testGetRootCause() throws Exception {
+    Method method = MetadataFilter.class.getDeclaredMethod(GET_ROOT_CAUSE, Throwable.class);
     method.setAccessible(true);
 
-    StringWriter stringWriter = new StringWriter();
-    when(response.getWriter()).thenReturn(new PrintWriter(stringWriter));
+    RuntimeException root = new RuntimeException("root");
+    RuntimeException wrapper = new RuntimeException("wrapper", root);
 
-    method.invoke(filter, request, response);
-
-    verify(response).setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-    verify(response).setContentType("text/html; charset=UTF-8");
-    assertTrue(stringWriter.toString().contains("Empty response returned by downstream component"));
+    Throwable result = (Throwable) method.invoke(filter, wrapper);
+    assertTrue(result.getMessage().contains("root"));
   }
 
   @Test
-  public void testHandleCapturedResponse() throws Exception {
-    Method method = MetadataFilter.class.getDeclaredMethod("handleCapturedResponse", HttpServletRequest.class,
-        HttpServletResponse.class, HttpServletResponseLegacyWrapper.class);
+  public void testEscapeHtml() throws Exception {
+    Method method = MetadataFilter.class.getDeclaredMethod(ESCAPE, String.class);
     method.setAccessible(true);
 
-    HttpServletResponseLegacyWrapper captureWrapper = mock(HttpServletResponseLegacyWrapper.class);
-
-    // Case 1: Empty successful response
-    when(captureWrapper.getCapturedOutput()).thenReturn(new byte[0]);
-    when(captureWrapper.getStatus()).thenReturn(200);
-    when(response.getWriter()).thenReturn(new PrintWriter(new StringWriter()));
-
-    method.invoke(filter, request, response, captureWrapper);
-    verify(response, atLeastOnce()).setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-
-    // Case 2: Regular response
-    byte[] body = "content".getBytes();
-    when(captureWrapper.getCapturedOutput()).thenReturn(body);
-    when(captureWrapper.getStatus()).thenReturn(200);
-    when(captureWrapper.getContentType()).thenReturn(TEXT_PLAIN);
-    ServletOutputStream mockOutput = mock(ServletOutputStream.class);
-    when(response.getOutputStream()).thenReturn(mockOutput);
-
-    method.invoke(filter, request, response, captureWrapper);
-    verify(response).setContentType(TEXT_PLAIN);
-    verify(mockOutput).write(body);
+    String result = (String) method.invoke(filter, "<script>");
+    assertTrue(result.contains("&lt;script&gt;"));
   }
 
-  private void setupJsonRequest(String uri, String method) {
-    when(request.getRequestURI()).thenReturn(uri);
-    when(request.getMethod()).thenReturn(method);
-    when(request.getHeader(ACCEPT_HEADER)).thenReturn(APPLICATION_JSON);
+  @Test
+  public void testGetRootCauseDirectException() throws Exception {
+    Method method = getPrivateMethod(GET_ROOT_CAUSE, Throwable.class);
+
+    RuntimeException directException = new RuntimeException("direct");
+    Throwable result = (Throwable) method.invoke(filter, directException);
+
+    assertEquals(directException, result);
   }
 
-  private void setupJsonResponse() throws Exception {
-    when(response.isCommitted()).thenReturn(false);
-    when(response.getWriter()).thenReturn(new PrintWriter(new StringWriter()));
+  @Test
+  public void testGetRootCauseNestedChain() throws Exception {
+    Method method = getPrivateMethod(GET_ROOT_CAUSE, Throwable.class);
+
+    RuntimeException root = new RuntimeException("root");
+    RuntimeException middle = new RuntimeException("middle", root);
+    RuntimeException top = new RuntimeException("top", middle);
+
+    Throwable result = (Throwable) method.invoke(filter, top);
+
+    assertEquals(root, result);
   }
 
-  private StringWriter setupHtmlResponse() throws Exception {
-    StringWriter stringWriter = new StringWriter();
-    when(response.isCommitted()).thenReturn(false);
-    when(response.getWriter()).thenReturn(new PrintWriter(stringWriter));
-    return stringWriter;
-  }
+  @Test
+  public void testGetRootCauseSelfReference() throws Exception {
+    Method method = getPrivateMethod(GET_ROOT_CAUSE, Throwable.class);
 
-  private void setupHtmlRequest(String path) {
-    when(request.getPathInfo()).thenReturn(path);
-    when(request.getRequestURI()).thenReturn("/etendo/meta" + path);
-    when(request.getMethod()).thenReturn("GET");
-    when(request.getSession()).thenReturn(mock(javax.servlet.http.HttpSession.class));
-    when(request.getSession(true)).thenReturn(mock(javax.servlet.http.HttpSession.class));
-  }
-
-  private FilterChain createExceptionChain(String message) {
-    return (ServletRequest r, ServletResponse s) -> {
-      throw new RuntimeException(message);
+    RuntimeException selfRef = new RuntimeException("self") {
+      @Override
+      public synchronized Throwable getCause() {
+        return this;
+      }
     };
+
+    Throwable result = (Throwable) method.invoke(filter, selfRef);
+    assertEquals(selfRef, result);
+  }
+
+  @Test
+  public void testEscapeNull() throws Exception {
+    Method escapeMethod = getPrivateMethod(ESCAPE, String.class);
+
+    String result = (String) escapeMethod.invoke(filter, (String) null);
+    assertEquals("", result);
+  }
+
+  @Test
+  public void testEscapeAmpersand() throws Exception {
+    Method escapeMethod = getPrivateMethod(ESCAPE, String.class);
+
+    String result = (String) escapeMethod.invoke(filter, "a&b");
+    assertEquals("a&amp;b", result);
+  }
+
+  @Test
+  public void testEscapeAngleBrackets() throws Exception {
+    Method escapeMethod = getPrivateMethod(ESCAPE, String.class);
+
+    String result = (String) escapeMethod.invoke(filter, "<div>");
+    assertEquals("&lt;div&gt;", result);
+  }
+
+  @Test
+  public void testDeriveLegacyClassValid() throws Exception {
+    Method method = getPrivateMethod(DERIVE_LEGACY_CLASS, String.class);
+
+    String result = (String) method.invoke(filter, "/etendo/meta/forward/SalesOrder/Header_Edition.html");
+    assertNotNull(result);
+    assertTrue(result.contains("org.openbravo.erpWindows"));
+    assertTrue(result.contains("SalesOrder"));
+    assertTrue(result.contains("Header"));
+  }
+
+  @Test
+  public void testDeriveLegacyClassNoForwardPath() throws Exception {
+    Method method = getPrivateMethod(DERIVE_LEGACY_CLASS, String.class);
+
+    String result = (String) method.invoke(filter, "/etendo/meta/other/path");
+    assertNull(result);
+  }
+
+  @Test
+  public void testDeriveLegacyClassTooFewParts() throws Exception {
+    Method method = getPrivateMethod(DERIVE_LEGACY_CLASS, String.class);
+
+    String result = (String) method.invoke(filter, "/etendo/meta/forward/onlyOneLevel");
+    assertNull(result);
+  }
+
+  @Test
+  public void testDeriveLegacyClassNoUnderscore() throws Exception {
+    Method method = getPrivateMethod(DERIVE_LEGACY_CLASS, String.class);
+
+    String result = (String) method.invoke(filter, "/etendo/meta/forward/Window/Page.html");
+    assertNotNull(result);
+    assertEquals("org.openbravo.erpWindows.Window.Page", result);
+  }
+
+  @Test
+  public void testBuildHtmlErrorNullMessageAdditional() throws Exception {
+    Method method = getPrivateMethod(BUILD_HTML_ERROR,
+        String.class, int.class, String.class, String.class, String.class);
+
+    String result = (String) method.invoke(filter, CID_123, 500, "GET", TEST_PATH, null);
+    assertNotNull(result);
+    assertTrue(result.contains("Unexpected error"));
+  }
+
+  @Test
+  public void testBuildHtmlErrorDetailedWithCNF() throws Exception {
+    String result = invokeBuildHtmlErrorDetailed(CID_123, 500, "GET",
+        FORWARD_SALES_ORDER_HEADER_HTML,
+        "java.lang.ClassNotFoundException",
+        "org.openbravo.erpWindows.SalesOrder.Header");
+
+    assertNotNull(result);
+    assertTrue(result.contains("Hint"));
+    assertTrue(result.contains("Legacy WAD servlet not found"));
+  }
+
+  @Test
+  public void testBuildHtmlErrorDetailedWithoutCNF() throws Exception {
+    String result = invokeBuildHtmlErrorDetailed(CID_123, 500, "GET",
+        META_API_TEST_URI,
+        "java.lang.RuntimeException",
+        "some error");
+
+    assertNotNull(result);
+    assertFalse(result.contains("Hint"));
+  }
+
+  @Test
+  public void testBuildHtmlErrorDetailedNonHtmlUri() throws Exception {
+    String result = invokeBuildHtmlErrorDetailed(CID_123, 500, "GET",
+        META_API_TEST_URI,
+        "java.lang.ClassNotFoundException",
+        "org.openbravo.erpWindows.SomeClass");
+
+    assertNotNull(result);
+    assertFalse(result.contains("Legacy WAD servlet not found"));
+  }
+
+  @Test
+  public void testBuildLegacyHint() throws Exception {
+    Method method = getPrivateMethod("buildLegacyHint", String.class);
+
+    String result = (String) method.invoke(filter, FORWARD_SALES_ORDER_HEADER_HTML);
+    assertNotNull(result);
+    assertTrue(result.contains("Expected class"));
+    assertTrue(result.contains("compile src-wad"));
+  }
+
+  @Test
+  public void testBuildLegacyHintNoForwardPath() throws Exception {
+    Method method = getPrivateMethod("buildLegacyHint", String.class);
+
+    String result = (String) method.invoke(filter, "/etendo/meta/other/path");
+    assertNotNull(result);
+    assertTrue(result.contains("compile src-wad"));
+    assertFalse(result.contains("Expected class"));
+  }
+
+  @Test
+  public void testHandleExceptionNullResponse() throws Exception {
+    javax.servlet.ServletResponse nonHttpResponse = mock(javax.servlet.ServletResponse.class);
+
+    invokeHandleException(request, nonHttpResponse, new RuntimeException("test"));
+  }
+
+  @Test
+  public void testHandleExceptionCommittedResponse() throws Exception {
+    when(response.isCommitted()).thenReturn(true);
+    when(request.getRequestURI()).thenReturn(TEST_PATH);
+    when(request.getMethod()).thenReturn("GET");
+
+    invokeHandleException(request, response, new RuntimeException("test"));
+
+    verify(response, never()).setStatus(anyInt());
+  }
+
+  @Test
+  public void testHandleExceptionHtmlUriResponse() throws Exception {
+    StringWriter stringWriter = new StringWriter();
+    when(response.isCommitted()).thenReturn(false);
+    when(response.getWriter()).thenReturn(new PrintWriter(stringWriter));
+    when(request.getRequestURI()).thenReturn(TEST_HTML_PATH);
+    when(request.getMethod()).thenReturn("GET");
+    when(request.getHeader(ACCEPT_HEADER)).thenReturn(TEXT_HTML);
+
+    invokeHandleException(request, response, new RuntimeException("html error"));
+
+    verify(response).setContentType(TEXT_HTML_CHARSET_UTF8);
+    assertTrue(stringWriter.toString().contains(ETENDO_META_ERROR));
+  }
+
+  @Test
+  public void testHandleExceptionIscJsonOverridesHtml() throws Exception {
+    when(response.isCommitted()).thenReturn(false);
+    when(response.getWriter()).thenReturn(new PrintWriter(new StringWriter()));
+    when(request.getRequestURI()).thenReturn(TEST_HTML_PATH);
+    when(request.getMethod()).thenReturn("GET");
+    when(request.getHeader(ACCEPT_HEADER)).thenReturn(TEXT_HTML);
+    when(request.getParameter(ISC_DATA_FORMAT)).thenReturn("json");
+
+    invokeHandleException(request, response, new RuntimeException("json error"));
+
+    verify(response, never()).setContentType(TEXT_HTML_CHARSET_UTF8);
+  }
+
+  @Test
+  public void testDetermineWantsHtmlNullInputs() throws Exception {
+    Method method = getPrivateMethod(DETERMINE_WANTS_HTML,
+        String.class, String.class, HttpServletRequest.class);
+
+    assertFalse((Boolean) method.invoke(filter, null, null, null));
+  }
+
+  @Test
+  public void testDetermineWantsHtmlWithHtmlUri() throws Exception {
+    Method method = getPrivateMethod(DETERMINE_WANTS_HTML,
+        String.class, String.class, HttpServletRequest.class);
+
+    assertTrue((Boolean) method.invoke(filter, TEST_HTML_PATH, null, null));
+  }
+
+  @Test
+  public void testDetermineWantsHtmlIscJsonOverride() throws Exception {
+    Method method = getPrivateMethod(DETERMINE_WANTS_HTML,
+        String.class, String.class, HttpServletRequest.class);
+
+    when(request.getParameter(ISC_DATA_FORMAT)).thenReturn("json");
+
+    assertFalse((Boolean) method.invoke(filter, TEST_HTML_PATH, TEXT_HTML, request));
+  }
+
+  @Test
+  public void testDetermineWantsHtmlWithAcceptHeader() throws Exception {
+    Method method = getPrivateMethod(DETERMINE_WANTS_HTML,
+        String.class, String.class, HttpServletRequest.class);
+
+    assertTrue((Boolean) method.invoke(filter, TEST_PATH, TEXT_HTML, null));
+  }
+
+  @Test
+  public void testDoFilterForwardPathMatch() throws Exception {
+    when(request.getPathInfo()).thenReturn("/forward/SalesOrder/Header");
+    when(request.getRequestURI()).thenReturn("/etendo/meta/forward/SalesOrder/Header");
+    when(request.getMethod()).thenReturn("GET");
+
+    try {
+      filter.doFilter(request, response, chain);
+    } catch (Exception e) {
+      // Expected - ForwarderServlet may throw
+    }
+
+    verify(chain, never()).doFilter(request, response);
+  }
+
+  @Test
+  public void testHandleExceptionAcceptHtmlHeader() throws Exception {
+    StringWriter stringWriter = new StringWriter();
+    when(response.isCommitted()).thenReturn(false);
+    when(response.getWriter()).thenReturn(new PrintWriter(stringWriter));
+    when(request.getRequestURI()).thenReturn("/test/api");
+    when(request.getMethod()).thenReturn("POST");
+    when(request.getHeader(ACCEPT_HEADER)).thenReturn(TEXT_HTML);
+
+    invokeHandleException(request, response, new RuntimeException("accept html"));
+
+    verify(response).setContentType(TEXT_HTML_CHARSET_UTF8);
+  }
+
+  @Test
+  public void testHandleExceptionChainedCause() throws Exception {
+    when(response.isCommitted()).thenReturn(false);
+    when(response.getWriter()).thenReturn(new PrintWriter(new StringWriter()));
+    when(request.getRequestURI()).thenReturn("/test/api");
+    when(request.getMethod()).thenReturn("GET");
+    when(request.getHeader(ACCEPT_HEADER)).thenReturn(APPLICATION_JSON);
+
+    Exception root = new IllegalArgumentException("root cause");
+    Exception wrapper = new RuntimeException("wrapper", root);
+
+    FilterChain exceptionChain = (req, res) -> {
+      throw new javax.servlet.ServletException(wrapper);
+    };
+
+    filter.doFilter(request, response, exceptionChain);
+
+    verify(response).setStatus(anyInt());
+  }
+
+  @Test
+  public void testBuildHtmlErrorDetailedCnfInMessage() throws Exception {
+    String result = invokeBuildHtmlErrorDetailed(CID_123, 500, "GET",
+        FORWARD_SALES_ORDER_HEADER_HTML,
+        "java.lang.RuntimeException",
+        "org.openbravo.erpWindows.SalesOrder.Header not found");
+
+    assertNotNull(result);
+    assertTrue(result.contains("Hint"));
+  }
+
+  @Test
+  public void testBuildHtmlErrorDetailedNullExClass() throws Exception {
+    String result = invokeBuildHtmlErrorDetailed(CID_123, 500, "GET",
+        "/etendo/meta/test.html",
+        null,
+        "some error");
+
+    assertNotNull(result);
+    assertFalse(result.contains("Hint"));
   }
 }

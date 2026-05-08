@@ -9,7 +9,7 @@
  * "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
  * implied. See the License for the specific language governing rights
  * and limitations under the License.
- * All portions are Copyright © 2021–2025 FUTIT SERVICES, S.L
+ * All portions are Copyright © 2021-2026 FUTIT SERVICES, S.L
  * All Rights Reserved.
  * Contributor(s): Futit Services S.L.
  *************************************************************************
@@ -51,6 +51,28 @@ public class CallAsyncProcess extends CallProcess {
 
   public static synchronized CallAsyncProcess getInstance() {
     return instance;
+  }
+
+  /**
+   * Sets the executor service to use for background processes.
+   * Internal use only, primarily for testing purposes.
+   *
+   * @param executorService the executor service to use
+   */
+  public void setExecutorService(ExecutorService executorService) {
+    if (executorService == null) {
+      throw new OBException("ExecutorService cannot be null");
+    }
+    this.executorService = executorService;
+  }
+
+  /**
+   * Returns the executor service used for background processes.
+   *
+   * @return the current executor service
+   */
+  public ExecutorService getExecutorService() {
+    return executorService;
   }
 
   @Override
