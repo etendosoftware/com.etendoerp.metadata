@@ -22,6 +22,7 @@ import static com.etendoerp.metadata.MetadataTestConstants.TEST_CONTENT;
 import static com.etendoerp.metadata.MetadataTestConstants.UTF8_ENCODING;
 import static com.etendoerp.metadata.MetadataTestConstants.WORLD;
 import static org.junit.Assert.*;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -865,5 +866,101 @@ public class HttpServletResponseLegacyWrapperTest extends OBBaseTest {
 
     assertEquals("Special characters should be preserved", specialUrl, wrapper.getRedirectLocation());
     assertTrue(SHOULD_BE_MARKED_AS_REDIRECTED, wrapper.isRedirected());
+  }
+
+  // -------------------------------------------------------------------------
+  // setContentLength / setContentLengthLong — no-op overrides
+  // -------------------------------------------------------------------------
+
+  /**
+   * Verifies that {@code setContentLength} is a no-op: it does not throw and
+   * the wrapper continues capturing output normally afterwards.
+   *
+   * <p>Script injection changes the body size, so the real Content-Length must
+   * be recomputed by the container; suppressing the servlet-set value here
+   * prevents the browser from truncating the augmented response.
+   *
+   * @throws IOException if I/O operations fail
+   */
+  @Test
+  public void setContentLengthShouldBeNoOpAndNotAffectCapture() throws IOException {
+    wrapper.setContentLength(1024);
+
+    PrintWriter writer = wrapper.getWriter();
+    writer.write(TEST_CONTENT);
+    writer.flush();
+
+    assertEquals("Content-Length no-op must not break output capture",
+        TEST_CONTENT, wrapper.getCapturedOutputAsString());
+  }
+
+  /**
+   * Verifies that {@code setContentLengthLong} is a no-op: it does not throw
+   * and the wrapper continues capturing output normally afterwards.
+   *
+   * @throws IOException if I/O operations fail
+   */
+  @Test
+  public void setContentLengthLongShouldBeNoOpAndNotAffectCapture() throws IOException {
+    wrapper.setContentLengthLong(Long.MAX_VALUE);
+
+    PrintWriter writer = wrapper.getWriter();
+    writer.write(TEST_CONTENT);
+    writer.flush();
+
+    assertEquals("setContentLengthLong no-op must not break output capture",
+        TEST_CONTENT, wrapper.getCapturedOutputAsString());
+  }
+
+  // -------------------------------------------------------------------------
+  // resolveCapturedEncoding — encoding is cached once per wrapper lifecycle
+  // -------------------------------------------------------------------------
+
+  /**
+   * Verifies that the character encoding is resolved once on the first
+   * write and cached for the lifetime of the wrapper: even if the underlying
+   * response changes its encoding mid-flight, subsequent reads of the captured
+   * output still use the originally resolved encoding.
+   *
+   * @throws IOException if I/O operations fail
+   */
+  @Test
+  public void capturedEncodingIsCachedAfterFirstWrite() throws IOException {
+    PrintWriter writer = wrapper.getWriter();
+    writer.write("hello");
+    writer.flush();
+
+    lenient().when(mockResponse.getCharacterEncoding()).thenReturn(ISO_ENCODING);
+
+    writer.write(" world");
+    writer.flush();
+
+    String result = wrapper.getCapturedOutputAsString();
+    assertEquals("Encoding change mid-flight must not corrupt captured output",
+        "hello world", result);
+  }
+
+  /**
+   * Verifies that {@code reset()} clears the cached encoding so the next
+   * write resolves a fresh encoding from the underlying response.
+   *
+   * @throws IOException if I/O operations fail
+   */
+  @Test
+  public void resetClearsCachedEncodingForSubsequentWrites() throws IOException {
+    PrintWriter firstWriter = wrapper.getWriter();
+    firstWriter.write("first");
+    firstWriter.flush();
+
+    // reset() must clear capturedEncoding so a new getWriter() gets a fresh encode cycle
+    wrapper.reset();
+
+    PrintWriter secondWriter = wrapper.getWriter();
+    secondWriter.write("second");
+    secondWriter.flush();
+
+    String result = wrapper.getCapturedOutputAsString();
+    assertEquals("After reset(), captured output must reflect only the post-reset writes",
+        "second", result);
   }
 }
