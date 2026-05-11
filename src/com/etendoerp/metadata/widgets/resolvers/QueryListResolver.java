@@ -19,16 +19,22 @@ package com.etendoerp.metadata.widgets.resolvers;
 
 import com.etendoerp.metadata.widgets.WidgetDataContext;
 import com.etendoerp.metadata.widgets.WidgetDataResolver;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONObject;
 import org.hibernate.query.Query;
+import org.openbravo.base.model.Entity;
+import org.openbravo.base.model.ModelProvider;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -39,6 +45,13 @@ import java.util.regex.Pattern;
  * as a comma-separated list (e.g. "order,org,total,deliveryDate").
  */
 public class QueryListResolver implements WidgetDataResolver {
+    private static final Logger log = LogManager.getLogger();
+
+    private static final String TAB_LOOKUP_HQL =
+        "select t.id, t.window.id from ADTab t " +
+        "where t.table.dBTableName = :tn and t.tabLevel = 0 " +
+        "and t.window.active = true order by t.sequenceNumber";
+
     @Override public String getType() { return "QUERY_LIST"; }
 
     @Override
@@ -73,8 +86,10 @@ public class QueryListResolver implements WidgetDataResolver {
         List<Object[]> rawRows = q.list();
         if (totalRows < 0) totalRows = rawRows.size();
 
-        JSONArray rows = buildRows(rawRows, colNames);
-        JSONArray colDefs = buildColumnDefs(colNames);
+        Map<String, LinkDef> links = parseLinks(ctx);
+
+        JSONArray rows = buildRows(rawRows, colNames, links);
+        JSONArray colDefs = buildColumnDefs(colNames, links);
 
         return new JSONObject()
                 .put("columns",   colDefs)
@@ -82,7 +97,82 @@ public class QueryListResolver implements WidgetDataResolver {
                 .put("totalRows", totalRows);
     }
 
-    private JSONArray buildRows(List<Object[]> rawRows, String[] colNames) throws Exception {
+    // ── Link support ────────────────────────────────────────────────────
+
+    /**
+     * Holds resolved navigation metadata for a linked column.
+     */
+    static class LinkDef {
+        final String idCol;
+        final String referencedWindowId;
+        final String referencedTabId;
+
+        LinkDef(String idCol, String windowId, String tabId) {
+            this.idCol = idCol;
+            this.referencedWindowId = windowId;
+            this.referencedTabId = tabId;
+        }
+    }
+
+    /**
+     * Reads the "links" fixed param and resolves window/tab IDs for each entity.
+     * Expected JSON format:
+     * <pre>
+     * {
+     *   "product": { "idCol": "pid",   "entity": "Product" },
+     *   "store":   { "idCol": "orgid", "entity": "Organization" }
+     * }
+     * </pre>
+     */
+    private Map<String, LinkDef> parseLinks(WidgetDataContext ctx) {
+        String linksJson = ctx.param("links");
+        if (linksJson == null || linksJson.isBlank()) return Collections.emptyMap();
+
+        Map<String, LinkDef> result = new HashMap<>();
+        try {
+            JSONObject linksObj = new JSONObject(linksJson);
+            Iterator<?> keys = linksObj.keys();
+            while (keys.hasNext()) {
+                String colName = (String) keys.next();
+                JSONObject entry = linksObj.getJSONObject(colName);
+                String idCol = entry.getString("idCol");
+                String entityName = entry.getString("entity");
+
+                Object[] windowTab = resolveWindowTab(entityName);
+                if (windowTab.length >= 2) {
+                    result.put(colName, new LinkDef(idCol,
+                        (String) windowTab[1], (String) windowTab[0]));
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to parse links param for QUERY_LIST widget", e);
+        }
+        return result;
+    }
+
+    /**
+     * Finds the first header tab (tabLevel=0) and its window for a given DAL entity name.
+     * Returns {tabId, windowId} or null.
+     */
+    private Object[] resolveWindowTab(String entityName) {
+        try {
+            Entity entity = ModelProvider.getInstance().getEntity(entityName);
+            Query<Object[]> q = OBDal.getInstance().getSession()
+                .createQuery(TAB_LOOKUP_HQL, Object[].class);
+            q.setParameter("tn", entity.getTableName());
+            q.setMaxResults(1);
+            Object[] result = q.uniqueResult();
+            return result != null ? result : new Object[0];
+        } catch (Exception e) {
+            log.warn("Could not resolve window/tab for entity: {}", entityName, e);
+            return new Object[0];
+        }
+    }
+
+    // ── Row & column builders ───────────────────────────────────────────
+
+    private JSONArray buildRows(List<Object[]> rawRows, String[] colNames,
+                                Map<String, LinkDef> links) throws Exception {
         JSONArray rows = new JSONArray();
         for (Object[] raw : rawRows) {
             JSONObject row = new JSONObject();
@@ -90,20 +180,41 @@ public class QueryListResolver implements WidgetDataResolver {
                 String col = i < colNames.length ? colNames[i].trim() : "col" + i;
                 row.put(col, raw[i]);
             }
+            for (Map.Entry<String, LinkDef> entry : links.entrySet()) {
+                Object idValue = row.opt(entry.getValue().idCol);
+                if (idValue != null) {
+                    row.put(entry.getKey() + "_id", idValue);
+                }
+            }
             rows.put(row);
         }
         return rows;
     }
 
-    private JSONArray buildColumnDefs(String[] colNames) throws Exception {
+    private JSONArray buildColumnDefs(String[] colNames,
+                                      Map<String, LinkDef> links) throws Exception {
         JSONArray colDefs = new JSONArray();
         for (String col : colNames) {
             String name = col.trim();
-            if (name.endsWith("Id")) continue;
-            colDefs.put(new JSONObject().put("name", name).put("label", toLabel(name)));
+            if (isIdColumn(name)) continue;
+            JSONObject colDef = new JSONObject()
+                .put("name", name)
+                .put("label", toLabel(name));
+            LinkDef link = links.get(name);
+            if (link != null) {
+                colDef.put("referencedWindowId", link.referencedWindowId);
+                colDef.put("referencedTabId", link.referencedTabId);
+            }
+            colDefs.put(colDef);
         }
         return colDefs;
     }
+
+    private boolean isIdColumn(String alias) {
+        return alias.toLowerCase().endsWith("id");
+    }
+
+    // ── Param resolution & binding ──────────────────────────────────────
 
     private Map<String, Object> buildResolvedParams(WidgetDataContext ctx) {
         Map<String, Object> resolved = new HashMap<>(ctx.getParams());
@@ -131,6 +242,8 @@ public class QueryListResolver implements WidgetDataResolver {
             }
         }
     }
+
+    // ── HQL parsing helpers ─────────────────────────────────────────────
 
     private static final Pattern PAREN_OR_FROM  = Pattern.compile("[()]|\\bfrom\\b",     Pattern.CASE_INSENSITIVE);
     private static final Pattern ORDER_BY       = Pattern.compile("\\border\\s+by\\b",   Pattern.CASE_INSENSITIVE);

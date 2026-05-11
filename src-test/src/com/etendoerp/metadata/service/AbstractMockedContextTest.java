@@ -29,6 +29,7 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
@@ -63,6 +64,8 @@ abstract class AbstractMockedContextTest {
         try (MockedStatic<OBContext> ctxMock = mockStatic(OBContext.class);
              MockedStatic<OBDal> dalMock = mockStatic(OBDal.class)) {
             ctxMock.when(OBContext::getOBContext).thenReturn(obContext);
+            ctxMock.when(() -> OBContext.setAdminMode(anyBoolean())).thenAnswer(inv -> null);
+            ctxMock.when(OBContext::restorePreviousMode).thenAnswer(inv -> null);
             dalMock.when(OBDal::getInstance).thenReturn(obDal);
             when(obDal.getSession()).thenReturn(session);
             action.run();
