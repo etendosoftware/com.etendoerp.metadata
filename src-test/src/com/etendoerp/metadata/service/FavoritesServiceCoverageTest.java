@@ -36,7 +36,10 @@ import org.openbravo.model.common.enterprise.Organization;
 
 import java.io.BufferedReader;
 import java.io.StringReader;
+import java.util.Arrays;
+import java.util.Collections;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -57,7 +60,9 @@ class FavoritesServiceCoverageTest extends AbstractMockedContextTest {
     private static final String USER_ID = "user-001";
     private static final String ROLE_ID = "role-001";
     private static final String MENU_ID = "menu-001";
+    private static final String FAVORITES_PATH = "/favorites";
     private static final String FAVORITES_TOGGLE_PATH = "/favorites/toggle";
+    private static final String ITEMS_KEY = "items";
 
     @Mock OBProvider obProvider;
 
@@ -154,6 +159,92 @@ class FavoritesServiceCoverageTest extends AbstractMockedContextTest {
 
     @Test
     void processThrowsNotFoundForWrongPathSuffix() {
-        assertNotFoundForMethodAndPath("POST", "/favorites/list");
+        assertNotFoundForMethodAndPath("POST", FAVORITES_PATH + "/list");
+    }
+
+    @SuppressWarnings("unchecked")
+    private void setupListQuery(java.util.List<Object[]> rows) {
+        Query<Object[]> listQuery = mock(Query.class);
+        when(session.createQuery(any(String.class), eq(Object[].class)))
+                .thenReturn(listQuery);
+        when(listQuery.setParameter(anyString(), anyString())).thenReturn(listQuery);
+        when(listQuery.list()).thenReturn(rows);
+    }
+
+    private void runGetFavoritesTest(String pathInfo, java.util.List<Object[]> rows,
+                                     ThrowingRunnable assertions) throws Exception {
+        runWithMockedContext(() -> {
+            User mockUser = mock(User.class);
+            lenient().when(mockUser.getId()).thenReturn(USER_ID);
+            lenient().when(obContext.getUser()).thenReturn(mockUser);
+            Role mockRole = mock(Role.class);
+            lenient().when(mockRole.getId()).thenReturn(ROLE_ID);
+            lenient().when(obContext.getRole()).thenReturn(mockRole);
+
+            when(request.getPathInfo()).thenReturn(pathInfo);
+            when(request.getMethod()).thenReturn("GET");
+            setupListQuery(rows);
+
+            new FavoritesService(request, response).process();
+            assertions.run();
+        });
+    }
+
+    @Test
+    void listFavoritesReturnsItems() throws Exception {
+        runGetFavoritesTest(FAVORITES_PATH, Arrays.asList(
+                new Object[]{"Sales Order", "W", MENU_ID, "win-001"},
+                new Object[]{"Purchase Invoice", "W", "menu-002", "win-002"}
+        ), () -> {
+            String output = responseCapture.toString();
+            assertTrue(output.contains(ITEMS_KEY));
+            assertTrue(output.contains("Sales Order"));
+            assertTrue(output.contains("Purchase Invoice"));
+            assertTrue(output.contains("win-001"));
+        });
+    }
+
+    @Test
+    void listFavoritesReturnsEmptyItems() throws Exception {
+        runGetFavoritesTest(FAVORITES_PATH, Collections.emptyList(), () -> {
+            String output = responseCapture.toString();
+            assertTrue(output.contains(ITEMS_KEY));
+            assertFalse(output.contains("label"));
+        });
+    }
+
+    @Test
+    void listFavoritesHandlesNullWindowId() throws Exception {
+        runGetFavoritesTest(FAVORITES_PATH, Collections.singletonList(
+                new Object[]{"Report", "R", "menu-003", null}
+        ), () -> {
+            String output = responseCapture.toString();
+            assertTrue(output.contains("Report"));
+            assertTrue(output.contains("null"));
+        });
+    }
+
+    @Test
+    void processNormalizesMetaModulePath() throws Exception {
+        runGetFavoritesTest("/com.etendoerp.metadata.meta" + FAVORITES_PATH,
+                Collections.emptyList(),
+                () -> assertTrue(responseCapture.toString().contains(ITEMS_KEY)));
+    }
+
+    @Test
+    void processNormalizesSWSModulePath() throws Exception {
+        runGetFavoritesTest("/com.etendoerp.metadata.sws" + FAVORITES_PATH,
+                Collections.emptyList(),
+                () -> assertTrue(responseCapture.toString().contains(ITEMS_KEY)));
+    }
+
+    @Test
+    void processThrowsNotFoundForGetOnTogglePath() {
+        assertNotFoundForMethodAndPath("GET", FAVORITES_TOGGLE_PATH);
+    }
+
+    @Test
+    void processThrowsNotFoundForPatchMethod() {
+        assertNotFoundForMethodAndPath("PATCH", FAVORITES_PATH);
     }
 }

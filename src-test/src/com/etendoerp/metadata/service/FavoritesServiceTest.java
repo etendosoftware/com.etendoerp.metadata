@@ -240,7 +240,7 @@ class FavoritesServiceTest {
         when(existsQuery.uniqueResult()).thenReturn(0L);
 
         FavoritesService svc = new FavoritesService(request, response);
-        assertThrows(InternalServerException.class, svc::process);
+        assertThrows(NotFoundException.class, svc::process);
     }
 
     @Test
