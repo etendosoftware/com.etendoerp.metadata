@@ -60,7 +60,9 @@ class FavoritesServiceCoverageTest extends AbstractMockedContextTest {
     private static final String USER_ID = "user-001";
     private static final String ROLE_ID = "role-001";
     private static final String MENU_ID = "menu-001";
+    private static final String FAVORITES_PATH = "/favorites";
     private static final String FAVORITES_TOGGLE_PATH = "/favorites/toggle";
+    private static final String ITEMS_KEY = "items";
 
     @Mock OBProvider obProvider;
 
@@ -157,7 +159,7 @@ class FavoritesServiceCoverageTest extends AbstractMockedContextTest {
 
     @Test
     void processThrowsNotFoundForWrongPathSuffix() {
-        assertNotFoundForMethodAndPath("POST", "/favorites/list");
+        assertNotFoundForMethodAndPath("POST", FAVORITES_PATH + "/list");
     }
 
     @SuppressWarnings("unchecked")
@@ -169,8 +171,8 @@ class FavoritesServiceCoverageTest extends AbstractMockedContextTest {
         when(listQuery.list()).thenReturn(rows);
     }
 
-    @Test
-    void listFavoritesReturnsItems() throws Exception {
+    private void runGetFavoritesTest(String pathInfo, java.util.List<Object[]> rows,
+                                     ThrowingRunnable assertions) throws Exception {
         runWithMockedContext(() -> {
             User mockUser = mock(User.class);
             lenient().when(mockUser.getId()).thenReturn(USER_ID);
@@ -179,19 +181,23 @@ class FavoritesServiceCoverageTest extends AbstractMockedContextTest {
             lenient().when(mockRole.getId()).thenReturn(ROLE_ID);
             lenient().when(obContext.getRole()).thenReturn(mockRole);
 
-            when(request.getPathInfo()).thenReturn("/favorites");
+            when(request.getPathInfo()).thenReturn(pathInfo);
             when(request.getMethod()).thenReturn("GET");
+            setupListQuery(rows);
 
-            setupListQuery(Arrays.asList(
-                    new Object[]{"Sales Order", "W", "menu-001", "win-001"},
-                    new Object[]{"Purchase Invoice", "W", "menu-002", "win-002"}
-            ));
+            new FavoritesService(request, response).process();
+            assertions.run();
+        });
+    }
 
-            FavoritesService svc = new FavoritesService(request, response);
-            svc.process();
-
+    @Test
+    void listFavoritesReturnsItems() throws Exception {
+        runGetFavoritesTest(FAVORITES_PATH, Arrays.asList(
+                new Object[]{"Sales Order", "W", MENU_ID, "win-001"},
+                new Object[]{"Purchase Invoice", "W", "menu-002", "win-002"}
+        ), () -> {
             String output = responseCapture.toString();
-            assertTrue(output.contains("items"));
+            assertTrue(output.contains(ITEMS_KEY));
             assertTrue(output.contains("Sales Order"));
             assertTrue(output.contains("Purchase Invoice"));
             assertTrue(output.contains("win-001"));
@@ -200,48 +206,18 @@ class FavoritesServiceCoverageTest extends AbstractMockedContextTest {
 
     @Test
     void listFavoritesReturnsEmptyItems() throws Exception {
-        runWithMockedContext(() -> {
-            User mockUser = mock(User.class);
-            lenient().when(mockUser.getId()).thenReturn(USER_ID);
-            lenient().when(obContext.getUser()).thenReturn(mockUser);
-            Role mockRole = mock(Role.class);
-            lenient().when(mockRole.getId()).thenReturn(ROLE_ID);
-            lenient().when(obContext.getRole()).thenReturn(mockRole);
-
-            when(request.getPathInfo()).thenReturn("/favorites");
-            when(request.getMethod()).thenReturn("GET");
-
-            setupListQuery(Collections.emptyList());
-
-            FavoritesService svc = new FavoritesService(request, response);
-            svc.process();
-
+        runGetFavoritesTest(FAVORITES_PATH, Collections.emptyList(), () -> {
             String output = responseCapture.toString();
-            assertTrue(output.contains("items"));
+            assertTrue(output.contains(ITEMS_KEY));
             assertFalse(output.contains("label"));
         });
     }
 
     @Test
     void listFavoritesHandlesNullWindowId() throws Exception {
-        runWithMockedContext(() -> {
-            User mockUser = mock(User.class);
-            lenient().when(mockUser.getId()).thenReturn(USER_ID);
-            lenient().when(obContext.getUser()).thenReturn(mockUser);
-            Role mockRole = mock(Role.class);
-            lenient().when(mockRole.getId()).thenReturn(ROLE_ID);
-            lenient().when(obContext.getRole()).thenReturn(mockRole);
-
-            when(request.getPathInfo()).thenReturn("/favorites");
-            when(request.getMethod()).thenReturn("GET");
-
-            setupListQuery(Collections.singletonList(
-                    new Object[]{"Report", "R", "menu-003", null}
-            ));
-
-            FavoritesService svc = new FavoritesService(request, response);
-            svc.process();
-
+        runGetFavoritesTest(FAVORITES_PATH, Collections.singletonList(
+                new Object[]{"Report", "R", "menu-003", null}
+        ), () -> {
             String output = responseCapture.toString();
             assertTrue(output.contains("Report"));
             assertTrue(output.contains("null"));
@@ -250,48 +226,16 @@ class FavoritesServiceCoverageTest extends AbstractMockedContextTest {
 
     @Test
     void processNormalizesMetaModulePath() throws Exception {
-        runWithMockedContext(() -> {
-            User mockUser = mock(User.class);
-            lenient().when(mockUser.getId()).thenReturn(USER_ID);
-            lenient().when(obContext.getUser()).thenReturn(mockUser);
-            Role mockRole = mock(Role.class);
-            lenient().when(mockRole.getId()).thenReturn(ROLE_ID);
-            lenient().when(obContext.getRole()).thenReturn(mockRole);
-
-            when(request.getPathInfo()).thenReturn("/com.etendoerp.metadata.meta/favorites");
-            when(request.getMethod()).thenReturn("GET");
-
-            setupListQuery(Collections.emptyList());
-
-            FavoritesService svc = new FavoritesService(request, response);
-            svc.process();
-
-            String output = responseCapture.toString();
-            assertTrue(output.contains("items"));
-        });
+        runGetFavoritesTest("/com.etendoerp.metadata.meta" + FAVORITES_PATH,
+                Collections.emptyList(),
+                () -> assertTrue(responseCapture.toString().contains(ITEMS_KEY)));
     }
 
     @Test
     void processNormalizesSWSModulePath() throws Exception {
-        runWithMockedContext(() -> {
-            User mockUser = mock(User.class);
-            lenient().when(mockUser.getId()).thenReturn(USER_ID);
-            lenient().when(obContext.getUser()).thenReturn(mockUser);
-            Role mockRole = mock(Role.class);
-            lenient().when(mockRole.getId()).thenReturn(ROLE_ID);
-            lenient().when(obContext.getRole()).thenReturn(mockRole);
-
-            when(request.getPathInfo()).thenReturn("/com.etendoerp.metadata.sws/favorites");
-            when(request.getMethod()).thenReturn("GET");
-
-            setupListQuery(Collections.emptyList());
-
-            FavoritesService svc = new FavoritesService(request, response);
-            svc.process();
-
-            String output = responseCapture.toString();
-            assertTrue(output.contains("items"));
-        });
+        runGetFavoritesTest("/com.etendoerp.metadata.sws" + FAVORITES_PATH,
+                Collections.emptyList(),
+                () -> assertTrue(responseCapture.toString().contains(ITEMS_KEY)));
     }
 
     @Test
@@ -301,6 +245,6 @@ class FavoritesServiceCoverageTest extends AbstractMockedContextTest {
 
     @Test
     void processThrowsNotFoundForPatchMethod() {
-        assertNotFoundForMethodAndPath("PATCH", "/favorites");
+        assertNotFoundForMethodAndPath("PATCH", FAVORITES_PATH);
     }
 }
