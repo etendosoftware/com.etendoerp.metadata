@@ -36,7 +36,10 @@ import org.openbravo.model.common.enterprise.Organization;
 
 import java.io.BufferedReader;
 import java.io.StringReader;
+import java.util.Arrays;
+import java.util.Collections;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -155,5 +158,149 @@ class FavoritesServiceCoverageTest extends AbstractMockedContextTest {
     @Test
     void processThrowsNotFoundForWrongPathSuffix() {
         assertNotFoundForMethodAndPath("POST", "/favorites/list");
+    }
+
+    @SuppressWarnings("unchecked")
+    private void setupListQuery(java.util.List<Object[]> rows) {
+        Query<Object[]> listQuery = mock(Query.class);
+        when(session.createQuery(any(String.class), eq(Object[].class)))
+                .thenReturn(listQuery);
+        when(listQuery.setParameter(anyString(), anyString())).thenReturn(listQuery);
+        when(listQuery.list()).thenReturn(rows);
+    }
+
+    @Test
+    void listFavoritesReturnsItems() throws Exception {
+        runWithMockedContext(() -> {
+            User mockUser = mock(User.class);
+            lenient().when(mockUser.getId()).thenReturn(USER_ID);
+            lenient().when(obContext.getUser()).thenReturn(mockUser);
+            Role mockRole = mock(Role.class);
+            lenient().when(mockRole.getId()).thenReturn(ROLE_ID);
+            lenient().when(obContext.getRole()).thenReturn(mockRole);
+
+            when(request.getPathInfo()).thenReturn("/favorites");
+            when(request.getMethod()).thenReturn("GET");
+
+            setupListQuery(Arrays.asList(
+                    new Object[]{"Sales Order", "W", "menu-001", "win-001"},
+                    new Object[]{"Purchase Invoice", "W", "menu-002", "win-002"}
+            ));
+
+            FavoritesService svc = new FavoritesService(request, response);
+            svc.process();
+
+            String output = responseCapture.toString();
+            assertTrue(output.contains("items"));
+            assertTrue(output.contains("Sales Order"));
+            assertTrue(output.contains("Purchase Invoice"));
+            assertTrue(output.contains("win-001"));
+        });
+    }
+
+    @Test
+    void listFavoritesReturnsEmptyItems() throws Exception {
+        runWithMockedContext(() -> {
+            User mockUser = mock(User.class);
+            lenient().when(mockUser.getId()).thenReturn(USER_ID);
+            lenient().when(obContext.getUser()).thenReturn(mockUser);
+            Role mockRole = mock(Role.class);
+            lenient().when(mockRole.getId()).thenReturn(ROLE_ID);
+            lenient().when(obContext.getRole()).thenReturn(mockRole);
+
+            when(request.getPathInfo()).thenReturn("/favorites");
+            when(request.getMethod()).thenReturn("GET");
+
+            setupListQuery(Collections.emptyList());
+
+            FavoritesService svc = new FavoritesService(request, response);
+            svc.process();
+
+            String output = responseCapture.toString();
+            assertTrue(output.contains("items"));
+            assertFalse(output.contains("label"));
+        });
+    }
+
+    @Test
+    void listFavoritesHandlesNullWindowId() throws Exception {
+        runWithMockedContext(() -> {
+            User mockUser = mock(User.class);
+            lenient().when(mockUser.getId()).thenReturn(USER_ID);
+            lenient().when(obContext.getUser()).thenReturn(mockUser);
+            Role mockRole = mock(Role.class);
+            lenient().when(mockRole.getId()).thenReturn(ROLE_ID);
+            lenient().when(obContext.getRole()).thenReturn(mockRole);
+
+            when(request.getPathInfo()).thenReturn("/favorites");
+            when(request.getMethod()).thenReturn("GET");
+
+            setupListQuery(Collections.singletonList(
+                    new Object[]{"Report", "R", "menu-003", null}
+            ));
+
+            FavoritesService svc = new FavoritesService(request, response);
+            svc.process();
+
+            String output = responseCapture.toString();
+            assertTrue(output.contains("Report"));
+            assertTrue(output.contains("null"));
+        });
+    }
+
+    @Test
+    void processNormalizesMetaModulePath() throws Exception {
+        runWithMockedContext(() -> {
+            User mockUser = mock(User.class);
+            lenient().when(mockUser.getId()).thenReturn(USER_ID);
+            lenient().when(obContext.getUser()).thenReturn(mockUser);
+            Role mockRole = mock(Role.class);
+            lenient().when(mockRole.getId()).thenReturn(ROLE_ID);
+            lenient().when(obContext.getRole()).thenReturn(mockRole);
+
+            when(request.getPathInfo()).thenReturn("/com.etendoerp.metadata.meta/favorites");
+            when(request.getMethod()).thenReturn("GET");
+
+            setupListQuery(Collections.emptyList());
+
+            FavoritesService svc = new FavoritesService(request, response);
+            svc.process();
+
+            String output = responseCapture.toString();
+            assertTrue(output.contains("items"));
+        });
+    }
+
+    @Test
+    void processNormalizesSWSModulePath() throws Exception {
+        runWithMockedContext(() -> {
+            User mockUser = mock(User.class);
+            lenient().when(mockUser.getId()).thenReturn(USER_ID);
+            lenient().when(obContext.getUser()).thenReturn(mockUser);
+            Role mockRole = mock(Role.class);
+            lenient().when(mockRole.getId()).thenReturn(ROLE_ID);
+            lenient().when(obContext.getRole()).thenReturn(mockRole);
+
+            when(request.getPathInfo()).thenReturn("/com.etendoerp.metadata.sws/favorites");
+            when(request.getMethod()).thenReturn("GET");
+
+            setupListQuery(Collections.emptyList());
+
+            FavoritesService svc = new FavoritesService(request, response);
+            svc.process();
+
+            String output = responseCapture.toString();
+            assertTrue(output.contains("items"));
+        });
+    }
+
+    @Test
+    void processThrowsNotFoundForGetOnTogglePath() {
+        assertNotFoundForMethodAndPath("GET", FAVORITES_TOGGLE_PATH);
+    }
+
+    @Test
+    void processThrowsNotFoundForPatchMethod() {
+        assertNotFoundForMethodAndPath("PATCH", "/favorites");
     }
 }
