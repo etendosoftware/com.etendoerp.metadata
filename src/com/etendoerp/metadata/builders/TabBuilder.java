@@ -108,6 +108,8 @@ public class TabBuilder extends Builder {
         json.put("readOnly", true);
       }
 
+      json.put("obuiappCanAdd", Boolean.TRUE.equals(tab.isObuiappCanAdd()));
+
       return json;
     } catch (JSONException e) {
       logger.warn(e.getMessage(), e);

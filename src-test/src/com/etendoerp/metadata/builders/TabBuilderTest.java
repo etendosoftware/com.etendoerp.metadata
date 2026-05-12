@@ -90,6 +90,7 @@ class TabBuilderTest {
     private static final String READ_ONLY_KEY = "readOnly";
     private static final String RO_PATTERN = "RO";
     private static final String PARENT_COLUMN_KEY = "parentColumns";
+    private static final String OBUIAPP_CAN_ADD_KEY = "obuiappCanAdd";
 
     // Test data
     private static final String TEST_TABLE_NAME = "TestTable";
@@ -572,6 +573,78 @@ class TabBuilderTest {
                         fail(JSON_EXCEPTION + ": " + e.getMessage());
                     }
                 });
+    }
+
+    /**
+     * Tests that {@code obuiappCanAdd} is emitted as {@code true} when the underlying
+     * {@link Tab#isObuiappCanAdd()} returns {@code Boolean.TRUE}. Mirrors the classic
+     * UI rule in {@code OBViewTab#isAllowAdd()} — the property gates the inline
+     * "Add row" toolbar button in P&E grids rendered inside Process Definition modals.
+     *
+     * @throws Exception when mock setup fails
+     */
+    @Test
+    void toJSONEmitsObuiappCanAddTrueWhenIsObuiappCanAddIsTrue() throws Exception {
+        TestContext ctx = setupTestContext();
+        setupBasicMocks(ctx.context, ctx.language, ctx.tab, ctx.table, ctx.kernelUtils, List.of());
+        when(ctx.tab.isObuiappCanAdd()).thenReturn(Boolean.TRUE);
+
+        executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), result -> {
+            try {
+                assertTrue(result.has(OBUIAPP_CAN_ADD_KEY), "obuiappCanAdd should be present in JSON");
+                assertTrue(result.getBoolean(OBUIAPP_CAN_ADD_KEY),
+                        "obuiappCanAdd should be true when Tab.isObuiappCanAdd() returns TRUE");
+            } catch (JSONException e) {
+                fail(JSON_EXCEPTION + ": " + e.getMessage());
+            }
+        });
+    }
+
+    /**
+     * Tests that {@code obuiappCanAdd} is emitted as {@code false} when
+     * {@link Tab#isObuiappCanAdd()} returns {@code Boolean.FALSE}.
+     *
+     * @throws Exception when mock setup fails
+     */
+    @Test
+    void toJSONEmitsObuiappCanAddFalseWhenIsObuiappCanAddIsFalse() throws Exception {
+        TestContext ctx = setupTestContext();
+        setupBasicMocks(ctx.context, ctx.language, ctx.tab, ctx.table, ctx.kernelUtils, List.of());
+        when(ctx.tab.isObuiappCanAdd()).thenReturn(Boolean.FALSE);
+
+        executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), result -> {
+            try {
+                assertTrue(result.has(OBUIAPP_CAN_ADD_KEY), "obuiappCanAdd should be present in JSON");
+                assertFalse(result.getBoolean(OBUIAPP_CAN_ADD_KEY),
+                        "obuiappCanAdd should be false when Tab.isObuiappCanAdd() returns FALSE");
+            } catch (JSONException e) {
+                fail(JSON_EXCEPTION + ": " + e.getMessage());
+            }
+        });
+    }
+
+    /**
+     * Tests that {@code obuiappCanAdd} is emitted as {@code false} when
+     * {@link Tab#isObuiappCanAdd()} returns {@code null}. We always emit the
+     * property so the client can rely on a strict {@code === true} check.
+     *
+     * @throws Exception when mock setup fails
+     */
+    @Test
+    void toJSONEmitsObuiappCanAddFalseWhenIsObuiappCanAddIsNull() throws Exception {
+        TestContext ctx = setupTestContext();
+        setupBasicMocks(ctx.context, ctx.language, ctx.tab, ctx.table, ctx.kernelUtils, List.of());
+        when(ctx.tab.isObuiappCanAdd()).thenReturn(null);
+
+        executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), result -> {
+            try {
+                assertTrue(result.has(OBUIAPP_CAN_ADD_KEY), "obuiappCanAdd should be present in JSON");
+                assertFalse(result.getBoolean(OBUIAPP_CAN_ADD_KEY),
+                        "obuiappCanAdd should be false when Tab.isObuiappCanAdd() returns null");
+            } catch (JSONException e) {
+                fail(JSON_EXCEPTION + ": " + e.getMessage());
+            }
+        });
     }
 
     // Helper methods
