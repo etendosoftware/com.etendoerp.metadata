@@ -44,6 +44,7 @@ import java.util.List;
  */
 public class FavoritesService extends MetadataService {
 
+    private static final String ACTION = "action";
     private static final String MENU_ID = "menuId";
     private static final String USER_ID = "userId";
     private static final String ROLE_ID = "roleId";
@@ -91,25 +92,27 @@ public class FavoritesService extends MetadataService {
             .replace("/com.etendoerp.metadata.sws/", "/");
 
         String method = getRequest().getMethod();
+        boolean isGetFavorites = "GET".equalsIgnoreCase(method) && FAVORITES_BASE.equals(normalizedPath);
+        boolean isPostToggle = "POST".equalsIgnoreCase(method) && normalizedPath.endsWith(TOGGLE_PATH);
+
+        if (!isGetFavorites && !isPostToggle) {
+            throw new NotFoundException();
+        }
 
         try {
             OBContext.setAdminMode(true);
             String userId = OBContext.getOBContext().getUser().getId();
             String roleId = OBContext.getOBContext().getRole().getId();
 
-            if ("GET".equalsIgnoreCase(method) && FAVORITES_BASE.equals(normalizedPath)) {
+            if (isGetFavorites) {
                 write(listFavorites(userId, roleId));
-            } else if ("POST".equalsIgnoreCase(method) && normalizedPath.endsWith(TOGGLE_PATH)) {
+            } else {
                 JSONObject body = new JSONObject(readBody());
                 String menuId = body.getString(MENU_ID);
                 write(toggle(userId, menuId, roleId));
-            } else {
-                throw new NotFoundException();
             }
 
-        } catch (IOException e) {
-            throw e;
-        } catch (NotFoundException e) {
+        } catch (IOException | NotFoundException e) {
             throw e;
         } catch (Exception e) {
             throw new InternalServerException(e.getMessage(), e);
@@ -129,7 +132,7 @@ public class FavoritesService extends MetadataService {
         for (Object[] row : rows) {
             items.put(new JSONObject()
                     .put("label",    row[0])
-                    .put("action",   row[1])
+                    .put(ACTION,   row[1])
                     .put(MENU_ID,    row[2])
                     .put("windowId", row[3] != null ? row[3] : JSONObject.NULL));
         }
@@ -153,7 +156,7 @@ public class FavoritesService extends MetadataService {
                     .setParameter(ROLE_ID, roleId)
                     .executeUpdate();
             OBDal.getInstance().flush();
-            return new JSONObject().put("action", "removed").put(MENU_ID, menuId);
+            return new JSONObject().put(ACTION, "removed").put(MENU_ID, menuId);
         }
 
         // add
@@ -184,7 +187,7 @@ public class FavoritesService extends MetadataService {
             throw e;
         }
 
-        return new JSONObject().put("action", "added").put(MENU_ID, menuId);
+        return new JSONObject().put(ACTION, "added").put(MENU_ID, menuId);
     }
 
     private String readBody() throws IOException {
