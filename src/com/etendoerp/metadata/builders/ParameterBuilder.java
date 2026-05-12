@@ -78,6 +78,7 @@ public class ParameterBuilder extends Builder {
         addListInfo(json, parameter);
         addButtonListInfo(json, parameter);
         addWindowInfo(json, parameter);
+        addFieldGroupCollapsed(json, parameter);
 
         return json;
     }
@@ -147,6 +148,26 @@ public class ParameterBuilder extends Builder {
             }
         } catch (Exception e) {
             logger.warn("Error building window info for parameter {}: {}", parameter.getId(), e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Adds the {@code fieldGroupCollapsed} property to the parameter JSON when the
+     * parameter belongs to a FieldGroup. Mirrors the classic UI behavior implemented
+     * in {@code OBViewParameterHandler.OBViewParamGroup#isExpanded()}: a section is
+     * collapsed by default iff {@code AD_FieldGroup.IsCollapsed} is {@code true}.
+     *
+     * @param json      the JSON object to enrich
+     * @param parameter the process definition parameter being serialized
+     */
+    private void addFieldGroupCollapsed(JSONObject json, Parameter parameter) {
+        try {
+            org.openbravo.model.ad.ui.FieldGroup fg = parameter.getFieldGroup();
+            if (fg != null) {
+                json.put("fieldGroupCollapsed", Boolean.TRUE.equals(fg.isCollapsed()));
+            }
+        } catch (Exception e) {
+            logger.warn("Error building fieldGroupCollapsed for parameter {}: {}", parameter.getId(), e.getMessage(), e);
         }
     }
 }
