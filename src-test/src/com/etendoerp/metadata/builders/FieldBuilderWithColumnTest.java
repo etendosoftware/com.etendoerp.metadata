@@ -369,6 +369,51 @@ class FieldBuilderWithColumnTest {
         assertNotNull(result);
     }
 
+    /**
+     * Asserts that when the field has a non-blank {@code displaylogicgrid}
+     * (such as the {@code @ACCT_DIMENSION_DISPLAY@} placeholder classic UI
+     * rewrites per field), the resulting JSON exposes the rewritten
+     * expression under {@code gridDisplayLogicExpression}.
+     */
+    @Test
+    void testToJSONWithGridDisplayLogic() throws JSONException {
+        String rewritten = "(context.$IsAcctDimCentrally === 'Y' && context['$Element_BP_APP_L'] === 'Y')";
+        when(field.getDisplaylogicgrid()).thenReturn("@ACCT_DIMENSION_DISPLAY@");
+
+        JSONObject result = executeWithExpressionParser(rewritten, null);
+
+        assertTrue(result.has("gridDisplayLogicExpression"));
+        assertEquals(rewritten, result.getString("gridDisplayLogicExpression"));
+    }
+
+    /**
+     * Asserts that {@code gridDisplayLogicExpression} is omitted when the
+     * field's {@code displaylogicgrid} column is {@code null} (the typical
+     * case for non-accounting-dimension fields).
+     */
+    @Test
+    void testToJSONWithoutGridDisplayLogicWhenNull() throws JSONException {
+        when(field.getDisplaylogicgrid()).thenReturn(null);
+
+        JSONObject result = executeToJSON(null);
+
+        assertFalse(result.has("gridDisplayLogicExpression"));
+    }
+
+    /**
+     * Asserts that {@code gridDisplayLogicExpression} is omitted when the
+     * field's {@code displaylogicgrid} column is blank, matching the
+     * defensive guard in {@code FieldBuilder#addGridDisplayLogic}.
+     */
+    @Test
+    void testToJSONWithoutGridDisplayLogicWhenBlank() throws JSONException {
+        when(field.getDisplaylogicgrid()).thenReturn("   ");
+
+        JSONObject result = executeToJSON(null);
+
+        assertFalse(result.has("gridDisplayLogicExpression"));
+    }
+
     @Test
     void testToJSONWithMandatoryColumn() throws JSONException {
         when(column.isMandatory()).thenReturn(true);

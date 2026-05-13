@@ -777,6 +777,7 @@ public abstract class FieldBuilder extends Builder {
             addAccessProperties(fieldAccess);
             addHqlName(field);
             addDisplayLogic(field);
+            addGridDisplayLogic(field);
             addIsAuditField(field);
             addFieldGroupCollapsed(field);
         } catch (Exception e) {
@@ -893,6 +894,26 @@ public abstract class FieldBuilder extends Builder {
         if (displayLogic != null && !displayLogic.isBlank()) {
             DynamicExpressionParser parser = new DynamicExpressionParser(displayLogic, field.getTab(), field);
             json.put("displayLogicExpression", parser.getJSExpression());
+        }
+    }
+
+    /**
+     * Adds the grid display logic expression to the field JSON if configured.
+     * Mirrors {@link #addDisplayLogic} but operates on the field's
+     * {@code displaylogicgrid} column, which classic UI feeds through the same
+     * {@link DynamicExpressionParser} so placeholders like
+     * {@code @ACCT_DIMENSION_DISPLAY@} are rewritten per field. Without this the
+     * client receives the raw placeholder and cannot evaluate it.
+     *
+     * @param field The field that may have a grid display logic configured
+     * @throws JSONException if there's an error updating the JSON structure
+     */
+    private void addGridDisplayLogic(Field field) throws JSONException {
+        String gridDisplayLogic = field.getDisplaylogicgrid();
+
+        if (gridDisplayLogic != null && !gridDisplayLogic.isBlank()) {
+            DynamicExpressionParser parser = new DynamicExpressionParser(gridDisplayLogic, field.getTab(), field);
+            json.put("gridDisplayLogicExpression", parser.getJSExpression());
         }
     }
 }

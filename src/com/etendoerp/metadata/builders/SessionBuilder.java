@@ -20,11 +20,13 @@ package com.etendoerp.metadata.builders;
 import static com.etendoerp.metadata.utils.Utils.getJsonObject;
 
 import java.util.List;
+import java.util.Map;
 
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.dal.core.OBContext;
+import org.openbravo.erpCommon.utility.DimensionDisplayUtility;
 import org.openbravo.model.ad.access.Role;
 import org.openbravo.model.ad.access.RoleOrganization;
 import org.openbravo.model.ad.access.User;
@@ -58,6 +60,7 @@ public class SessionBuilder extends Builder {
             json.put("currentWarehouse", getJsonObject(warehouse));
             json.put("roles", getRoles(user));
             json.put("languages", new LanguageBuilder().toJSON());
+            json.put("attributes", buildAcctDimensionSessionAttributes(client));
 
             return json;
         } catch (JSONException e) {
@@ -111,6 +114,35 @@ public class SessionBuilder extends Builder {
         }
 
         return organizations;
+    }
+
+    /**
+     * Builds the session attributes object exposed to the new client, mirroring
+     * the keys classic UI populates at login (see
+     * {@code LoginUtils#fillSessionArguments}). The new UI evaluates per-field
+     * {@code gridDisplayLogicExpression} that classic rewrites against these
+     * keys (e.g. {@code $Element_BP_APP_L}); without them, accounting-dimension
+     * columns in P&E grids cannot resolve visibility.
+     *
+     * @param client The current AD Client
+     * @return JSON map of session attribute name → "Y"/"N" string value
+     */
+    private JSONObject buildAcctDimensionSessionAttributes(Client client) throws JSONException {
+        JSONObject attributes = new JSONObject();
+        if (client == null) {
+            return attributes;
+        }
+        boolean isCentrallyMaintained = client.isAcctdimCentrallyMaintained();
+        attributes.put(DimensionDisplayUtility.IsAcctDimCentrally, isCentrallyMaintained ? "Y" : "N");
+
+        if (isCentrallyMaintained) {
+            Map<String, String> acctDimMap = DimensionDisplayUtility.getAccountingDimensionConfiguration(client);
+            for (Map.Entry<String, String> entry : acctDimMap.entrySet()) {
+                attributes.put(entry.getKey(), entry.getValue());
+            }
+        }
+
+        return attributes;
     }
 
     private JSONArray getWarehouses(Organization organization) {
