@@ -122,6 +122,17 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
      * {@link #REFRESH_COMMAND_PREFIXES_JS} — this prevents the false warning that
      * would otherwise appear when the user refreshes the popup contents (combo
      * onChange firing {@code submitCommandForm('FIND_PO',...)} and similar).
+     *
+     * <p>The script also installs a one-shot hook on
+     * {@code HTMLFormElement.prototype.submit} that dispatches
+     * {@link LegacyMessageProtocol#ACTION_PROCESS_ORDER} only when a form is
+     * really submitted to the server (filtering refresh-prefix Commands via the
+     * same {@code isRefreshCommand} helper). This replaces the previous
+     * call-site injection that prepended {@code sendMessage('processOrder')} to
+     * every {@code submitThisPage(...)}, which fired even when the classic
+     * client-side validation (e.g. {@code showJSMessage('NoDataSelected')})
+     * aborted the submit and left the React shell polling
+     * {@code GetTabMessageActionHandler} until the fallback warning tripped.
      */
     private static final String POST_MESSAGE_SCRIPT = "<script>(function(){" +
             "var sent=false;" +
@@ -146,6 +157,18 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             "if(action==='" + LegacyMessageProtocol.ACTION_SHOW_PROCESS_MESSAGE + "'||action==='"
             + LegacyMessageProtocol.ACTION_CLOSE_MODAL + "'){sent=true;window.__etendoMessageSent=true;}" +
             "};" +
+            "if(typeof HTMLFormElement!=='undefined'&&HTMLFormElement.prototype&&!HTMLFormElement.prototype.__etendoSubmitHooked){" +
+            "var origSubmit=HTMLFormElement.prototype.submit;" +
+            "HTMLFormElement.prototype.submit=function(){" +
+            "try{" +
+            "var cmd=(this&&this.Command&&this.Command.value)||null;" +
+            "if(cmd&&!isRefreshCommand(cmd))window.sendMessage('"
+            + LegacyMessageProtocol.ACTION_PROCESS_ORDER + "');" +
+            "}catch(e){}" +
+            "return origSubmit.apply(this,arguments);" +
+            "};" +
+            "HTMLFormElement.prototype.__etendoSubmitHooked=true;" +
+            "}" +
             "function notifyUnload(){" +
             "if(sent||window.__etendoMessageSent)return;" +
             "if(isRefreshCommand(getSubmittedCommand()))return;" +
@@ -1622,19 +1645,21 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         String decSep = ".";
         String groupSep = ",";
         String maskNum = "#,##0.00";
+        String contextPath = "";
         try {
             HttpServletRequest req = RequestContext.get().getRequest();
             VariablesSecureApp vars = new VariablesSecureApp(req);
             decSep = StringUtils.defaultIfBlank(vars.getSessionValue("#DECIMALSEPARATOR|QTYEDITION"), decSep);
             groupSep = StringUtils.defaultIfBlank(vars.getSessionValue("#GROUPSEPARATOR|QTYEDITION"), groupSep);
             maskNum = StringUtils.defaultIfBlank(vars.getSessionValue("#FORMATOUTPUT|QTYEDITION"), maskNum);
+            contextPath = StringUtils.defaultIfBlank(req.getContextPath(), "");
         } catch (Exception e) {
             log.warn("Could not read locale session values for frameMenu shim, using defaults: {}", e.getMessage());
         }
-        return buildShimScript(escapeJs(decSep), escapeJs(groupSep), escapeJs(maskNum));
+        return buildShimScript(escapeJs(decSep), escapeJs(groupSep), escapeJs(maskNum), escapeJs(contextPath));
     }
 
-    private static String buildShimScript(String decSep, String groupSep, String maskNum) {
+    private static String buildShimScript(String decSep, String groupSep, String maskNum, String contextPath) {
         return "<script>(function(){" +
                 "var m={" +
                 "decSeparator_global:'" + decSep + "'," +
@@ -1645,7 +1670,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
                 "arrMessages:[]," +
                 "arrTypes:[]," +
                 "F:{formats:[],getFormat:function(n){return '" + maskNum + "';}}," +
-                "getAppUrlFromMenu:function(){return '';}," +
+                "getAppUrlFromMenu:function(){return '" + contextPath + "';}," +
                 "focus:function(){}," +
                 "document:window.document" +
                 "};" +
@@ -1738,11 +1763,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             resWithNewScript = resWithNewScript.replace("href=\"../web/", "href=\"" + contextPath + WEB_PATH);
 
             return injectCodeAfterFunctionCall(
-                    injectCodeBeforeFunctionCall(
-                            resWithNewScript,
-                            "submitThisPage\\(([^)]+)\\);",
-                            "sendMessage('" + LegacyMessageProtocol.ACTION_PROCESS_ORDER + "');",
-                            true),
+                    resWithNewScript,
                     "close(This)?Page\\(\\);",
                     "sendMessage('" + LegacyMessageProtocol.ACTION_CLOSE_MODAL + "');",
                     true);

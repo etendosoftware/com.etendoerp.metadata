@@ -89,6 +89,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
     private static final String SUBMIT_THIS_PAGE_PATTERN = "submitThisPage\\(([^)]+)\\);";
     private static final String BUILD_SHIM_SCRIPT = "buildShimScript";
     private static final String DEFAULT_NUMERIC_MASK = "#,##0.00";
+    private static final String DEFAULT_CONTEXT_PATH = "/etendo";
     private static final String MESSAGES_GET_FRAME_ASSIGNMENT = "var _messagesGetFrame=getFrame;";
     private static final String ESCAPE_JS = "escapeJs";
     private static final String INJECT_FRAME_MENU_SHIM = "injectFrameMenuShim";
@@ -698,13 +699,28 @@ public class LegacyProcessServletTest extends OBBaseTest {
     // ========== Tests for frameMenu shim injection (new functionality) ==========
 
     /**
+     * Invokes the private {@code buildShimScript} method with default decimal/group
+     * separators and numeric mask, and the supplied context path. Centralises the
+     * reflective invocation so individual tests stay free of boilerplate.
+     *
+     * @param contextPath the servlet context path to embed in {@code getAppUrlFromMenu}
+     * @return the generated shim script
+     * @throws Exception if the reflective invocation of the private method fails
+     */
+    private String invokeBuildShimScript(String contextPath) throws Exception {
+        return (String) invokePrivateMethod(legacyProcessServlet, BUILD_SHIM_SCRIPT,
+                new Class<?>[] { String.class, String.class, String.class, String.class },
+                ".", ",", DEFAULT_NUMERIC_MASK, contextPath);
+    }
+
+    /**
      * Tests buildShimScript includes all required frameMenu properties.
+     *
+     * @throws Exception if the reflective invocation of the private method fails
      */
     @Test
     public void testBuildShimScriptIncludesRequiredProperties() throws Exception {
-        String script = (String) invokePrivateMethod(legacyProcessServlet, BUILD_SHIM_SCRIPT,
-                new Class<?>[] { String.class, String.class, String.class },
-                ".", ",", DEFAULT_NUMERIC_MASK);
+        String script = invokeBuildShimScript(DEFAULT_CONTEXT_PATH);
 
         assertTrue("Should include decimal separator", script.contains("decSeparator_global:'.'"));
         assertTrue("Should include group separator", script.contains("groupSeparator_global:','"));
@@ -716,12 +732,12 @@ public class LegacyProcessServletTest extends OBBaseTest {
 
     /**
      * Tests buildShimScript defines _shimGetFrame function correctly.
+     *
+     * @throws Exception if the reflective invocation of the private method fails
      */
     @Test
     public void testBuildShimScriptDefinesShimGetFrame() throws Exception {
-        String script = (String) invokePrivateMethod(legacyProcessServlet, BUILD_SHIM_SCRIPT,
-                new Class<?>[] { String.class, String.class, String.class },
-                ".", ",", DEFAULT_NUMERIC_MASK);
+        String script = invokeBuildShimScript(DEFAULT_CONTEXT_PATH);
 
         assertTrue("Should define _shimGetFrame", script.contains("var _shimGetFrame=function(name)"));
         assertTrue("Should return frameMenu mock", script.contains("if(name==='frameMenu')return window.frameMenu;"));
@@ -730,15 +746,66 @@ public class LegacyProcessServletTest extends OBBaseTest {
 
     /**
      * Tests buildShimScript wraps in IIFE for scope isolation.
+     *
+     * @throws Exception if the reflective invocation of the private method fails
      */
     @Test
     public void testBuildShimScriptUsesIIFE() throws Exception {
-        String script = (String) invokePrivateMethod(legacyProcessServlet, BUILD_SHIM_SCRIPT,
-                new Class<?>[] { String.class, String.class, String.class },
-                ".", ",", DEFAULT_NUMERIC_MASK);
+        String script = invokeBuildShimScript(DEFAULT_CONTEXT_PATH);
 
         assertTrue("Should start with IIFE", script.contains("(function(){"));
         assertTrue("Should end with IIFE call", script.contains("})();"));
+    }
+
+    /**
+     * Tests that buildShimScript embeds the servlet context path into
+     * {@code getAppUrlFromMenu} so legacy XHRs (e.g. {@code /businessUtility/MessageJS.html})
+     * resolve against {@code /etendo/...} instead of the host root.
+     * <p>
+     * Regression for the 404 reported when invoking "Reconcile" with no rows
+     * selected: {@code showJSMessage('NoDataSelected')} → {@code getDataBaseMessage} → XHR
+     * against an empty {@code appUrl} was hitting {@code /businessUtility/MessageJS.html}
+     * (no context path) and 404'ing.
+     *
+     * @throws Exception if the reflective invocation of the private method fails
+     */
+    @Test
+    public void testBuildShimScriptEmbedsContextPathInGetAppUrlFromMenu() throws Exception {
+        String script = invokeBuildShimScript(DEFAULT_CONTEXT_PATH);
+
+        assertTrue("getAppUrlFromMenu must return the configured context path",
+                script.contains("getAppUrlFromMenu:function(){return '" + DEFAULT_CONTEXT_PATH + "';}"));
+    }
+
+    /**
+     * Tests that buildShimScript falls back to an empty string when no context
+     * path is supplied (defensive — matches the pre-fix behaviour so existing
+     * deployments without a context path keep working).
+     *
+     * @throws Exception if the reflective invocation of the private method fails
+     */
+    @Test
+    public void testBuildShimScriptDefaultsToEmptyContextPath() throws Exception {
+        String script = invokeBuildShimScript("");
+
+        assertTrue("getAppUrlFromMenu must default to an empty string when no context path is given",
+                script.contains("getAppUrlFromMenu:function(){return '';}"));
+    }
+
+    /**
+     * Tests that buildShimScript preserves an already-escaped single quote in the
+     * context path so a crafted value cannot break out of the JS string literal
+     * (defence in depth — the caller is expected to pass the value through
+     * {@code escapeJs} as {@code buildFrameMenuShim} does).
+     *
+     * @throws Exception if the reflective invocation of the private method fails
+     */
+    @Test
+    public void testBuildShimScriptPreservesEscapedQuoteInContextPath() throws Exception {
+        String script = invokeBuildShimScript("/etendo\\'evil");
+
+        assertTrue("Escaped quotes in context path must be preserved verbatim",
+                script.contains("getAppUrlFromMenu:function(){return '/etendo\\'evil';}"));
     }
 
     /**
@@ -1322,42 +1389,104 @@ public class LegacyProcessServletTest extends OBBaseTest {
     }
 
     /**
-     * {@code sendMessage('processOrder')} must be injected BEFORE
-     * {@code submitThisPage(...)} so the postMessage is queued before the form
-     * submit can trigger a navigation that destroys the document.
+     * The before-call helper must prepend the supplied payload immediately
+     * before each matched call, preserving the original call verbatim. The
+     * helper is generic; {@code getInjectedContent} no longer uses it to inject
+     * {@code sendMessage('processOrder')} (that path moved to a global
+     * {@code HTMLFormElement.prototype.submit} hook in {@code POST_MESSAGE_SCRIPT}),
+     * but the helper itself is still part of the internal API.
+     *
+     * @throws Exception if the reflective invocation of the private method fails
      */
     @Test
-    public void processOrderShouldBeInjectedBeforeSubmitThisPage() throws Exception {
+    public void injectCodeBeforeFunctionCallShouldPrependPayloadToMatchedCall() throws Exception {
         String html = "<html><body><form><a onclick=\"submitThisPage('save');\">go</a></form></body></html>";
 
         String result = (String) invokePrivateMethod(legacyProcessServlet, "injectCodeBeforeFunctionCall",
                 new Class<?>[] { String.class, String.class, String.class, boolean.class },
-                html, SUBMIT_THIS_PAGE_PATTERN, "sendMessage('processOrder');", true);
+                html, SUBMIT_THIS_PAGE_PATTERN, "extra();", true);
 
-        assertTrue("processOrder must be emitted before submitThisPage",
-                result.contains("sendMessage('processOrder');submitThisPage('save');"));
-        assertTrue("Original submitThisPage call must be preserved",
+        assertTrue("Payload must be emitted before the matched call",
+                result.contains("extra();submitThisPage('save');"));
+        assertTrue("Original call must be preserved",
                 result.contains("submitThisPage('save');"));
-        assertTrue("processOrder must NOT remain after submitThisPage",
-                !result.contains("submitThisPage('save');sendMessage('processOrder');"));
+        assertTrue("Payload must NOT remain after the matched call",
+                !result.contains("submitThisPage('save');extra();"));
     }
 
     /**
      * The before-call helper must inject the new code in front of every match,
-     * not only the first occurrence (action buttons, save buttons, etc. all
-     * resolve to {@code submitThisPage}).
+     * not only the first occurrence. Generic helper test — the payload here is
+     * deliberately not {@code processOrder} because {@code getInjectedContent}
+     * no longer relies on this helper for that flow.
+     *
+     * @throws Exception if the reflective invocation of the private method fails
      */
     @Test
-    public void injectCodeBeforeFunctionCallShouldInjectAtEveryMatch() throws Exception {
+    public void injectCodeBeforeFunctionCallShouldPrependBeforeEveryMatch() throws Exception {
         String html = "submitThisPage('a');submitThisPage('b');";
 
         String result = (String) invokePrivateMethod(legacyProcessServlet, "injectCodeBeforeFunctionCall",
                 new Class<?>[] { String.class, String.class, String.class, boolean.class },
-                html, SUBMIT_THIS_PAGE_PATTERN, "sendMessage('processOrder');", true);
+                html, SUBMIT_THIS_PAGE_PATTERN, "extra();", true);
 
-        assertEquals("Both submitThisPage calls must be preceded by sendMessage",
-                "sendMessage('processOrder');submitThisPage('a');sendMessage('processOrder');submitThisPage('b');",
+        assertEquals("Both calls must be preceded by the injected payload",
+                "extra();submitThisPage('a');extra();submitThisPage('b');",
                 result);
+    }
+
+    /**
+     * Tests that POST_MESSAGE_SCRIPT installs a hook on
+     * {@code HTMLFormElement.prototype.submit} so {@code processOrder} fires only
+     * when the form is actually submitted (not on every button click).
+     * <p>
+     * Regression for the "Could not capture response" warning shown when classic
+     * client-side validation aborted via {@code showJSMessage('NoDataSelected')}
+     * but the old inline injection had already dispatched {@code processOrder}.
+     *
+     * @throws Exception if the script constant cannot be read via reflection
+     */
+    @Test
+    public void postMessageScriptShouldHookFormSubmitForProcessOrder() throws Exception {
+        String script = readScriptConstant(POST_MESSAGE_SCRIPT_KEY);
+
+        assertTrue("Script must wrap HTMLFormElement.prototype.submit",
+                script.contains("HTMLFormElement.prototype.submit=function()"));
+        assertTrue("Hook must dispatch processOrder via window.sendMessage",
+                script.contains("window.sendMessage('processOrder')"));
+        assertTrue("Hook must guard against double-installation",
+                script.contains("__etendoSubmitHooked"));
+        assertTrue("Hook must skip refresh commands by reusing isRefreshCommand",
+                script.contains("!isRefreshCommand(cmd)"));
+    }
+
+    /**
+     * Tests that {@code getInjectedContent} no longer prepends
+     * {@code sendMessage('processOrder')} to inline {@code submitThisPage(...)}
+     * calls — the global {@code form.submit} hook in POST_MESSAGE_SCRIPT
+     * replaces that behaviour so client-side validation aborts no longer fire
+     * a false {@code processOrder}. The {@code closeModal} wrap on
+     * {@code closePage()}/{@code closeThisPage()} is preserved.
+     *
+     * @throws Exception if the reflective invocation of the private method fails
+     */
+    @Test
+    public void getInjectedContentShouldNotPrependProcessOrderToSubmitThisPage() throws Exception {
+        String html = "<HTML><HEAD></HEAD><BODY><FORM>"
+                + "<BUTTON onclick=\"submitThisPage('PROCESS');\">Go</BUTTON>"
+                + "<BUTTON onclick=\"closeThisPage();\">X</BUTTON>"
+                + "</FORM></BODY></HTML>";
+
+        String result = (String) invokePrivateMethod(legacyProcessServlet, "getInjectedContent",
+                new Class<?>[] { String.class, String.class },
+                "", html);
+
+        assertFalse("Inline submitThisPage must no longer carry a prepended processOrder",
+                result.contains("sendMessage('processOrder');submitThisPage('PROCESS');"));
+        assertTrue("Original submitThisPage call must be preserved as-is",
+                result.contains("submitThisPage('PROCESS');"));
+        assertTrue("closeModal injection on closeThisPage() must be preserved",
+                result.contains("closeThisPage();sendMessage('closeModal');"));
     }
 
     // ========== Tests for refresh-Command guard in notifyUnload ==========
