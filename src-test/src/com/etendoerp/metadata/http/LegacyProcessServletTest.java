@@ -113,6 +113,9 @@ public class LegacyProcessServletTest extends OBBaseTest {
     private static final String METHOD_DERIVE_LEGACY_CLASS = "deriveLegacyClass";
     private static final String PATH_PAGE_HTML = "/page.html";
     private static final String PATH_SALES_ORDER_EDIT_LINES = "/SalesOrder/EditLines.html";
+    private static final String EXTRA_KEY = "extra();";
+    private static final String SET_TIMEOUT_KEY = "setTimeout";
+    private static final String WRITE_PROCESS_COMMAND_FORWARDER_KEY = "writeProcessCommandForwarder";
 
     @Mock
     private HttpServletRequest request;
@@ -691,7 +694,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
         String original = "function test() { submitThisPage('action'); }";
         String result = (String) invokePrivateMethod(legacyProcessServlet, "injectCodeAfterFunctionCall",
                 new Class<?>[] { String.class, String.class, String.class, boolean.class },
-                original, "submitThisPage\\(([^)]+)\\);", "extra();", true);
+                original, SUBMIT_THIS_PAGE_PATTERN, EXTRA_KEY, true);
 
         assertTrue("Should contain injected code", result.contains("submitThisPage('action');extra();"));
     }
@@ -705,9 +708,9 @@ public class LegacyProcessServletTest extends OBBaseTest {
      *
      * @param contextPath the servlet context path to embed in {@code getAppUrlFromMenu}
      * @return the generated shim script
-     * @throws Exception if the reflective invocation of the private method fails
+     * @throws ReflectiveOperationException if the reflective invocation of the private method fails
      */
-    private String invokeBuildShimScript(String contextPath) throws Exception {
+    private String invokeBuildShimScript(String contextPath) throws ReflectiveOperationException {
         return (String) invokePrivateMethod(legacyProcessServlet, BUILD_SHIM_SCRIPT,
                 new Class<?>[] { String.class, String.class, String.class, String.class },
                 ".", ",", DEFAULT_NUMERIC_MASK, contextPath);
@@ -993,7 +996,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
         assertFalse("Forwarder must NOT dispatch closeModal (React shell governs the close)",
                 result.contains(ACTION_CLOSE_MODAL));
         assertFalse("Forwarder must NOT schedule any setTimeout (no auto-close)",
-                result.contains("setTimeout"));
+                result.contains(SET_TIMEOUT_KEY));
     }
 
     /**
@@ -1170,7 +1173,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
         PrintWriter writer = new PrintWriter(stringWriter);
         when(response.getWriter()).thenReturn(writer);
 
-        invokePrivateMethod(legacyProcessServlet, "writeProcessCommandForwarder",
+        invokePrivateMethod(legacyProcessServlet, WRITE_PROCESS_COMMAND_FORWARDER_KEY,
                 new Class<?>[] { HttpServletResponse.class, String.class },
                 response, POPUP_ERROR_HTML);
 
@@ -1180,7 +1183,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
         assertTrue("Response must contain the showProcessMessage dispatch",
                 output.contains(ACTION_SHOW_PROCESS_MESSAGE));
         assertTrue("Response must NOT auto-close the modal",
-                !output.contains(ACTION_CLOSE_MODAL) && !output.contains("setTimeout"));
+                !output.contains(ACTION_CLOSE_MODAL) && !output.contains(SET_TIMEOUT_KEY));
         assertTrue("Response payload must carry the extracted type",
                 output.contains("\"type\":\"error\""));
         assertTrue("Response payload must carry the extracted title",
@@ -1216,7 +1219,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
         PrintWriter writer = new PrintWriter(stringWriter);
         when(response.getWriter()).thenReturn(writer);
 
-        invokePrivateMethod(legacyProcessServlet, "writeProcessCommandForwarder",
+        invokePrivateMethod(legacyProcessServlet, WRITE_PROCESS_COMMAND_FORWARDER_KEY,
                 new Class<?>[] { HttpServletResponse.class, String.class },
                 response, htmlWithEnglishId);
 
@@ -1301,7 +1304,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
         PrintWriter writer = new PrintWriter(stringWriter);
         when(response.getWriter()).thenReturn(writer);
 
-        invokePrivateMethod(legacyProcessServlet, "writeProcessCommandForwarder",
+        invokePrivateMethod(legacyProcessServlet, WRITE_PROCESS_COMMAND_FORWARDER_KEY,
                 new Class<?>[] { HttpServletResponse.class, String.class },
                 response, POPUP_SUCCESS_HTML);
 
@@ -1373,7 +1376,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
         assertFalse("Script must NOT dispatch closeModal (React shell governs the close)",
                 script.contains(ACTION_CLOSE_MODAL));
         assertFalse("Script must NOT schedule any setTimeout (no auto-close)",
-                script.contains("setTimeout"));
+                script.contains(SET_TIMEOUT_KEY));
     }
 
     /**
@@ -1404,7 +1407,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
 
         String result = (String) invokePrivateMethod(legacyProcessServlet, "injectCodeBeforeFunctionCall",
                 new Class<?>[] { String.class, String.class, String.class, boolean.class },
-                html, SUBMIT_THIS_PAGE_PATTERN, "extra();", true);
+                html, SUBMIT_THIS_PAGE_PATTERN, EXTRA_KEY, true);
 
         assertTrue("Payload must be emitted before the matched call",
                 result.contains("extra();submitThisPage('save');"));
@@ -1428,7 +1431,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
 
         String result = (String) invokePrivateMethod(legacyProcessServlet, "injectCodeBeforeFunctionCall",
                 new Class<?>[] { String.class, String.class, String.class, boolean.class },
-                html, SUBMIT_THIS_PAGE_PATTERN, "extra();", true);
+                html, SUBMIT_THIS_PAGE_PATTERN, EXTRA_KEY, true);
 
         assertEquals("Both calls must be preceded by the injected payload",
                 "extra();submitThisPage('a');extra();submitThisPage('b');",

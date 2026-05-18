@@ -1811,6 +1811,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
      * (e.g. {@code submitThisPage}) and we need the side-effect (e.g. postMessage)
      * to fire before the page can unload.
      */
+    @SuppressWarnings("unused")
     private String injectCodeBeforeFunctionCall(String originalRes, String originalFunctionCall,
             String newFunctionCall, boolean isRegex) {
         Pattern pattern = isRegex ? Pattern.compile(originalFunctionCall)
