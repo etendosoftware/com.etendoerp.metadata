@@ -900,7 +900,12 @@ public class LegacyProcessServletTest extends OBBaseTest {
 
     /**
      * Tests injectPopupMessageForwarder injects the forwarder script before </HEAD>
-     * when the response is an Openbravo classic popup-message page (error).
+     * when the response is an Openbravo classic popup-message page (error). The
+     * forwarder must NOT auto-close the modal — closing is the React shell's
+     * responsibility (mirroring {@code MINIMAL_FORWARDER_HTML}). See the Javadoc
+     * on {@code SHOW_PROCESS_MESSAGE_SCRIPT}.
+     *
+     * @throws Exception if the reflective invocation of the private method fails
      */
     @Test
     public void testInjectPopupMessageForwarderInjectsForErrorPopup() throws Exception {
@@ -918,14 +923,19 @@ public class LegacyProcessServletTest extends OBBaseTest {
         int closeHeadIndex = result.indexOf("</HEAD>");
         assertTrue("Forwarder script should be injected before </HEAD>",
                 scriptIndex >= 0 && closeHeadIndex >= 0 && scriptIndex < closeHeadIndex);
-        assertTrue("Forwarder should schedule closeModal via setTimeout",
-                result.contains(ACTION_CLOSE_MODAL) && result.contains("setTimeout"));
+        assertFalse("Forwarder must NOT dispatch closeModal (React shell governs the close)",
+                result.contains(ACTION_CLOSE_MODAL));
+        assertFalse("Forwarder must NOT schedule any setTimeout (no auto-close)",
+                result.contains("setTimeout"));
     }
 
     /**
      * Tests injectPopupMessageForwarder also injects for success-style popups.
-     * The type is computed client-side from paramTipo's className, so the server
-     * only needs to confirm the script was injected.
+     * The type is computed client-side from the {@code MessageBox*} CSS class on
+     * the message table (via {@code querySelector}), so the server only needs to
+     * confirm the script was injected.
+     *
+     * @throws Exception if the reflective invocation of the private method fails
      */
     @Test
     public void testInjectPopupMessageForwarderInjectsForSuccessPopup() throws Exception {
@@ -1118,6 +1128,60 @@ public class LegacyProcessServletTest extends OBBaseTest {
     }
 
     /**
+     * Tests writeProcessCommandForwarder extracts the message type from the CSS
+     * class even when the popup table uses {@code id="paramType"} (English
+     * variant emitted by {@code AdvisePopUpRefresh.html} and observed in real
+     * ERP responses). Regression for the bug where {@code SUCCESS} popups
+     * rendered as blue {@code info} because the type regex was anchored to the
+     * Spanish {@code id="paramTipo"}.
+     *
+     * @throws Exception if the reflective invocation of the private method fails
+     */
+    @Test
+    public void testWriteProcessCommandForwarderDetectsTypeWhenIdIsParamTypeEnglishVariant() throws Exception {
+        String htmlWithEnglishId = "<HTML><HEAD></HEAD><BODY>"
+                + "<TABLE id=\"paramType\" class=\"MessageBoxSUCCESS\">"
+                + "<DIV id=\"messageBoxIDTitle\">Done</DIV>"
+                + "<DIV id=\"messageBoxIDMessage\">All good</DIV>"
+                + "</TABLE></BODY></HTML>";
+
+        StringWriter stringWriter = new StringWriter();
+        PrintWriter writer = new PrintWriter(stringWriter);
+        when(response.getWriter()).thenReturn(writer);
+
+        invokePrivateMethod(legacyProcessServlet, "writeProcessCommandForwarder",
+                new Class<?>[] { HttpServletResponse.class, String.class },
+                response, htmlWithEnglishId);
+
+        writer.flush();
+        String output = stringWriter.toString();
+
+        assertTrue("Payload must carry the SUCCESS type even with id=paramType",
+                output.contains("\"type\":\"success\""));
+    }
+
+    /**
+     * Tests the injected popup-message forwarder script reads the message type
+     * via a CSS-class {@code querySelector}, so it works regardless of whether
+     * the template uses {@code id="paramTipo"} or {@code id="paramType"}. The
+     * legacy {@code getElementById('paramTipo')} lookup is gone.
+     *
+     * @throws Exception if the script constant cannot be read via reflection
+     */
+    @Test
+    public void showProcessMessageScriptShouldDetectTypeViaCssClass() throws Exception {
+        String script = readScriptConstant("SHOW_PROCESS_MESSAGE_SCRIPT");
+
+        assertTrue("Script must read the type via querySelector on the MessageBox* classes",
+                script.contains(
+                        "querySelector('.MessageBoxERROR,.MessageBoxSUCCESS,.MessageBoxWARNING,.MessageBoxINFO')"));
+        assertFalse("Script must NOT depend on the paramTipo id anymore",
+                script.contains("getElementById('paramTipo')"));
+        assertFalse("Script must NOT depend on the paramType id anymore",
+                script.contains("getElementById('paramType')"));
+    }
+
+    /**
      * Tests rollbackDalSessionIfErrorPopup rolls back the DAL session when the
      * captured body is an error popup — preventing StaleStateException during
      * the filter-chain post-commit which would otherwise abort the HTTP
@@ -1220,23 +1284,29 @@ public class LegacyProcessServletTest extends OBBaseTest {
     }
 
     /**
-     * The popup-message forwarder must mark the message-sent flag so the
-     * pagehide listener does not emit a redundant {@code iframeUnloaded} during
-     * the 150 ms delay before {@code closeModal}.
+     * The popup-message forwarder must mark the message-sent flag immediately
+     * after posting {@code showProcessMessage} so the pagehide listener does not
+     * emit a redundant {@code iframeUnloaded}. The forwarder must NOT dispatch
+     * {@code closeModal} on its own — closing the modal is the React shell's
+     * responsibility (mirroring {@code MINIMAL_FORWARDER_HTML}).
+     *
+     * @throws Exception if the script constant cannot be read via reflection
      */
     @Test
-    public void showProcessMessageScriptShouldMarkMessageSent() throws Exception {
+    public void showProcessMessageScriptShouldMarkMessageSentAndNotCloseModal() throws Exception {
         String script = readScriptConstant("SHOW_PROCESS_MESSAGE_SCRIPT");
 
         int postIndex = script.indexOf(ACTION_SHOW_PROCESS_MESSAGE);
         int markIndex = script.indexOf("__etendoMessageSent=true");
-        int closeIndex = script.indexOf(ACTION_CLOSE_MODAL);
 
         assertTrue("Script must post showProcessMessage", postIndex >= 0);
         assertTrue("Script must mark the message-sent flag", markIndex >= 0);
-        assertTrue("Script must still schedule closeModal", closeIndex >= 0);
-        assertTrue("Flag must be set after showProcessMessage and before closeModal",
-                postIndex < markIndex && markIndex < closeIndex);
+        assertTrue("Flag must be set after showProcessMessage",
+                postIndex < markIndex);
+        assertFalse("Script must NOT dispatch closeModal (React shell governs the close)",
+                script.contains(ACTION_CLOSE_MODAL));
+        assertFalse("Script must NOT schedule any setTimeout (no auto-close)",
+                script.contains("setTimeout"));
     }
 
     /**

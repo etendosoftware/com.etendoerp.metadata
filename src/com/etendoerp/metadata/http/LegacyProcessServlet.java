@@ -177,19 +177,21 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
     /**
      * Script injected into popup-message pages. Extracts the title/text/type from
      * the DOM and forwards them to the parent window so the new UI can render the
-     * dialog with its own styles, then closes the iframe modal.
+     * dialog with its own styles.
      *
-     * <p>Delays {@code closeModal} by 150 ms so the parent processes
-     * {@code showProcessMessage} and captures the payload before the iframe is
-     * unmounted (otherwise the React state update is discarded).
+     * <p>The modal close is intentionally NOT triggered from here: the React shell
+     * governs the lifecycle ({@code success} auto-closes after its 3 s progress
+     * timer; {@code error}/{@code warning}/{@code info} stay open until the user
+     * dismisses them). This mirrors {@link #MINIMAL_FORWARDER_HTML}, which also
+     * relies on the parent for the close decision.
      */
     private static final String SHOW_PROCESS_MESSAGE_SCRIPT = "<script>(function(){" +
             "function forward(){" +
             "var t=document.getElementById('messageBoxIDTitle');" +
             "var m=document.getElementById('messageBoxIDMessage');" +
-            "var p=document.getElementById('paramTipo');" +
             "if(!t||!m||!window.parent)return;" +
-            "var cls=(p&&p.className)||'';" +
+            "var typeEl=document.querySelector('.MessageBoxERROR,.MessageBoxSUCCESS,.MessageBoxWARNING,.MessageBoxINFO');" +
+            "var cls=(typeEl&&typeEl.className)||'';" +
             "var type='info';" +
             "if(cls.indexOf('ERROR')>=0)type='error';" +
             "else if(cls.indexOf('SUCCESS')>=0)type='success';" +
@@ -198,10 +200,6 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             "window.parent.postMessage({type:'" + LegacyMessageProtocol.MESSAGE_TYPE + ACTION_JSON_SEPARATOR
             + "'" + LegacyMessageProtocol.ACTION_SHOW_PROCESS_MESSAGE + "',payload:payload},'*');" +
             "window.__etendoMessageSent=true;" +
-            "setTimeout(function(){" +
-            "window.parent.postMessage({type:'" + LegacyMessageProtocol.MESSAGE_TYPE + ACTION_JSON_SEPARATOR
-            + "'" + LegacyMessageProtocol.ACTION_CLOSE_MODAL + "'},'*');" +
-            "},150);" +
             "}" +
             "if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',forward);" +
             "else forward();" +
@@ -218,15 +216,20 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
 
     /**
      * Patterns used to extract the popup title, message and message-type class
-     * from the captured legacy HTML. The popup template is stable across
-     * Openbravo versions and modules.
+     * from the captured legacy HTML. The {@code messageBoxIDTitle} and
+     * {@code messageBoxIDMessage} ids are stable across all Openbravo classic
+     * templates; the message-type signal is matched on the CSS class
+     * ({@code MessageBoxERROR|SUCCESS|WARNING|INFO}) because the id of the
+     * carrier table is inconsistent — most templates use {@code paramTipo}
+     * (Spanish) but {@code AdvisePopUpRefresh.html} uses {@code paramType}
+     * (English). The class is the canonical signal in every template.
      */
     private static final Pattern POPUP_TITLE_PATTERN = Pattern.compile(
             "id=\"messageBoxIDTitle\"[^>]*>([^<]*)<", Pattern.CASE_INSENSITIVE);
     private static final Pattern POPUP_MESSAGE_PATTERN = Pattern.compile(
             "id=\"messageBoxIDMessage\"[^>]*>([^<]*)<", Pattern.CASE_INSENSITIVE);
     private static final Pattern POPUP_TYPE_PATTERN = Pattern.compile(
-            "id=\"paramTipo\"[^>]*class=\"MessageBox([A-Z]+)\"", Pattern.CASE_INSENSITIVE);
+            "class=\"MessageBox(ERROR|SUCCESS|WARNING|INFO)\"", Pattern.CASE_INSENSITIVE);
 
     /** Shared HTML preamble for all postMessage forwarder pages. */
     private static final String HTML_DOCTYPE_HEAD =
