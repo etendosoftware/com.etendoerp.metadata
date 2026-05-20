@@ -97,6 +97,7 @@ import com.etendoerp.metadata.utils.Utils;
 
 @MockitoSettings(strictness = Strictness.LENIENT)
 @ExtendWith(MockitoExtension.class)
+@SuppressWarnings("java:S1448")
 class FieldBuilderWithColumnTest {
 
     @Mock
@@ -133,6 +134,9 @@ class FieldBuilderWithColumnTest {
     private OBCriteria<Tab> criteria;
     @Mock
     private OBContext obContext;
+    private static final String PAYMENT_TERMS = PAYMENT_TERMS;
+    private static final String SELECTOR_KEY = SELECTOR_KEY;
+    private static final String OUT_FIELDS_KEY = OUT_FIELDS_KEY;
     private static final String BUTTON_REF_LIST_STRING = "buttonRefList";
     private static final String WINDOW_ID_STRING = "window-id";
     private static final String ROLE_ID_STRING = "role-id";
@@ -683,29 +687,43 @@ class FieldBuilderWithColumnTest {
         assertFalse(result.has(FIELD_GROUP_COLLAPSED));
     }
 
+    private JSONObject invokeAddComboSelectInfoAndGetJson(
+            ReferenceSelectors selectors,
+            MockedStatic<FieldBuilder> mockedFieldBuilder) throws Exception {
+
+        mockedFieldBuilder.when(() -> FieldBuilder.getSelectorInfo(anyString(), any()))
+                .thenReturn(new JSONObject());
+        mockedFieldBuilder.when(() -> FieldBuilder.getReferenceSelectors(any()))
+                .thenReturn(selectors);
+
+        fieldBuilder = new FieldBuilderWithColumn(field, fieldAccess);
+        invokePrivate(fieldBuilder, "addComboSelectInfo",
+                new Class<?>[] { Field.class }, field);
+
+        java.lang.reflect.Field jsonField = FieldBuilder.class.getDeclaredField("json");
+        jsonField.setAccessible(true);
+        return (JSONObject) jsonField.get(fieldBuilder);
+    }
+
     @Test
     void testAddComboSelectInfoIncludesOutFieldsForObuiselSelector() throws Exception {
-        // Setup: OBUISEL selector
         Selector mockSelector = mock(Selector.class);
 
         SelectorField outSf = mock(SelectorField.class);
         when(outSf.isOutfield()).thenReturn(true);
         when(outSf.isActive()).thenReturn(true);
-        when(outSf.getProperty()).thenReturn("paymentTerms");
+        when(outSf.getProperty()).thenReturn(PAYMENT_TERMS);
         when(outSf.getSuffix()).thenReturn(null);
         when(mockSelector.getOBUISELSelectorFieldList()).thenReturn(List.of(outSf));
 
-        // Target tab field
         Field targetField = mock(Field.class);
         Column targetCol = mock(Column.class);
         when(targetField.getObuiselOutfield()).thenReturn(outSf);
         when(targetField.getColumn()).thenReturn(targetCol);
         when(targetCol.getDBColumnName()).thenReturn("C_PaymentTerm_ID");
         when(targetField.getName()).thenReturn("Payment Terms");
-
         when(tab.getADFieldList()).thenReturn(List.of(targetField));
 
-        // Set reference to OBUISEL selector type
         when(reference.getId()).thenReturn("95E2A8B50A254B2AAE6774B8C2F28120");
 
         try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
@@ -713,44 +731,27 @@ class FieldBuilderWithColumnTest {
              MockedConstruction<DataToJsonConverter> ignored = mockDataToJsonConverter()) {
 
             mockedOBContext.when(OBContext::getOBContext).thenReturn(obContext);
-
-            // Mock getSelectorInfo to return a base JSON
-            mockedFieldBuilder.when(() -> FieldBuilder.getSelectorInfo(anyString(), any()))
-                    .thenReturn(new JSONObject());
-            mockedFieldBuilder.when(() -> FieldBuilder.getReferenceSelectors(any()))
-                    .thenReturn(new ReferenceSelectors(mockSelector, null));
             mockedFieldBuilder.when(() -> FieldBuilder.getPropertyOrDataSourceField(outSf))
-                    .thenReturn("paymentTerms");
+                    .thenReturn(PAYMENT_TERMS);
             mockedFieldBuilder.when(() -> FieldBuilder.getHqlName(targetField))
-                    .thenReturn("paymentTerms");
+                    .thenReturn(PAYMENT_TERMS);
 
-            fieldBuilder = new FieldBuilderWithColumn(field, fieldAccess);
+            JSONObject json = invokeAddComboSelectInfoAndGetJson(
+                    new ReferenceSelectors(mockSelector, null), mockedFieldBuilder);
 
-            // Invoke private addComboSelectInfo
-            invokePrivate(fieldBuilder, "addComboSelectInfo",
-                    new Class<?>[] { Field.class }, field);
-
-            // Get the json field via reflection
-            java.lang.reflect.Field jsonField = FieldBuilder.class.getDeclaredField("json");
-            jsonField.setAccessible(true);
-            JSONObject json = (JSONObject) jsonField.get(fieldBuilder);
-
-            assertTrue(json.has("selector"));
-            JSONObject selectorJson = json.getJSONObject("selector");
-            assertTrue(selectorJson.has("outFields"));
-
-            JSONArray outFields = selectorJson.getJSONArray("outFields");
+            assertTrue(json.has(SELECTOR_KEY));
+            JSONObject selectorJson = json.getJSONObject(SELECTOR_KEY);
+            assertTrue(selectorJson.has(OUT_FIELDS_KEY));
+            JSONArray outFields = selectorJson.getJSONArray(OUT_FIELDS_KEY);
             assertEquals(1, outFields.length());
             assertEquals("field", outFields.getJSONObject(0).getString("type"));
-            assertEquals("paymentTerms", outFields.getJSONObject(0).getString("selectorFieldProperty"));
+            assertEquals(PAYMENT_TERMS, outFields.getJSONObject(0).getString("selectorFieldProperty"));
         }
     }
 
     @Test
     void testAddComboSelectInfoTreeSelectorDoesNotIncludeOutFields() throws Exception {
-        // Set reference to a tree selector type
         when(reference.getId()).thenReturn("8C57A4A2E05F4261A1FADF47C30398AD");
-
         ReferencedTree mockTree = mock(ReferencedTree.class);
 
         try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
@@ -759,23 +760,11 @@ class FieldBuilderWithColumnTest {
 
             mockedOBContext.when(OBContext::getOBContext).thenReturn(obContext);
 
-            mockedFieldBuilder.when(() -> FieldBuilder.getSelectorInfo(anyString(), any()))
-                    .thenReturn(new JSONObject());
-            mockedFieldBuilder.when(() -> FieldBuilder.getReferenceSelectors(any()))
-                    .thenReturn(new ReferenceSelectors(null, mockTree));
+            JSONObject json = invokeAddComboSelectInfoAndGetJson(
+                    new ReferenceSelectors(null, mockTree), mockedFieldBuilder);
 
-            fieldBuilder = new FieldBuilderWithColumn(field, fieldAccess);
-
-            invokePrivate(fieldBuilder, "addComboSelectInfo",
-                    new Class<?>[] { Field.class }, field);
-
-            java.lang.reflect.Field jsonField = FieldBuilder.class.getDeclaredField("json");
-            jsonField.setAccessible(true);
-            JSONObject json = (JSONObject) jsonField.get(fieldBuilder);
-
-            if (json.has("selector")) {
-                JSONObject selectorJson = json.getJSONObject("selector");
-                assertFalse(selectorJson.has("outFields"));
+            if (json.has(SELECTOR_KEY)) {
+                assertFalse(json.getJSONObject(SELECTOR_KEY).has(OUT_FIELDS_KEY));
             }
         }
     }

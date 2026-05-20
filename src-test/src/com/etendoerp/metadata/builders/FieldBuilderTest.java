@@ -162,6 +162,13 @@ class FieldBuilderTest {
   private static final String MY_FIELD = "myField";
   private static final String GET_DOMAIN_TYPE = "getDomainType";
   private static final String CUSTOM_DISPLAY = "customDisplay";
+  private static final String PAYMENT_TERMS = PAYMENT_TERMS;
+  private static final String OUT_FIELDS_KEY = OUT_FIELDS_KEY;
+  private static final String SELECTOR_FIELD_PROPERTY_KEY = SELECTOR_FIELD_PROPERTY_KEY;
+  private static final String TARGET_COLUMN_NAME_KEY = TARGET_COLUMN_NAME_KEY;
+  private static final String TARGET_HQL_NAME_KEY = TARGET_HQL_NAME_KEY;
+  private static final String CURRENCY = CURRENCY;
+  private static final String STORAGE_BIN = STORAGE_BIN;
 
   /**
    * Sets up the necessary mocks and their behaviors before each test.
@@ -1668,162 +1675,114 @@ class FieldBuilderTest {
         regularField);
   }
 
-  @Test
-  void testAddOutFieldsWithFieldTypeMapping() throws JSONException {
-    // Setup selector field marked as out-field
+  private SelectorField createOutSelectorFieldMock(String property, String suffix) {
     SelectorField outSelectorField = mock(SelectorField.class);
     when(outSelectorField.isOutfield()).thenReturn(true);
     when(outSelectorField.isActive()).thenReturn(true);
-    when(outSelectorField.getProperty()).thenReturn("paymentTerms");
-    when(outSelectorField.getSuffix()).thenReturn(null);
-
+    when(outSelectorField.getProperty()).thenReturn(property);
+    when(outSelectorField.getSuffix()).thenReturn(suffix);
     when(selector.getOBUISELSelectorFieldList()).thenReturn(List.of(outSelectorField));
+    return outSelectorField;
+  }
 
-    // Setup tab field that references this out-field
+  private Tab createTabWithTargetField(SelectorField outSelectorField,
+      String dbColumnName, String fieldName) {
     Field targetField = mock(Field.class);
     Column targetColumn = mock(Column.class);
     when(targetField.getObuiselOutfield()).thenReturn(outSelectorField);
     when(targetField.getColumn()).thenReturn(targetColumn);
-    when(targetColumn.getDBColumnName()).thenReturn("C_PaymentTerm_ID");
-    when(targetField.getName()).thenReturn("Payment Terms");
+    when(targetColumn.getDBColumnName()).thenReturn(dbColumnName);
+    when(targetField.getName()).thenReturn(fieldName);
 
     Tab mockTab = mock(Tab.class);
     when(mockTab.getADFieldList()).thenReturn(List.of(targetField));
+    return mockTab;
+  }
 
+  private JSONObject executeAddOutFields(SelectorField outSelectorField,
+      Tab mockTab, String property, Field targetField, String hqlName) throws JSONException {
     JSONObject selectorJson = new JSONObject();
-
     try (MockedStatic<FieldBuilder> mockedStatic = mockStatic(FieldBuilder.class, CALLS_REAL_METHODS)) {
       mockedStatic.when(() -> FieldBuilder.getPropertyOrDataSourceField(outSelectorField))
-              .thenReturn("paymentTerms");
-      mockedStatic.when(() -> FieldBuilder.getHqlName(targetField))
-              .thenReturn("paymentTerms");
-
+              .thenReturn(property);
+      if (targetField != null) {
+        mockedStatic.when(() -> FieldBuilder.getHqlName(targetField))
+                .thenReturn(hqlName);
+      }
       FieldBuilder.addOutFields(selectorJson, selector, mockTab);
     }
+    return selectorJson;
+  }
 
-    assertTrue(selectorJson.has("outFields"));
-    JSONArray outFields = selectorJson.getJSONArray("outFields");
-    assertEquals(1, outFields.length());
+  @Test
+  void testAddOutFieldsWithFieldTypeMapping() throws JSONException {
+    SelectorField outSf = createOutSelectorFieldMock(PAYMENT_TERMS, null);
+    Tab mockTab = createTabWithTargetField(outSf, "C_PaymentTerm_ID", "Payment Terms");
+    Field targetField = mockTab.getADFieldList().get(0);
 
-    JSONObject entry = outFields.getJSONObject(0);
+    JSONObject selectorJson = executeAddOutFields(outSf, mockTab, PAYMENT_TERMS, targetField, PAYMENT_TERMS);
+
+    assertTrue(selectorJson.has(OUT_FIELDS_KEY));
+    JSONObject entry = selectorJson.getJSONArray(OUT_FIELDS_KEY).getJSONObject(0);
     assertEquals("field", entry.getString("type"));
-    assertEquals("paymentTerms", entry.getString("selectorFieldProperty"));
-    assertEquals("C_PaymentTerm_ID", entry.getString("targetColumnName"));
-    assertEquals("paymentTerms", entry.getString("targetHqlName"));
+    assertEquals(PAYMENT_TERMS, entry.getString(SELECTOR_FIELD_PROPERTY_KEY));
+    assertEquals("C_PaymentTerm_ID", entry.getString(TARGET_COLUMN_NAME_KEY));
+    assertEquals(PAYMENT_TERMS, entry.getString(TARGET_HQL_NAME_KEY));
   }
 
   @Test
   void testAddOutFieldsWithCalloutInputType() throws JSONException {
-    // Selector field with suffix but no tab field references it
-    SelectorField outSelectorField = mock(SelectorField.class);
-    when(outSelectorField.isOutfield()).thenReturn(true);
-    when(outSelectorField.isActive()).thenReturn(true);
-    when(outSelectorField.getProperty()).thenReturn("currency");
-    when(outSelectorField.getSuffix()).thenReturn("_CURR");
-
-    when(selector.getOBUISELSelectorFieldList()).thenReturn(List.of(outSelectorField));
-
-    // Tab has no field referencing this out-field
+    SelectorField outSf = createOutSelectorFieldMock(CURRENCY, "_CURR");
     Tab mockTab = mock(Tab.class);
     when(mockTab.getADFieldList()).thenReturn(Collections.emptyList());
 
-    JSONObject selectorJson = new JSONObject();
+    JSONObject selectorJson = executeAddOutFields(outSf, mockTab, CURRENCY, null, null);
 
-    try (MockedStatic<FieldBuilder> mockedStatic = mockStatic(FieldBuilder.class, CALLS_REAL_METHODS)) {
-      mockedStatic.when(() -> FieldBuilder.getPropertyOrDataSourceField(outSelectorField))
-              .thenReturn("currency");
-
-      FieldBuilder.addOutFields(selectorJson, selector, mockTab);
-    }
-
-    assertTrue(selectorJson.has("outFields"));
-    JSONArray outFields = selectorJson.getJSONArray("outFields");
-    assertEquals(1, outFields.length());
-
-    JSONObject entry = outFields.getJSONObject(0);
+    assertTrue(selectorJson.has(OUT_FIELDS_KEY));
+    JSONObject entry = selectorJson.getJSONArray(OUT_FIELDS_KEY).getJSONObject(0);
     assertEquals("calloutInput", entry.getString("type"));
-    assertEquals("currency", entry.getString("selectorFieldProperty"));
+    assertEquals(CURRENCY, entry.getString(SELECTOR_FIELD_PROPERTY_KEY));
     assertEquals("_CURR", entry.getString("suffix"));
-    assertTrue(entry.isNull("targetColumnName"));
-    assertTrue(entry.isNull("targetHqlName"));
+    assertTrue(entry.isNull(TARGET_COLUMN_NAME_KEY));
+    assertTrue(entry.isNull(TARGET_HQL_NAME_KEY));
   }
 
   @Test
   void testAddOutFieldsEmptySelectorFieldsOmitsKey() throws JSONException {
     when(selector.getOBUISELSelectorFieldList()).thenReturn(Collections.emptyList());
-
     Tab mockTab = mock(Tab.class);
     when(mockTab.getADFieldList()).thenReturn(Collections.emptyList());
 
     JSONObject selectorJson = new JSONObject();
     FieldBuilder.addOutFields(selectorJson, selector, mockTab);
 
-    assertFalse(selectorJson.has("outFields"));
+    assertFalse(selectorJson.has(OUT_FIELDS_KEY));
   }
 
   @Test
   void testAddOutFieldsNoMatchNoSuffixSkipped() throws JSONException {
-    SelectorField outSelectorField = mock(SelectorField.class);
-    when(outSelectorField.isOutfield()).thenReturn(true);
-    when(outSelectorField.isActive()).thenReturn(true);
-    when(outSelectorField.getProperty()).thenReturn("someProperty");
-    when(outSelectorField.getSuffix()).thenReturn(null);
-
-    when(selector.getOBUISELSelectorFieldList()).thenReturn(List.of(outSelectorField));
-
+    SelectorField outSf = createOutSelectorFieldMock("someProperty", null);
     Tab mockTab = mock(Tab.class);
     when(mockTab.getADFieldList()).thenReturn(Collections.emptyList());
 
-    JSONObject selectorJson = new JSONObject();
+    JSONObject selectorJson = executeAddOutFields(outSf, mockTab, "someProperty", null, null);
 
-    try (MockedStatic<FieldBuilder> mockedStatic = mockStatic(FieldBuilder.class, CALLS_REAL_METHODS)) {
-      mockedStatic.when(() -> FieldBuilder.getPropertyOrDataSourceField(outSelectorField))
-              .thenReturn("someProperty");
-
-      FieldBuilder.addOutFields(selectorJson, selector, mockTab);
-    }
-
-    assertFalse(selectorJson.has("outFields"));
+    assertFalse(selectorJson.has(OUT_FIELDS_KEY));
   }
 
   @Test
   void testAddOutFieldsFieldTypeWithSuffix() throws JSONException {
-    SelectorField outSelectorField = mock(SelectorField.class);
-    when(outSelectorField.isOutfield()).thenReturn(true);
-    when(outSelectorField.isActive()).thenReturn(true);
-    when(outSelectorField.getProperty()).thenReturn("storageBin");
-    when(outSelectorField.getSuffix()).thenReturn("_LOC");
+    SelectorField outSf = createOutSelectorFieldMock(STORAGE_BIN, "_LOC");
+    Tab mockTab = createTabWithTargetField(outSf, "M_Locator_ID", "Storage Bin");
+    Field targetField = mockTab.getADFieldList().get(0);
 
-    when(selector.getOBUISELSelectorFieldList()).thenReturn(List.of(outSelectorField));
+    JSONObject selectorJson = executeAddOutFields(outSf, mockTab, STORAGE_BIN, targetField, STORAGE_BIN);
 
-    // Tab field references this out-field
-    Field targetField = mock(Field.class);
-    Column targetColumn = mock(Column.class);
-    when(targetField.getObuiselOutfield()).thenReturn(outSelectorField);
-    when(targetField.getColumn()).thenReturn(targetColumn);
-    when(targetColumn.getDBColumnName()).thenReturn("M_Locator_ID");
-    when(targetField.getName()).thenReturn("Storage Bin");
-
-    Tab mockTab = mock(Tab.class);
-    when(mockTab.getADFieldList()).thenReturn(List.of(targetField));
-
-    JSONObject selectorJson = new JSONObject();
-
-    try (MockedStatic<FieldBuilder> mockedStatic = mockStatic(FieldBuilder.class, CALLS_REAL_METHODS)) {
-      mockedStatic.when(() -> FieldBuilder.getPropertyOrDataSourceField(outSelectorField))
-              .thenReturn("storageBin");
-      mockedStatic.when(() -> FieldBuilder.getHqlName(targetField))
-              .thenReturn("storageBin");
-
-      FieldBuilder.addOutFields(selectorJson, selector, mockTab);
-    }
-
-    JSONArray outFields = selectorJson.getJSONArray("outFields");
-    JSONObject entry = outFields.getJSONObject(0);
+    JSONObject entry = selectorJson.getJSONArray(OUT_FIELDS_KEY).getJSONObject(0);
     assertEquals("field", entry.getString("type"));
-    assertEquals("storageBin", entry.getString("selectorFieldProperty"));
-    assertEquals("M_Locator_ID", entry.getString("targetColumnName"));
-    assertEquals("storageBin", entry.getString("targetHqlName"));
+    assertEquals(STORAGE_BIN, entry.getString(SELECTOR_FIELD_PROPERTY_KEY));
+    assertEquals("M_Locator_ID", entry.getString(TARGET_COLUMN_NAME_KEY));
+    assertEquals(STORAGE_BIN, entry.getString(TARGET_HQL_NAME_KEY));
     assertEquals("_LOC", entry.getString("suffix"));
   }
 
