@@ -18,17 +18,23 @@
 package com.etendoerp.metadata.service;
 
 import java.io.IOException;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
+import org.openbravo.dal.service.OBQuery;
 import org.openbravo.erpCommon.utility.OBMessageUtils;
 import org.openbravo.model.ad.process.ProcessInstance;
 import org.openbravo.model.ad.ui.Process;
@@ -36,6 +42,7 @@ import org.openbravo.model.ad.ui.Process;
 import com.etendoerp.metadata.exceptions.InternalServerException;
 import com.etendoerp.metadata.exceptions.NotFoundException;
 import com.etendoerp.metadata.utils.CallAsyncProcess;
+import com.etendoerp.metadata.utils.Constants;
 import com.etendoerp.metadata.utils.ProcessExecutionUtils;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -64,9 +71,12 @@ public class ProcessExecutionService extends MetadataService {
     @Override
     public void process() throws IOException, ServletException {
         String method = getRequest().getMethod();
+        String pathInfo = getRequest().getPathInfo();
 
         if ("POST".equalsIgnoreCase(method)) {
             handleExecute();
+        } else if ("GET".equalsIgnoreCase(method) && pathInfo != null && pathInfo.endsWith(Constants.PROCESS_EXECUTION_LIST_SUFFIX)) {
+            handleList();
         } else if ("GET".equalsIgnoreCase(method)) {
             handleStatus();
         } else {
@@ -110,6 +120,86 @@ public class ProcessExecutionService extends MetadataService {
         } finally {
             OBContext.restorePreviousMode();
         }
+    }
+
+    private void handleList() throws IOException {
+        try {
+            OBContext.setAdminMode(true);
+            String hoursParam = getRequest().getParameter("hours");
+            String statusFilter = getRequest().getParameter("status");
+            int hours = 24;
+            try {
+                if (hoursParam != null) hours = Integer.parseInt(hoursParam);
+            } catch (NumberFormatException ignored) { }
+
+            String currentUserId = OBContext.getOBContext().getUser().getId();
+            Date cutoff = Date.from(Instant.now().minus(hours, ChronoUnit.HOURS));
+
+            String hql = "SELECT pi FROM ProcessInstance pi " +
+                         "WHERE pi.process.background = true " +
+                         "AND pi.creationDate >= :cutoff " +
+                         "AND pi.createdBy.id = :userId " +
+                         "ORDER BY pi.creationDate DESC";
+
+            OBQuery<ProcessInstance> query = OBDal.getInstance().createQuery(ProcessInstance.class, hql);
+            query.setNamedParameter("cutoff", cutoff);
+            query.setNamedParameter("userId", currentUserId);
+            query.setMaxResult(200);
+
+            List<ProcessInstance> instances = query.list();
+
+            JSONArray items = new JSONArray();
+            for (ProcessInstance pi : instances) {
+                String errorMsg = pi.getErrorMsg();
+                String status = deriveStatus(errorMsg, pi.getResult());
+
+                if (statusFilter != null && !"ALL".equalsIgnoreCase(statusFilter) && !status.equals(statusFilter)) {
+                    continue;
+                }
+
+                String displayError = CallAsyncProcess.PROCESSING_MSG.equals(errorMsg) ? null : errorMsg;
+                if (displayError != null) {
+                    displayError = OBMessageUtils.parseTranslation(displayError);
+                }
+
+                JSONObject item = new JSONObject();
+                item.put("pInstanceId", pi.getId());
+                item.put("processId", pi.getProcess().getId());
+                item.put("processName", pi.getProcess().getName());
+                item.put("status", status);
+                item.put("startTime", pi.getCreationDate().toInstant().toString());
+                item.put("updatedTime", pi.getUpdated().toInstant().toString());
+                item.put("errorMsg", displayError != null ? displayError : JSONObject.NULL);
+                item.put("userId", pi.getCreatedBy() != null ? pi.getCreatedBy().getId() : JSONObject.NULL);
+                items.put(item);
+            }
+
+            JSONObject result = new JSONObject();
+            result.put("items", items);
+            result.put("totalCount", items.length());
+            write(result);
+
+        } catch (JSONException e) {
+            throw new InternalServerException("Error building process list response", e);
+        } finally {
+            OBContext.restorePreviousMode();
+        }
+    }
+
+    private String deriveStatus(String errorMsg, Object result) {
+        if (CallAsyncProcess.PROCESSING_MSG.equals(errorMsg)) {
+            return "RUNNING";
+        }
+        if (result != null) {
+            long val;
+            if (result instanceof Number) {
+                val = ((Number) result).longValue();
+            } else {
+                try { val = Long.parseLong(result.toString()); } catch (NumberFormatException e) { val = 0; }
+            }
+            if (val == 1L) return "COMPLETED";
+        }
+        return "FAILED";
     }
 
     private void handleStatus() throws IOException {
