@@ -134,9 +134,9 @@ class FieldBuilderWithColumnTest {
     private OBCriteria<Tab> criteria;
     @Mock
     private OBContext obContext;
-    private static final String PAYMENT_TERMS = PAYMENT_TERMS;
-    private static final String SELECTOR_KEY = SELECTOR_KEY;
-    private static final String OUT_FIELDS_KEY = OUT_FIELDS_KEY;
+    private static final String PAYMENT_TERMS = "paymentTerms";
+    private static final String SELECTOR_KEY = "selector";
+    private static final String OUT_FIELDS_KEY = "outFields";
     private static final String BUTTON_REF_LIST_STRING = "buttonRefList";
     private static final String WINDOW_ID_STRING = "window-id";
     private static final String ROLE_ID_STRING = "role-id";

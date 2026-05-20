@@ -162,13 +162,13 @@ class FieldBuilderTest {
   private static final String MY_FIELD = "myField";
   private static final String GET_DOMAIN_TYPE = "getDomainType";
   private static final String CUSTOM_DISPLAY = "customDisplay";
-  private static final String PAYMENT_TERMS = PAYMENT_TERMS;
-  private static final String OUT_FIELDS_KEY = OUT_FIELDS_KEY;
-  private static final String SELECTOR_FIELD_PROPERTY_KEY = SELECTOR_FIELD_PROPERTY_KEY;
-  private static final String TARGET_COLUMN_NAME_KEY = TARGET_COLUMN_NAME_KEY;
-  private static final String TARGET_HQL_NAME_KEY = TARGET_HQL_NAME_KEY;
-  private static final String CURRENCY = CURRENCY;
-  private static final String STORAGE_BIN = STORAGE_BIN;
+  private static final String PAYMENT_TERMS = "paymentTerms";
+  private static final String OUT_FIELDS_KEY = "outFields";
+  private static final String SELECTOR_FIELD_PROPERTY_KEY = "selectorFieldProperty";
+  private static final String TARGET_COLUMN_NAME_KEY = "targetColumnName";
+  private static final String TARGET_HQL_NAME_KEY = "targetHqlName";
+  private static final String CURRENCY = "currency";
+  private static final String STORAGE_BIN = "storageBin";
 
   /**
    * Sets up the necessary mocks and their behaviors before each test.
