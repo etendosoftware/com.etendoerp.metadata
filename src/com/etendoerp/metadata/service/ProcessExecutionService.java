@@ -57,6 +57,10 @@ public class ProcessExecutionService extends MetadataService {
 
     private static final ObjectMapper mapper = new ObjectMapper();
     private static final String PARAMETERS_STRING = "parameters";
+    private static final String P_INSTANCE_ID_KEY = "pInstanceId";
+    private static final String PROCESS_ID_KEY = "processId";
+    private static final String STATUS_KEY = "status";
+    private static final int DEFAULT_HOURS = 24;
 
     /**
      * Constructs a ProcessExecutionService with the specified HTTP request and response.
@@ -89,9 +93,9 @@ public class ProcessExecutionService extends MetadataService {
             OBContext.setAdminMode(true);
             JsonNode root = mapper.readTree(getRequest().getInputStream());
             
-            String processId = root.has("processId") ? root.get("processId").asText() : null;
+            String processId = root.has(PROCESS_ID_KEY) ? root.get(PROCESS_ID_KEY).asText() : null;
             String recordId = root.has("recordId") ? root.get("recordId").asText() : null;
-            
+
             if (processId == null) {
                 throw new InternalServerException("Missing processId");
             }
@@ -111,8 +115,8 @@ public class ProcessExecutionService extends MetadataService {
             ProcessInstance pInstance = ProcessExecutionUtils.callProcessAsync(process, recordId, parameters);
             
             JSONObject result = new JSONObject();
-            result.put("pInstanceId", pInstance.getId());
-            result.put("status", "STARTED");
+            result.put(P_INSTANCE_ID_KEY, pInstance.getId());
+            result.put(STATUS_KEY, "STARTED");
             write(result);
 
         } catch (JSONException e) {
@@ -126,11 +130,8 @@ public class ProcessExecutionService extends MetadataService {
         try {
             OBContext.setAdminMode(true);
             String hoursParam = getRequest().getParameter("hours");
-            String statusFilter = getRequest().getParameter("status");
-            int hours = 24;
-            try {
-                if (hoursParam != null) hours = Integer.parseInt(hoursParam);
-            } catch (NumberFormatException ignored) { }
+            String statusFilter = getRequest().getParameter(STATUS_KEY);
+            int hours = parseHours(hoursParam);
 
             String currentUserId = OBContext.getOBContext().getUser().getId();
             Date cutoff = Date.from(Instant.now().minus(hours, ChronoUnit.HOURS));
@@ -150,28 +151,11 @@ public class ProcessExecutionService extends MetadataService {
 
             JSONArray items = new JSONArray();
             for (ProcessInstance pi : instances) {
-                String errorMsg = pi.getErrorMsg();
-                String status = deriveStatus(errorMsg, pi.getResult());
-
+                String status = deriveStatus(pi.getErrorMsg(), pi.getResult());
                 if (statusFilter != null && !"ALL".equalsIgnoreCase(statusFilter) && !status.equals(statusFilter)) {
                     continue;
                 }
-
-                String displayError = CallAsyncProcess.PROCESSING_MSG.equals(errorMsg) ? null : errorMsg;
-                if (displayError != null) {
-                    displayError = OBMessageUtils.parseTranslation(displayError);
-                }
-
-                JSONObject item = new JSONObject();
-                item.put("pInstanceId", pi.getId());
-                item.put("processId", pi.getProcess().getId());
-                item.put("processName", pi.getProcess().getName());
-                item.put("status", status);
-                item.put("startTime", pi.getCreationDate().toInstant().toString());
-                item.put("updatedTime", pi.getUpdated().toInstant().toString());
-                item.put("errorMsg", displayError != null ? displayError : JSONObject.NULL);
-                item.put("userId", pi.getCreatedBy() != null ? pi.getCreatedBy().getId() : JSONObject.NULL);
-                items.put(item);
+                items.put(buildInstanceItem(pi, status));
             }
 
             JSONObject result = new JSONObject();
@@ -183,6 +167,37 @@ public class ProcessExecutionService extends MetadataService {
             throw new InternalServerException("Error building process list response", e);
         } finally {
             OBContext.restorePreviousMode();
+        }
+    }
+
+    private JSONObject buildInstanceItem(ProcessInstance pi, String status) throws JSONException {
+        String errorMsg = pi.getErrorMsg();
+        String displayError = CallAsyncProcess.PROCESSING_MSG.equals(errorMsg) ? null : errorMsg;
+        if (displayError != null) {
+            displayError = OBMessageUtils.parseTranslation(displayError);
+        }
+
+        Process proc = pi.getProcess();
+        JSONObject item = new JSONObject();
+        item.put(P_INSTANCE_ID_KEY, pi.getId());
+        item.put(PROCESS_ID_KEY, proc != null ? proc.getId() : JSONObject.NULL);
+        item.put("processName", proc != null ? proc.getName() : JSONObject.NULL);
+        item.put(STATUS_KEY, status);
+        item.put("startTime", pi.getCreationDate().toInstant().toString());
+        item.put("updatedTime", pi.getUpdated().toInstant().toString());
+        item.put("errorMsg", displayError != null ? displayError : JSONObject.NULL);
+        item.put("userId", pi.getCreatedBy() != null ? pi.getCreatedBy().getId() : JSONObject.NULL);
+        return item;
+    }
+
+    private int parseHours(String hoursParam) {
+        if (hoursParam == null) {
+            return DEFAULT_HOURS;
+        }
+        try {
+            return Integer.parseInt(hoursParam);
+        } catch (NumberFormatException e) {
+            return DEFAULT_HOURS;
         }
     }
 
@@ -222,7 +237,7 @@ public class ProcessExecutionService extends MetadataService {
             OBDal.getInstance().getSession().refresh(pInstance);
 
             JSONObject result = new JSONObject();
-            result.put("pInstanceId", pInstance.getId());
+            result.put(P_INSTANCE_ID_KEY, pInstance.getId());
             result.put("result", pInstance.getResult()); // 1 = Success, 0 = Error/Processing
             
             String errorMsg = pInstance.getErrorMsg();
