@@ -136,11 +136,10 @@ public class ProcessExecutionService extends MetadataService {
             String currentUserId = OBContext.getOBContext().getUser().getId();
             Date cutoff = Date.from(Instant.now().minus(hours, ChronoUnit.HOURS));
 
-            String hql = "SELECT pi FROM ProcessInstance pi " +
-                         "WHERE pi.process.background = true " +
-                         "AND pi.creationDate >= :cutoff " +
-                         "AND pi.createdBy.id = :userId " +
-                         "ORDER BY pi.creationDate DESC";
+            String hql = "e.process.background = true " +
+                         "AND e.creationDate >= :cutoff " +
+                         "AND e.createdBy.id = :userId " +
+                         "ORDER BY e.creationDate DESC";
 
             OBQuery<ProcessInstance> query = OBDal.getInstance().createQuery(ProcessInstance.class, hql);
             query.setNamedParameter("cutoff", cutoff);
