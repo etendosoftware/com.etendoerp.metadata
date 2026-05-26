@@ -80,6 +80,10 @@ class WindowBuilderTest {
   @Mock
   private OBCriteria<WindowAccess> mockCriteria;
 
+  // Test data
+  private static final String WINDOW_TYPE = "windowType";
+  private static final String WINDOW_TYPE_VALUE = "OBUIAPP_PickAndExecute";
+
   /**
    * Sets up the basic mock behavior before each test.
    * This includes setting up OBContext, Language, and Role mocks.
@@ -281,7 +285,7 @@ class WindowBuilderTest {
       JSONObject windowJson = new JSONObject();
       windowJson.put("id", WINDOW_ID);
       windowJson.put("name", "Test Window");
-      windowJson.put("windowType", windowType);
+      windowJson.put(WINDOW_TYPE, windowType);
       when(mock.toJsonObject(any(), any())).thenReturn(windowJson);
     });
   }
@@ -300,18 +304,18 @@ class WindowBuilderTest {
     WindowBuilder windowBuilder;
     JSONObject result;
     try (MockedStatic<OBContext> ignored1 = createOBContextMock();
-         MockedConstruction<DataToJsonConverter> ignored2 = createConverterMockWithWindowType("OBUIAPP_PickAndExecute")) {
+         MockedConstruction<DataToJsonConverter> ignored2 = createConverterMockWithWindowType(WINDOW_TYPE_VALUE)) {
       windowBuilder = new WindowBuilder(WINDOW_ID);
     }
     try (MockedStatic<OBContext> ignored1 = createOBContextMock();
          MockedStatic<OBDal> ignored2 = createOBDalMock();
-         MockedConstruction<DataToJsonConverter> ignored3 = createConverterMockWithWindowType("OBUIAPP_PickAndExecute")) {
+         MockedConstruction<DataToJsonConverter> ignored3 = createConverterMockWithWindowType(WINDOW_TYPE_VALUE)) {
       result = windowBuilder.toJSON();
     }
 
     assertNotNull(result);
-    assertTrue(result.has("windowType"));
-    assertEquals("OBUIAPP_PickAndExecute", result.getString("windowType"));
+    assertTrue(result.has(WINDOW_TYPE));
+    assertEquals(WINDOW_TYPE_VALUE, result.getString(WINDOW_TYPE));
   }
 
   /**

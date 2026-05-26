@@ -98,6 +98,7 @@ class TabBuilderTest {
     private static final String TEST_HELP = "Test help";
     private static final String AD_USER_ENTITY = "ADUser";
     private static final String CUSTOM_CREATION_DATE_NAME = "Custom Creation Date";
+    private static final String OBUIAPP_CAN_ADD_MISSING = "obuiappCanAdd should be present in JSON";
 
     /**
      * Tests that audit fields are automatically added to the fields JSON
@@ -591,7 +592,7 @@ class TabBuilderTest {
 
         executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), result -> {
             try {
-                assertTrue(result.has(OBUIAPP_CAN_ADD_KEY), "obuiappCanAdd should be present in JSON");
+                assertTrue(result.has(OBUIAPP_CAN_ADD_KEY), OBUIAPP_CAN_ADD_MISSING);
                 assertTrue(result.getBoolean(OBUIAPP_CAN_ADD_KEY),
                         "obuiappCanAdd should be true when Tab.isObuiappCanAdd() returns TRUE");
             } catch (JSONException e) {
@@ -614,7 +615,7 @@ class TabBuilderTest {
 
         executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), result -> {
             try {
-                assertTrue(result.has(OBUIAPP_CAN_ADD_KEY), "obuiappCanAdd should be present in JSON");
+                assertTrue(result.has(OBUIAPP_CAN_ADD_KEY), OBUIAPP_CAN_ADD_MISSING);
                 assertFalse(result.getBoolean(OBUIAPP_CAN_ADD_KEY),
                         "obuiappCanAdd should be false when Tab.isObuiappCanAdd() returns FALSE");
             } catch (JSONException e) {
@@ -638,7 +639,7 @@ class TabBuilderTest {
 
         executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), result -> {
             try {
-                assertTrue(result.has(OBUIAPP_CAN_ADD_KEY), "obuiappCanAdd should be present in JSON");
+                assertTrue(result.has(OBUIAPP_CAN_ADD_KEY), OBUIAPP_CAN_ADD_MISSING);
                 assertFalse(result.getBoolean(OBUIAPP_CAN_ADD_KEY),
                         "obuiappCanAdd should be false when Tab.isObuiappCanAdd() returns null");
             } catch (JSONException e) {

@@ -101,10 +101,18 @@ class MenuBuilderTest {
   private static final String VIEW_MENU = "View Menu";
   private static final String VIEW_DESC = "View Desc";
   private static final String VIEW_ID = "viewId";
+  private static final String WINDOW_TYPE = "windowType";
+  private static final String WINDOW_MENU_ID = "WINDOW_MENU_ID";
+  private static final String PICK_AND_EXECUTE = "OBUIAPP_PickAndExecute";
 
   @FunctionalInterface
   private interface MenuBuilderConsumer {
     void accept(MenuBuilder builder) throws JSONException;
+  }
+
+  @FunctionalInterface
+  private interface MenuEntryConsumer {
+    void accept(JSONObject entry) throws JSONException;
   }
 
   @AfterEach
@@ -498,17 +506,46 @@ class MenuBuilderTest {
   private MenuOption buildSingleWindowMenuFixture(Window window) {
     MenuOption childOption = mock(MenuOption.class);
     Menu childMenu = mock(Menu.class);
-    String menuId = "WINDOW_MENU_ID";
 
     when(rootMenuOption.getChildren()).thenReturn(List.of(childOption));
     when(childOption.getMenu()).thenReturn(childMenu);
     when(childOption.getType()).thenReturn(MenuManager.MenuEntryType.Window);
-    when(childMenu.getId()).thenReturn(menuId);
+    when(childMenu.getId()).thenReturn(WINDOW_MENU_ID);
     when(childMenu.getWindow()).thenReturn(window);
     if (window != null) {
       when(window.getId()).thenReturn("WINDOW_ID_VAL");
     }
     return rootMenuOption;
+  }
+
+  /**
+   * Mocks a Window with the given windowType and wires it into the root fixture.
+   * Returns the configured window mock for further stubbing if needed.
+   *
+   * @param windowType The value returned by {@code Window.getWindowType()}, may be null.
+   * @return The window mock just installed in the menu fixture.
+   */
+  private Window mockWindowWithType(String windowType) {
+    Window window = mock(Window.class);
+    when(window.getWindowType()).thenReturn(windowType);
+    buildSingleWindowMenuFixture(window);
+    return window;
+  }
+
+  /**
+   * Runs the standard MenuBuilder fixture and hands the first JSON menu entry to
+   * the supplied assertion block. Removes the boilerplate shared by the
+   * windowType test cases.
+   *
+   * @param assertion Assertion block to execute against the first menu entry.
+   * @throws JSONException if the JSON traversal fails.
+   */
+  private void withFirstMenuEntry(MenuEntryConsumer assertion) throws JSONException {
+    withMenuBuilder(builder -> {
+      JSONObject result = builder.toJSON();
+      JSONObject entry = result.getJSONArray("menu").getJSONObject(0);
+      assertion.accept(entry);
+    });
   }
 
   /**
@@ -519,23 +556,11 @@ class MenuBuilderTest {
    */
   @Test
   void testMenuEntryIncludesWindowTypeWhenWindowIsPickAndExecute() throws JSONException {
-    Window window = mock(Window.class);
-    when(window.getWindowType()).thenReturn("OBUIAPP_PickAndExecute");
-    buildSingleWindowMenuFixture(window);
-
-    try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
-        MockedConstruction<MenuManager> ignored = mockConstruction(MenuManager.class,
-            (mock, context) -> when(mock.getMenu()).thenReturn(rootMenuOption))) {
-
-      obContextStatic.when(OBContext::getOBContext).thenReturn(obContext);
-      when(obContext.getLanguage()).thenReturn(language);
-
-      JSONObject result = new MenuBuilder().toJSON();
-      JSONObject entry = result.getJSONArray("menu").getJSONObject(0);
-
-      assertTrue(entry.has("windowType"));
-      assertEquals("OBUIAPP_PickAndExecute", entry.getString("windowType"));
-    }
+    mockWindowWithType(PICK_AND_EXECUTE);
+    withFirstMenuEntry(entry -> {
+      assertTrue(entry.has(WINDOW_TYPE));
+      assertEquals(PICK_AND_EXECUTE, entry.getString(WINDOW_TYPE));
+    });
   }
 
   /**
@@ -545,23 +570,11 @@ class MenuBuilderTest {
    */
   @Test
   void testMenuEntryIncludesWindowTypeWhenWindowIsMaintain() throws JSONException {
-    Window window = mock(Window.class);
-    when(window.getWindowType()).thenReturn("M");
-    buildSingleWindowMenuFixture(window);
-
-    try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
-        MockedConstruction<MenuManager> ignored = mockConstruction(MenuManager.class,
-            (mock, context) -> when(mock.getMenu()).thenReturn(rootMenuOption))) {
-
-      obContextStatic.when(OBContext::getOBContext).thenReturn(obContext);
-      when(obContext.getLanguage()).thenReturn(language);
-
-      JSONObject result = new MenuBuilder().toJSON();
-      JSONObject entry = result.getJSONArray("menu").getJSONObject(0);
-
-      assertTrue(entry.has("windowType"));
-      assertEquals("M", entry.getString("windowType"));
-    }
+    mockWindowWithType("M");
+    withFirstMenuEntry(entry -> {
+      assertTrue(entry.has(WINDOW_TYPE));
+      assertEquals("M", entry.getString(WINDOW_TYPE));
+    });
   }
 
   /**
@@ -574,19 +587,7 @@ class MenuBuilderTest {
   @Test
   void testMenuEntryDoesNotIncludeWindowTypeWhenWindowIsNull() throws JSONException {
     buildSingleWindowMenuFixture(null);
-
-    try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
-        MockedConstruction<MenuManager> ignored = mockConstruction(MenuManager.class,
-            (mock, context) -> when(mock.getMenu()).thenReturn(rootMenuOption))) {
-
-      obContextStatic.when(OBContext::getOBContext).thenReturn(obContext);
-      when(obContext.getLanguage()).thenReturn(language);
-
-      JSONObject result = new MenuBuilder().toJSON();
-      JSONObject entry = result.getJSONArray("menu").getJSONObject(0);
-
-      assertFalse(entry.has("windowType"));
-    }
+    withFirstMenuEntry(entry -> assertFalse(entry.has(WINDOW_TYPE)));
   }
 
   /**
@@ -598,22 +599,8 @@ class MenuBuilderTest {
    */
   @Test
   void testMenuEntryDoesNotIncludeWindowTypeWhenWindowTypeIsNull() throws JSONException {
-    Window window = mock(Window.class);
-    when(window.getWindowType()).thenReturn(null);
-    buildSingleWindowMenuFixture(window);
-
-    try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
-        MockedConstruction<MenuManager> ignored = mockConstruction(MenuManager.class,
-            (mock, context) -> when(mock.getMenu()).thenReturn(rootMenuOption))) {
-
-      obContextStatic.when(OBContext::getOBContext).thenReturn(obContext);
-      when(obContext.getLanguage()).thenReturn(language);
-
-      JSONObject result = new MenuBuilder().toJSON();
-      JSONObject entry = result.getJSONArray("menu").getJSONObject(0);
-
-      assertFalse(entry.has("windowType"));
-    }
+    mockWindowWithType(null);
+    withFirstMenuEntry(entry -> assertFalse(entry.has(WINDOW_TYPE)));
   }
 
 }

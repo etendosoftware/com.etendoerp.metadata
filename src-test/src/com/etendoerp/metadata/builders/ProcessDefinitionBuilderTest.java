@@ -16,49 +16,44 @@
  */
 package com.etendoerp.metadata.builders;
 
-import org.codehaus.jettison.json.JSONException;
-import org.codehaus.jettison.json.JSONObject;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.MockedConstruction;
-import org.mockito.MockedStatic;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.mockito.junit.jupiter.MockitoSettings;
-import org.openbravo.client.application.Parameter;
-import org.openbravo.client.application.Process;
-import org.openbravo.dal.core.OBContext;
-import org.openbravo.model.ad.system.Language;
-import org.openbravo.service.json.DataResolvingMode;
-import org.openbravo.service.json.DataToJsonConverter;
-
-import java.util.ArrayList;
-import java.util.List;
-
-import static com.etendoerp.metadata.MetadataTestConstants.CONVERTER;
-import static com.etendoerp.metadata.MetadataTestConstants.COULD_NOT_SET_CONVERTER_FIELD;
 import static com.etendoerp.metadata.MetadataTestConstants.ON_LOAD;
 import static com.etendoerp.metadata.MetadataTestConstants.ON_PROCESS;
 import static com.etendoerp.metadata.MetadataTestConstants.PARAM1_COLUMN;
 import static com.etendoerp.metadata.MetadataTestConstants.PARAM2_COLUMN;
 import static com.etendoerp.metadata.MetadataTestConstants.PARAMETERS;
 import static com.etendoerp.metadata.MetadataTestConstants.TEST_PROCESS_ID;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mockConstruction;
+import static org.mockito.Mockito.when;
 import static org.mockito.quality.Strictness.LENIENT;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.codehaus.jettison.json.JSONException;
+import org.codehaus.jettison.json.JSONObject;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.MockedConstruction;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.openbravo.client.application.Parameter;
+import org.openbravo.service.json.DataResolvingMode;
 
 /**
  * Unit tests for ProcessDefinitionBuilder class - Fixed version that handles Openbravo dependencies
  */
-@MockitoSettings (strictness = LENIENT)
+@MockitoSettings(strictness = LENIENT)
 @ExtendWith(MockitoExtension.class)
-public class ProcessDefinitionBuilderTest {
-
-  @Mock
-  private Process mockProcess;
+public class ProcessDefinitionBuilderTest extends ProcessDefinitionBuilderTestSupport {
 
   @Mock
   private Parameter mockParameter1;
@@ -66,30 +61,13 @@ public class ProcessDefinitionBuilderTest {
   @Mock
   private Parameter mockParameter2;
 
-  @Mock
-  private DataToJsonConverter mockConverter;
-
-  @Mock
-  private OBContext mockOBContext;
-
-  @Mock
-  private Language mockLanguage;
-
-  private MockedStatic<OBContext> mockedOBContextStatic;
-
   /**
-   * Sets up the test environment before each test case.
-   * Mocks static methods and initializes common mock behaviors.
+   * Wires the default two-parameter list and the standard onLoad/onProcess scripts
+   * on the shared {@code mockProcess}. Individual tests override these stubs when
+   * they need empty lists or null scripts.
    */
   @BeforeEach
-  void setUp() {
-    mockedOBContextStatic = mockStatic(OBContext.class);
-
-    when(mockOBContext.getLanguage()).thenReturn(mockLanguage);
-    when(mockLanguage.getLanguage()).thenReturn("en_US");
-
-    mockedOBContextStatic.when(OBContext::getOBContext).thenReturn(mockOBContext);
-
+  void stubProcessParametersAndScripts() {
     List<Parameter> parameterList = new ArrayList<>();
     parameterList.add(mockParameter1);
     parameterList.add(mockParameter2);
@@ -99,17 +77,6 @@ public class ProcessDefinitionBuilderTest {
     when(mockParameter2.getDBColumnName()).thenReturn(PARAM2_COLUMN);
     when(mockProcess.getETMETAOnload()).thenReturn("onLoadScript");
     when(mockProcess.getEtmetaOnprocess()).thenReturn("onProcessScript");
-  }
-
-  /**
-   * Cleans up the test environment after each test case.
-   * Closes any mocked static methods to avoid side effects.
-   */
-  @AfterEach
-  void tearDown() {
-    if (mockedOBContextStatic != null) {
-      mockedOBContextStatic.close();
-    }
   }
 
   /**
@@ -145,14 +112,7 @@ public class ProcessDefinitionBuilderTest {
         ))) {
 
       ProcessDefinitionBuilder builder = new ProcessDefinitionBuilder(mockProcess);
-
-      try {
-        java.lang.reflect.Field converterField = Builder.class.getDeclaredField(CONVERTER);
-        converterField.setAccessible(true);
-        converterField.set(builder, mockConverter);
-      } catch (Exception e) {
-        fail(COULD_NOT_SET_CONVERTER_FIELD + e.getMessage());
-      }
+      injectConverter(builder);
 
       when(mockConverter.toJsonObject(eq(mockProcess), eq(DataResolvingMode.FULL_TRANSLATABLE)))
           .thenReturn(mockProcessJSON);
@@ -191,14 +151,7 @@ public class ProcessDefinitionBuilderTest {
     mockProcessJSON.put("id", TEST_PROCESS_ID);
 
     ProcessDefinitionBuilder builder = new ProcessDefinitionBuilder(mockProcess);
-
-    try {
-      java.lang.reflect.Field converterField = Builder.class.getDeclaredField(CONVERTER);
-      converterField.setAccessible(true);
-      converterField.set(builder, mockConverter);
-    } catch (Exception e) {
-      fail(COULD_NOT_SET_CONVERTER_FIELD + e.getMessage());
-    }
+    injectConverter(builder);
 
     when(mockConverter.toJsonObject(eq(mockProcess), eq(DataResolvingMode.FULL_TRANSLATABLE)))
         .thenReturn(mockProcessJSON);
@@ -237,14 +190,7 @@ public class ProcessDefinitionBuilderTest {
         (mock, context) -> when(mock.toJSON()).thenReturn(mockParamJSON))) {
 
       ProcessDefinitionBuilder builder = new ProcessDefinitionBuilder(mockProcess);
-
-      try {
-        java.lang.reflect.Field converterField = Builder.class.getDeclaredField(CONVERTER);
-        converterField.setAccessible(true);
-        converterField.set(builder, mockConverter);
-      } catch (Exception e) {
-        fail(COULD_NOT_SET_CONVERTER_FIELD + e.getMessage());
-      }
+      injectConverter(builder);
 
       when(mockConverter.toJsonObject(eq(mockProcess), eq(DataResolvingMode.FULL_TRANSLATABLE)))
           .thenReturn(mockProcessJSON);
@@ -263,14 +209,7 @@ public class ProcessDefinitionBuilderTest {
   @Test
   void testToJSONThrowsRuntimeException() {
     ProcessDefinitionBuilder builder = new ProcessDefinitionBuilder(mockProcess);
-
-    try {
-      java.lang.reflect.Field converterField = Builder.class.getDeclaredField(CONVERTER);
-      converterField.setAccessible(true);
-      converterField.set(builder, mockConverter);
-    } catch (Exception e) {
-      fail(COULD_NOT_SET_CONVERTER_FIELD + e.getMessage());
-    }
+    injectConverter(builder);
 
     when(mockConverter.toJsonObject(eq(mockProcess), eq(DataResolvingMode.FULL_TRANSLATABLE)))
         .thenThrow(new RuntimeException("Test exception"));
@@ -293,14 +232,7 @@ public class ProcessDefinitionBuilderTest {
   @Test
   void testToJSONWithNullConverter() {
     ProcessDefinitionBuilder builder = new ProcessDefinitionBuilder(mockProcess);
-
-    try {
-      java.lang.reflect.Field converterField = Builder.class.getDeclaredField(CONVERTER);
-      converterField.setAccessible(true);
-      converterField.set(builder, null);
-    } catch (Exception e) {
-      fail(COULD_NOT_SET_CONVERTER_FIELD + e.getMessage());
-    }
+    injectConverter(builder, null);
 
     assertThrows(NullPointerException.class, builder::toJSON);
   }

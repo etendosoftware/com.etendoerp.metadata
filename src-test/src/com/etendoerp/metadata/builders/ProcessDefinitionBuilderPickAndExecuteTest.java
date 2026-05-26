@@ -16,32 +16,25 @@
  */
 package com.etendoerp.metadata.builders;
 
-import org.codehaus.jettison.json.JSONException;
-import org.codehaus.jettison.json.JSONObject;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.MockedStatic;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.mockito.junit.jupiter.MockitoSettings;
-import org.openbravo.client.application.Parameter;
-import org.openbravo.client.application.Process;
-import org.openbravo.dal.core.OBContext;
-import org.openbravo.model.ad.system.Language;
-import org.openbravo.service.json.DataResolvingMode;
-import org.openbravo.service.json.DataToJsonConverter;
+import static com.etendoerp.metadata.MetadataTestConstants.TEST_PROCESS_ID;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.mockito.quality.Strictness.LENIENT;
 
 import java.util.ArrayList;
 
-import static com.etendoerp.metadata.MetadataTestConstants.CONVERTER;
-import static com.etendoerp.metadata.MetadataTestConstants.COULD_NOT_SET_CONVERTER_FIELD;
-import static com.etendoerp.metadata.MetadataTestConstants.TEST_PROCESS_ID;
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
-import static org.mockito.quality.Strictness.LENIENT;
+import org.codehaus.jettison.json.JSONException;
+import org.codehaus.jettison.json.JSONObject;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.openbravo.service.json.DataResolvingMode;
 
 /**
  * Verifies that ProcessDefinitionBuilder.toJSON() preserves the Pick-and-Execute fields
@@ -56,53 +49,32 @@ import static org.mockito.quality.Strictness.LENIENT;
  */
 @MockitoSettings(strictness = LENIENT)
 @ExtendWith(MockitoExtension.class)
-public class ProcessDefinitionBuilderPickAndExecuteTest {
+public class ProcessDefinitionBuilderPickAndExecuteTest extends ProcessDefinitionBuilderTestSupport {
 
   private static final String UI_PATTERN = "uiPattern";
   private static final String IS_MULTI_RECORD = "isMultiRecord";
   private static final String PE_UI_PATTERN = "OBUIAPP_PickAndExecute";
 
-  @Mock
-  private Process mockProcess;
-
-  @Mock
-  private DataToJsonConverter mockConverter;
-
-  @Mock
-  private OBContext mockOBContext;
-
-  @Mock
-  private Language mockLanguage;
-
-  private MockedStatic<OBContext> mockedOBContextStatic;
-
   @BeforeEach
-  void setUp() {
-    mockedOBContextStatic = mockStatic(OBContext.class);
-    when(mockOBContext.getLanguage()).thenReturn(mockLanguage);
-    when(mockLanguage.getLanguage()).thenReturn("en_US");
-    mockedOBContextStatic.when(OBContext::getOBContext).thenReturn(mockOBContext);
-
+  void stubProcessDefaults() {
     when(mockProcess.getOBUIAPPParameterList()).thenReturn(new ArrayList<>());
     when(mockProcess.getETMETAOnload()).thenReturn(null);
     when(mockProcess.getEtmetaOnprocess()).thenReturn(null);
   }
 
-  @AfterEach
-  void tearDown() {
-    if (mockedOBContextStatic != null) {
-      mockedOBContextStatic.close();
-    }
-  }
-
-  private void injectConverter(ProcessDefinitionBuilder builder) {
-    try {
-      java.lang.reflect.Field converterField = Builder.class.getDeclaredField(CONVERTER);
-      converterField.setAccessible(true);
-      converterField.set(builder, mockConverter);
-    } catch (Exception e) {
-      fail(COULD_NOT_SET_CONVERTER_FIELD + e.getMessage());
-    }
+  /**
+   * Builds the SUT and wires the supplied converter output as the return value of
+   * the FULL_TRANSLATABLE conversion. Keeps each test focused on the assertions.
+   *
+   * @param converterOutput The JSON object the mocked converter must return.
+   * @return The configured {@link ProcessDefinitionBuilder} ready to invoke.
+   */
+  private ProcessDefinitionBuilder builderReturning(JSONObject converterOutput) {
+    ProcessDefinitionBuilder builder = new ProcessDefinitionBuilder(mockProcess);
+    injectConverter(builder);
+    when(mockConverter.toJsonObject(eq(mockProcess), eq(DataResolvingMode.FULL_TRANSLATABLE)))
+        .thenReturn(converterOutput);
+    return builder;
   }
 
   /**
@@ -116,12 +88,7 @@ public class ProcessDefinitionBuilderPickAndExecuteTest {
     converterOutput.put(UI_PATTERN, PE_UI_PATTERN);
     converterOutput.put(IS_MULTI_RECORD, true);
 
-    ProcessDefinitionBuilder builder = new ProcessDefinitionBuilder(mockProcess);
-    injectConverter(builder);
-    when(mockConverter.toJsonObject(eq(mockProcess), eq(DataResolvingMode.FULL_TRANSLATABLE)))
-        .thenReturn(converterOutput);
-
-    JSONObject result = builder.toJSON();
+    JSONObject result = builderReturning(converterOutput).toJSON();
 
     assertEquals(PE_UI_PATTERN, result.getString(UI_PATTERN));
     assertTrue(result.getBoolean(IS_MULTI_RECORD));
@@ -138,12 +105,7 @@ public class ProcessDefinitionBuilderPickAndExecuteTest {
     converterOutput.put(UI_PATTERN, PE_UI_PATTERN);
     converterOutput.put(IS_MULTI_RECORD, false);
 
-    ProcessDefinitionBuilder builder = new ProcessDefinitionBuilder(mockProcess);
-    injectConverter(builder);
-    when(mockConverter.toJsonObject(eq(mockProcess), eq(DataResolvingMode.FULL_TRANSLATABLE)))
-        .thenReturn(converterOutput);
-
-    JSONObject result = builder.toJSON();
+    JSONObject result = builderReturning(converterOutput).toJSON();
 
     assertEquals(PE_UI_PATTERN, result.getString(UI_PATTERN));
     assertFalse(result.getBoolean(IS_MULTI_RECORD));
@@ -161,12 +123,7 @@ public class ProcessDefinitionBuilderPickAndExecuteTest {
     converterOutput.put("id", TEST_PROCESS_ID);
     // uiPattern is intentionally absent
 
-    ProcessDefinitionBuilder builder = new ProcessDefinitionBuilder(mockProcess);
-    injectConverter(builder);
-    when(mockConverter.toJsonObject(eq(mockProcess), eq(DataResolvingMode.FULL_TRANSLATABLE)))
-        .thenReturn(converterOutput);
-
-    JSONObject result = builder.toJSON();
+    JSONObject result = builderReturning(converterOutput).toJSON();
 
     assertFalse(result.has(UI_PATTERN), "Builder must not inject uiPattern when absent in converter output");
   }
@@ -181,12 +138,7 @@ public class ProcessDefinitionBuilderPickAndExecuteTest {
     JSONObject converterOutput = new JSONObject();
     converterOutput.put("id", TEST_PROCESS_ID);
 
-    ProcessDefinitionBuilder builder = new ProcessDefinitionBuilder(mockProcess);
-    injectConverter(builder);
-    when(mockConverter.toJsonObject(eq(mockProcess), eq(DataResolvingMode.FULL_TRANSLATABLE)))
-        .thenReturn(converterOutput);
-
-    builder.toJSON();
+    builderReturning(converterOutput).toJSON();
 
     verify(mockConverter).toJsonObject(mockProcess, DataResolvingMode.FULL_TRANSLATABLE);
   }
