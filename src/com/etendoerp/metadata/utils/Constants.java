@@ -70,6 +70,13 @@ public class Constants {
             TABLE_REFERENCE_ID, TABLE_DIR_REFERENCE_ID,
             SEARCH_REFERENCE_ID, SELECTOR_REFERENCE_ID, TREE_REFERENCE_ID));
     public static final String WINDOW_REFERENCE_ID = "FF80818132D8F0F30132D9BC395D0038";
+    /**
+     * OBUISEL_Multi Selector Reference base id. Process Definition parameters
+     * carrying this reference render as multi-record pickers in the new UI and
+     * must include the same `selector` JSON block as standard selectors so the
+     * client can resolve datasource + grid columns.
+     */
+    public static final String MULTI_SELECTOR_REFERENCE_ID = "87E6CFF8F71548AFA33F181C317970B5";
     public static final String FORM_CLOSE_TAG = "</FORM>";
     public static final String FRAMESET_CLOSE_TAG = "</FRAMESET>";
     public static final String HEAD_CLOSE_TAG = "</HEAD>";

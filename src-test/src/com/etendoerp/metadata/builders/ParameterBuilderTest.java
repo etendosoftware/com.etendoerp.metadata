@@ -259,7 +259,7 @@ class ParameterBuilderTest {
    * Tests the toJSON method includes selector information for selector references.
    * Verifies that when a parameter has a selector reference type (table reference),
    * the method includes selector information obtained from FieldBuilder.
-   * 
+   *
    * @throws Exception if JSON processing or selector info retrieval fails
    */
   @Test
@@ -270,6 +270,25 @@ class ParameterBuilderTest {
     assertTrue(result.has(SELECTOR));
     JSONObject selector = result.getJSONObject(SELECTOR);
     assertEquals("TestDataSource", selector.getString(DATASOURCE_NAME));
+  }
+
+  /**
+   * Tests the toJSON method includes selector information for the multi-record
+   * selector reference (OBUISEL_Multi Selector). Without this, Process Definition
+   * parameters such as NotPostedDocuments.accounting_status reach the client with
+   * no `selector` block, which prevents the multi-record picker modal from
+   * resolving its datasource or grid columns.
+   *
+   * @throws Exception if JSON processing or selector info retrieval fails
+   */
+  @Test
+  void toJSONWithMultiSelectorReferenceIncludesSelectorInfo() throws Exception {
+    JSONObject result = executeSelectorTest(Constants.MULTI_SELECTOR_REFERENCE_ID, "List");
+
+    assertNotNull(result);
+    assertTrue(result.has(SELECTOR));
+    JSONObject selector = result.getJSONObject(SELECTOR);
+    assertEquals("List", selector.getString(DATASOURCE_NAME));
   }
 
   /**

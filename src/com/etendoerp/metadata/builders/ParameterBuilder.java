@@ -51,6 +51,16 @@ public class ParameterBuilder extends Builder {
             parameter.getReference().getId());
     }
 
+    /**
+     * Process Definition parameters using the OBUISEL_Multi Selector reference
+     * (e.g. NotPostedDocuments.accounting_status) need the same selector JSON as
+     * standard selectors so the client can resolve datasource and grid columns.
+     */
+    private static boolean isMultiSelectorParameter(Parameter parameter) {
+        return parameter != null && parameter.getReference() != null &&
+               MULTI_SELECTOR_REFERENCE_ID.equals(parameter.getReference().getId());
+    }
+
     private static boolean isListParameter(Parameter parameter) {
         return parameter != null && parameter.getReference() != null &&
                (LIST_REFERENCE_ID.equals(parameter.getReference().getId()) ||
@@ -109,7 +119,7 @@ public class ParameterBuilder extends Builder {
 
     private void addSelectorInfo(JSONObject json, Parameter parameter) {
         try {
-            if (isSelectorParameter(parameter)) {
+            if (isSelectorParameter(parameter) || isMultiSelectorParameter(parameter)) {
                 json.put("selector", getSelectorInfo(parameter.getId(), parameter.getReferenceSearchKey()));
             }
         } catch (Exception e) {
