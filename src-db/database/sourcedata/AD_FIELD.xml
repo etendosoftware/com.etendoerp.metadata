@@ -29,7 +29,7 @@
 <!--018865A7F06945D8BF9C69A653448433-->  <AD_CLIENT_ID><![CDATA[0]]></AD_CLIENT_ID>
 <!--018865A7F06945D8BF9C69A653448433-->  <AD_ORG_ID><![CDATA[0]]></AD_ORG_ID>
 <!--018865A7F06945D8BF9C69A653448433-->  <ISACTIVE><![CDATA[Y]]></ISACTIVE>
-<!--018865A7F06945D8BF9C69A653448433-->  <NAME><![CDATA[EM_Etmeta_On_Refresh]]></NAME>
+<!--018865A7F06945D8BF9C69A653448433-->  <NAME><![CDATA[Custom On Refresh Function]]></NAME>
 <!--018865A7F06945D8BF9C69A653448433-->  <DESCRIPTION><![CDATA[JavaScript hook executed when the process view is refreshed at runtime.]]></DESCRIPTION>
 <!--018865A7F06945D8BF9C69A653448433-->  <HELP><![CDATA[JavaScript code triggered when the process dialog is re-evaluated after its initial opening — typically after a change that requires recomputing derived state across several parameters at once, rather than the single-field reaction handled by parameter-level onChange. It is the right place to recompute totals that span multiple inputs, reload selectors that depend on a combination of parameters, restore cross-parameter consistency, and synchronize the UI with the current data state. The script runs in the browser with access to the full set of current parameter values and the standard Etendo process context (user, role, organization, client). Leave empty to disable.]]></HELP>
 <!--018865A7F06945D8BF9C69A653448433-->  <ISCENTRALLYMAINTAINED><![CDATA[Y]]></ISCENTRALLYMAINTAINED>
@@ -183,7 +183,7 @@
 <!--21E98F9D584A4FBD8A4ABBD9A5EEA33E-->  <AD_CLIENT_ID><![CDATA[0]]></AD_CLIENT_ID>
 <!--21E98F9D584A4FBD8A4ABBD9A5EEA33E-->  <AD_ORG_ID><![CDATA[0]]></AD_ORG_ID>
 <!--21E98F9D584A4FBD8A4ABBD9A5EEA33E-->  <ISACTIVE><![CDATA[Y]]></ISACTIVE>
-<!--21E98F9D584A4FBD8A4ABBD9A5EEA33E-->  <NAME><![CDATA[EM_Etmeta_Payscript Logic]]></NAME>
+<!--21E98F9D584A4FBD8A4ABBD9A5EEA33E-->  <NAME><![CDATA[PayScript Logic]]></NAME>
 <!--21E98F9D584A4FBD8A4ABBD9A5EEA33E-->  <DESCRIPTION><![CDATA[Field to describe a compatible payscript logic]]></DESCRIPTION>
 <!--21E98F9D584A4FBD8A4ABBD9A5EEA33E-->  <HELP><![CDATA[Field to describe a compatible payscript logic to adapt business logic of legacy javascript linked to static smartclient.]]></HELP>
 <!--21E98F9D584A4FBD8A4ABBD9A5EEA33E-->  <ISCENTRALLYMAINTAINED><![CDATA[Y]]></ISCENTRALLYMAINTAINED>
@@ -531,7 +531,9 @@
 <!--40FC57456E474A91B7E1511B5CFFDD9C-->  <AD_CLIENT_ID><![CDATA[0]]></AD_CLIENT_ID>
 <!--40FC57456E474A91B7E1511B5CFFDD9C-->  <AD_ORG_ID><![CDATA[0]]></AD_ORG_ID>
 <!--40FC57456E474A91B7E1511B5CFFDD9C-->  <ISACTIVE><![CDATA[Y]]></ISACTIVE>
-<!--40FC57456E474A91B7E1511B5CFFDD9C-->  <NAME><![CDATA[Custom OnLoad Function]]></NAME>
+<!--40FC57456E474A91B7E1511B5CFFDD9C-->  <NAME><![CDATA[Custom On Load Function]]></NAME>
+<!--40FC57456E474A91B7E1511B5CFFDD9C-->  <DESCRIPTION><![CDATA[On Load event handler]]></DESCRIPTION>
+<!--40FC57456E474A91B7E1511B5CFFDD9C-->  <HELP><![CDATA[JavaScript code that executes when the window or tab is loaded in the new UI. Use this to initialize field values, set visibility rules, or configure dynamic behavior at load time.]]></HELP>
 <!--40FC57456E474A91B7E1511B5CFFDD9C-->  <ISCENTRALLYMAINTAINED><![CDATA[Y]]></ISCENTRALLYMAINTAINED>
 <!--40FC57456E474A91B7E1511B5CFFDD9C-->  <AD_TAB_ID><![CDATA[FF80818132D7FB620132D819C1720046]]></AD_TAB_ID>
 <!--40FC57456E474A91B7E1511B5CFFDD9C-->  <AD_COLUMN_ID><![CDATA[6D9D75F752064AB6A0ADC33D5F713BB0]]></AD_COLUMN_ID>
@@ -1074,7 +1076,9 @@
 <!--95C5FF9002804A8A9DF08EE517AF6799-->  <AD_CLIENT_ID><![CDATA[0]]></AD_CLIENT_ID>
 <!--95C5FF9002804A8A9DF08EE517AF6799-->  <AD_ORG_ID><![CDATA[0]]></AD_ORG_ID>
 <!--95C5FF9002804A8A9DF08EE517AF6799-->  <ISACTIVE><![CDATA[Y]]></ISACTIVE>
-<!--95C5FF9002804A8A9DF08EE517AF6799-->  <NAME><![CDATA[Custom OnProcess Function]]></NAME>
+<!--95C5FF9002804A8A9DF08EE517AF6799-->  <NAME><![CDATA[Custom On Process Function]]></NAME>
+<!--95C5FF9002804A8A9DF08EE517AF6799-->  <DESCRIPTION><![CDATA[On Process]]></DESCRIPTION>
+<!--95C5FF9002804A8A9DF08EE517AF6799-->  <HELP><![CDATA[JavaScript code that executes when a process or action is triggered in the new UI. Use this to intercept, validate, or modify process behavior.]]></HELP>
 <!--95C5FF9002804A8A9DF08EE517AF6799-->  <ISCENTRALLYMAINTAINED><![CDATA[Y]]></ISCENTRALLYMAINTAINED>
 <!--95C5FF9002804A8A9DF08EE517AF6799-->  <AD_TAB_ID><![CDATA[FF80818132D7FB620132D819C1720046]]></AD_TAB_ID>
 <!--95C5FF9002804A8A9DF08EE517AF6799-->  <AD_COLUMN_ID><![CDATA[7F6ED622B1084745A7272D31DD43E608]]></AD_COLUMN_ID>
