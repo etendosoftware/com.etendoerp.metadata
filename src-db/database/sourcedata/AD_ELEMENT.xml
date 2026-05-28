@@ -14,6 +14,20 @@
 <!--0F12CA966BC147C0B68C96066095C99A-->  <ISGLOSSARY><![CDATA[N]]></ISGLOSSARY>
 <!--0F12CA966BC147C0B68C96066095C99A--></AD_ELEMENT>
 
+<!--2575DB425F9947C984A703C5C867C9C2--><AD_ELEMENT>
+<!--2575DB425F9947C984A703C5C867C9C2-->  <AD_ELEMENT_ID><![CDATA[2575DB425F9947C984A703C5C867C9C2]]></AD_ELEMENT_ID>
+<!--2575DB425F9947C984A703C5C867C9C2-->  <AD_CLIENT_ID><![CDATA[0]]></AD_CLIENT_ID>
+<!--2575DB425F9947C984A703C5C867C9C2-->  <AD_ORG_ID><![CDATA[0]]></AD_ORG_ID>
+<!--2575DB425F9947C984A703C5C867C9C2-->  <ISACTIVE><![CDATA[Y]]></ISACTIVE>
+<!--2575DB425F9947C984A703C5C867C9C2-->  <COLUMNNAME><![CDATA[EM_Etmeta_On_Refresh]]></COLUMNNAME>
+<!--2575DB425F9947C984A703C5C867C9C2-->  <NAME><![CDATA[EM_Etmeta_On_Refresh]]></NAME>
+<!--2575DB425F9947C984A703C5C867C9C2-->  <PRINTNAME><![CDATA[EM_Etmeta_On_Refresh]]></PRINTNAME>
+<!--2575DB425F9947C984A703C5C867C9C2-->  <DESCRIPTION><![CDATA[JavaScript hook executed when the process view is refreshed at runtime.]]></DESCRIPTION>
+<!--2575DB425F9947C984A703C5C867C9C2-->  <HELP><![CDATA[JavaScript code triggered when the process dialog is re-evaluated after its initial opening — typically after a change that requires recomputing derived state across several parameters at once, rather than the single-field reaction handled by parameter-level onChange. It is the right place to recompute totals that span multiple inputs, reload selectors that depend on a combination of parameters, restore cross-parameter consistency, and synchronize the UI with the current data state. The script runs in the browser with access to the full set of current parameter values and the standard Etendo process context (user, role, organization, client). Leave empty to disable.]]></HELP>
+<!--2575DB425F9947C984A703C5C867C9C2-->  <AD_MODULE_ID><![CDATA[51E67C9184F6439595409B46040FC572]]></AD_MODULE_ID>
+<!--2575DB425F9947C984A703C5C867C9C2-->  <ISGLOSSARY><![CDATA[N]]></ISGLOSSARY>
+<!--2575DB425F9947C984A703C5C867C9C2--></AD_ELEMENT>
+
 <!--32CCEED4F7D4445A8F58D72BDA5ED4E7--><AD_ELEMENT>
 <!--32CCEED4F7D4445A8F58D72BDA5ED4E7-->  <AD_ELEMENT_ID><![CDATA[32CCEED4F7D4445A8F58D72BDA5ED4E7]]></AD_ELEMENT_ID>
 <!--32CCEED4F7D4445A8F58D72BDA5ED4E7-->  <AD_CLIENT_ID><![CDATA[0]]></AD_CLIENT_ID>

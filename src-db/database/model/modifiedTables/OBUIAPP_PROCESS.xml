@@ -13,5 +13,9 @@
         <default/>
         <onCreateDefault/>
       </column>
+      <column name="EM_ETMETA_ON_REFRESH" primaryKey="false" required="false" type="CLOB" size="4000" autoIncrement="false">
+        <default/>
+        <onCreateDefault/>
+      </column>
     </table>
   </database>
