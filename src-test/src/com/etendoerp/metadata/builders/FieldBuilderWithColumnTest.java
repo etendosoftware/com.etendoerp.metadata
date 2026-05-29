@@ -34,6 +34,7 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Answers.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.mockStatic;
@@ -44,6 +45,7 @@ import static org.mockito.Mockito.when;
 import java.util.Collections;
 import java.util.List;
 
+import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.hibernate.criterion.Criterion;
@@ -83,13 +85,19 @@ import org.openbravo.service.json.DataToJsonConverter;
 import java.lang.reflect.Method;
 import java.util.Map;
 
+import org.openbravo.model.ad.domain.ReferencedTree;
+import org.openbravo.userinterface.selector.Selector;
+import org.openbravo.userinterface.selector.SelectorField;
+
 import com.etendoerp.etendorx.utils.DataSourceUtils;
+import com.etendoerp.metadata.data.ReferenceSelectors;
 import com.etendoerp.metadata.utils.Constants;
 import com.etendoerp.metadata.utils.LegacyUtils;
 import com.etendoerp.metadata.utils.Utils;
 
 @MockitoSettings(strictness = Strictness.LENIENT)
 @ExtendWith(MockitoExtension.class)
+@SuppressWarnings("java:S1448")
 class FieldBuilderWithColumnTest {
 
     @Mock
@@ -126,6 +134,9 @@ class FieldBuilderWithColumnTest {
     private OBCriteria<Tab> criteria;
     @Mock
     private OBContext obContext;
+    private static final String PAYMENT_TERMS = "paymentTerms";
+    private static final String SELECTOR_KEY = "selector";
+    private static final String OUT_FIELDS_KEY = "outFields";
     private static final String BUTTON_REF_LIST_STRING = "buttonRefList";
     private static final String WINDOW_ID_STRING = "window-id";
     private static final String ROLE_ID_STRING = "role-id";
@@ -675,5 +686,87 @@ class FieldBuilderWithColumnTest {
         JSONObject result = executeToJSON(null);
 
         assertFalse(result.has(FIELD_GROUP_COLLAPSED));
+    }
+
+    private JSONObject invokeAddComboSelectInfoAndGetJson(
+            ReferenceSelectors selectors,
+            MockedStatic<FieldBuilder> mockedFieldBuilder) throws Exception {
+
+        mockedFieldBuilder.when(() -> FieldBuilder.getSelectorInfo(anyString(), any()))
+                .thenReturn(new JSONObject());
+        mockedFieldBuilder.when(() -> FieldBuilder.getReferenceSelectors(any()))
+                .thenReturn(selectors);
+
+        fieldBuilder = new FieldBuilderWithColumn(field, fieldAccess);
+        invokePrivate(fieldBuilder, "addComboSelectInfo",
+                new Class<?>[] { Field.class }, field);
+
+        java.lang.reflect.Field jsonField = FieldBuilder.class.getDeclaredField("json");
+        jsonField.setAccessible(true);
+        return (JSONObject) jsonField.get(fieldBuilder);
+    }
+
+    @Test
+    void testAddComboSelectInfoIncludesOutFieldsForObuiselSelector() throws Exception {
+        Selector mockSelector = mock(Selector.class);
+
+        SelectorField outSf = mock(SelectorField.class);
+        when(outSf.isOutfield()).thenReturn(true);
+        when(outSf.isActive()).thenReturn(true);
+        when(outSf.getProperty()).thenReturn(PAYMENT_TERMS);
+        when(outSf.getSuffix()).thenReturn(null);
+        when(mockSelector.getOBUISELSelectorFieldList()).thenReturn(List.of(outSf));
+
+        Field targetField = mock(Field.class);
+        Column targetCol = mock(Column.class);
+        when(targetField.getObuiselOutfield()).thenReturn(outSf);
+        when(targetField.getColumn()).thenReturn(targetCol);
+        when(targetCol.getDBColumnName()).thenReturn("C_PaymentTerm_ID");
+        when(targetField.getName()).thenReturn("Payment Terms");
+        when(tab.getADFieldList()).thenReturn(List.of(targetField));
+
+        when(reference.getId()).thenReturn("95E2A8B50A254B2AAE6774B8C2F28120");
+
+        try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
+             MockedStatic<FieldBuilder> mockedFieldBuilder = mockStatic(FieldBuilder.class, CALLS_REAL_METHODS);
+             MockedConstruction<DataToJsonConverter> ignored = mockDataToJsonConverter()) {
+
+            mockedOBContext.when(OBContext::getOBContext).thenReturn(obContext);
+            mockedFieldBuilder.when(() -> FieldBuilder.getPropertyOrDataSourceField(outSf))
+                    .thenReturn(PAYMENT_TERMS);
+            mockedFieldBuilder.when(() -> FieldBuilder.getHqlName(targetField))
+                    .thenReturn(PAYMENT_TERMS);
+
+            JSONObject json = invokeAddComboSelectInfoAndGetJson(
+                    new ReferenceSelectors(mockSelector, null), mockedFieldBuilder);
+
+            assertTrue(json.has(SELECTOR_KEY));
+            JSONObject selectorJson = json.getJSONObject(SELECTOR_KEY);
+            assertTrue(selectorJson.has(OUT_FIELDS_KEY));
+            JSONArray outFields = selectorJson.getJSONArray(OUT_FIELDS_KEY);
+            assertEquals(1, outFields.length());
+            assertEquals("field", outFields.getJSONObject(0).getString("type"));
+            assertEquals(PAYMENT_TERMS, outFields.getJSONObject(0).getString("selectorFieldProperty"));
+        }
+    }
+
+    @Test
+    void testAddComboSelectInfoTreeSelectorDoesNotIncludeOutFields() throws Exception {
+        when(reference.getId()).thenReturn("8C57A4A2E05F4261A1FADF47C30398AD");
+        ReferencedTree mockTree = mock(ReferencedTree.class);
+
+        try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
+             MockedStatic<FieldBuilder> mockedFieldBuilder = mockStatic(FieldBuilder.class, CALLS_REAL_METHODS);
+             MockedConstruction<DataToJsonConverter> ignored = mockDataToJsonConverter()) {
+
+            mockedOBContext.when(OBContext::getOBContext).thenReturn(obContext);
+
+            JSONObject json = invokeAddComboSelectInfoAndGetJson(
+                    new ReferenceSelectors(null, mockTree), mockedFieldBuilder);
+
+            if (json.has(SELECTOR_KEY)) {
+                assertFalse(json.getJSONObject(SELECTOR_KEY).has(OUT_FIELDS_KEY));
+            }
+        }
     }
 }
