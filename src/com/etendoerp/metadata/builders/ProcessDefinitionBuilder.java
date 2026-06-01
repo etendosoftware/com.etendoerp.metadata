@@ -27,6 +27,12 @@ import org.openbravo.service.json.DataResolvingMode;
  * Builds a JSON representation of an OBUIAPP process definition and its parameters.
  */
 public class ProcessDefinitionBuilder extends Builder {
+    private static final String PARAMETERS = "parameters";
+    /** Key auto-emitted by DataToJsonConverter from the ORM property name (legacy casing). */
+    private static final String ETMETA_ONLOAD_RAW = "eTMETAOnload";
+    /** Public, normalized key for the onLoad hook in the JSON response. */
+    private static final String ETMETA_ONLOAD = "etmetaOnload";
+
     private final Process process;
 
     /**
@@ -47,9 +53,11 @@ public class ProcessDefinitionBuilder extends Builder {
             parameters.put(param.getDBColumnName(), new ParameterBuilder(param).toJSON());
         }
 
-        processJSON.put("parameters", parameters);
-        processJSON.put("onLoad", process.getETMETAOnload());
-        processJSON.put("onProcess", process.getEtmetaOnprocess());
+        processJSON.put(PARAMETERS, parameters);
+        // Rename the typo'd auto-emitted key. `etmetaOnprocess`, `etmetaOnRefresh`
+        // and `etmetaPayscriptLogic` already come from the converter under their
+        // correct property names, so no further explicit puts are required.
+        processJSON.put(ETMETA_ONLOAD, processJSON.remove(ETMETA_ONLOAD_RAW));
 
         return processJSON;
     }
