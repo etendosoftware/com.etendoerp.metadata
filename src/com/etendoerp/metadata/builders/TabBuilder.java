@@ -25,6 +25,9 @@ import org.apache.commons.lang3.StringUtils;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
+import org.openbravo.base.model.Entity;
+import org.openbravo.base.model.ModelProvider;
+import org.openbravo.base.model.Property;
 import org.openbravo.client.kernel.KernelUtils;
 import org.openbravo.client.application.ApplicationUtils;
 import org.openbravo.model.ad.access.FieldAccess;
@@ -90,6 +93,7 @@ public class TabBuilder extends Builder {
       }
 
       json.put("entityName", tab.getTable().getName());
+      enrichDefaultSortOrder(json);
       json.put("parentColumns", getParentColumns());
 
       JSONObject fields = getFields();
@@ -112,6 +116,34 @@ public class TabBuilder extends Builder {
     } catch (JSONException e) {
       logger.warn(e.getMessage(), e);
       throw new InternalServerException();
+    }
+  }
+
+  /**
+   * If hqlorderbyclause is absent/blank, derives it from the tab's orderColumn reference
+   * so the frontend getDefaultSort() logic always has a clause to work with.
+   */
+  private void enrichDefaultSortOrder(JSONObject json) throws JSONException {
+    String existing = json.optString("hqlorderbyclause", "").trim();
+    if (!existing.isEmpty()) {
+      return;
+    }
+    Column orderColumn = tab.getOrderColumn();
+    if (orderColumn == null) {
+      return;
+    }
+    try {
+      String entityName = tab.getTable().getName();
+      Entity entity = ModelProvider.getInstance().getEntity(entityName);
+      if (entity == null) {
+        return;
+      }
+      Property prop = entity.getPropertyByColumnName(orderColumn.getDBColumnName(), false);
+      if (prop != null) {
+        json.put("hqlorderbyclause", prop.getName());
+      }
+    } catch (Exception e) {
+      logger.warn("Could not derive hqlorderbyclause from orderColumn for tab {}: {}", tab.getId(), e.getMessage());
     }
   }
 

@@ -50,6 +50,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.openbravo.model.ad.access.WindowAccess;
 import org.openbravo.model.ad.access.Role;
 import org.openbravo.dal.service.OBCriteria;
+import org.hibernate.query.NativeQuery;
 
 /**
  * Concrete implementation of FieldBuilder for fields with database columns.
@@ -86,6 +87,7 @@ public class FieldBuilderWithColumn extends FieldBuilder {
     private static final String READ_ONLY_LOGIC_EXPRESSION = "readOnlyLogicExpression";
     private static final String IS_REFERENCED_WINDOW_ACCESSIBLE = "isReferencedWindowAccessible";
     private static final String NULL_STRING = "null";
+    private static final String IS_SELECTION_COLUMN = "isSelectionColumn";
 
     /**
      * Constructs a FieldBuilderWithColumn for fields that have associated database
@@ -119,6 +121,7 @@ public class FieldBuilderWithColumn extends FieldBuilder {
 
             // Add column-specific properties
             addColumnSpecificProperties(field);
+            addSelectionColumnFlag(field);
             addReferencedProperty(field);
             addReferencedTableInfo(field);
             addReadOnlyLogic(field);
@@ -145,6 +148,29 @@ public class FieldBuilderWithColumn extends FieldBuilder {
     @Override
     protected boolean getColumnUpdatable() {
         return field.getColumn() == null || field.getColumn().isUpdatable();
+    }
+
+    /**
+     * Adds isSelectionColumn flag to the field JSON.
+     * ISSELECTIONCOLUMN is not mapped in the ORM Column entity, so it is read via native SQL.
+     * When true, the frontend renders this column as a default quick-filter input in the grid toolbar.
+     *
+     * @param field The field whose column may have ISSELECTIONCOLUMN=Y
+     * @throws JSONException if there's an error updating the JSON structure
+     */
+    private void addSelectionColumnFlag(Field field) throws JSONException {
+        Column column = field.getColumn();
+        if (column == null) return;
+        try {
+            @SuppressWarnings("unchecked")
+            NativeQuery<String> query = (NativeQuery<String>) OBDal.getReadOnlyInstance().getSession()
+                    .createNativeQuery("SELECT isselectioncolumn FROM ad_column WHERE ad_column_id = :colId");
+            query.setParameter("colId", column.getId());
+            String result = query.uniqueResult();
+            json.put(IS_SELECTION_COLUMN, "Y".equals(result));
+        } catch (Exception e) {
+            logger.warn("Could not read ISSELECTIONCOLUMN for column {}: {}", column.getId(), e.getMessage());
+        }
     }
 
     /**
