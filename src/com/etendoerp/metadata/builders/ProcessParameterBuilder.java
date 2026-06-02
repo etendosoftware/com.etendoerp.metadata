@@ -93,6 +93,26 @@ public class ProcessParameterBuilder extends Builder {
         json.put("minValue", currentParameter.getMinValue());
         json.put("maxValue", currentParameter.getMaxValue());
 
+        // Normalize reference to ID string so the frontend always receives a plain string,
+        // regardless of how the JSON converter serializes the FK property.
+        if (currentParameter.getReference() != null) {
+            json.put("reference", currentParameter.getReference().getId());
+        }
+
+        // Explicit sequenceNumber (seqno DB column) for frontend parameter ordering.
+        // The FULL_TRANSLATABLE serializer may output this under a different key name;
+        // always write it as "sequenceNumber" so the frontend sort is reliable.
+        Long seqNo = currentParameter.getSequenceNumber();
+        json.put("sequenceNumber", seqNo != null ? seqNo : 0L);
+
+        // Explicit mandatory, name, dBColumnName and defaultValue for frontend type resolution.
+        // AD_PROCESS_PARA does not have displayLogic/readOnlyLogic — those exist only in OBUIAPP_PROCESS_PARA.
+        json.put("mandatory", currentParameter.isMandatory());
+        json.put("dBColumnName", currentParameter.getDBColumnName());
+        if (currentParameter.getDefaultValue() != null) {
+            json.put("defaultValue", currentParameter.getDefaultValue());
+        }
+
         return json;
     }
 }
