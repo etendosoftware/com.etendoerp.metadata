@@ -32,6 +32,10 @@ public class ProcessDefinitionBuilder extends Builder {
     private static final String ETMETA_ONLOAD_RAW = "eTMETAOnload";
     /** Public, normalized key for the onLoad hook in the JSON response. */
     private static final String ETMETA_ONLOAD = "etmetaOnload";
+    /** Key the converter may emit for the custom-component flag with the legacy ETMETA casing. */
+    private static final String ETMETA_CUSTOM_COMPONENT_RAW = "eTMETACustomComponent";
+    /** Public, normalized key for the custom-component flag in the JSON response. */
+    private static final String ETMETA_CUSTOM_COMPONENT = "etmetaCustomComponent";
 
     private final Process process;
 
@@ -58,6 +62,12 @@ public class ProcessDefinitionBuilder extends Builder {
         // and `etmetaPayscriptLogic` already come from the converter under their
         // correct property names, so no further explicit puts are required.
         processJSON.put(ETMETA_ONLOAD, processJSON.remove(ETMETA_ONLOAD_RAW));
+        // The custom-component flag may be emitted under the legacy ETMETA casing
+        // depending on the generated property name; normalize it when present so
+        // the client always reads `etmetaCustomComponent`.
+        if (processJSON.has(ETMETA_CUSTOM_COMPONENT_RAW)) {
+            processJSON.put(ETMETA_CUSTOM_COMPONENT, processJSON.remove(ETMETA_CUSTOM_COMPONENT_RAW));
+        }
 
         return processJSON;
     }
