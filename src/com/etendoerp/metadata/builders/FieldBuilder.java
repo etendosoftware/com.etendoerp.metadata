@@ -48,6 +48,7 @@ import org.openbravo.model.ad.system.Language;
 import org.openbravo.model.ad.ui.Field;
 import org.openbravo.model.ad.ui.Process;
 import org.openbravo.model.ad.ui.ProcessParameter;
+import org.openbravo.model.ad.ui.Tab;
 import org.openbravo.service.datasource.DataSource;
 import org.openbravo.service.datasource.DatasourceField;
 import org.openbravo.service.db.DalConnectionProvider;
@@ -328,6 +329,82 @@ public abstract class FieldBuilder extends Builder {
         }
 
         return selectorInfo;
+    }
+
+    /**
+     * Adds out-field mappings to the selector JSON for a custom OBUISEL selector.
+     * Iterates selector fields marked as out-fields and resolves target mappings
+     * from the tab's field list.
+     *
+     * Two types of out-field entries are produced:
+     * <ul>
+     *   <li>{@code "field"} — the selector field is referenced by an AD_Field in the tab
+     *       via {@code obuiselOutfield}. The frontend uses this to set a form field value directly.</li>
+     *   <li>{@code "calloutInput"} — the selector field has a suffix but no AD_Field references it.
+     *       The frontend uses this to populate the callout payload.</li>
+     * </ul>
+     *
+     * If no out-field entries are produced, the {@code "outFields"} key is omitted from the JSON.
+     *
+     * @param selectorJson The selector JSON object to augment with out-fields
+     * @param selector     The OBUISEL selector entity
+     * @param tab          The tab containing the field that uses this selector
+     * @throws JSONException if there's an error updating the JSON structure
+     */
+    public static void addOutFields(JSONObject selectorJson, Selector selector, Tab tab)
+            throws JSONException {
+        List<SelectorField> outFields = selector.getOBUISELSelectorFieldList().stream()
+                .filter(sf -> Boolean.TRUE.equals(sf.isOutfield()) && Boolean.TRUE.equals(sf.isActive()))
+                .collect(Collectors.toList());
+
+        if (outFields.isEmpty()) {
+            return;
+        }
+
+        List<Field> tabFields = tab.getADFieldList();
+        JSONArray outFieldsArray = new JSONArray();
+
+        for (SelectorField sf : outFields) {
+            String selectorFieldProperty = getPropertyOrDataSourceField(sf);
+            List<Field> matchedFields = tabFields.stream()
+                    .filter(f -> sf.equals(f.getObuiselOutfield()))
+                    .collect(Collectors.toList());
+
+            if (!matchedFields.isEmpty()) {
+                for (Field matchedField : matchedFields) {
+                    outFieldsArray.put(buildOutFieldEntry(
+                            "field", selectorFieldProperty, matchedField, sf.getSuffix()));
+                }
+            } else if (sf.getSuffix() != null && !sf.getSuffix().isEmpty()) {
+                outFieldsArray.put(buildCalloutInputEntry(selectorFieldProperty, sf.getSuffix()));
+            }
+        }
+
+        if (outFieldsArray.length() > 0) {
+            selectorJson.put("outFields", outFieldsArray);
+        }
+    }
+
+    private static JSONObject buildOutFieldEntry(String type, String selectorFieldProperty,
+            Field targetField, String suffix) throws JSONException {
+        JSONObject entry = new JSONObject();
+        entry.put("type", type);
+        entry.put("selectorFieldProperty", selectorFieldProperty);
+        entry.put("targetColumnName", targetField.getColumn().getDBColumnName());
+        entry.put("targetHqlName", getHqlName(targetField));
+        entry.put("suffix", suffix);
+        return entry;
+    }
+
+    private static JSONObject buildCalloutInputEntry(String selectorFieldProperty, String suffix)
+            throws JSONException {
+        JSONObject entry = new JSONObject();
+        entry.put("type", "calloutInput");
+        entry.put("selectorFieldProperty", selectorFieldProperty);
+        entry.put("targetColumnName", (Object) null);
+        entry.put("targetHqlName", (Object) null);
+        entry.put("suffix", suffix);
+        return entry;
     }
 
     /**

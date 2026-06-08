@@ -162,6 +162,13 @@ class FieldBuilderTest {
   private static final String MY_FIELD = "myField";
   private static final String GET_DOMAIN_TYPE = "getDomainType";
   private static final String CUSTOM_DISPLAY = "customDisplay";
+  private static final String PAYMENT_TERMS = "paymentTerms";
+  private static final String OUT_FIELDS_KEY = "outFields";
+  private static final String SELECTOR_FIELD_PROPERTY_KEY = "selectorFieldProperty";
+  private static final String TARGET_COLUMN_NAME_KEY = "targetColumnName";
+  private static final String TARGET_HQL_NAME_KEY = "targetHqlName";
+  private static final String CURRENCY = "currency";
+  private static final String STORAGE_BIN = "storageBin";
 
   /**
    * Sets up the necessary mocks and their behaviors before each test.
@@ -1666,6 +1673,117 @@ class FieldBuilderTest {
 
     assertSelectorInfoSelectedPropertiesContains(CUSTOM_DISPLAY, "customValue", displayField, valueField,
         regularField);
+  }
+
+  private SelectorField createOutSelectorFieldMock(String property, String suffix) {
+    SelectorField outSelectorField = mock(SelectorField.class);
+    when(outSelectorField.isOutfield()).thenReturn(true);
+    when(outSelectorField.isActive()).thenReturn(true);
+    when(outSelectorField.getProperty()).thenReturn(property);
+    when(outSelectorField.getSuffix()).thenReturn(suffix);
+    when(selector.getOBUISELSelectorFieldList()).thenReturn(List.of(outSelectorField));
+    return outSelectorField;
+  }
+
+  private Tab createTabWithTargetField(SelectorField outSelectorField,
+      String dbColumnName, String fieldName) {
+    Field targetField = mock(Field.class);
+    Column targetColumn = mock(Column.class);
+    when(targetField.getObuiselOutfield()).thenReturn(outSelectorField);
+    when(targetField.getColumn()).thenReturn(targetColumn);
+    when(targetColumn.getDBColumnName()).thenReturn(dbColumnName);
+    when(targetField.getName()).thenReturn(fieldName);
+
+    Tab mockTab = mock(Tab.class);
+    when(mockTab.getADFieldList()).thenReturn(List.of(targetField));
+    return mockTab;
+  }
+
+  private JSONObject executeAddOutFields(SelectorField outSelectorField,
+      Tab mockTab, String property, Field targetField, String hqlName) throws JSONException {
+    JSONObject selectorJson = new JSONObject();
+    try (MockedStatic<FieldBuilder> mockedStatic = mockStatic(FieldBuilder.class, CALLS_REAL_METHODS)) {
+      mockedStatic.when(() -> FieldBuilder.getPropertyOrDataSourceField(outSelectorField))
+              .thenReturn(property);
+      if (targetField != null) {
+        mockedStatic.when(() -> FieldBuilder.getHqlName(targetField))
+                .thenReturn(hqlName);
+      }
+      FieldBuilder.addOutFields(selectorJson, selector, mockTab);
+    }
+    return selectorJson;
+  }
+
+  @Test
+  void testAddOutFieldsWithFieldTypeMapping() throws JSONException {
+    SelectorField outSf = createOutSelectorFieldMock(PAYMENT_TERMS, null);
+    Tab mockTab = createTabWithTargetField(outSf, "C_PaymentTerm_ID", "Payment Terms");
+    Field targetField = mockTab.getADFieldList().get(0);
+
+    JSONObject selectorJson = executeAddOutFields(outSf, mockTab, PAYMENT_TERMS, targetField, PAYMENT_TERMS);
+
+    assertTrue(selectorJson.has(OUT_FIELDS_KEY));
+    JSONObject entry = selectorJson.getJSONArray(OUT_FIELDS_KEY).getJSONObject(0);
+    assertEquals("field", entry.getString("type"));
+    assertEquals(PAYMENT_TERMS, entry.getString(SELECTOR_FIELD_PROPERTY_KEY));
+    assertEquals("C_PaymentTerm_ID", entry.getString(TARGET_COLUMN_NAME_KEY));
+    assertEquals(PAYMENT_TERMS, entry.getString(TARGET_HQL_NAME_KEY));
+  }
+
+  @Test
+  void testAddOutFieldsWithCalloutInputType() throws JSONException {
+    SelectorField outSf = createOutSelectorFieldMock(CURRENCY, "_CURR");
+    Tab mockTab = mock(Tab.class);
+    when(mockTab.getADFieldList()).thenReturn(Collections.emptyList());
+
+    JSONObject selectorJson = executeAddOutFields(outSf, mockTab, CURRENCY, null, null);
+
+    assertTrue(selectorJson.has(OUT_FIELDS_KEY));
+    JSONObject entry = selectorJson.getJSONArray(OUT_FIELDS_KEY).getJSONObject(0);
+    assertEquals("calloutInput", entry.getString("type"));
+    assertEquals(CURRENCY, entry.getString(SELECTOR_FIELD_PROPERTY_KEY));
+    assertEquals("_CURR", entry.getString("suffix"));
+    assertTrue(entry.isNull(TARGET_COLUMN_NAME_KEY));
+    assertTrue(entry.isNull(TARGET_HQL_NAME_KEY));
+  }
+
+  @Test
+  void testAddOutFieldsEmptySelectorFieldsOmitsKey() throws JSONException {
+    when(selector.getOBUISELSelectorFieldList()).thenReturn(Collections.emptyList());
+    Tab mockTab = mock(Tab.class);
+    when(mockTab.getADFieldList()).thenReturn(Collections.emptyList());
+
+    JSONObject selectorJson = new JSONObject();
+    FieldBuilder.addOutFields(selectorJson, selector, mockTab);
+
+    assertFalse(selectorJson.has(OUT_FIELDS_KEY));
+  }
+
+  @Test
+  void testAddOutFieldsNoMatchNoSuffixSkipped() throws JSONException {
+    SelectorField outSf = createOutSelectorFieldMock("someProperty", null);
+    Tab mockTab = mock(Tab.class);
+    when(mockTab.getADFieldList()).thenReturn(Collections.emptyList());
+
+    JSONObject selectorJson = executeAddOutFields(outSf, mockTab, "someProperty", null, null);
+
+    assertFalse(selectorJson.has(OUT_FIELDS_KEY));
+  }
+
+  @Test
+  void testAddOutFieldsFieldTypeWithSuffix() throws JSONException {
+    SelectorField outSf = createOutSelectorFieldMock(STORAGE_BIN, "_LOC");
+    Tab mockTab = createTabWithTargetField(outSf, "M_Locator_ID", "Storage Bin");
+    Field targetField = mockTab.getADFieldList().get(0);
+
+    JSONObject selectorJson = executeAddOutFields(outSf, mockTab, STORAGE_BIN, targetField, STORAGE_BIN);
+
+    JSONObject entry = selectorJson.getJSONArray(OUT_FIELDS_KEY).getJSONObject(0);
+    assertEquals("field", entry.getString("type"));
+    assertEquals(STORAGE_BIN, entry.getString(SELECTOR_FIELD_PROPERTY_KEY));
+    assertEquals("M_Locator_ID", entry.getString(TARGET_COLUMN_NAME_KEY));
+    assertEquals(STORAGE_BIN, entry.getString(TARGET_HQL_NAME_KEY));
+    assertEquals("_LOC", entry.getString("suffix"));
   }
 
 }
