@@ -78,8 +78,8 @@
         <onCreateDefault/>
       </column>
       <column name="AD_MODULE_ID" primaryKey="false" required="true" type="VARCHAR" size="32" autoIncrement="false">
-        <default/>
-        <onCreateDefault/>
+        <default><![CDATA[0]]></default>
+        <onCreateDefault><![CDATA['0']]></onCreateDefault>
       </column>
       <foreign-key foreignTable="AD_MODULE" name="ETMETA_WIDGET_PARAM_ADMOD_FK">
         <reference local="AD_MODULE_ID" foreign="AD_MODULE_ID"/>
