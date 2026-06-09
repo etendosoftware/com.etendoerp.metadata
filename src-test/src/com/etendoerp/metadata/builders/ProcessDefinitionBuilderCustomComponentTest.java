@@ -17,6 +17,7 @@
 package com.etendoerp.metadata.builders;
 
 import static com.etendoerp.metadata.MetadataTestConstants.TEST_PROCESS_ID;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.eq;
@@ -36,12 +37,12 @@ import org.openbravo.service.json.DataResolvingMode;
 
 /**
  * Verifies that ProcessDefinitionBuilder.toJSON() exposes the custom-component flag
- * (em_etmeta_custom_component) under the normalized JSON key {@code etmetaCustomComponent}.
+ * (em_etmeta_custom_component) under the JSON key {@code etmetaCustomComponent}.
  *
- * The flag is serialized automatically by the FULL_TRANSLATABLE converter, but its
- * property name may be emitted with the legacy ETMETA casing ({@code eTMETACustomComponent}),
- * exactly like {@code eTMETAOnload}. These tests confirm the builder normalizes that case
- * while leaving the already-correct key and the absent case untouched.
+ * The flag is emitted explicitly from the entity getter ({@code isEtmetaCustomComponent()}),
+ * so it is always present regardless of the role's derived-read access (the converter
+ * skips non-derived-readable properties for business roles). Any value the converter
+ * left under the legacy ETMETA casing ({@code eTMETACustomComponent}) is dropped.
  *
  * Run manually: ant test -Dtest.case=ProcessDefinitionBuilderCustomComponentTest
  */
@@ -73,52 +74,61 @@ public class ProcessDefinitionBuilderCustomComponentTest extends ProcessDefiniti
   }
 
   /**
-   * Case 1: the converter emits the flag with the legacy ETMETA casing.
-   * toJSON() must rename it to {@code etmetaCustomComponent} and drop the raw key.
+   * Case 1: the entity flag is true. toJSON() must publish {@code etmetaCustomComponent}
+   * as true and drop any value the converter left under the legacy raw key.
    *
    * @throws JSONException if reading the resulting JSON object fails.
    */
   @Test
-  void testLegacyKeyIsNormalized() throws JSONException {
+  void testFlagTrueIsEmittedFromEntity() throws JSONException {
+    when(mockProcess.isEtmetaCustomComponent()).thenReturn(true);
+
     JSONObject converterOutput = new JSONObject();
     converterOutput.put("id", TEST_PROCESS_ID);
-    converterOutput.put(ETMETA_CUSTOM_COMPONENT_RAW, true);
+    converterOutput.put(ETMETA_CUSTOM_COMPONENT_RAW, false);
 
     JSONObject result = builderReturning(converterOutput).toJSON();
 
     assertFalse(result.has(ETMETA_CUSTOM_COMPONENT_RAW), "Raw ETMETA-cased key must be removed");
-    assertTrue(result.getBoolean(ETMETA_CUSTOM_COMPONENT), "Normalized flag must be true");
+    assertTrue(result.getBoolean(ETMETA_CUSTOM_COMPONENT), "Flag must reflect the entity getter (true)");
   }
 
   /**
-   * Case 2: the converter already emits the correct key. It must be preserved as-is.
+   * Case 2: the entity flag is false. toJSON() must publish {@code etmetaCustomComponent}
+   * as false (the key is always present).
    *
    * @throws JSONException if reading the resulting JSON object fails.
    */
   @Test
-  void testCorrectKeyIsPreserved() throws JSONException {
-    JSONObject converterOutput = new JSONObject();
-    converterOutput.put("id", TEST_PROCESS_ID);
-    converterOutput.put(ETMETA_CUSTOM_COMPONENT, true);
+  void testFlagFalseIsEmittedFromEntity() throws JSONException {
+    when(mockProcess.isEtmetaCustomComponent()).thenReturn(false);
 
-    JSONObject result = builderReturning(converterOutput).toJSON();
-
-    assertTrue(result.getBoolean(ETMETA_CUSTOM_COMPONENT), "Existing flag must be preserved");
-  }
-
-  /**
-   * Case 3: neither key is present (process without the flag). The builder must not
-   * inject {@code etmetaCustomComponent}.
-   *
-   * @throws JSONException if reading the resulting JSON object fails.
-   */
-  @Test
-  void testAbsentFlagIsNotInjected() throws JSONException {
     JSONObject converterOutput = new JSONObject();
     converterOutput.put("id", TEST_PROCESS_ID);
 
     JSONObject result = builderReturning(converterOutput).toJSON();
 
-    assertFalse(result.has(ETMETA_CUSTOM_COMPONENT), "Builder must not inject the flag when absent");
+    assertTrue(result.has(ETMETA_CUSTOM_COMPONENT), "Flag key must always be present");
+    assertFalse(result.getBoolean(ETMETA_CUSTOM_COMPONENT), "Flag must reflect the entity getter (false)");
+  }
+
+  /**
+   * Case 3: the entity returns null (flag never set). The key must still be present
+   * and hold JSON null, honoring the always-present / JSON-null contract.
+   *
+   * @throws JSONException if reading the resulting JSON object fails.
+   */
+  @Test
+  void testNullFlagIsEmittedAsJsonNull() throws JSONException {
+    when(mockProcess.isEtmetaCustomComponent()).thenReturn(null);
+
+    JSONObject converterOutput = new JSONObject();
+    converterOutput.put("id", TEST_PROCESS_ID);
+
+    JSONObject result = builderReturning(converterOutput).toJSON();
+
+    assertTrue(result.has(ETMETA_CUSTOM_COMPONENT), "Flag key must always be present");
+    assertEquals(JSONObject.NULL, result.opt(ETMETA_CUSTOM_COMPONENT),
+        "Flag must hold JSON null when the column is empty");
   }
 }

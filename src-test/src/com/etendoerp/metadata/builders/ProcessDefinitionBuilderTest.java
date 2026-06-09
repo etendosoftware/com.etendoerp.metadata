@@ -67,11 +67,15 @@ import org.openbravo.service.json.DataToJsonConverter;
 /**
  * Unit tests for ProcessDefinitionBuilder.
  * <p>
- * The builder no longer puts {@code onLoad}/{@code onProcess} explicitly. The
- * onProcess, onRefresh and payscriptLogic hooks flow through the
- * {@link DataToJsonConverter} unchanged (their property names are already
- * correctly cased). The builder's only direct manipulation is renaming the
- * typo'd {@code eTMETAOnload} key emitted by the converter to {@code etmetaOnload}.
+ * The builder emits the process-level JS-hook columns ({@code etmetaOnload},
+ * {@code etmetaOnprocess}, {@code etmetaOnRefresh}, {@code etmetaPayscriptLogic}
+ * and {@code etmetaCustomComponent}) <em>explicitly from the entity getters</em>,
+ * not from the {@link DataToJsonConverter} output. This guarantees the keys are
+ * present regardless of the role's derived-read access to {@code OBUIAPP_Process}
+ * (the converter skips non-derived-readable properties for business roles). The
+ * builder also drops the converter's legacy-cased raw keys ({@code eTMETAOnload} /
+ * {@code eTMETACustomComponent}). The custom-component flag is exercised in
+ * {@link ProcessDefinitionBuilderCustomComponentTest}.
  */
 @MockitoSettings(strictness = LENIENT)
 @ExtendWith(MockitoExtension.class)
@@ -79,13 +83,13 @@ public class ProcessDefinitionBuilderTest {
 
   private static final String ID = "id";
   private static final String NAME = "name";
+  private static final String PROCESS_NAME_VALUE = "Test Process";
   private static final String SCRIPT_ONLOAD = "onLoadScript";
   private static final String SCRIPT_ONPROCESS = "onProcessScript";
   private static final String SCRIPT_ONREFRESH = "onRefreshScript";
   private static final String SCRIPT_PAYSCRIPT = "payScriptLogic";
   private static final String PARAM1_ID_VALUE = "param1Id";
   private static final String PARAM2_ID_VALUE = "param2Id";
-  private static final String PARAM_ID_VALUE = "paramId";
 
   @Mock
   private Process mockProcess;
@@ -174,6 +178,45 @@ public class ProcessDefinitionBuilderTest {
   }
 
   /**
+   * Stubs the four string-valued process-level hook getters on {@link #mockProcess}
+   * with the canonical script constants, so a test can assert each hook is published
+   * under its public key from the entity.
+   */
+  private void stubProcessHookGetters() {
+    when(mockProcess.getETMETAOnload()).thenReturn(SCRIPT_ONLOAD);
+    when(mockProcess.getEtmetaOnprocess()).thenReturn(SCRIPT_ONPROCESS);
+    when(mockProcess.getEtmetaOnRefresh()).thenReturn(SCRIPT_ONREFRESH);
+    when(mockProcess.getEtmetaPayscriptLogic()).thenReturn(SCRIPT_PAYSCRIPT);
+  }
+
+  /**
+   * Asserts the four string-valued process-level hooks hold their canonical script
+   * values in the resulting payload.
+   *
+   * @param result the JSON produced by the builder
+   * @throws JSONException if reading the resulting JSON object fails
+   */
+  private static void assertProcessHookValues(JSONObject result) throws JSONException {
+    assertEquals(SCRIPT_ONLOAD, result.getString(ETMETA_ONLOAD));
+    assertEquals(SCRIPT_ONPROCESS, result.getString(ETMETA_ONPROCESS));
+    assertEquals(SCRIPT_ONREFRESH, result.getString(ETMETA_ON_REFRESH));
+    assertEquals(SCRIPT_PAYSCRIPT, result.getString(ETMETA_PAYSCRIPT_LOGIC));
+  }
+
+  /**
+   * Asserts that {@code key} is present in {@code json} and holds {@link JSONObject#NULL}.
+   * Encapsulates the always-present / JSON-null contract assertion so it is not
+   * repeated (with its message strings) once per metadata key.
+   *
+   * @param json the JSON object under test
+   * @param key  the metadata key that must always be present with a JSON-null value
+   */
+  private static void assertPresentAndNull(JSONObject json, String key) {
+    assertTrue(json.has(key), key + " must always be present in the payload");
+    assertEquals(JSONObject.NULL, json.opt(key), key + " must hold JSON null when the column is empty");
+  }
+
+  /**
    * Tests that the constructor of ProcessDefinitionBuilder initializes correctly with a mock Process.
    */
   @Test
@@ -183,10 +226,9 @@ public class ProcessDefinitionBuilderTest {
   }
 
   /**
-   * Tests the happy path: parameters are nested under {@code parameters}, the
-   * converter-emitted {@code eTMETAOnload} key is renamed to {@code etmetaOnload},
-   * and the other etmeta hooks pass through unchanged. Also verifies the legacy
-   * {@code onLoad}/{@code onProcess} keys are not added by the builder.
+   * Happy path: parameters are nested under {@code parameters}, each process-level
+   * hook is published under its public key from the entity getter, the typo'd raw
+   * key is absent, and the legacy {@code onLoad}/{@code onProcess} keys are not added.
    *
    * @throws JSONException if there is an error creating or manipulating JSON objects
    */
@@ -194,11 +236,9 @@ public class ProcessDefinitionBuilderTest {
   void testToJSONWithParametersAndScripts() throws JSONException {
     JSONObject converterJson = new JSONObject();
     converterJson.put(ID, TEST_PROCESS_ID);
-    converterJson.put(NAME, "Test Process");
-    converterJson.put(ETMETA_ONLOAD_TYPO, SCRIPT_ONLOAD);
-    converterJson.put(ETMETA_ONPROCESS, SCRIPT_ONPROCESS);
-    converterJson.put(ETMETA_ON_REFRESH, SCRIPT_ONREFRESH);
-    converterJson.put(ETMETA_PAYSCRIPT_LOGIC, SCRIPT_PAYSCRIPT);
+    converterJson.put(NAME, PROCESS_NAME_VALUE);
+
+    stubProcessHookGetters();
 
     JSONObject mockParamJSON1 = new JSONObject();
     mockParamJSON1.put(ID, PARAM1_ID_VALUE);
@@ -214,16 +254,11 @@ public class ProcessDefinitionBuilderTest {
 
       assertNotNull(result);
       assertEquals(TEST_PROCESS_ID, result.getString(ID));
-      assertEquals("Test Process", result.getString(NAME));
+      assertEquals(PROCESS_NAME_VALUE, result.getString(NAME));
 
-      // Rename happens: etmetaOnload present, eTMETAOnload gone.
-      assertEquals(SCRIPT_ONLOAD, result.getString(ETMETA_ONLOAD));
+      // Hooks are emitted from the entity getters; the typo'd raw key never survives.
+      assertProcessHookValues(result);
       assertNull(result.opt(ETMETA_ONLOAD_TYPO));
-
-      // Other hooks pass through unchanged.
-      assertEquals(SCRIPT_ONPROCESS, result.getString(ETMETA_ONPROCESS));
-      assertEquals(SCRIPT_ONREFRESH, result.getString(ETMETA_ON_REFRESH));
-      assertEquals(SCRIPT_PAYSCRIPT, result.getString(ETMETA_PAYSCRIPT_LOGIC));
 
       // Legacy duplicate keys are not added.
       assertNull(result.opt(ON_LOAD));
@@ -239,8 +274,9 @@ public class ProcessDefinitionBuilderTest {
   }
 
   /**
-   * Tests an empty parameter list with no etmeta scripts emitted by the converter:
-   * the parameters JSON is empty and neither legacy nor etmeta keys appear.
+   * Tests an empty parameter list: the parameters JSON is empty, the legacy and
+   * typo'd keys never appear, and the always-present hook keys are emitted (null
+   * here, since the entity getters return null).
    *
    * @throws JSONException if there is an error creating or manipulating JSON objects
    */
@@ -259,105 +295,63 @@ public class ProcessDefinitionBuilderTest {
     assertTrue(result.has(PARAMETERS));
     assertEquals(0, result.getJSONObject(PARAMETERS).length());
 
-    // No script keys (legacy or new) — converter returned nothing for them.
+    // Legacy keys are never added; the typo'd raw key never survives.
     assertNull(result.opt(ON_LOAD));
     assertNull(result.opt(ON_PROCESS));
-    assertNull(result.opt(ETMETA_ONLOAD));
     assertNull(result.opt(ETMETA_ONLOAD_TYPO));
+    // The hook key is still present (null) even when the column is empty.
+    assertPresentAndNull(result, ETMETA_ONLOAD);
   }
 
   /**
-   * Tests that {@link JSONObject#NULL} emitted by the converter under the
-   * typo'd key is preserved under the renamed key after the builder runs.
+   * Regression for the derived-read gate: a business role's converter omits the
+   * non-derived-readable {@code em_etmeta_*} properties entirely (and may leave a
+   * stale value under the typo'd raw key). The builder must still publish every
+   * hook from the entity getters and drop the raw key.
    *
    * @throws JSONException if there is an error creating or manipulating JSON objects
    */
   @Test
-  void testToJSONPreservesNullThroughRename() throws JSONException {
+  void testToJSONEmitsHooksFromEntityWhenConverterOmitsThem() throws JSONException {
+    when(mockProcess.getOBUIAPPParameterList()).thenReturn(new ArrayList<>());
+    stubProcessHookGetters();
+
+    // Converter returns no etmeta keys (gate), except a stale value under the raw key.
     JSONObject converterJson = new JSONObject();
     converterJson.put(ID, TEST_PROCESS_ID);
-    converterJson.put(ETMETA_ONLOAD_TYPO, JSONObject.NULL);
+    converterJson.put(ETMETA_ONLOAD_TYPO, "staleConverterValue");
 
-    JSONObject mockParamJSON = new JSONObject();
-    mockParamJSON.put(ID, PARAM_ID_VALUE);
+    JSONObject result = newBuilderWithConverterReturning(converterJson).toJSON();
 
-    try (MockedConstruction<ParameterBuilder> ignored = mockConstruction(ParameterBuilder.class,
-        (mock, context) -> when(mock.toJSON()).thenReturn(mockParamJSON))) {
-
-      JSONObject result = newBuilderWithConverterReturning(converterJson).toJSON();
-
-      assertNotNull(result);
-      assertNull(result.opt(ETMETA_ONLOAD_TYPO));
-      // Renamed key exists and holds JSONObject.NULL.
-      assertTrue(result.has(ETMETA_ONLOAD));
-      assertEquals(JSONObject.NULL, result.opt(ETMETA_ONLOAD));
-    }
+    assertNull(result.opt(ETMETA_ONLOAD_TYPO));
+    assertProcessHookValues(result);
   }
 
   /**
-   * Asserts that {@code key} is present in {@code json} and holds {@link JSONObject#NULL}.
-   * Encapsulates the always-present / JSON-null contract assertion so it is not
-   * repeated (with its message strings) once per metadata key.
-   *
-   * @param json the JSON object under test
-   * @param key  the metadata key that must always be present with a JSON-null value
-   */
-  private static void assertPresentAndNull(JSONObject json, String key) {
-    assertTrue(json.has(key), key + " must always be present in the payload");
-    assertEquals(JSONObject.NULL, json.opt(key), key + " must hold JSON null when the column is empty");
-  }
-
-  /**
-   * Locks the §5.2 stable null-vs-absent contract for the four process-level
-   * {@code etmeta*} keys: when every metadata column is empty the converter emits
-   * each key with {@link JSONObject#NULL}, and the builder must keep all four keys
-   * present (never absent) with their null value — including {@code etmetaOnload}
-   * after the typo-key rename. A downstream FE consumer can therefore rely on the
-   * keys always existing and only test for {@code null}.
+   * Locks the stable null-vs-absent contract for the four string-valued process-level
+   * {@code etmeta*} keys: when every column is empty the builder keeps all four keys
+   * present (never absent) with {@link JSONObject#NULL}. A downstream FE consumer can
+   * therefore rely on the keys always existing and only test for {@code null}.
    *
    * @throws JSONException if there is an error creating or manipulating JSON objects
    */
   @Test
   void testToJSONKeepsAllProcessEtmetaKeysPresentWhenColumnsEmpty() throws JSONException {
+    when(mockProcess.getOBUIAPPParameterList()).thenReturn(new ArrayList<>());
+
     JSONObject converterJson = new JSONObject();
     converterJson.put(ID, TEST_PROCESS_ID);
-    converterJson.put(ETMETA_ONLOAD_TYPO, JSONObject.NULL);
-    converterJson.put(ETMETA_ONPROCESS, JSONObject.NULL);
-    converterJson.put(ETMETA_ON_REFRESH, JSONObject.NULL);
-    converterJson.put(ETMETA_PAYSCRIPT_LOGIC, JSONObject.NULL);
-
-    when(mockProcess.getOBUIAPPParameterList()).thenReturn(new ArrayList<>());
 
     JSONObject result = newBuilderWithConverterReturning(converterJson).toJSON();
 
     assertNotNull(result);
-    // The typo'd raw key must not survive the rename.
+    // The typo'd raw key must not survive.
     assertNull(result.opt(ETMETA_ONLOAD_TYPO));
-    // All four process-level hooks remain present and null.
+    // All four string-valued process-level hooks remain present and null.
     assertPresentAndNull(result, ETMETA_ONLOAD);
     assertPresentAndNull(result, ETMETA_ONPROCESS);
     assertPresentAndNull(result, ETMETA_ON_REFRESH);
     assertPresentAndNull(result, ETMETA_PAYSCRIPT_LOGIC);
-  }
-
-  /**
-   * Verifies the rename in isolation: when the converter emits {@code eTMETAOnload},
-   * the result exposes {@code etmetaOnload} with the same value and the raw key
-   * is removed.
-   *
-   * @throws JSONException if there is an error creating or manipulating JSON objects
-   */
-  @Test
-  void testToJSONRenamesTypoToCamelCase() throws JSONException {
-    JSONObject converterJson = new JSONObject();
-    converterJson.put(ETMETA_ONLOAD_TYPO, SCRIPT_ONLOAD);
-
-    when(mockProcess.getOBUIAPPParameterList()).thenReturn(new ArrayList<>());
-
-    JSONObject result = newBuilderWithConverterReturning(converterJson).toJSON();
-
-    assertNull(result.opt(ETMETA_ONLOAD_TYPO));
-    assertEquals(SCRIPT_ONLOAD, result.getString(ETMETA_ONLOAD));
   }
 
   /**
@@ -368,12 +362,10 @@ public class ProcessDefinitionBuilderTest {
    */
   @Test
   void testToJSONDropsLegacyKeys() throws JSONException {
+    when(mockProcess.getOBUIAPPParameterList()).thenReturn(new ArrayList<>());
+
     JSONObject converterJson = new JSONObject();
     converterJson.put(ID, TEST_PROCESS_ID);
-    converterJson.put(ETMETA_ONLOAD_TYPO, SCRIPT_ONLOAD);
-    converterJson.put(ETMETA_ONPROCESS, SCRIPT_ONPROCESS);
-
-    when(mockProcess.getOBUIAPPParameterList()).thenReturn(new ArrayList<>());
 
     JSONObject result = newBuilderWithConverterReturning(converterJson).toJSON();
 

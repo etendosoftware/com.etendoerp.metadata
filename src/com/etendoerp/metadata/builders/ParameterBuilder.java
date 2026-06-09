@@ -35,6 +35,11 @@ import static com.etendoerp.metadata.utils.Constants.*;
  * Builds a JSON representation of a process definition parameter including selector and list info.
  */
 public class ParameterBuilder extends Builder {
+    /** Public key for the parameter onChange hook in the JSON response. */
+    private static final String ETMETA_ON_PARAMETER_CHANGE = "etmetaOnParameterChange";
+    /** Public key for the parameter onGridLoad hook in the JSON response. */
+    private static final String ETMETA_ON_GRID_LOAD = "etmetaOnGridLoad";
+
     private final Parameter parameter;
 
     /**
@@ -89,6 +94,10 @@ public class ParameterBuilder extends Builder {
         addButtonListInfo(json, parameter);
         addWindowInfo(json, parameter);
         addFieldGroupCollapsed(json, parameter);
+        // Emit the parameter-level JS-hook columns directly from the entity so they are
+        // always present regardless of the role's derived-read access to OBUIAPP_Parameter.
+        putValueOrNull(json, ETMETA_ON_PARAMETER_CHANGE, parameter.getEtmetaOnParameterChange());
+        putValueOrNull(json, ETMETA_ON_GRID_LOAD, parameter.getEtmetaOnGridLoad());
 
         return json;
     }

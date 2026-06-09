@@ -627,11 +627,11 @@ class ParameterBuilderTest {
   }
 
   /**
-   * Tests that the parameter-level {@code etmetaOnParameterChange} and
-   * {@code etmetaOnGridLoad} hooks emitted by the converter pass through
-   * {@code toJSON()} unchanged when populated. These are clean camelCase entity
-   * properties (no typo rename, unlike the process-level {@code etmetaOnload}), so
-   * the builder must neither drop nor transform them.
+   * Tests that {@code toJSON()} publishes the parameter-level
+   * {@code etmetaOnParameterChange} and {@code etmetaOnGridLoad} hooks from the
+   * entity getters when populated. They are emitted explicitly (not relied upon
+   * from the converter), so they are present regardless of the role's derived-read
+   * access to {@code OBUIAPP_Parameter}.
    *
    * @throws Exception if JSON processing fails
    */
@@ -640,10 +640,10 @@ class ParameterBuilderTest {
     final String onParameterChangeScript = "onParameterChangeScript";
     final String onGridLoadScript = "onGridLoadScript";
 
-    JSONObject result = executeToJSON(null, null, json -> {
-      json.put(ETMETA_ON_PARAMETER_CHANGE, onParameterChangeScript);
-      json.put(ETMETA_ON_GRID_LOAD, onGridLoadScript);
-    });
+    JSONObject result = executeToJSON(() -> {
+      when(mockParameter.getEtmetaOnParameterChange()).thenReturn(onParameterChangeScript);
+      when(mockParameter.getEtmetaOnGridLoad()).thenReturn(onGridLoadScript);
+    }, null, null);
 
     assertNotNull(result);
     assertEquals(onParameterChangeScript, result.getString(ETMETA_ON_PARAMETER_CHANGE));
@@ -651,10 +651,10 @@ class ParameterBuilderTest {
   }
 
   /**
-   * Locks the §5.2 stable null-vs-absent contract at the parameter level: when the
+   * Locks the stable null-vs-absent contract at the parameter level: when the
    * {@code EM_Etmeta_On_Parameter_Change} / {@code EM_Etmeta_On_Grid_Load} columns
-   * are empty, the converter emits each key with {@link JSONObject#NULL} and the
-   * builder must keep both keys present (never absent) with their null value. A FE
+   * are empty (the getters return null and the converter omits them), the builder
+   * keeps both keys present (never absent) with {@link JSONObject#NULL}. A FE
    * consumer can therefore rely on the keys always existing and only test for
    * {@code null}.
    *
@@ -662,10 +662,7 @@ class ParameterBuilderTest {
    */
   @Test
   void toJSONKeepsParameterLevelEtmetaHooksPresentWhenColumnsEmpty() throws Exception {
-    JSONObject result = executeToJSON(null, null, json -> {
-      json.put(ETMETA_ON_PARAMETER_CHANGE, JSONObject.NULL);
-      json.put(ETMETA_ON_GRID_LOAD, JSONObject.NULL);
-    });
+    JSONObject result = executeToJSON(null, null, null);
 
     assertNotNull(result);
     assertPresentAndNull(result, ETMETA_ON_PARAMETER_CHANGE);
