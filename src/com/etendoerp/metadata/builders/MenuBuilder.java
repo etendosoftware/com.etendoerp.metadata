@@ -271,12 +271,24 @@ public class MenuBuilder extends Builder {
      * only added when present, mirroring the convention used by other optional
      * keys (e.g. {@code processId}, {@code formId}).
      *
+     * <p>The {@code window} reference comes from the cached {@link MenuManager}
+     * tree (held in a thread-local and reused across requests), so it may be a
+     * Hibernate proxy detached from a closed session: reading {@code getWindowType()}
+     * directly on it raises {@code LazyInitializationException}. The window is
+     * therefore re-fetched by id within the current session before its type is
+     * read, following the same pattern used by {@code WindowBuilder} and
+     * {@link #addViewInfo}.
+     *
      * @param json   The menu entry JSON being built.
      * @param window The non-null window associated with the menu entry.
      * @throws JSONException If the JSON object rejects the put operation.
      */
     private void addWindowType(JSONObject json, Window window) throws JSONException {
-        String windowType = window.getWindowType();
+        Window persistentWindow = OBDal.getInstance().get(Window.class, window.getId());
+        if (persistentWindow == null) {
+            return;
+        }
+        String windowType = persistentWindow.getWindowType();
         if (windowType != null) {
             json.put(Constants.JSON_WINDOW_TYPE_KEY, windowType);
         }
