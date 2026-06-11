@@ -100,6 +100,11 @@ class TabBuilderTest {
     private static final String AD_USER_ENTITY = "ADUser";
     private static final String CUSTOM_CREATION_DATE_NAME = "Custom Creation Date";
     private static final String OBUIAPP_CAN_ADD_MISSING = "obuiappCanAdd should be present in JSON";
+    private static final String HAS_TREE_KEY = "hasTree";
+    private static final String TABLE_TREE_ID_KEY = "tableTreeId";
+    private static final String TREE_STRUCTURE_KEY = "treeStructure";
+    private static final String HQL_WHERE_KEY = "hqlWhereClauseForRootNodes";
+    private static final String HAS_TREE_SHOULD_BE_TRUE = "hasTree should be true";
 
     /**
      * Tests that audit fields are automatically added to the fields JSON
@@ -602,13 +607,13 @@ class TabBuilderTest {
 
         executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), result -> {
             try {
-                assertTrue(result.getBoolean("hasTree"), "hasTree should be true");
+                assertTrue(result.getBoolean(HAS_TREE_KEY), HAS_TREE_SHOULD_BE_TRUE);
                 assertEquals(tableId, result.getString("tableId"), "tableId should be set");
-                assertEquals(treeId, result.getString("tableTreeId"), "tableTreeId should be set");
-                assertEquals(treeStructure, result.getString("treeStructure"), "treeStructure should be set");
+                assertEquals(treeId, result.getString(TABLE_TREE_ID_KEY), "tableTreeId should be set");
+                assertEquals(treeStructure, result.getString(TREE_STRUCTURE_KEY), "treeStructure should be set");
                 assertFalse(result.getBoolean("isReadOnlyTree"), "isReadOnlyTree should be false");
                 assertTrue(result.getBoolean("showTreeNodeIcons"), "showTreeNodeIcons should be true");
-                assertEquals(hqlWhere, result.getString("hqlWhereClauseForRootNodes"),
+                assertEquals(hqlWhere, result.getString(HQL_WHERE_KEY),
                         "hqlWhereClauseForRootNodes should be set");
             } catch (JSONException e) {
                 fail(JSON_EXCEPTION + ": " + e.getMessage());
@@ -651,9 +656,9 @@ class TabBuilderTest {
         when(ctx.tab.isTreeIncluded()).thenReturn(false);
 
         executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), result -> {
-            assertFalse(result.has("hasTree"), "hasTree should be absent");
-            assertFalse(result.has("tableTreeId"), "tableTreeId should be absent");
-            assertFalse(result.has("treeStructure"), "treeStructure should be absent");
+            assertFalse(result.has(HAS_TREE_KEY), "hasTree should be absent");
+            assertFalse(result.has(TABLE_TREE_ID_KEY), "tableTreeId should be absent");
+            assertFalse(result.has(TREE_STRUCTURE_KEY), "treeStructure should be absent");
         });
     }
 
@@ -675,11 +680,11 @@ class TabBuilderTest {
 
         executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), result -> {
             try {
-                assertTrue(result.getBoolean("hasTree"), "hasTree should be true");
+                assertTrue(result.getBoolean(HAS_TREE_KEY), HAS_TREE_SHOULD_BE_TRUE);
                 assertEquals(tableId, result.getString("tableId"), "tableId should be set");
-                assertFalse(result.has("tableTreeId"), "tableTreeId should be absent when tableTree is null");
-                assertFalse(result.has("treeStructure"), "treeStructure should be absent when tableTree is null");
-                assertFalse(result.has("hqlWhereClauseForRootNodes"),
+                assertFalse(result.has(TABLE_TREE_ID_KEY), "tableTreeId should be absent when tableTree is null");
+                assertFalse(result.has(TREE_STRUCTURE_KEY), "treeStructure should be absent when tableTree is null");
+                assertFalse(result.has(HQL_WHERE_KEY),
                         "hqlWhereClauseForRootNodes should be absent when null");
             } catch (JSONException e) {
                 fail(JSON_EXCEPTION + ": " + e.getMessage());
@@ -731,10 +736,10 @@ class TabBuilderTest {
 
         executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), result -> {
             try {
-                assertTrue(result.getBoolean("hasTree"), "hasTree should be true");
-                assertEquals(treeId, result.getString("tableTreeId"), "tableTreeId should be set");
-                assertFalse(result.has("treeStructure"), "treeStructure should be absent when null");
-                assertFalse(result.has("hqlWhereClauseForRootNodes"),
+                assertTrue(result.getBoolean(HAS_TREE_KEY), HAS_TREE_SHOULD_BE_TRUE);
+                assertEquals(treeId, result.getString(TABLE_TREE_ID_KEY), "tableTreeId should be set");
+                assertFalse(result.has(TREE_STRUCTURE_KEY), "treeStructure should be absent when null");
+                assertFalse(result.has(HQL_WHERE_KEY),
                         "hqlWhereClauseForRootNodes should be absent when blank");
             } catch (JSONException e) {
                 fail(JSON_EXCEPTION + ": " + e.getMessage());
