@@ -14,15 +14,6 @@ sourceSets {
             srcDirs("etendo-resources")
         }
     }
-    test {
-        java {
-            srcDirs("src-test/src")
-        }
-    }
-}
-
-test {
-    useJUnitPlatform()
 }
 
 publishing {
@@ -61,8 +52,4 @@ dependencies {
     implementation('com.etendoerp.platform:etendo-core:[26.1.0,26.2.0)')
     implementation('com.etendoerp:metadata.template:1.0.1')
     implementation('com.etendoerp:etendorx:4.1.0')
-    testImplementation('org.junit.jupiter:junit-jupiter:5.9.2')
-    testImplementation('junit:junit:4.13.2')
-    testImplementation('org.mockito:mockito-junit-jupiter:5.2.0')
-    testImplementation('org.mockito:mockito-core:5.2.0')
 }
