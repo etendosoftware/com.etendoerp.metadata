@@ -17,6 +17,7 @@
 
 package com.etendoerp.metadata.builders;
 
+import com.etendoerp.metadata.data.ReferenceSelectors;
 import com.etendoerp.metadata.utils.Constants;
 import com.etendoerp.metadata.utils.LegacyUtils;
 import com.etendoerp.metadata.utils.Utils;
@@ -352,7 +353,15 @@ public class FieldBuilderWithColumn extends FieldBuilder {
     private void addComboSelectInfo(Field field) throws JSONException {
         if (isSelectorField(field)) {
             try {
-                json.put(SELECTOR, getSelectorInfo(field.getId(), field.getColumn().getReferenceSearchKey()));
+                var ref = field.getColumn().getReferenceSearchKey();
+                JSONObject selectorJson = getSelectorInfo(field.getId(), ref);
+
+                ReferenceSelectors refSelectors = getReferenceSelectors(ref);
+                if (refSelectors.selector != null) {
+                    addOutFields(selectorJson, refSelectors.selector, field.getTab());
+                }
+
+                json.put(SELECTOR, selectorJson);
             } catch (Exception e) {
                 logger.error("Error retrieving selector info for field: {} ({}). Skipping selector configuration.",
                         field.getId(), field.getName(), e);
