@@ -59,6 +59,7 @@ import org.openbravo.erpCommon.utility.Utility;
 import org.openbravo.model.ad.domain.ModelImplementation;
 import org.openbravo.model.ad.domain.ModelImplementationMapping;
 import org.openbravo.model.ad.system.Language;
+import org.openbravo.model.ad.ui.Form;
 import org.openbravo.model.ad.ui.Menu;
 import org.openbravo.model.ad.ui.Window;
 
@@ -104,6 +105,8 @@ class MenuBuilderTest {
   private static final String WINDOW_TYPE = "windowType";
   private static final String WINDOW_MENU_ID = "WINDOW_MENU_ID";
   private static final String PICK_AND_EXECUTE = "OBUIAPP_PickAndExecute";
+  private static final String FORM_ICON = "form-icon";
+  private static final String FORM_ID = "formId";
 
   @FunctionalInterface
   private interface MenuBuilderConsumer {
@@ -454,6 +457,144 @@ class MenuBuilderTest {
       JSONObject result = builder.toJSON();
       JSONObject viewMenu = result.getJSONArray("menu").getJSONObject(0);
       assertFalse(viewMenu.has(VIEW_ID));
+    });
+  }
+
+  // -------------------------------------------------------------------------
+  // addFormInfo — tests for the new form-URL derivation helper
+  // -------------------------------------------------------------------------
+
+  /**
+   * Tests addFormInfo with a fully qualified Java class name.
+   * The simple class name (after the last dot) must be used in the formUrl.
+   *
+   * @throws JSONException if there is an error during JSON construction
+   */
+  @Test
+  void testAddFormInfoWithFullyQualifiedClassName() throws JSONException {
+    MenuOption childOption = mock(MenuOption.class);
+    Menu childMenu = mock(Menu.class);
+    Form mockForm = mock(Form.class);
+    String menuId = "FORM_FQ_ID";
+
+    when(rootMenuOption.getChildren()).thenReturn(List.of(childOption));
+    when(childOption.getMenu()).thenReturn(childMenu);
+    when(childOption.getType()).thenReturn(MenuManager.MenuEntryType.External);
+    when(childMenu.getId()).thenReturn(menuId);
+    when(childMenu.get(Menu.PROPERTY_ETMETAICON, language, menuId)).thenReturn(FORM_ICON);
+    when(childMenu.get(Menu.PROPERTY_NAME, language, menuId)).thenReturn("Form Menu");
+    when(childMenu.get(Menu.PROPERTY_DESCRIPTION, language, menuId)).thenReturn("Form Desc");
+    when(childMenu.getURL()).thenReturn("/form/url");
+    when(childMenu.getAction()).thenReturn("F");
+    when(childMenu.getSpecialForm()).thenReturn(mockForm);
+    when(mockForm.getId()).thenReturn("FORM_ABC_123");
+    when(mockForm.getJavaClassName()).thenReturn("org.openbravo.erpCommon.ad_forms.SomeForm");
+
+    withMenuBuilder(builder -> {
+      JSONObject result = builder.toJSON();
+      JSONObject formMenu = result.getJSONArray("menu").getJSONObject(0);
+      assertEquals("FORM_ABC_123", formMenu.getString(FORM_ID));
+      assertEquals("/ad_forms/SomeForm.html", formMenu.getString("formUrl"));
+    });
+  }
+
+  /**
+   * Tests addFormInfo with a simple class name (no package prefix).
+   * The class name itself must be used directly in the formUrl path.
+   *
+   * @throws JSONException if there is an error during JSON construction
+   */
+  @Test
+  void testAddFormInfoWithSimpleClassName() throws JSONException {
+    MenuOption childOption = mock(MenuOption.class);
+    Menu childMenu = mock(Menu.class);
+    Form mockForm = mock(Form.class);
+    String menuId = "FORM_SIMPLE_ID";
+
+    when(rootMenuOption.getChildren()).thenReturn(List.of(childOption));
+    when(childOption.getMenu()).thenReturn(childMenu);
+    when(childOption.getType()).thenReturn(MenuManager.MenuEntryType.External);
+    when(childMenu.getId()).thenReturn(menuId);
+    when(childMenu.get(Menu.PROPERTY_ETMETAICON, language, menuId)).thenReturn(FORM_ICON);
+    when(childMenu.get(Menu.PROPERTY_NAME, language, menuId)).thenReturn("Simple Form Menu");
+    when(childMenu.get(Menu.PROPERTY_DESCRIPTION, language, menuId)).thenReturn("Simple Desc");
+    when(childMenu.getURL()).thenReturn("/simple/url");
+    when(childMenu.getAction()).thenReturn("F");
+    when(childMenu.getSpecialForm()).thenReturn(mockForm);
+    when(mockForm.getId()).thenReturn("FORM_SIMPLE_456");
+    when(mockForm.getJavaClassName()).thenReturn("SimpleFormClass");
+
+    withMenuBuilder(builder -> {
+      JSONObject result = builder.toJSON();
+      JSONObject formMenu = result.getJSONArray("menu").getJSONObject(0);
+      assertEquals("FORM_SIMPLE_456", formMenu.getString(FORM_ID));
+      assertEquals("/ad_forms/SimpleFormClass.html", formMenu.getString("formUrl"));
+    });
+  }
+
+  /**
+   * Tests addFormInfo when the form has a null Java class name.
+   * Only formId must be set; formUrl must be absent.
+   *
+   * @throws JSONException if there is an error during JSON construction
+   */
+  @Test
+  void testAddFormInfoWithNullClassNameSetsOnlyFormId() throws JSONException {
+    MenuOption childOption = mock(MenuOption.class);
+    Menu childMenu = mock(Menu.class);
+    Form mockForm = mock(Form.class);
+    String menuId = "FORM_NULL_CLS_ID";
+
+    when(rootMenuOption.getChildren()).thenReturn(List.of(childOption));
+    when(childOption.getMenu()).thenReturn(childMenu);
+    when(childOption.getType()).thenReturn(MenuManager.MenuEntryType.External);
+    when(childMenu.getId()).thenReturn(menuId);
+    when(childMenu.get(Menu.PROPERTY_ETMETAICON, language, menuId)).thenReturn(FORM_ICON);
+    when(childMenu.get(Menu.PROPERTY_NAME, language, menuId)).thenReturn("Null Class Form");
+    when(childMenu.get(Menu.PROPERTY_DESCRIPTION, language, menuId)).thenReturn("Null Class Desc");
+    when(childMenu.getURL()).thenReturn("/null/url");
+    when(childMenu.getAction()).thenReturn("F");
+    when(childMenu.getSpecialForm()).thenReturn(mockForm);
+    when(mockForm.getId()).thenReturn("FORM_NULL_789");
+    when(mockForm.getJavaClassName()).thenReturn(null);
+
+    withMenuBuilder(builder -> {
+      JSONObject result = builder.toJSON();
+      JSONObject formMenu = result.getJSONArray("menu").getJSONObject(0);
+      assertEquals("FORM_NULL_789", formMenu.getString(FORM_ID));
+    });
+  }
+
+  /**
+   * Tests addFormInfo when the form has an empty Java class name.
+   * Only formId must be set; formUrl must be absent.
+   *
+   * @throws JSONException if there is an error during JSON construction
+   */
+  @Test
+  void testAddFormInfoWithEmptyClassNameSetsOnlyFormId() throws JSONException {
+    MenuOption childOption = mock(MenuOption.class);
+    Menu childMenu = mock(Menu.class);
+    Form mockForm = mock(Form.class);
+    String menuId = "FORM_EMPTY_CLS_ID";
+
+    when(rootMenuOption.getChildren()).thenReturn(List.of(childOption));
+    when(childOption.getMenu()).thenReturn(childMenu);
+    when(childOption.getType()).thenReturn(MenuManager.MenuEntryType.External);
+    when(childMenu.getId()).thenReturn(menuId);
+    when(childMenu.get(Menu.PROPERTY_ETMETAICON, language, menuId)).thenReturn(FORM_ICON);
+    when(childMenu.get(Menu.PROPERTY_NAME, language, menuId)).thenReturn("Empty Class Form");
+    when(childMenu.get(Menu.PROPERTY_DESCRIPTION, language, menuId)).thenReturn("Empty Class Desc");
+    when(childMenu.getURL()).thenReturn("/empty/url");
+    when(childMenu.getAction()).thenReturn("F");
+    when(childMenu.getSpecialForm()).thenReturn(mockForm);
+    when(mockForm.getId()).thenReturn("FORM_EMPTY_000");
+    when(mockForm.getJavaClassName()).thenReturn("");
+
+    withMenuBuilder(builder -> {
+      JSONObject result = builder.toJSON();
+      JSONObject formMenu = result.getJSONArray("menu").getJSONObject(0);
+      assertEquals("FORM_EMPTY_000", formMenu.getString(FORM_ID));
     });
   }
 

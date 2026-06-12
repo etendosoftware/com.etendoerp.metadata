@@ -27,59 +27,34 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Utility class for identifying legacy process in the system.
- * These legacy processes are identified by their unique process IDs.
+ * Utility class for legacy-process auxiliary helpers (stub processes, path
+ * detection, mutable session attribute registry). Legacy detection itself is
+ * handled by {@link com.etendoerp.metadata.builders.LegacyProcessResolver#isLegacy(
+ * org.openbravo.model.ad.ui.Field)} and lives there exclusively.
  */
 public class LegacyUtils {
-
-    private LegacyUtils() { }
-
-    /**
-     * Set of process IDs that do not have an associated AD_Process_ID or
-     * EM_OBUIAPP_Process_ID,
-     * and therefore must be treated in a special way by the system.
-     */
-    private static final Set<String> LEGACY_PROCESS_IDS = Set.of(
-            "3663",
-            "4242",
-            "3670",
-            "4248",
-            "7C541AC0C767FDD7E040007F01016B4D"
-    );
-
     /** Set of legacy paths used in the system. */
     private static final Set<String> LEGACY_PATHS = Set.of(
             LegacyPaths.USED_BY_LINK);
 
     private static final Set<String> MUTABLE_SESSION_ATTRIBUTES = Set.of(
             "143|C_ORDER_ID",
-            "CREATEFROM|TABID");
+            "CREATEFROM|TABID"
+    );
 
     /**
-     * Checks if the provided process ID belongs to the list of legacy-defined
-     * processes.
+     * Creates a stub {@link Process} with the given {@code fieldId} as its ID.
+     * Used when a legacy process definition cannot be resolved from the
+     * Application Dictionary.
      *
-     * @param processId The ID of the process definition to check
-     * @return true if the ID is part of the legacy process definitions; false
-     *         otherwise
+     * @param fieldId the ID to assign to the stub process
+     * @return a new {@link Process} instance with the given id, a fixed placeholder
+     *         name, and active set to {@code true}
      */
-    public static boolean isLegacyProcess(String processId) {
-        if (processId == null) {
-            return false;
-        }
-        return LEGACY_PROCESS_IDS.contains(processId);
-    }
-
-    /**
-     * Simulates a legacy Process object with minimal required data.
-     *
-     * @param processId The ID to assign to the stubbed process
-     * @return A stubbed Process instance with minimal fields set
-     */
-    public static Process getLegacyProcess(String processId) {
+    public static Process getLegacyProcess(String fieldId) {
         Process legacyProcess = (Process) OBProvider.getInstance().get(Process.class);
 
-        legacyProcess.setId(processId);
+        legacyProcess.setId(fieldId);
         legacyProcess.setName("Legacy Process Placeholder");
         legacyProcess.setActive(true);
 

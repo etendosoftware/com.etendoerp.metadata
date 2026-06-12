@@ -41,6 +41,8 @@ public class ProcessUtilsTest {
     private static final String ERROR_INVALID_PATH = "Error message should mention invalid path";
     private static final String INVALID_PATH_FORMAT = "Invalid path format";
     private static final String EXCEPTION_NOT_NULL = "Exception should not be null";
+    private static final String OTHER_RESOURCE_NAME = "window";
+    private static final String QUERY_STRING = "?_operationType=fetch";
 
     // ========== extractEntityId Tests ==========
 
@@ -313,6 +315,47 @@ public class ProcessUtilsTest {
         } catch (NotFoundException e) {
             // This is also acceptable behavior for malformed paths
             assertNotNull(EXCEPTION_NOT_NULL, e);
+        }
+    }
+
+    /**
+     * Tests extracting entity ID when the normalized path contains query parameters.
+     */
+    @Test
+    public void testExtractEntityIdKeepsQueryParametersAsPartOfLastSegment() {
+        String idWithQuery = ENTITY_ID + QUERY_STRING;
+        String path = PATH_DELIMITER + RESOURCE_NAME + PATH_DELIMITER + idWithQuery;
+
+        String result = ProcessUtils.extractEntityId(path, RESOURCE_NAME);
+
+        assertEquals("Entity ID segment should be returned unchanged", idWithQuery, result);
+    }
+
+    /**
+     * Tests extracting entity ID from a metadata-prefixed path with extra child segments.
+     */
+    @Test
+    public void testExtractEntityIdWithMetadataPrefixAndExtraSegments() {
+        String path = METADATA_PREFIX + RESOURCE_NAME + PATH_DELIMITER + ENTITY_ID + PATH_DELIMITER + OTHER_RESOURCE_NAME;
+
+        String result = ProcessUtils.extractEntityId(path, RESOURCE_NAME);
+
+        assertEquals("Entity ID should be extracted from prefixed path before extra segments", ENTITY_ID, result);
+    }
+
+    /**
+     * Tests that a metadata-prefixed path still validates the expected resource segment.
+     */
+    @Test
+    public void testExtractEntityIdWithMetadataPrefixAndWrongResourceName() {
+        String path = METADATA_PREFIX + OTHER_RESOURCE_NAME + PATH_DELIMITER + ENTITY_ID;
+
+        try {
+            ProcessUtils.extractEntityId(path, RESOURCE_NAME);
+            fail("Should throw NotFoundException for prefixed path with wrong resource name");
+        } catch (NotFoundException e) {
+            assertTrue(ERROR_INVALID_PATH, e.getMessage().contains(INVALID_PATH_FORMAT));
+            assertTrue("Error message should include original path", e.getMessage().contains(path));
         }
     }
 }

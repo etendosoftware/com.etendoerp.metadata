@@ -26,6 +26,10 @@ import static org.junit.Assert.*;
  */
 public class ConstantsTest {
 
+    private static final String URL = "url";
+    private static final String COMMAND = "command";
+    private static final String KEY_COLUMN_NAME = "keyColumnName";
+
     /**
      * Tests all path-related constants for correct values.
      */
@@ -147,5 +151,44 @@ public class ConstantsTest {
     public void testErrorMessages() {
         assertEquals("SWS misconfigured message", "SWS - SWS are misconfigured", Constants.SWS_SWS_ARE_MISCONFIGURED);
         assertEquals("SWS invalid credentials message", "SWS - You must specify a username and password or a valid token", Constants.SWS_INVALID_CREDENTIALS);
+    }
+
+    /**
+     * Tests process-related endpoint constants for correct values.
+     */
+    @Test
+    public void testProcessPathConstants() {
+        assertEquals("Report and process path", "/report-and-process/", Constants.REPORT_AND_PROCESS_PATH);
+        assertEquals("Process metadata path", "/process/", Constants.PROCESS_PATH);
+        assertEquals("Process execution path", "/process-execution", Constants.PROCESS_EXECUTION_PATH);
+        assertEquals("Public JavaScript path", "/web/js/", Constants.PUBLIC_JS_PATH);
+    }
+
+    /**
+     * Tests audit field and database column constants for correct values.
+     */
+    @Test
+    public void testAuditConstants() {
+        assertEquals("Creation date property", "creationDate", Constants.CREATION_DATE);
+        assertEquals("Created by property", "createdBy", Constants.CREATED_BY);
+        assertEquals("Updated property", "updated", Constants.UPDATED);
+        assertEquals("Updated by property", "updatedBy", Constants.UPDATED_BY);
+        assertEquals("Created DB column", "Created", Constants.DB_CREATED);
+        assertEquals("Created by DB column", "CreatedBy", Constants.DB_CREATED_BY);
+        assertEquals("Updated DB column", "Updated", Constants.DB_UPDATED);
+        assertEquals("Updated by DB column", "UpdatedBy", Constants.DB_UPDATED_BY);
+    }
+
+    /**
+     * Tests legacy process action JSON key constants for correct values.
+     */
+    @Test
+    public void testLegacyProcessActionConstants() {
+        assertEquals("Legacy URL key", URL, Constants.LEGACY_URL);
+        assertEquals("Legacy command key", COMMAND, Constants.LEGACY_COMMAND);
+        assertEquals("Legacy key column name key", KEY_COLUMN_NAME, Constants.LEGACY_KEY_COLUMN_NAME);
+        assertEquals("Legacy input key column ID key", "inpkeyColumnId", Constants.LEGACY_INP_KEY_COLUMN_ID);
+        assertEquals("Legacy additional parameters key", "additionalParameters",
+                Constants.LEGACY_ADDITIONAL_PARAMETERS);
     }
 }
