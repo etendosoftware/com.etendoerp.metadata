@@ -22,9 +22,11 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.MockedConstruction;
+import org.mockito.MockedStatic;
 import org.mockito.junit.MockitoJUnitRunner;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.openbravo.dal.core.OBContext;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -114,7 +116,8 @@ public class SessionServiceTest {
         JSONObject sessionJson = new JSONObject();
         sessionJson.put("sessionId", "test-session");
 
-        try (MockedConstruction<SessionBuilder> builderMock = mockConstruction(SessionBuilder.class,
+        try (MockedStatic<OBContext> obContextMock = mockStatic(OBContext.class);
+                MockedConstruction<SessionBuilder> builderMock = mockConstruction(SessionBuilder.class,
                 (mock, context) -> when(mock.toJSON()).thenReturn(sessionJson))) {
             SessionService service = new SessionService(mockRequest, mockResponse);
             service.process();
