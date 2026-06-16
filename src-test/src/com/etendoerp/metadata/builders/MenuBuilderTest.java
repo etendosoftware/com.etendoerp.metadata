@@ -61,6 +61,7 @@ import org.openbravo.model.ad.domain.ModelImplementationMapping;
 import org.openbravo.model.ad.system.Language;
 import org.openbravo.model.ad.ui.Form;
 import org.openbravo.model.ad.ui.Menu;
+import org.openbravo.model.ad.ui.Window;
 
 /**
  * Test class for MenuBuilder.
@@ -101,12 +102,20 @@ class MenuBuilderTest {
   private static final String VIEW_MENU = "View Menu";
   private static final String VIEW_DESC = "View Desc";
   private static final String VIEW_ID = "viewId";
+  private static final String WINDOW_TYPE = "windowType";
+  private static final String WINDOW_MENU_ID = "WINDOW_MENU_ID";
+  private static final String PICK_AND_EXECUTE = "OBUIAPP_PickAndExecute";
   private static final String FORM_ICON = "form-icon";
   private static final String FORM_ID = "formId";
 
   @FunctionalInterface
   private interface MenuBuilderConsumer {
     void accept(MenuBuilder builder) throws JSONException;
+  }
+
+  @FunctionalInterface
+  private interface MenuEntryConsumer {
+    void accept(JSONObject entry) throws JSONException;
   }
 
   @AfterEach
@@ -626,6 +635,113 @@ class MenuBuilderTest {
       assertEquals(menuUrl, basicMenu.getString("url"));
       assertEquals(menuAction, basicMenu.getString("action"));
     });
+  }
+
+  /**
+   * Builds a single-entry menu fixture wired to the supplied window mock.
+   * Centralises the boilerplate shared by the windowType test cases.
+   *
+   * @param window The window mock to be returned by {@code Menu.getWindow()}, or null.
+   * @return The configured root MenuOption ready to be returned by MenuManager.
+   */
+  private MenuOption buildSingleWindowMenuFixture(Window window) {
+    MenuOption childOption = mock(MenuOption.class);
+    Menu childMenu = mock(Menu.class);
+
+    when(rootMenuOption.getChildren()).thenReturn(List.of(childOption));
+    when(childOption.getMenu()).thenReturn(childMenu);
+    when(childOption.getType()).thenReturn(MenuManager.MenuEntryType.Window);
+    when(childMenu.getId()).thenReturn(WINDOW_MENU_ID);
+    when(childMenu.getWindow()).thenReturn(window);
+    if (window != null) {
+      when(window.getId()).thenReturn("WINDOW_ID_VAL");
+    }
+    return rootMenuOption;
+  }
+
+  /**
+   * Mocks a Window with the given windowType and wires it into the root fixture.
+   * Returns the configured window mock for further stubbing if needed.
+   *
+   * @param windowType The value returned by {@code Window.getWindowType()}, may be null.
+   * @return The window mock just installed in the menu fixture.
+   */
+  private Window mockWindowWithType(String windowType) {
+    Window window = mock(Window.class);
+    when(window.getWindowType()).thenReturn(windowType);
+    buildSingleWindowMenuFixture(window);
+    return window;
+  }
+
+  /**
+   * Runs the standard MenuBuilder fixture and hands the first JSON menu entry to
+   * the supplied assertion block. Removes the boilerplate shared by the
+   * windowType test cases.
+   *
+   * @param assertion Assertion block to execute against the first menu entry.
+   * @throws JSONException if the JSON traversal fails.
+   */
+  private void withFirstMenuEntry(MenuEntryConsumer assertion) throws JSONException {
+    withMenuBuilder(builder -> {
+      JSONObject result = builder.toJSON();
+      JSONObject entry = result.getJSONArray("menu").getJSONObject(0);
+      assertion.accept(entry);
+    });
+  }
+
+  /**
+   * Verifies that a Pick and Execute window emits the windowType field with the
+   * canonical "OBUIAPP_PickAndExecute" value.
+   *
+   * @throws JSONException if there is an error during JSON construction
+   */
+  @Test
+  void testMenuEntryIncludesWindowTypeWhenWindowIsPickAndExecute() throws JSONException {
+    mockWindowWithType(PICK_AND_EXECUTE);
+    withFirstMenuEntry(entry -> {
+      assertTrue(entry.has(WINDOW_TYPE));
+      assertEquals(PICK_AND_EXECUTE, entry.getString(WINDOW_TYPE));
+    });
+  }
+
+  /**
+   * Verifies that a standard Maintain window emits its windowType verbatim.
+   *
+   * @throws JSONException if there is an error during JSON construction
+   */
+  @Test
+  void testMenuEntryIncludesWindowTypeWhenWindowIsMaintain() throws JSONException {
+    mockWindowWithType("M");
+    withFirstMenuEntry(entry -> {
+      assertTrue(entry.has(WINDOW_TYPE));
+      assertEquals("M", entry.getString(WINDOW_TYPE));
+    });
+  }
+
+  /**
+   * Verifies that menu entries without an associated window do not emit the
+   * windowType key. This keeps the JSON shape minimal for non-window entries
+   * (Process Definitions, Forms, etc.).
+   *
+   * @throws JSONException if there is an error during JSON construction
+   */
+  @Test
+  void testMenuEntryDoesNotIncludeWindowTypeWhenWindowIsNull() throws JSONException {
+    buildSingleWindowMenuFixture(null);
+    withFirstMenuEntry(entry -> assertFalse(entry.has(WINDOW_TYPE)));
+  }
+
+  /**
+   * Defensive case: a window whose getWindowType() returns null must not
+   * produce a "windowType" key in the JSON, matching the optional-field
+   * convention used for processId/formId.
+   *
+   * @throws JSONException if there is an error during JSON construction
+   */
+  @Test
+  void testMenuEntryDoesNotIncludeWindowTypeWhenWindowTypeIsNull() throws JSONException {
+    mockWindowWithType(null);
+    withFirstMenuEntry(entry -> assertFalse(entry.has(WINDOW_TYPE)));
   }
 
 }

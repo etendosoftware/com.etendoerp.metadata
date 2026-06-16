@@ -53,7 +53,11 @@ import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import java.util.HashMap;
+import java.util.Map;
+
 import org.openbravo.dal.core.OBContext;
+import org.openbravo.erpCommon.utility.DimensionDisplayUtility;
 import org.openbravo.model.ad.access.Role;
 import org.openbravo.model.ad.access.RoleOrganization;
 import org.openbravo.model.ad.access.User;
@@ -74,6 +78,11 @@ import com.etendoerp.metadata.utils.Utils;
 @MockitoSettings(strictness = Strictness.LENIENT)
 @ExtendWith(MockitoExtension.class)
 class SessionBuilderTest {
+
+  private static final String ATTRIBUTES = "attributes";
+  private static final String KEY_ACCT_CENTRALLY = "$IsAcctDimCentrally";
+  private static final String KEY_BP_APP_L = "$Element_BP_APP_L";
+  private static final String KEY_PR_APP_L = "$Element_PR_APP_L";
 
   @Mock
   private OBContext obContext;
@@ -410,6 +419,74 @@ class SessionBuilderTest {
         if (foundOrgWithEmptyWarehouses) break;
       }
       assertTrue(foundOrgWithEmptyWarehouses);
+    }
+  }
+
+  /**
+   * Verifies that when the client is configured for centralized accounting
+   * dimensions, {@code toJSON()} emits {@code attributes} containing
+   * {@code $IsAcctDimCentrally="Y"} together with the per-dimension session
+   * vars produced by {@link DimensionDisplayUtility#getAccountingDimensionConfiguration}.
+   *
+   * @throws JSONException if JSON operations fail during assertions or building
+   */
+  @Test
+  void testToJSONIncludesAcctDimSessionAttributesWhenCentralized() throws JSONException {
+    when(client.isAcctdimCentrallyMaintained()).thenReturn(true);
+
+    Map<String, String> acctMap = new HashMap<>();
+    acctMap.put(KEY_BP_APP_L, "Y");
+    acctMap.put(KEY_PR_APP_L, "N");
+
+    try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
+         MockedStatic<Utils> utilsStatic = mockStatic(Utils.class);
+         MockedStatic<DimensionDisplayUtility> dimStatic = mockStatic(DimensionDisplayUtility.class)) {
+
+      obContextStatic.when(OBContext::getOBContext).thenReturn(obContext);
+      utilsStatic.when(() -> Utils.getJsonObject(any())).thenReturn(new JSONObject());
+      dimStatic.when(() -> DimensionDisplayUtility.getAccountingDimensionConfiguration(client))
+          .thenReturn(acctMap);
+
+      SessionBuilder sessionBuilder = new SessionBuilder();
+      JSONObject result = sessionBuilder.toJSON();
+
+      assertNotNull(result);
+      assertTrue(result.has(ATTRIBUTES));
+      JSONObject attributes = result.getJSONObject(ATTRIBUTES);
+      assertEquals("Y", attributes.getString(KEY_ACCT_CENTRALLY));
+      assertEquals("Y", attributes.getString(KEY_BP_APP_L));
+      assertEquals("N", attributes.getString(KEY_PR_APP_L));
+    }
+  }
+
+  /**
+   * Verifies that when the client uses decentralized accounting dimensions,
+   * {@code attributes} carries {@code $IsAcctDimCentrally="N"} and does not
+   * include the centralized per-(dim,doctype,level) keys.
+   *
+   * @throws JSONException if JSON operations fail during assertions or building
+   */
+  @Test
+  void testToJSONOmitsCentralizedAttributesWhenDecentralized() throws JSONException {
+    when(client.isAcctdimCentrallyMaintained()).thenReturn(false);
+
+    try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
+         MockedStatic<Utils> utilsStatic = mockStatic(Utils.class);
+         MockedStatic<DimensionDisplayUtility> dimStatic = mockStatic(DimensionDisplayUtility.class)) {
+
+      obContextStatic.when(OBContext::getOBContext).thenReturn(obContext);
+      utilsStatic.when(() -> Utils.getJsonObject(any())).thenReturn(new JSONObject());
+
+      SessionBuilder sessionBuilder = new SessionBuilder();
+      JSONObject result = sessionBuilder.toJSON();
+
+      JSONObject attributes = result.getJSONObject(ATTRIBUTES);
+      assertEquals("N", attributes.getString(KEY_ACCT_CENTRALLY));
+      assertTrue(!attributes.has(KEY_BP_APP_L));
+
+      // The centralized configuration helper must not be invoked in decentralized mode.
+      dimStatic.verify(() -> DimensionDisplayUtility.getAccountingDimensionConfiguration(client),
+          org.mockito.Mockito.never());
     }
   }
 

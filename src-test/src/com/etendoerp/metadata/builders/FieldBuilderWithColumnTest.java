@@ -16,8 +16,12 @@
  */
 package com.etendoerp.metadata.builders;
 
-import static com.etendoerp.metadata.MetadataTestConstants.COLUMN_ID;
 import static com.etendoerp.metadata.MetadataTestConstants.FIELD_ID;
+import static com.etendoerp.metadata.builders.FieldBuilderWithColumnTestHelpers.invokePrivate;
+import static com.etendoerp.metadata.builders.FieldBuilderWithColumnTestHelpers.mockDataToJsonConverter;
+import static com.etendoerp.metadata.builders.FieldBuilderWithColumnTestHelpers.setJson;
+import static com.etendoerp.metadata.builders.FieldBuilderWithColumnTestHelpers.setupOBDalWithTabCriteria;
+import static com.etendoerp.metadata.builders.FieldBuilderWithColumnTestHelpers.setupWindowAccessMocks;
 import static com.etendoerp.metadata.MetadataTestConstants.LIST_ID;
 import static com.etendoerp.metadata.MetadataTestConstants.REF_LIST;
 import static com.etendoerp.metadata.MetadataTestConstants.TABLE_ID;
@@ -31,7 +35,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Answers.CALLS_REAL_METHODS;
@@ -48,7 +51,6 @@ import java.util.List;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
-import org.hibernate.criterion.Criterion;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -82,7 +84,6 @@ import org.openbravo.model.ad.ui.Window;
 import org.openbravo.service.json.DataResolvingMode;
 import org.openbravo.service.json.DataToJsonConverter;
 
-import java.lang.reflect.Method;
 import java.util.Map;
 
 import org.openbravo.model.ad.domain.ReferencedTree;
@@ -148,6 +149,7 @@ class FieldBuilderWithColumnTest {
     private static final String IS_REFERENCE_WINDOW_STRING = "isReferencedWindowAccessible";
     private static final String FIELD_GROUP_COLLAPSED = "fieldGroupCollapsed";
     private static final String PROP_REFERENCED_WINDOW_ID = "referencedWindowId";
+    private static final String GRID_DISPLAY_LOGIC_EXPRESSION = "gridDisplayLogicExpression";
 
     private FieldBuilderWithColumn fieldBuilder;
 
@@ -192,49 +194,6 @@ class FieldBuilderWithColumnTest {
     /* Helpers */
     /* ---------------------------------------------------------------------- */
 
-    private MockedConstruction<DataToJsonConverter> mockDataToJsonConverter() throws JSONException {
-        return mockConstruction(DataToJsonConverter.class,
-                (mock, context) -> {
-                    JSONObject base = new JSONObject().put("id", FIELD_ID);
-                    when(mock.toJsonObject(any(Field.class),
-                            eq(DataResolvingMode.FULL_TRANSLATABLE)))
-                            .thenReturn(base);
-                    when(mock.toJsonObject(any(Column.class),
-                            eq(DataResolvingMode.FULL_TRANSLATABLE)))
-                            .thenReturn(new JSONObject().put("id", COLUMN_ID));
-                });
-    }
-
-    private void setupWindowAccessMocks(String windowId, OBCriteria<WindowAccess> criteriaMock,
-            WindowAccess windowAccess) {
-        when(obDal.get(Window.class, windowId)).thenReturn(mock(Window.class));
-        when(obDal.createCriteria(WindowAccess.class)).thenReturn(criteriaMock);
-        when(criteriaMock.add(any())).thenReturn(criteriaMock);
-        when(criteriaMock.setMaxResults(1)).thenReturn(criteriaMock);
-        when(criteriaMock.uniqueResult()).thenReturn(windowAccess);
-    }
-
-    private void setupOBDalWithTabCriteria() {
-        when(obDal.get(eq(Table.class), any())).thenReturn(table);
-        when(obDal.createCriteria(Tab.class)).thenReturn(criteria);
-        when(criteria.add(any(Criterion.class))).thenReturn(criteria);
-        when(criteria.setMaxResults(anyInt())).thenReturn(criteria);
-        when(criteria.uniqueResult()).thenReturn(null);
-    }
-
-    private Object invokePrivate(Object target, String methodName, Class<?>[] parameterTypes, Object... args)
-            throws ReflectiveOperationException {
-        Method method = target.getClass().getDeclaredMethod(methodName, parameterTypes);
-        method.setAccessible(true);
-        return method.invoke(target, args);
-    }
-
-    private void setJson(FieldBuilder builder, JSONObject json) throws ReflectiveOperationException {
-        java.lang.reflect.Field jsonField = FieldBuilder.class.getDeclaredField("json");
-        jsonField.setAccessible(true);
-        jsonField.set(builder, json);
-    }
-
     private void runWindowAccessTest(WindowAccess windowAccess,
             WindowAccessTestAction action) throws Exception {
         Role role = mock(Role.class);
@@ -249,7 +208,7 @@ class FieldBuilderWithColumnTest {
             mockedOBContext.when(OBContext::getOBContext).thenReturn(obContext);
             when(obContext.getRole()).thenReturn(role);
             mockedOBDal.when(OBDal::getReadOnlyInstance).thenReturn(obDal);
-            setupWindowAccessMocks(WINDOW_ID_STRING, criteriaMock, windowAccess);
+            setupWindowAccessMocks(obDal, WINDOW_ID_STRING, criteriaMock, windowAccess);
 
             fieldBuilder = new FieldBuilderWithColumn(field, fieldAccess);
             action.execute(fieldBuilder, role);
@@ -312,7 +271,7 @@ class FieldBuilderWithColumnTest {
                     .thenReturn(new String[] { TEST_FIELD });
 
             mockedOBDal.when(OBDal::getInstance).thenReturn(obDal);
-            setupOBDalWithTabCriteria();
+            setupOBDalWithTabCriteria(obDal, table, criteria);
 
             if (extraMocks != null) {
                 extraMocks.run();
@@ -379,6 +338,51 @@ class FieldBuilderWithColumnTest {
                 null);
 
         assertNotNull(result);
+    }
+
+    /**
+     * Asserts that when the field has a non-blank {@code displaylogicgrid}
+     * (such as the {@code @ACCT_DIMENSION_DISPLAY@} placeholder classic UI
+     * rewrites per field), the resulting JSON exposes the rewritten
+     * expression under {@code gridDisplayLogicExpression}.
+     */
+    @Test
+    void testToJSONWithGridDisplayLogic() throws JSONException {
+        String rewritten = "(context.$IsAcctDimCentrally === 'Y' && context['$Element_BP_APP_L'] === 'Y')";
+        when(field.getDisplaylogicgrid()).thenReturn("@ACCT_DIMENSION_DISPLAY@");
+
+        JSONObject result = executeWithExpressionParser(rewritten, null);
+
+        assertTrue(result.has(GRID_DISPLAY_LOGIC_EXPRESSION));
+        assertEquals(rewritten, result.getString(GRID_DISPLAY_LOGIC_EXPRESSION));
+    }
+
+    /**
+     * Asserts that {@code gridDisplayLogicExpression} is omitted when the
+     * field's {@code displaylogicgrid} column is {@code null} (the typical
+     * case for non-accounting-dimension fields).
+     */
+    @Test
+    void testToJSONWithoutGridDisplayLogicWhenNull() throws JSONException {
+        when(field.getDisplaylogicgrid()).thenReturn(null);
+
+        JSONObject result = executeToJSON(null);
+
+        assertFalse(result.has(GRID_DISPLAY_LOGIC_EXPRESSION));
+    }
+
+    /**
+     * Asserts that {@code gridDisplayLogicExpression} is omitted when the
+     * field's {@code displaylogicgrid} column is blank, matching the
+     * defensive guard in {@code FieldBuilder#addGridDisplayLogic}.
+     */
+    @Test
+    void testToJSONWithoutGridDisplayLogicWhenBlank() throws JSONException {
+        when(field.getDisplaylogicgrid()).thenReturn("   ");
+
+        JSONObject result = executeToJSON(null);
+
+        assertFalse(result.has(GRID_DISPLAY_LOGIC_EXPRESSION));
     }
 
     @Test
@@ -454,7 +458,7 @@ class FieldBuilderWithColumnTest {
             when(obContext.getLanguage()).thenReturn(language);
 
             mockedOBDal.when(OBDal::getInstance).thenReturn(obDal);
-            setupOBDalWithTabCriteria();
+            setupOBDalWithTabCriteria(obDal, table, criteria);
 
             mockedUtils.when(() -> Utils.getReferencedTab(any(Property.class))).thenReturn(null);
 

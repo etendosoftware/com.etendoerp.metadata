@@ -51,6 +51,16 @@ public class ParameterBuilder extends Builder {
             parameter.getReference().getId());
     }
 
+    /**
+     * Process Definition parameters using the OBUISEL_Multi Selector reference
+     * (e.g. NotPostedDocuments.accounting_status) need the same selector JSON as
+     * standard selectors so the client can resolve datasource and grid columns.
+     */
+    private static boolean isMultiSelectorParameter(Parameter parameter) {
+        return parameter != null && parameter.getReference() != null &&
+               MULTI_SELECTOR_REFERENCE_ID.equals(parameter.getReference().getId());
+    }
+
     private static boolean isListParameter(Parameter parameter) {
         return parameter != null && parameter.getReference() != null &&
                (LIST_REFERENCE_ID.equals(parameter.getReference().getId()) ||
@@ -78,6 +88,7 @@ public class ParameterBuilder extends Builder {
         addListInfo(json, parameter);
         addButtonListInfo(json, parameter);
         addWindowInfo(json, parameter);
+        addFieldGroupCollapsed(json, parameter);
 
         return json;
     }
@@ -108,7 +119,7 @@ public class ParameterBuilder extends Builder {
 
     private void addSelectorInfo(JSONObject json, Parameter parameter) {
         try {
-            if (isSelectorParameter(parameter)) {
+            if (isSelectorParameter(parameter) || isMultiSelectorParameter(parameter)) {
                 json.put("selector", getSelectorInfo(parameter.getId(), parameter.getReferenceSearchKey()));
             }
         } catch (Exception e) {
@@ -147,6 +158,26 @@ public class ParameterBuilder extends Builder {
             }
         } catch (Exception e) {
             logger.warn("Error building window info for parameter {}: {}", parameter.getId(), e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Adds the {@code fieldGroupCollapsed} property to the parameter JSON when the
+     * parameter belongs to a FieldGroup. Mirrors the classic UI behavior implemented
+     * in {@code OBViewParameterHandler.OBViewParamGroup#isExpanded()}: a section is
+     * collapsed by default iff {@code AD_FieldGroup.IsCollapsed} is {@code true}.
+     *
+     * @param json      the JSON object to enrich
+     * @param parameter the process definition parameter being serialized
+     */
+    private void addFieldGroupCollapsed(JSONObject json, Parameter parameter) {
+        try {
+            org.openbravo.model.ad.ui.FieldGroup fg = parameter.getFieldGroup();
+            if (fg != null) {
+                json.put("fieldGroupCollapsed", Boolean.TRUE.equals(fg.isCollapsed()));
+            }
+        } catch (Exception e) {
+            logger.warn("Error building fieldGroupCollapsed for parameter {}: {}", parameter.getId(), e.getMessage(), e);
         }
     }
 }

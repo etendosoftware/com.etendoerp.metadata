@@ -80,6 +80,10 @@ class WindowBuilderTest {
   @Mock
   private OBCriteria<WindowAccess> mockCriteria;
 
+  // Test data
+  private static final String WINDOW_TYPE = "windowType";
+  private static final String WINDOW_TYPE_VALUE = "OBUIAPP_PickAndExecute";
+
   /**
    * Sets up the basic mock behavior before each test.
    * This includes setting up OBContext, Language, and Role mocks.
@@ -266,6 +270,52 @@ class WindowBuilderTest {
     JSONArray tabs = result.getJSONArray("tabs");
     assertNotNull(tabs);
     assertEquals(0, tabs.length());
+  }
+
+  /**
+   * Builds a {@link DataToJsonConverter} mock that emits a JSON containing the
+   * {@code windowType} field with the supplied value. Mirrors the production
+   * behaviour of {@code DataToJsonConverter.toJsonObject(window, FULL_TRANSLATABLE)}.
+   *
+   * @param windowType The window type value the converter should expose.
+   * @return A MockedConstruction of DataToJsonConverter pre-wired with the field.
+   */
+  private MockedConstruction<DataToJsonConverter> createConverterMockWithWindowType(String windowType) {
+    return mockConstruction(DataToJsonConverter.class, (mock, context) -> {
+      JSONObject windowJson = new JSONObject();
+      windowJson.put("id", WINDOW_ID);
+      windowJson.put("name", "Test Window");
+      windowJson.put(WINDOW_TYPE, windowType);
+      when(mock.toJsonObject(any(), any())).thenReturn(windowJson);
+    });
+  }
+
+  /**
+   * Defensive regression test: when the {@link DataToJsonConverter} exposes the
+   * {@code windowType} property of the window, the {@link WindowBuilder} output
+   * must preserve it. This guarantees that the client can read
+   * {@code windowType} from {@code /meta/window/{id}} for any window type.
+   *
+   * @throws Exception if any unexpected error occurs during the test execution.
+   */
+  @Test
+  void toJSONExposesWindowTypeWhenConverterEmitsIt() throws Exception {
+    setupWindowAccess(true, true);
+    WindowBuilder windowBuilder;
+    JSONObject result;
+    try (MockedStatic<OBContext> ignored1 = createOBContextMock();
+         MockedConstruction<DataToJsonConverter> ignored2 = createConverterMockWithWindowType(WINDOW_TYPE_VALUE)) {
+      windowBuilder = new WindowBuilder(WINDOW_ID);
+    }
+    try (MockedStatic<OBContext> ignored1 = createOBContextMock();
+         MockedStatic<OBDal> ignored2 = createOBDalMock();
+         MockedConstruction<DataToJsonConverter> ignored3 = createConverterMockWithWindowType(WINDOW_TYPE_VALUE)) {
+      result = windowBuilder.toJSON();
+    }
+
+    assertNotNull(result);
+    assertTrue(result.has(WINDOW_TYPE));
+    assertEquals(WINDOW_TYPE_VALUE, result.getString(WINDOW_TYPE));
   }
 
   /**

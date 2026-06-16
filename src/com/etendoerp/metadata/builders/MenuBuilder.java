@@ -36,6 +36,8 @@ import org.openbravo.model.ad.ui.Form;
 import org.openbravo.model.ad.ui.Menu;
 import org.openbravo.model.ad.ui.Window;
 
+import com.etendoerp.metadata.utils.Constants;
+
 /**
  * Builder class for generating Menu metadata in JSON format.
  *
@@ -229,6 +231,7 @@ public class MenuBuilder extends Builder {
             Window window = menu.getWindow();
             if (null != window) {
                 json.put("windowId", window.getId());
+                addWindowType(json, window);
             }
 
             org.openbravo.model.ad.ui.Process process = menu.getProcess();
@@ -260,6 +263,23 @@ public class MenuBuilder extends Builder {
         }
 
         return json;
+    }
+
+    /**
+     * Emits the {@code windowType} field into the menu entry JSON when the
+     * underlying {@link Window} declares a type. The field is optional and is
+     * only added when present, mirroring the convention used by other optional
+     * keys (e.g. {@code processId}, {@code formId}).
+     *
+     * @param json   The menu entry JSON being built.
+     * @param window The non-null window associated with the menu entry.
+     * @throws JSONException If the JSON object rejects the put operation.
+     */
+    private void addWindowType(JSONObject json, Window window) throws JSONException {
+        String windowType = window.getWindowType();
+        if (windowType != null) {
+            json.put(Constants.JSON_WINDOW_TYPE_KEY, windowType);
+        }
     }
 
     /**
