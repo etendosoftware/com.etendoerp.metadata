@@ -32,6 +32,7 @@ import org.openbravo.model.ad.access.TabAccess;
 import org.openbravo.model.ad.datamodel.Column;
 import org.openbravo.model.ad.datamodel.Table;
 import org.openbravo.model.ad.ui.Tab;
+import org.openbravo.model.ad.utility.TableTree;
 import org.openbravo.service.json.DataResolvingMode;
 
 import com.etendoerp.metadata.data.TabProcessor;
@@ -102,6 +103,10 @@ public class TabBuilder extends Builder {
         json.put("parentTabId", parentTab.getId());
       }
 
+      if (Boolean.TRUE.equals(tab.isTreeIncluded())) {
+        addTreeProperties(json);
+      }
+
       boolean isTabReadOnly = isWindowReadOnly || (tabAccess != null && !tabAccess.isEditableField());
       if (isTabReadOnly) {
         json.put("uIPattern", "RO");
@@ -114,6 +119,26 @@ public class TabBuilder extends Builder {
     } catch (JSONException e) {
       logger.warn(e.getMessage(), e);
       throw new InternalServerException();
+    }
+  }
+
+  private void addTreeProperties(JSONObject json) throws JSONException {
+    json.put("hasTree", true);
+    if (tab.getTable() != null) {
+      json.put("tableId", tab.getTable().getId());
+    }
+    TableTree tableTree = tab.getTableTree();
+    if (tableTree != null) {
+      json.put("tableTreeId", tableTree.getId());
+      if (tableTree.getTreeStructure() != null) {
+        json.put("treeStructure", tableTree.getTreeStructure());
+      }
+    }
+    json.put("isReadOnlyTree", Boolean.TRUE.equals(tab.isReadOnlyTree()));
+    json.put("showTreeNodeIcons", Boolean.TRUE.equals(tab.isShowTreeNodeIcons()));
+    String hqlWhere = tab.getHQLWhereClauseForRootNodes();
+    if (hqlWhere != null && !hqlWhere.isEmpty()) {
+      json.put("hqlWhereClauseForRootNodes", hqlWhere);
     }
   }
 

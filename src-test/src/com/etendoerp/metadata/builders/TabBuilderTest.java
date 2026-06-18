@@ -46,6 +46,7 @@ import org.openbravo.model.ad.datamodel.Table;
 import org.openbravo.model.ad.system.Language;
 import org.openbravo.model.ad.ui.Field;
 import org.openbravo.model.ad.ui.Tab;
+import org.openbravo.model.ad.utility.TableTree;
 import org.openbravo.dal.security.EntityAccessChecker;
 import org.openbravo.base.model.Entity;
 import com.etendoerp.metadata.data.TabProcessor;
@@ -99,6 +100,11 @@ class TabBuilderTest {
     private static final String AD_USER_ENTITY = "ADUser";
     private static final String CUSTOM_CREATION_DATE_NAME = "Custom Creation Date";
     private static final String OBUIAPP_CAN_ADD_MISSING = "obuiappCanAdd should be present in JSON";
+    private static final String HAS_TREE_KEY = "hasTree";
+    private static final String TABLE_TREE_ID_KEY = "tableTreeId";
+    private static final String TREE_STRUCTURE_KEY = "treeStructure";
+    private static final String HQL_WHERE_KEY = "hqlWhereClauseForRootNodes";
+    private static final String HAS_TREE_SHOULD_BE_TRUE = "hasTree should be true";
 
     /**
      * Tests that audit fields are automatically added to the fields JSON
@@ -577,6 +583,45 @@ class TabBuilderTest {
     }
 
     /**
+     * Tests that hasTree and all tree-related properties are included in the JSON
+     * when the tab has isTreeIncluded = true and a full TableTree configuration.
+     */
+    @Test
+    void toJSONIncludesFullTreePropertiesWhenHasTreeIsTrue() throws Exception {
+        TestContext ctx = setupTestContext();
+        TableTree mockTableTree = mock(TableTree.class);
+        String treeId = "tree-001";
+        String treeStructure = "LP";
+        String hqlWhere = "it.parent is null";
+        String tableId = "table-001";
+
+        setupBasicMocks(ctx.context, ctx.language, ctx.tab, ctx.table, ctx.kernelUtils, List.of());
+        when(ctx.table.getId()).thenReturn(tableId);
+        when(ctx.tab.isTreeIncluded()).thenReturn(true);
+        when(ctx.tab.getTableTree()).thenReturn(mockTableTree);
+        when(ctx.tab.isReadOnlyTree()).thenReturn(false);
+        when(ctx.tab.isShowTreeNodeIcons()).thenReturn(true);
+        when(ctx.tab.getHQLWhereClauseForRootNodes()).thenReturn(hqlWhere);
+        when(mockTableTree.getId()).thenReturn(treeId);
+        when(mockTableTree.getTreeStructure()).thenReturn(treeStructure);
+
+        executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), result -> {
+            try {
+                assertTrue(result.getBoolean(HAS_TREE_KEY), HAS_TREE_SHOULD_BE_TRUE);
+                assertEquals(tableId, result.getString("tableId"), "tableId should be set");
+                assertEquals(treeId, result.getString(TABLE_TREE_ID_KEY), "tableTreeId should be set");
+                assertEquals(treeStructure, result.getString(TREE_STRUCTURE_KEY), "treeStructure should be set");
+                assertFalse(result.getBoolean("isReadOnlyTree"), "isReadOnlyTree should be false");
+                assertTrue(result.getBoolean("showTreeNodeIcons"), "showTreeNodeIcons should be true");
+                assertEquals(hqlWhere, result.getString(HQL_WHERE_KEY),
+                        "hqlWhereClauseForRootNodes should be set");
+            } catch (JSONException e) {
+                fail(JSON_EXCEPTION + ": " + e.getMessage());
+            }
+        });
+    }
+
+    /**
      * Tests that {@code obuiappCanAdd} is emitted as {@code true} when the underlying
      * {@link Tab#isObuiappCanAdd()} returns {@code Boolean.TRUE}. Mirrors the classic
      * UI rule in {@code OBViewTab#isAllowAdd()} — the property gates the inline
@@ -602,6 +647,52 @@ class TabBuilderTest {
     }
 
     /**
+     * Tests that tree properties are omitted when isTreeIncluded is false.
+     */
+    @Test
+    void toJSONOmitsTreePropertiesWhenHasTreeIsFalse() throws Exception {
+        TestContext ctx = setupTestContext();
+        setupBasicMocks(ctx.context, ctx.language, ctx.tab, ctx.table, ctx.kernelUtils, List.of());
+        when(ctx.tab.isTreeIncluded()).thenReturn(false);
+
+        executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), result -> {
+            assertFalse(result.has(HAS_TREE_KEY), "hasTree should be absent");
+            assertFalse(result.has(TABLE_TREE_ID_KEY), "tableTreeId should be absent");
+            assertFalse(result.has(TREE_STRUCTURE_KEY), "treeStructure should be absent");
+        });
+    }
+
+    /**
+     * Tests that hasTree is set but tree sub-fields are absent when tableTree is null.
+     */
+    @Test
+    void toJSONHandlesTreeWithNullTableTree() throws Exception {
+        TestContext ctx = setupTestContext();
+        String tableId = "table-002";
+
+        setupBasicMocks(ctx.context, ctx.language, ctx.tab, ctx.table, ctx.kernelUtils, List.of());
+        when(ctx.table.getId()).thenReturn(tableId);
+        when(ctx.tab.isTreeIncluded()).thenReturn(true);
+        when(ctx.tab.getTableTree()).thenReturn(null);
+        when(ctx.tab.isReadOnlyTree()).thenReturn(true);
+        when(ctx.tab.isShowTreeNodeIcons()).thenReturn(false);
+        when(ctx.tab.getHQLWhereClauseForRootNodes()).thenReturn(null);
+
+        executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), result -> {
+            try {
+                assertTrue(result.getBoolean(HAS_TREE_KEY), HAS_TREE_SHOULD_BE_TRUE);
+                assertEquals(tableId, result.getString("tableId"), "tableId should be set");
+                assertFalse(result.has(TABLE_TREE_ID_KEY), "tableTreeId should be absent when tableTree is null");
+                assertFalse(result.has(TREE_STRUCTURE_KEY), "treeStructure should be absent when tableTree is null");
+                assertFalse(result.has(HQL_WHERE_KEY),
+                        "hqlWhereClauseForRootNodes should be absent when null");
+            } catch (JSONException e) {
+                fail(JSON_EXCEPTION + ": " + e.getMessage());
+            }
+        });
+    }
+
+    /**
      * Tests that {@code obuiappCanAdd} is emitted as {@code false} when
      * {@link Tab#isObuiappCanAdd()} returns {@code Boolean.FALSE}.
      *
@@ -618,6 +709,38 @@ class TabBuilderTest {
                 assertTrue(result.has(OBUIAPP_CAN_ADD_KEY), OBUIAPP_CAN_ADD_MISSING);
                 assertFalse(result.getBoolean(OBUIAPP_CAN_ADD_KEY),
                         "obuiappCanAdd should be false when Tab.isObuiappCanAdd() returns FALSE");
+            } catch (JSONException e) {
+                fail(JSON_EXCEPTION + ": " + e.getMessage());
+            }
+        });
+    }
+
+    /**
+     * Tests that treeStructure is omitted when tableTree exists but getTreeStructure() returns null.
+     */
+    @Test
+    void toJSONHandlesTreeWithNullTreeStructure() throws Exception {
+        TestContext ctx = setupTestContext();
+        TableTree mockTableTree = mock(TableTree.class);
+        String treeId = "tree-003";
+
+        setupBasicMocks(ctx.context, ctx.language, ctx.tab, ctx.table, ctx.kernelUtils, List.of());
+        lenient().when(ctx.table.getId()).thenReturn("table-003");
+        when(ctx.tab.isTreeIncluded()).thenReturn(true);
+        when(ctx.tab.getTableTree()).thenReturn(mockTableTree);
+        when(ctx.tab.isReadOnlyTree()).thenReturn(false);
+        when(ctx.tab.isShowTreeNodeIcons()).thenReturn(false);
+        when(ctx.tab.getHQLWhereClauseForRootNodes()).thenReturn("");
+        when(mockTableTree.getId()).thenReturn(treeId);
+        when(mockTableTree.getTreeStructure()).thenReturn(null);
+
+        executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), result -> {
+            try {
+                assertTrue(result.getBoolean(HAS_TREE_KEY), HAS_TREE_SHOULD_BE_TRUE);
+                assertEquals(treeId, result.getString(TABLE_TREE_ID_KEY), "tableTreeId should be set");
+                assertFalse(result.has(TREE_STRUCTURE_KEY), "treeStructure should be absent when null");
+                assertFalse(result.has(HQL_WHERE_KEY),
+                        "hqlWhereClauseForRootNodes should be absent when blank");
             } catch (JSONException e) {
                 fail(JSON_EXCEPTION + ": " + e.getMessage());
             }
