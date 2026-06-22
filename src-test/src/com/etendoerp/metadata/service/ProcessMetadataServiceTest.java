@@ -21,8 +21,6 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
-import org.mockito.junit.jupiter.MockitoSettings;
-import org.mockito.quality.Strictness;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -34,8 +32,7 @@ import static org.mockito.Mockito.*;
 /**
  * Test class for ProcessMetadataService.
  */
-@RunWith(MockitoJUnitRunner.class)
-@MockitoSettings(strictness = Strictness.LENIENT)
+@RunWith(MockitoJUnitRunner.Silent.class)
 public class ProcessMetadataServiceTest {
 
     private static final String EXCEPTION_NOT_NULL_MESSAGE = "Exception should not be null";
