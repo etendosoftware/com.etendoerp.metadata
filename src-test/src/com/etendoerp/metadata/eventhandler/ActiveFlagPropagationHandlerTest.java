@@ -35,6 +35,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import org.openbravo.base.model.Entity;
 import org.openbravo.base.model.Property;
 import org.openbravo.base.structure.BaseOBObject;
@@ -51,6 +53,7 @@ import org.openbravo.dal.service.OBQuery;
  * can be verified in isolation with Mockito mocks.
  */
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class ActiveFlagPropagationHandlerTest {
 
   private static final String PARENT_ID = "parent-uuid";

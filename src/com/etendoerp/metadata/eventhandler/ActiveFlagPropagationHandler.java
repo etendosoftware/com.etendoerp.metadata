@@ -178,7 +178,7 @@ class ActiveFlagPropagationHandler extends EntityPersistenceEventObserver {
         .orElse(null);
   }
 
-  private static String recordKey(Entity entity, BaseOBObject record) {
-    return entity.getName() + "#" + record.getId();
+  private static String recordKey(Entity entity, BaseOBObject bob) {
+    return entity.getName() + "#" + bob.getId();
   }
 }
