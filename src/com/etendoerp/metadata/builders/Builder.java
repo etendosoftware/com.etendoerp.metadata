@@ -42,4 +42,21 @@ public abstract class Builder {
      * @throws JSONException if there is an error during JSON construction
      */
     public abstract JSONObject toJSON() throws JSONException;
+
+    /**
+     * Puts a value under the given key, keeping the key always present: a {@code null}
+     * value is written as {@link JSONObject#NULL} rather than removed (Jettison's
+     * {@code put(key, null)} deletes the entry). This preserves the stable
+     * "key always present, JSON null when empty" contract for explicitly-emitted
+     * properties that the {@link DataToJsonConverter} may skip for derived-readable
+     * entities.
+     *
+     * @param json  the JSON object to write into
+     * @param key   the property key that must always be present
+     * @param value the value to write, or {@code null} to write JSON null
+     * @throws JSONException if there is an error writing the value
+     */
+    protected static void putValueOrNull(JSONObject json, String key, Object value) throws JSONException {
+        json.put(key, value == null ? JSONObject.NULL : value);
+    }
 }

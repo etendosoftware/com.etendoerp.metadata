@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+  <database name="MODIFIED TABLE OBUIAPP_PARAMETER">
+    <table name="OBUIAPP_PARAMETER" primaryKey="OBUIAPP_PARAMETER_KEY">
+      <column name="EM_ETMETA_ON_PARAMETER_CHANGE" primaryKey="false" required="false" type="CLOB" size="4000" autoIncrement="false">
+        <default/>
+        <onCreateDefault/>
+      </column>
+      <column name="EM_ETMETA_ON_GRID_LOAD" primaryKey="false" required="false" type="CLOB" size="4000" autoIncrement="false">
+        <default/>
+        <onCreateDefault/>
+      </column>
+    </table>
+  </database>

@@ -31,6 +31,8 @@ import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.lang.reflect.Field;
@@ -104,6 +106,7 @@ class MenuBuilderTest {
   private static final String VIEW_ID = "viewId";
   private static final String WINDOW_TYPE = "windowType";
   private static final String WINDOW_MENU_ID = "WINDOW_MENU_ID";
+  private static final String WINDOW_ID = "WINDOW_ID_VAL";
   private static final String PICK_AND_EXECUTE = "OBUIAPP_PickAndExecute";
   private static final String FORM_ICON = "form-icon";
   private static final String FORM_ID = "formId";
@@ -654,23 +657,29 @@ class MenuBuilderTest {
     when(childMenu.getId()).thenReturn(WINDOW_MENU_ID);
     when(childMenu.getWindow()).thenReturn(window);
     if (window != null) {
-      when(window.getId()).thenReturn("WINDOW_ID_VAL");
+      when(window.getId()).thenReturn(WINDOW_ID);
     }
     return rootMenuOption;
   }
 
   /**
-   * Mocks a Window with the given windowType and wires it into the root fixture.
-   * Returns the configured window mock for further stubbing if needed.
+   * Builds the windowType fixture reproducing the production scenario: the window
+   * held by the menu tree is a (potentially detached) proxy, while the actual type
+   * is read from the instance re-fetched by {@code OBDal.get(Window.class, id)}.
+   * The detached window only answers {@code getId()}; reading {@code getWindowType()}
+   * on it is never expected.
    *
-   * @param windowType The value returned by {@code Window.getWindowType()}, may be null.
-   * @return The window mock just installed in the menu fixture.
+   * @param windowType The value returned by the persistent {@code Window.getWindowType()}, may be null.
+   * @return The detached window mock installed in the menu tree, for verification.
    */
-  private Window mockWindowWithType(String windowType) {
-    Window window = mock(Window.class);
-    when(window.getWindowType()).thenReturn(windowType);
-    buildSingleWindowMenuFixture(window);
-    return window;
+  private Window mockPersistentWindowWithType(String windowType) {
+    Window detachedWindow = mock(Window.class);
+    buildSingleWindowMenuFixture(detachedWindow);
+
+    Window persistentWindow = mock(Window.class);
+    when(persistentWindow.getWindowType()).thenReturn(windowType);
+    when(obDal.get(Window.class, WINDOW_ID)).thenReturn(persistentWindow);
+    return detachedWindow;
   }
 
   /**
@@ -690,18 +699,36 @@ class MenuBuilderTest {
   }
 
   /**
-   * Verifies that a Pick and Execute window emits the windowType field with the
-   * canonical "OBUIAPP_PickAndExecute" value.
+   * Same as {@link #withFirstMenuEntry} but under the DAL-mocking context, required
+   * since resolving the windowType re-fetches the window via {@code OBDal.getInstance()}.
+   *
+   * @param assertion Assertion block to execute against the first menu entry.
+   * @throws JSONException if the JSON traversal fails.
+   */
+  private void withFirstMenuEntryAndDal(MenuEntryConsumer assertion) throws JSONException {
+    withMenuBuilderAndDal(builder -> {
+      JSONObject result = builder.toJSON();
+      JSONObject entry = result.getJSONArray("menu").getJSONObject(0);
+      assertion.accept(entry);
+    });
+  }
+
+  /**
+   * Regression for the LazyInitializationException: the window held by the menu
+   * tree is a detached proxy, so the type must be read from the instance re-fetched
+   * via the DAL and never directly from the detached proxy. Verifies both the
+   * emitted value and that {@code getWindowType()} is never called on the proxy.
    *
    * @throws JSONException if there is an error during JSON construction
    */
   @Test
-  void testMenuEntryIncludesWindowTypeWhenWindowIsPickAndExecute() throws JSONException {
-    mockWindowWithType(PICK_AND_EXECUTE);
-    withFirstMenuEntry(entry -> {
+  void testMenuEntryReadsWindowTypeFromRefetchedWindow() throws JSONException {
+    Window detachedWindow = mockPersistentWindowWithType(PICK_AND_EXECUTE);
+    withFirstMenuEntryAndDal(entry -> {
       assertTrue(entry.has(WINDOW_TYPE));
       assertEquals(PICK_AND_EXECUTE, entry.getString(WINDOW_TYPE));
     });
+    verify(detachedWindow, never()).getWindowType();
   }
 
   /**
@@ -711,8 +738,8 @@ class MenuBuilderTest {
    */
   @Test
   void testMenuEntryIncludesWindowTypeWhenWindowIsMaintain() throws JSONException {
-    mockWindowWithType("M");
-    withFirstMenuEntry(entry -> {
+    mockPersistentWindowWithType("M");
+    withFirstMenuEntryAndDal(entry -> {
       assertTrue(entry.has(WINDOW_TYPE));
       assertEquals("M", entry.getString(WINDOW_TYPE));
     });
@@ -740,8 +767,22 @@ class MenuBuilderTest {
    */
   @Test
   void testMenuEntryDoesNotIncludeWindowTypeWhenWindowTypeIsNull() throws JSONException {
-    mockWindowWithType(null);
-    withFirstMenuEntry(entry -> assertFalse(entry.has(WINDOW_TYPE)));
+    mockPersistentWindowWithType(null);
+    withFirstMenuEntryAndDal(entry -> assertFalse(entry.has(WINDOW_TYPE)));
+  }
+
+  /**
+   * Defensive case: when the window can no longer be re-fetched (e.g. removed),
+   * {@code OBDal.get} returns null and the entry must omit the windowType key
+   * without raising any exception.
+   *
+   * @throws JSONException if there is an error during JSON construction
+   */
+  @Test
+  void testMenuEntryDoesNotIncludeWindowTypeWhenWindowNotFound() throws JSONException {
+    buildSingleWindowMenuFixture(mock(Window.class));
+    when(obDal.get(Window.class, WINDOW_ID)).thenReturn(null);
+    withFirstMenuEntryAndDal(entry -> assertFalse(entry.has(WINDOW_TYPE)));
   }
 
 }
