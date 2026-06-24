@@ -78,7 +78,7 @@ class DashboardServiceCoverageTest {
     private static final String PARAMETERS = "parameters";
     private static final String METHOD_DELETE = "DELETE";
     private static final String HQL_SELECT_LAYER = "select dw.layer";
-    private static final String METHOD_PATCH = "PATCH";
+    private static final String METHOD_PUT = "PUT";
     private static final String VALUE = "value";
     private static final String HQL_PARAMS_JSON = "dw.parametersJSON = :params";
     private static final String HQL_ID = "dw.id = :id";
@@ -262,7 +262,7 @@ class DashboardServiceCoverageTest {
 
     private StringWriter setupPatchRequest(String instanceId) throws Exception {
         StringWriter sw = prepareWriter();
-        setupRequest(METHOD_PATCH, "/dashboard/widget/" + instanceId + "/params");
+        setupRequest(METHOD_PUT, "/dashboard/widget/" + instanceId + "/params");
         JSONObject body = new JSONObject();
         body.put(PARAMETERS, new JSONObject().put("key", VALUE));
         setRequestBody(body.toString());
@@ -611,7 +611,7 @@ class DashboardServiceCoverageTest {
         });
     }
 
-    // --- 5. PATCH /dashboard/widget/{id}/params ---
+    // --- 5. PUT /dashboard/widget/{id}/params ---
 
     @Test
     void patchWidgetParamsDirectUpdateSuccess() throws Exception {

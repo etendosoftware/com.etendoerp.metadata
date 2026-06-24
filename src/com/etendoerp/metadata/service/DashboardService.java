@@ -83,7 +83,7 @@ public class DashboardService extends MetadataService {
                 handlePostWidget();
             } else if (DELETE.equals(method) && path.contains("/widget/")) {
                 handleDeleteWidget(extractLastSegment(path));
-            } else if (PATCH.equals(method) && path.contains("/widget/") && path.endsWith("/params")) {
+            } else if (PUT.equals(method) && path.contains("/widget/") && path.endsWith("/params")) {
                 handlePatchWidgetParams(extractSecondToLastSegment(path));
             } else {
                 throw new NotFoundException();
