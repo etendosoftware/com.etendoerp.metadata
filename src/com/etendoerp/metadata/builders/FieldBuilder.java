@@ -737,9 +737,12 @@ public abstract class FieldBuilder extends Builder {
     }
 
     /**
-     * Adds the fieldGroupCollapsed property to the field JSON when the field belongs
-     * to a FieldGroup. Reflects the FieldGroup's isCollapsed configuration so the
-     * frontend can initialize the section's expanded/collapsed state correctly.
+     * Adds the fieldGroupCollapsed and fieldGroupName properties to the field JSON
+     * when the field belongs to a FieldGroup. fieldGroupCollapsed reflects the
+     * FieldGroup's isCollapsed configuration so the frontend can initialize the
+     * section's expanded/collapsed state correctly. fieldGroupName is the translated
+     * name of the FieldGroup in the user's current language, falling back to the base
+     * name when no translation exists.
      *
      * @param field The field being processed
      * @throws JSONException if an error occurs while adding the property
@@ -748,7 +751,18 @@ public abstract class FieldBuilder extends Builder {
         org.openbravo.model.ad.ui.FieldGroup fg = field.getFieldGroup();
         if (fg != null) {
             json.put("fieldGroupCollapsed", Boolean.TRUE.equals(fg.isCollapsed()));
+            json.put("fieldGroupName", getTranslatedFieldGroupName(fg));
         }
+    }
+
+    private String getTranslatedFieldGroupName(org.openbravo.model.ad.ui.FieldGroup fg) {
+        String langId = lang.getId();
+        for (org.openbravo.model.ad.ui.FieldGroupTrl trl : fg.getADFieldGroupTrlList()) {
+            if (langId.equals(trl.getLanguage().getId())) {
+                return trl.getName();
+            }
+        }
+        return fg.getName();
     }
 
     /**

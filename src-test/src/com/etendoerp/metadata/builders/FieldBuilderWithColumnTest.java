@@ -78,6 +78,7 @@ import org.openbravo.model.ad.domain.Reference;
 import org.openbravo.model.ad.system.Language;
 import org.openbravo.model.ad.ui.Field;
 import org.openbravo.model.ad.ui.FieldGroup;
+import org.openbravo.model.ad.ui.FieldGroupTrl;
 import org.openbravo.model.ad.ui.Process;
 import org.openbravo.model.ad.ui.Tab;
 import org.openbravo.model.ad.ui.Window;
@@ -148,6 +149,9 @@ class FieldBuilderWithColumnTest {
 
     private static final String IS_REFERENCE_WINDOW_STRING = "isReferencedWindowAccessible";
     private static final String FIELD_GROUP_COLLAPSED = "fieldGroupCollapsed";
+    private static final String FIELD_GROUP_NAME = "fieldGroupName";
+    private static final String LANG_ES = "es_ES";
+    private static final String FIELD_GROUP_BASE_NAME = "Main Information";
     private static final String PROP_REFERENCED_WINDOW_ID = "referencedWindowId";
     private static final String GRID_DISPLAY_LOGIC_EXPRESSION = "gridDisplayLogicExpression";
 
@@ -690,6 +694,64 @@ class FieldBuilderWithColumnTest {
         JSONObject result = executeToJSON(null);
 
         assertFalse(result.has(FIELD_GROUP_COLLAPSED));
+        assertFalse(result.has(FIELD_GROUP_NAME));
+    }
+
+    @Test
+    void testFieldGroupNameWithMatchingTranslationIsSerializedInJSON() throws JSONException {
+        FieldGroup fieldGroup = mock(FieldGroup.class);
+        FieldGroupTrl trl = mock(FieldGroupTrl.class);
+        Language trlLanguage = mock(Language.class);
+
+        when(language.getId()).thenReturn(LANG_ES);
+        when(trlLanguage.getId()).thenReturn(LANG_ES);
+        when(trl.getLanguage()).thenReturn(trlLanguage);
+        when(trl.getName()).thenReturn("Información Principal");
+        when(fieldGroup.getADFieldGroupTrlList()).thenReturn(List.of(trl));
+        when(fieldGroup.isCollapsed()).thenReturn(Boolean.FALSE);
+        when(field.getFieldGroup()).thenReturn(fieldGroup);
+
+        JSONObject result = executeToJSON(null);
+
+        assertTrue(result.has(FIELD_GROUP_NAME));
+        assertEquals("Información Principal", result.getString(FIELD_GROUP_NAME));
+    }
+
+    @Test
+    void testFieldGroupNameFallsBackToBaseNameWhenNoMatchingTranslation() throws JSONException {
+        FieldGroup fieldGroup = mock(FieldGroup.class);
+        FieldGroupTrl trl = mock(FieldGroupTrl.class);
+        Language trlLanguage = mock(Language.class);
+
+        when(language.getId()).thenReturn(LANG_ES);
+        when(trlLanguage.getId()).thenReturn("en_US");
+        when(trl.getLanguage()).thenReturn(trlLanguage);
+        when(trl.getName()).thenReturn(FIELD_GROUP_BASE_NAME);
+        when(fieldGroup.getADFieldGroupTrlList()).thenReturn(List.of(trl));
+        when(fieldGroup.getName()).thenReturn(FIELD_GROUP_BASE_NAME);
+        when(fieldGroup.isCollapsed()).thenReturn(Boolean.FALSE);
+        when(field.getFieldGroup()).thenReturn(fieldGroup);
+
+        JSONObject result = executeToJSON(null);
+
+        assertTrue(result.has(FIELD_GROUP_NAME));
+        assertEquals(FIELD_GROUP_BASE_NAME, result.getString(FIELD_GROUP_NAME));
+    }
+
+    @Test
+    void testFieldGroupNameFallsBackToBaseNameWhenTranslationListIsEmpty() throws JSONException {
+        FieldGroup fieldGroup = mock(FieldGroup.class);
+
+        when(language.getId()).thenReturn(LANG_ES);
+        when(fieldGroup.getADFieldGroupTrlList()).thenReturn(Collections.emptyList());
+        when(fieldGroup.getName()).thenReturn("Dimensions");
+        when(fieldGroup.isCollapsed()).thenReturn(Boolean.TRUE);
+        when(field.getFieldGroup()).thenReturn(fieldGroup);
+
+        JSONObject result = executeToJSON(null);
+
+        assertTrue(result.has(FIELD_GROUP_NAME));
+        assertEquals("Dimensions", result.getString(FIELD_GROUP_NAME));
     }
 
     private JSONObject invokeAddComboSelectInfoAndGetJson(
