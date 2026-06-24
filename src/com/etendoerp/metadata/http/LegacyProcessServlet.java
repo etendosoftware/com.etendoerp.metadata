@@ -109,6 +109,50 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
     private static final String REFRESH_COMMAND_PREFIXES_JS = "['FIND','REFRESH','DEFAULT']";
 
     /**
+     * Script injected into the {@code <head>} of legacy action-button form pages.
+     * Patches {@code window.open} so that selector popup URLs (e.g.
+     * {@code ../info/Locator.html}) are resolved and have the {@code /meta/legacy/}
+     * prefix stripped before the browser navigates to them. Without this fix,
+     * {@code window.open()} resolves relative URLs against {@code window.location.href}
+     * (not the {@code <base>} tag), so the popup opens under {@code /meta/legacy/info/}
+     * — its Dojo DataGrid then issues {@code Command=STRUCTURE} and {@code Command=DATA}
+     * requests through {@code LegacyProcessServlet}, which was not designed to handle
+     * info-selector XML responses and returns them with {@code Content-Type: text/html},
+     * causing the browser to set {@code xhr.responseXML = null} and Dojo's
+     * {@code parseStructure} to throw "Cannot read properties of null".
+     *
+     * <p>This script also applies the popup-centering fix that the new UI previously
+     * attempted client-side via {@code injectPopupPositionFix} in {@code Iframe.tsx}:
+     * that approach is blocked by the cross-origin boundary between the Next.js dev
+     * server (port 3000) and Tomcat (port 8080), so it is applied here server-side.
+     */
+    private static final String POPUP_URL_FIX_SCRIPT = "<script>(function(){" +
+            "if(window.__etendoPopupUrlFixApplied)return;" +
+            "window.__etendoPopupUrlFixApplied=true;" +
+            "var _origOpen=window.open;" +
+            "window.open=function(url,name,features,replace){" +
+            "if(features&&typeof features==='string'){" +
+            "var w=800,h=600;" +
+            "var mw=features.match(/width=(\\d+)/);" +
+            "var mh=features.match(/height=(\\d+)/);" +
+            "if(mw)w=parseInt(mw[1],10);" +
+            "if(mh)h=parseInt(mh[1],10);" +
+            "features=features" +
+            ".replace(/left=-?\\d+/,'left='+Math.max(0,Math.round((screen.width-w)/2)))" +
+            ".replace(/top=-?\\d+/,'top='+Math.max(0,Math.round((screen.height-h)/2)));" +
+            "}" +
+            "if(typeof url==='string'&&url){" +
+            "try{" +
+            "var resolved=new URL(url,window.location.href);" +
+            "resolved.pathname=resolved.pathname.replace('/meta/legacy/','/');" +
+            "url=resolved.href;" +
+            "}catch(e){}" +
+            "}" +
+            "return _origOpen.call(this,url,name,features,replace);" +
+            "};" +
+            "})();</script>";
+
+    /**
      * Script injected into legacy form pages to expose {@code window.sendMessage}
      * and to guarantee that the parent always receives a final notification even
      * when the page is unloaded mid-flight (redirect, navigation, browser-tab
@@ -863,17 +907,23 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
 
     /**
      * Preserves the Content-Type declared by the wrapped legacy servlet when it
-     * is a JSON response (e.g. {@code UsedByLink} answering {@code JSONCategory}
-     * or {@code JSONLinkedItem}). For every other case the legacy WAD pipeline
-     * produces HTML, so the historical default is kept.
+     * is a JSON or XML response. JSON: e.g. {@code UsedByLink} answering
+     * {@code JSONCategory} or {@code JSONLinkedItem}. XML: e.g. selector info
+     * pages returning {@code Command=STRUCTURE} or {@code Command=DATA} responses
+     * — Dojo's DataGrid reads these via {@code xhr.responseXML}, which browsers
+     * set to {@code null} when the declared MIME type is not an XML variant,
+     * causing the "Error while parsing datagrid structure" alert. For every other
+     * case the legacy WAD pipeline produces HTML, so the historical default is kept.
      */
     private void applyFinalContentType(HttpServletResponse res,
             HttpServletResponseLegacyWrapper wrapper) {
         String wrappedContentType = wrapper.getContentType();
-        if (wrappedContentType != null
-                && wrappedContentType.toLowerCase().contains(JSON_CONTENT_TYPE_PREFIX)) {
-            res.setContentType(wrappedContentType);
-            return;
+        if (wrappedContentType != null) {
+            String lower = wrappedContentType.toLowerCase();
+            if (lower.contains(JSON_CONTENT_TYPE_PREFIX) || lower.contains("xml")) {
+                res.setContentType(wrappedContentType);
+                return;
+            }
         }
         res.setContentType(HTML_UTF8_CONTENT_TYPE);
         res.setCharacterEncoding(UTF8_CHARSET);
@@ -1756,6 +1806,9 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         }
 
         if (responseString.contains(FORM_CLOSE_TAG)) {
+            if (responseString.contains(HEAD_CLOSE_TAG)) {
+                responseString = responseString.replace(HEAD_CLOSE_TAG, POPUP_URL_FIX_SCRIPT.concat(HEAD_CLOSE_TAG));
+            }
             String resWithNewScript = responseString.replace(FORM_CLOSE_TAG,
                     FORM_CLOSE_TAG.concat(POST_MESSAGE_SCRIPT));
             resWithNewScript = resWithNewScript.replace(SRC_REPLACE_STRING + "../web/",
