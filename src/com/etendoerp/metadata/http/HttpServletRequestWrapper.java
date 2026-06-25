@@ -9,7 +9,7 @@
  * "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
  * implied. See the License for the specific language governing rights
  * and limitations under the License.
- * All portions are Copyright © 2021–2025 FUTIT SERVICES, S.L
+ * All portions are Copyright © 2021-2026 FUTIT SERVICES, S.L
  * All Rights Reserved.
  * Contributor(s): Futit Services S.L.
  *************************************************************************
@@ -24,8 +24,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.openbravo.base.exception.OBException;
 import org.openbravo.client.kernel.RequestContext;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpSession;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
@@ -49,9 +49,9 @@ import java.util.Set;
  *
  * @author luuchorocha
  */
+@SuppressWarnings("java:S2176")
 public class HttpServletRequestWrapper extends RequestContext.HttpServletRequestWrapper {
   private String sessionId;
-  private final String userId;
   private LegacyHttpSessionAdapter sessionAdapter;
   private final Map<String, List<String>> customHeaders;
 
@@ -75,7 +75,6 @@ public class HttpServletRequestWrapper extends RequestContext.HttpServletRequest
       }
     }
     if (token == null) {
-      this.userId = null;
       return;
     }
     DecodedJWT decodedJWT;
@@ -84,7 +83,6 @@ public class HttpServletRequestWrapper extends RequestContext.HttpServletRequest
     } catch (Exception e) {
       throw new OBException("Error decoding token", e);
     }
-    this.userId = decodedJWT.getClaim("user").asString();
     this.sessionId = decodedJWT.getClaim("jti").asString();
   }
 

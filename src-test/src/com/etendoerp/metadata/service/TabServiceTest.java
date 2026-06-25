@@ -1,3 +1,19 @@
+/*
+ *************************************************************************
+ * The contents of this file are subject to the Etendo License
+ * (the "License"), you may not use this file except in compliance with
+ * the License.
+ * You may obtain a copy of the License at
+ * https://github.com/etendosoftware/etendo_core/blob/main/legal/Etendo_license.txt
+ * Software distributed under the License is distributed on an
+ * "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
+ * implied. See the License for the specific language governing rights
+ * and limitations under the License.
+ * All portions are Copyright © 2021-2026 FUTIT SERVICES, S.L
+ * All Rights Reserved.
+ * Contributor(s): Futit Services S.L.
+ *************************************************************************
+ */
 package com.etendoerp.metadata.service;
 
 import static com.etendoerp.metadata.MetadataTestConstants.SINGLETON_NOT_SET_ERROR;
@@ -14,8 +30,8 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.codehaus.jettison.json.JSONObject;
 import org.junit.Before;
@@ -90,14 +106,7 @@ public class TabServiceTest extends BaseMetadataServiceTest {
             String responseContent = responseWriter.toString();
             assertNotNull("Response content should not be null", responseContent);
             assertFalse("Response should not be empty", responseContent.trim().isEmpty());
-
-            try {
-                JSONObject jsonResponse = new JSONObject(responseContent);
-                assertNotNull("JSON response should be parseable", jsonResponse);
-            } catch (Exception e) {
-                // If JSON parsing fails, the process still completed successfully
-                assertTrue("Process should complete without throwing exceptions", true);
-            }
+            validateJsonResponse(responseContent);
         } catch (NotFoundException e) {
             // This is expected if the tab doesn't exist in the test database
             assertTrue("NotFoundException is expected for non-existent tabs", true);
@@ -111,6 +120,16 @@ public class TabServiceTest extends BaseMetadataServiceTest {
         }
     }
 
+
+    private void validateJsonResponse(String responseContent) {
+        try {
+            JSONObject jsonResponse = new JSONObject(responseContent);
+            assertNotNull("JSON response should be parseable", jsonResponse);
+        } catch (Exception e) {
+            // If JSON parsing fails, the process still completed successfully
+            assertTrue("Process should complete without throwing exceptions", true);
+        }
+    }
 
     /**
      * Verifies that processing a request with an invalid tab identifier fails.

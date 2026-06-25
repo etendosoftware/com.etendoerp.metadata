@@ -9,7 +9,7 @@
  * "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
  * implied. See the License for the specific language governing rights
  * and limitations under the License.
- * All portions are Copyright © 2021–2025 FUTIT SERVICES, S.L
+ * All portions are Copyright © 2021-2026 FUTIT SERVICES, S.L
  * All Rights Reserved.
  * Contributor(s): Futit Services S.L.
  *************************************************************************
@@ -20,16 +20,21 @@ package com.etendoerp.metadata.data;
 import java.util.HashMap;
 import java.util.Map;
 
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 
 import org.openbravo.base.secureApp.VariablesSecureApp;
 
 /**
- * @author luuchorocha
+ * Extends VariablesSecureApp to track session attributes with their original case-sensitive names.
  */
 public class RequestVariables extends VariablesSecureApp {
     private final Map<String, Object> casedSessionAttributes = new HashMap<>();
 
+    /**
+     * Creates a new RequestVariables from the given HTTP request.
+     *
+     * @param request the HTTP servlet request
+     */
     public RequestVariables(HttpServletRequest request) {
         super(request);
     }

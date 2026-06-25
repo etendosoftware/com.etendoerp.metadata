@@ -9,7 +9,7 @@
  * "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
  * implied. See the License for the specific language governing rights
  * and limitations under the License.
- * All portions are Copyright © 2021–2025 FUTIT SERVICES, S.L
+ * All portions are Copyright © 2021-2026 FUTIT SERVICES, S.L
  * All Rights Reserved.
  * Contributor(s): Futit Services S.L.
  *************************************************************************
@@ -20,7 +20,7 @@ package com.etendoerp.metadata.service;
 import java.util.HashMap;
 import java.util.Map;
 
-import javax.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.context.ApplicationScoped;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.LogManager;
@@ -218,8 +218,19 @@ public class LocationService {
         private String countryId;
         private String regionId;
 
+        /** Creates an empty LocationData instance. */
         public LocationData() {}
 
+        /**
+         * Creates a LocationData instance with the given address fields.
+         *
+         * @param address1  primary address line
+         * @param address2  secondary address line
+         * @param postal    postal code
+         * @param city      city name
+         * @param countryId country identifier
+         * @param regionId  region identifier
+         */
         public LocationData(String address1, String address2, String postal, String city,
                             String countryId, String regionId) {
             this.address1 = address1;

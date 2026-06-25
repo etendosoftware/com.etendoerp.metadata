@@ -1,3 +1,19 @@
+/*
+ *************************************************************************
+ * The contents of this file are subject to the Etendo License
+ * (the "License"), you may not use this file except in compliance with
+ * the License.
+ * You may obtain a copy of the License at
+ * https://github.com/etendosoftware/etendo_core/blob/main/legal/Etendo_license.txt
+ * Software distributed under the License is distributed on an
+ * "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
+ * implied. See the License for the specific language governing rights
+ * and limitations under the License.
+ * All portions are Copyright © 2021-2026 FUTIT SERVICES, S.L
+ * All Rights Reserved.
+ * Contributor(s): Futit Services S.L.
+ *************************************************************************
+ */
 package com.etendoerp.metadata.http.session;
 
 import static com.etendoerp.metadata.MetadataTestConstants.ATTR1;
@@ -17,7 +33,7 @@ import static org.junit.Assert.assertTrue;
 
 import java.util.Enumeration;
 
-import javax.servlet.ServletContext;
+import jakarta.servlet.ServletContext;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -48,6 +64,7 @@ import org.openbravo.test.base.OBBaseTest;
  * Exception handling is also tested to ensure proper error conditions are met.</p>
  */
 @RunWith(MockitoJUnitRunner.class)
+@SuppressWarnings("java:S1448")
 public class LegacyHttpSessionAdapterTest extends OBBaseTest {
 
   @Mock
@@ -184,17 +201,6 @@ public class LegacyHttpSessionAdapterTest extends OBBaseTest {
   @Test
   public void getMaxInactiveIntervalShouldReturnMinusOne() {
     assertEquals(-1, session.getMaxInactiveInterval());
-  }
-
-  /**
-   * Tests that the deprecated session context method returns null.
-   *
-   * <p>This test validates that getSessionContext() returns null, which is the
-   * expected behavior for this deprecated method in modern servlet implementations.</p>
-   */
-  @Test
-  public void getSessionContextShouldReturnNull() {
-    assertNull(session.getSessionContext());
   }
 
   /**
@@ -464,22 +470,6 @@ public class LegacyHttpSessionAdapterTest extends OBBaseTest {
   public void getMaxInactiveIntervalAfterInvalidateShouldThrowException() {
     session.invalidate();
     session.getMaxInactiveInterval();
-  }
-
-  /**
-   * Tests that getting session context after invalidation throws IllegalStateException.
-   *
-   * <p>This test validates that once a session is invalidated, attempting to get
-   * the session context throws an IllegalStateException, even though this method
-   * is deprecated and normally returns null.</p>
-   *
-   * @throws IllegalStateException
-   *     when getting session context on invalidated session (expected)
-   */
-  @Test(expected = IllegalStateException.class)
-  public void getSessionContextAfterInvalidateShouldThrowException() {
-    session.invalidate();
-    session.getSessionContext();
   }
 
   /**

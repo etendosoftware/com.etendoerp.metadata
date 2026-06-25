@@ -9,7 +9,7 @@
  * "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
  * implied. See the License for the specific language governing rights
  * and limitations under the License.
- * All portions are Copyright © 2021–2025 FUTIT SERVICES, S.L
+ * All portions are Copyright © 2021-2026 FUTIT SERVICES, S.L
  * All Rights Reserved.
  * Contributor(s): Futit Services S.L.
  *************************************************************************
@@ -25,8 +25,8 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.codehaus.jettison.json.JSONObject;
 import org.junit.Test;
@@ -48,6 +48,7 @@ import com.etendoerp.metadata.exceptions.NotFoundException;
  * including parameter handling and JSON response generation.
  */
 @RunWith(MockitoJUnitRunner.Silent.class)
+@SuppressWarnings("java:S1075")
 public class ReportAndProcessServiceTest {
 
     private static final String EXCEPTION_NOT_NULL_MESSAGE = "Exception should not be null";

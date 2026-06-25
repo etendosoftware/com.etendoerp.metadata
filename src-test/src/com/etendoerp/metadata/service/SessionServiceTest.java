@@ -9,7 +9,7 @@
  * "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
  * implied. See the License for the specific language governing rights
  * and limitations under the License.
- * All portions are Copyright © 2021–2025 FUTIT SERVICES, S.L
+ * All portions are Copyright © 2021-2026 FUTIT SERVICES, S.L
  * All Rights Reserved.
  * Contributor(s): Futit Services S.L.
  *************************************************************************
@@ -17,21 +17,25 @@
 
 package com.etendoerp.metadata.service;
 
+import org.codehaus.jettison.json.JSONObject;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
+import org.mockito.MockedConstruction;
 import org.mockito.junit.MockitoJUnitRunner;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
+
+import com.etendoerp.metadata.builders.SessionBuilder;
 
 /**
  * Test class for SessionService.
@@ -79,19 +83,45 @@ public class SessionServiceTest {
 
     /**
      * Tests SessionService process method exception handling.
-     * 
+     *
      * @throws IOException if an I/O error occurs during processing
      */
     @Test
     public void testProcessWithException() throws IOException {
         SessionService service = new SessionService(mockRequest, mockResponse);
-        
+
         // Test that the service can be created and handles exceptions gracefully
         try {
             service.process();
         } catch (Exception e) {
             // Any exception is acceptable in test environment
             assertNotNull("Exception should not be null", e);
+        }
+    }
+
+    /**
+     * Tests the successful process execution with a properly mocked SessionBuilder.
+     * Covers the happy path of process() where SessionBuilder.toJSON() succeeds.
+     *
+     * @throws Exception if the process execution or JSON construction fails
+     */
+    @Test
+    public void testProcessSuccess() throws Exception {
+        StringWriter stringWriter = new StringWriter();
+        PrintWriter printWriter = new PrintWriter(stringWriter);
+        when(mockResponse.getWriter()).thenReturn(printWriter);
+
+        JSONObject sessionJson = new JSONObject();
+        sessionJson.put("sessionId", "test-session");
+
+        try (MockedConstruction<SessionBuilder> builderMock = mockConstruction(SessionBuilder.class,
+                (mock, context) -> when(mock.toJSON()).thenReturn(sessionJson))) {
+            SessionService service = new SessionService(mockRequest, mockResponse);
+            service.process();
+
+            String output = stringWriter.toString();
+            assertNotNull("Output should not be null", output);
+            assertTrue("Output should contain session data", output.contains("test-session"));
         }
     }
 }

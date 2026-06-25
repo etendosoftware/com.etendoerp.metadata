@@ -9,7 +9,7 @@
  * "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
  * implied. See the License for the specific language governing rights
  * and limitations under the License.
- * All portions are Copyright © 2021–2025 FUTIT SERVICES, S.L
+ * All portions are Copyright © 2021-2026 FUTIT SERVICES, S.L
  * All Rights Reserved.
  * Contributor(s): Futit Services S.L.
  *************************************************************************
@@ -19,17 +19,21 @@ package com.etendoerp.metadata.service;
 
 import java.io.IOException;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.openbravo.dal.core.OBContext;
 
 import com.etendoerp.metadata.builders.LanguageBuilder;
 
-/**
- * @author luuchorocha
- */
+/** Serves GET /meta/language with available system languages. */
 public class LanguageService extends MetadataService {
+    /**
+     * Creates a new LanguageService for the given request/response pair.
+     *
+     * @param request  the HTTP request
+     * @param response the HTTP response
+     */
     public LanguageService(HttpServletRequest request, HttpServletResponse response) {
         super(request, response);
     }

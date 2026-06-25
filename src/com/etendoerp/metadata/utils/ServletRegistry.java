@@ -9,7 +9,7 @@
  * "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
  * implied. See the License for the specific language governing rights
  * and limitations under the License.
- * All portions are Copyright © 2021–2025 FUTIT SERVICES, S.L
+ * All portions are Copyright © 2021-2026 FUTIT SERVICES, S.L
  * All Rights Reserved.
  * Contributor(s): Futit Services S.L.
  *************************************************************************
@@ -25,7 +25,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
-import javax.servlet.ServletRegistration;
+import jakarta.servlet.ServletRegistration;
 
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
 import org.openbravo.base.weld.WeldUtils;
@@ -33,7 +33,10 @@ import org.openbravo.client.kernel.RequestContext;
 
 import com.etendoerp.metadata.exceptions.NotFoundException;
 
+/** Resolves servlet mappings and delegates requests to the appropriate {@code HttpSecureAppServlet}. */
 public class ServletRegistry {
+    private ServletRegistry() { }
+
     private static final Map<String, ServletRegistration> SERVLET_REGISTRY = buildServletRegistry();
 
     private static Map<String, ServletRegistration> buildServletRegistry() {
@@ -96,6 +99,13 @@ public class ServletRegistry {
         return uri.startsWith(SERVLET_PATH) ? uri.substring(SERVLET_PATH_LENGTH) : uri;
     }
 
+    /**
+     * Returns the servlet mapped to the given URI, initializing it if needed.
+     *
+     * @param caller the calling servlet whose config is used for initialization
+     * @param uri    the request URI to resolve
+     * @return the resolved and initialized servlet
+     */
     public static HttpSecureAppServlet getDelegatedServlet(HttpSecureAppServlet caller, String uri) {
         HttpSecureAppServlet servlet = getOrCreateServlet(getMappingPath(uri));
 

@@ -1,3 +1,19 @@
+/*
+ *************************************************************************
+ * The contents of this file are subject to the Etendo License
+ * (the "License"), you may not use this file except in compliance with
+ * the License.
+ * You may obtain a copy of the License at
+ * https://github.com/etendosoftware/etendo_core/blob/main/legal/Etendo_license.txt
+ * Software distributed under the License is distributed on an
+ * "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
+ * implied. See the License for the specific language governing rights
+ * and limitations under the License.
+ * All portions are Copyright © 2021-2026 FUTIT SERVICES, S.L
+ * All Rights Reserved.
+ * Contributor(s): Futit Services S.L.
+ *************************************************************************
+ */
 package com.etendoerp.metadata;
 
 import java.util.Date;
@@ -7,6 +23,7 @@ import java.util.Date;
  * This class centralizes commonly used test values to improve maintainability
  * and consistency across all test cases.
  */
+@SuppressWarnings("java:S1075")
 public final class MetadataTestConstants {
 
   public static final String USERNAME = "username";
@@ -80,6 +97,7 @@ public final class MetadataTestConstants {
   public static final String ATTR2 = "attr2";
   public static final String ATTR3 = "attr3";
   public static final String VALUE = "value";
+  public static final String LABEL = "label";
   public static final String OBJECT = "object";
   public static final String JSON_ADDRESS_SAMPLE = "{\"address1\":\"123 Main St\",\"city\":\"Springfield\",\"countryId\":\"US\"}";
   public static final String CREATE = "create";
@@ -129,6 +147,7 @@ public final class MetadataTestConstants {
   public static final String TEST_TABLE_NAME = "testTable";
   public static final String TEST_PROPERTY_NAME = "testProperty";
   public static final String TEST_WINDOW_ID = "testWindowId";
+  @SuppressWarnings("java:S2386")
   public static final Date TEST_DATE = new Date();
 
   public static final String TEST_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test.token";
@@ -191,6 +210,14 @@ public final class MetadataTestConstants {
   public static final String WELD_CONTAINER_NOT_INITIALIZED_ERROR = "IllegalStateException due to Weld container not being initialized is expected in unit tests";
   public static final String SINGLETON_NOT_SET_ERROR = "Singleton not set for STATIC_INSTANCE";
   public static final String TAB_PATH = "/tab/";
+  public static final String EMAIL_PATH = "/email";
+  public static final String EMAIL_SEND_PATH = "/email/send";
+  public static final String EMAIL_CONFIG_PATH = "/email/config";
+
+  public static final String PARAM_RECORD_ID   = "recordId";
+  public static final String PARAM_TAB_ID      = "tabId";
+  public static final String KEY_SUCCESS        = "success";
+  public static final String INVALID_JSON_MSG   = "Response should be valid JSON: ";
   public static final String LEGACY_REQUEST_FAILED = "Failed to process legacy request";
   public static final String ENTITY_NAME_PROPERTY = "entityName";
   public static final String IDENTIFIER_PROPERTY = "identifier";

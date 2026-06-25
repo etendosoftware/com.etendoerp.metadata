@@ -9,7 +9,7 @@
  * "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
  * implied. See the License for the specific language governing rights
  * and limitations under the License.
- * All portions are Copyright © 2021–2025 FUTIT SERVICES, S.L
+ * All portions are Copyright © 2021-2026 FUTIT SERVICES, S.L
  * All Rights Reserved.
  * Contributor(s): Futit Services S.L.
  *************************************************************************
@@ -31,8 +31,8 @@ import java.util.Map;
 import java.util.Objects;
 
 import javax.script.ScriptException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.apache.http.HttpStatus;
 import org.apache.logging.log4j.LogManager;
@@ -41,7 +41,7 @@ import org.apache.logging.log4j.message.MessageFactory;
 import org.apache.logging.log4j.message.ParameterizedMessageFactory;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
-import org.hibernate.criterion.Restrictions;
+import org.openbravo.dal.service.Restrictions;
 import org.openbravo.authentication.AuthenticationException;
 import org.openbravo.base.exception.OBSecurityException;
 import org.openbravo.base.expression.OBScriptEngine;
@@ -72,6 +72,8 @@ import com.etendoerp.metadata.exceptions.UnprocessableContentException;
  * @author luuchorocha
  */
 public class Utils {
+    private Utils() { }
+
     private static final Logger logger = LogManager.getLogger(Utils.class);
     private static final MessageFactory messageFactory = new ParameterizedMessageFactory();
     private static final Map<String, Integer> exceptionStatusMap = buildExceptionMap();

@@ -9,7 +9,7 @@
  * "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
  * implied. See the License for the specific language governing rights
  * and limitations under the License.
- * All portions are Copyright © 2021–2025 FUTIT SERVICES, S.L
+ * All portions are Copyright © 2021-2026 FUTIT SERVICES, S.L
  * All Rights Reserved.
  * Contributor(s): Futit Services S.L.
  *************************************************************************
@@ -23,7 +23,7 @@ import com.etendoerp.metadata.utils.Utils;
 import org.apache.commons.lang3.StringUtils;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
-import org.hibernate.criterion.Restrictions;
+import org.openbravo.dal.service.Restrictions;
 import org.openbravo.base.model.Entity;
 import org.openbravo.base.model.ModelProvider;
 import org.openbravo.base.model.Property;
@@ -60,6 +60,15 @@ import org.openbravo.dal.service.OBCriteria;
  */
 public class FieldBuilderWithColumn extends FieldBuilder {
     private static final Map<String, Boolean> windowAccessCache = new ConcurrentHashMap<>();
+
+    /**
+     * Clears the cache used to store window accessibility results for roles.
+     * This forces a database check on subsequent evaluations of referenced window accessibility.
+     */
+    public static void clearWindowAccessCache() {
+        windowAccessCache.clear();
+    }
+
     private static final String COLUMN_NAME = "columnName";
     private static final String COLUMN = "column";
     private static final String IS_MANDATORY = "isMandatory";
@@ -134,7 +143,7 @@ public class FieldBuilderWithColumn extends FieldBuilder {
      */
     @Override
     protected boolean getColumnUpdatable() {
-        return field.getColumn() != null ? field.getColumn().isUpdatable() : true;
+        return field.getColumn() == null || field.getColumn().isUpdatable();
     }
 
     /**
@@ -282,12 +291,15 @@ public class FieldBuilderWithColumn extends FieldBuilder {
         }
 
         if (referenced != null) {
-            Tab referencedTab = getReferencedTab(referenced);
+            // Only resolve via Utils if addReferencedProperty did not already set a valid window ID
+            if (!json.has(REFERENCED_WINDOW_ID) || json.isNull(REFERENCED_WINDOW_ID)) {
+                Tab referencedTab = getReferencedTab(referenced);
 
-            if (referencedTab != null) {
-                json.put(REFERENCED_ENTITY, referenced.getEntity().getName());
-                json.put(REFERENCED_WINDOW_ID, referencedTab.getWindow().getId());
-                json.put(REFERENCED_TAB_ID, referencedTab.getId());
+                if (referencedTab != null) {
+                    json.put(REFERENCED_ENTITY, referenced.getEntity().getName());
+                    json.put(REFERENCED_WINDOW_ID, referencedTab.getWindow().getId());
+                    json.put(REFERENCED_TAB_ID, referencedTab.getId());
+                }
             }
 
             Property colorProp = findColorProperty(referenced.getEntity());
