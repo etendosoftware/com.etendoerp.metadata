@@ -18,8 +18,10 @@
 package com.etendoerp.metadata.utils;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
@@ -52,6 +54,8 @@ import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.access.Role;
 import org.openbravo.model.ad.access.User;
+import org.openbravo.erpCommon.utility.OBError;
+import org.openbravo.model.ad.domain.ModelImplementation;
 import org.openbravo.model.ad.process.Parameter;
 import org.openbravo.model.ad.process.ProcessInstance;
 import org.openbravo.model.ad.system.Client;
@@ -59,6 +63,7 @@ import org.openbravo.model.ad.system.Language;
 import org.openbravo.model.ad.ui.Process;
 import org.openbravo.model.common.enterprise.Organization;
 import org.openbravo.model.common.enterprise.Warehouse;
+import org.openbravo.scheduling.ProcessBundle;
 
 /**
  * Extended tests for {@link CallAsyncProcess} covering ContextValues,
@@ -80,6 +85,11 @@ public class CallAsyncProcessExtendedTest {
     private static final String WAREHOUSE_ID = "WAREHOUSE_ID";
     private static final String PINSTANCE_ID = "PI_ID";
     private static final String PROCESS_ID = "PROC_ID";
+    private static final String CLIENT_COLUMN = "AD_Client_ID";
+    private static final String CLIENT_KEY = "adClientId";
+    private static final String AUDIT_COLUMN = "ExportAuditInfo";
+    private static final String AUDIT_KEY = "exportauditinfo";
+    private static final String CLIENT_VALUE = "client-1";
 
     // ========== ContextValues Tests ==========
 
@@ -430,7 +440,7 @@ public class CallAsyncProcessExtendedTest {
         CallAsyncProcess instance = CallAsyncProcess.getInstance();
         Method method = CallAsyncProcess.class.getDeclaredMethod("runInBackground",
                 String.class, String.class,
-                Class.forName(CONTEXT_VALUES_CLASS), Boolean.class);
+                Class.forName(CONTEXT_VALUES_CLASS), Boolean.class, Map.class);
         method.setAccessible(true);
 
         OBDal mockOBDal = mock(OBDal.class);
@@ -441,10 +451,17 @@ public class CallAsyncProcessExtendedTest {
              MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class)) {
             obDalStatic.when(OBDal::getInstance).thenReturn(mockOBDal);
 
-            method.invoke(instance, pInstanceId, processId, null, null);
+            method.invoke(instance, pInstanceId, processId, null, null, null);
 
             verify(mockOBDal).rollbackAndClose();
         }
+    }
+
+    /** Invokes a private instance method of CallAsyncProcess by reflection. */
+    private Object invokePrivate(String name, Class<?>[] paramTypes, Object... args) throws Exception {
+        Method method = CallAsyncProcess.class.getDeclaredMethod(name, paramTypes);
+        method.setAccessible(true);
+        return method.invoke(CallAsyncProcess.getInstance(), args);
     }
 
     // ========== runInBackground Tests ==========
@@ -467,5 +484,273 @@ public class CallAsyncProcessExtendedTest {
     @Test
     public void testRunInBackgroundErrorHandlingWithLongMessage() throws Exception {
         assertRunInBackgroundRollsBack("PI_1", "PR_1");
+    }
+
+    // ========== dispatch (resolveJavaClassName / hasJavaClass / hasProcedure) Tests ==========
+
+    private static final String JAVA_CLASS = "org.openbravo.service.db.ExportClientProcess";
+
+    private Process mockProcessWithModelObjects(String processClassName, ModelImplementation... modelObjects) {
+        Process process = mock(Process.class);
+        when(process.getJavaClassName()).thenReturn(processClassName);
+        when(process.getADModelImplementationList()).thenReturn(java.util.Arrays.asList(modelObjects));
+        return process;
+    }
+
+    private ModelImplementation mockModelObject(String action, String className) {
+        ModelImplementation modelObject = mock(ModelImplementation.class);
+        lenient().when(modelObject.getAction()).thenReturn(action);
+        lenient().when(modelObject.getJavaClassName()).thenReturn(className);
+        return modelObject;
+    }
+
+    /**
+     * Verifies resolveJavaClassName prefers the process' own class name.
+     *
+     * @throws Exception if reflection fails
+     */
+    @Test
+    public void testResolveJavaClassNameFromProcess() throws Exception {
+        Process process = mockProcessWithModelObjects(JAVA_CLASS);
+        assertEquals(JAVA_CLASS,
+                invokePrivate("resolveJavaClassName", new Class<?>[] { Process.class }, process));
+    }
+
+    /**
+     * Verifies resolveJavaClassName falls back to the process-action ('P') model object class.
+     *
+     * @throws Exception if reflection fails
+     */
+    @Test
+    public void testResolveJavaClassNameFromModelObject() throws Exception {
+        Process process = mockProcessWithModelObjects(null, mockModelObject("P", JAVA_CLASS));
+        assertEquals(JAVA_CLASS,
+                invokePrivate("resolveJavaClassName", new Class<?>[] { Process.class }, process));
+    }
+
+    /**
+     * Verifies resolveJavaClassName ignores model objects whose action is not 'P'.
+     *
+     * @throws Exception if reflection fails
+     */
+    @Test
+    public void testResolveJavaClassNameIgnoresNonProcessAction() throws Exception {
+        Process process = mockProcessWithModelObjects(null, mockModelObject("S", JAVA_CLASS));
+        assertNull(invokePrivate("resolveJavaClassName", new Class<?>[] { Process.class }, process));
+    }
+
+    /**
+     * Verifies resolveJavaClassName returns null when there is no class anywhere.
+     *
+     * @throws Exception if reflection fails
+     */
+    @Test
+    public void testResolveJavaClassNameNone() throws Exception {
+        Process process = mockProcessWithModelObjects(null);
+        assertNull(invokePrivate("resolveJavaClassName", new Class<?>[] { Process.class }, process));
+    }
+
+    /**
+     * Verifies hasJavaClass reflects whether a Java class was resolved.
+     *
+     * @throws Exception if reflection fails
+     */
+    @Test
+    public void testHasJavaClass() throws Exception {
+        Class<?>[] types = { Process.class };
+        assertTrue((Boolean) invokePrivate("hasJavaClass", types, mockProcessWithModelObjects(JAVA_CLASS)));
+        assertFalse((Boolean) invokePrivate("hasJavaClass", types, mockProcessWithModelObjects(null)));
+    }
+
+    /**
+     * Verifies hasProcedure is true only for a non-empty stored procedure name.
+     *
+     * @throws Exception if reflection fails
+     */
+    @Test
+    public void testHasProcedure() throws Exception {
+        Class<?>[] types = { Process.class };
+
+        Process withProc = mock(Process.class);
+        when(withProc.getProcedure()).thenReturn(TEST_PROCEDURE);
+        Process emptyProc = mock(Process.class);
+        when(emptyProc.getProcedure()).thenReturn("");
+        Process nullProc = mock(Process.class);
+        when(nullProc.getProcedure()).thenReturn(null);
+
+        assertTrue((Boolean) invokePrivate("hasProcedure", types, withProc));
+        assertFalse((Boolean) invokePrivate("hasProcedure", types, emptyProc));
+        assertFalse((Boolean) invokePrivate("hasProcedure", types, nullProc));
+    }
+
+    // ========== populateBundleParams Tests ==========
+
+    /**
+     * Verifies populateBundleParams keys the bundle params with the Classic
+     * column-name transformation (AD_Client_ID -> adClientId, ExportAuditInfo -> exportauditinfo).
+     *
+     * @throws Exception if reflection fails
+     */
+    @Test
+    public void testPopulateBundleParamsUsesClassicKeys() throws Exception {
+        ProcessBundle bundle = mock(ProcessBundle.class);
+        Map<String, Object> bundleParams = new HashMap<>();
+        when(bundle.getParams()).thenReturn(bundleParams);
+
+        Map<String, String> parameters = new HashMap<>();
+        parameters.put(CLIENT_COLUMN, CLIENT_VALUE);
+        parameters.put(AUDIT_COLUMN, "Y");
+
+        invokePrivate("populateBundleParams", new Class<?>[] { ProcessBundle.class, Map.class },
+                bundle, parameters);
+
+        assertEquals(CLIENT_VALUE, bundleParams.get(CLIENT_KEY));
+        assertEquals("Y", bundleParams.get(AUDIT_KEY));
+    }
+
+    /**
+     * Verifies populateBundleParams is a no-op when parameters is null.
+     *
+     * @throws Exception if reflection fails
+     */
+    @Test
+    public void testPopulateBundleParamsWithNullParameters() throws Exception {
+        ProcessBundle bundle = mock(ProcessBundle.class);
+        Map<String, Object> bundleParams = new HashMap<>();
+        when(bundle.getParams()).thenReturn(bundleParams);
+
+        invokePrivate("populateBundleParams", new Class<?>[] { ProcessBundle.class, Map.class },
+                bundle, null);
+
+        assertTrue("No params should be added", bundleParams.isEmpty());
+    }
+
+    // ========== applyResultToInstance / failNoImplementation Tests ==========
+
+    /**
+     * Verifies a Success OBError sets result 1 and the message on the instance.
+     *
+     * @throws Exception if reflection fails
+     */
+    @Test
+    public void testApplyResultToInstanceSuccess() throws Exception {
+        ProcessInstance pInstance = mock(ProcessInstance.class);
+        OBError result = new OBError();
+        result.setType("Success");
+        result.setMessage("Exported");
+
+        OBDal mockOBDal = mock(OBDal.class);
+        try (MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class)) {
+            obDalStatic.when(OBDal::getInstance).thenReturn(mockOBDal);
+            invokePrivate("applyResultToInstance",
+                    new Class<?>[] { ProcessInstance.class, Object.class }, pInstance, result);
+        }
+
+        verify(pInstance).setResult(1L);
+        verify(pInstance).setErrorMsg("Exported");
+    }
+
+    /**
+     * Verifies an Error OBError sets result 0 and the message on the instance.
+     *
+     * @throws Exception if reflection fails
+     */
+    @Test
+    public void testApplyResultToInstanceError() throws Exception {
+        ProcessInstance pInstance = mock(ProcessInstance.class);
+        OBError result = new OBError();
+        result.setType("Error");
+        result.setMessage("Boom");
+
+        OBDal mockOBDal = mock(OBDal.class);
+        try (MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class)) {
+            obDalStatic.when(OBDal::getInstance).thenReturn(mockOBDal);
+            invokePrivate("applyResultToInstance",
+                    new Class<?>[] { ProcessInstance.class, Object.class }, pInstance, result);
+        }
+
+        verify(pInstance).setResult(0L);
+        verify(pInstance).setErrorMsg("Boom");
+    }
+
+    /**
+     * Verifies a non-OBError result is treated as success.
+     *
+     * @throws Exception if reflection fails
+     */
+    @Test
+    public void testApplyResultToInstanceNonError() throws Exception {
+        ProcessInstance pInstance = mock(ProcessInstance.class);
+
+        OBDal mockOBDal = mock(OBDal.class);
+        try (MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class)) {
+            obDalStatic.when(OBDal::getInstance).thenReturn(mockOBDal);
+            invokePrivate("applyResultToInstance",
+                    new Class<?>[] { ProcessInstance.class, Object.class }, pInstance, (Object) null);
+        }
+
+        verify(pInstance).setResult(1L);
+        verify(pInstance).setErrorMsg(null);
+    }
+
+    /**
+     * Verifies failNoImplementation marks the instance as failed with a readable message.
+     *
+     * @throws Exception if reflection fails
+     */
+    @Test
+    public void testFailNoImplementation() throws Exception {
+        ProcessInstance pInstance = mock(ProcessInstance.class);
+        Process process = mock(Process.class);
+        when(process.getName()).thenReturn("Export Client");
+
+        OBDal mockOBDal = mock(OBDal.class);
+        try (MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class)) {
+            obDalStatic.when(OBDal::getInstance).thenReturn(mockOBDal);
+            invokePrivate("failNoImplementation",
+                    new Class<?>[] { ProcessInstance.class, Process.class }, pInstance, process);
+        }
+
+        verify(pInstance).setResult(0L);
+        verify(pInstance).setErrorMsg(
+                "Process 'Export Client' has no stored procedure or Java class to execute.");
+        verify(mockOBDal).save(pInstance);
+    }
+
+    // ========== toStringParameters Tests ==========
+
+    /**
+     * Verifies toStringParameters stringifies values and skips null entries.
+     *
+     * @throws Exception if reflection fails
+     */
+    @Test
+    @SuppressWarnings("unchecked")
+    public void testToStringParameters() throws Exception {
+        Map<String, Object> input = new HashMap<>();
+        input.put(CLIENT_COLUMN, CLIENT_VALUE);
+        input.put("Amount", 5);
+        input.put("Ignored", null);
+
+        Map<String, String> result = (Map<String, String>) invokePrivate("toStringParameters",
+                new Class<?>[] { Map.class }, input);
+
+        assertEquals(CLIENT_VALUE, result.get(CLIENT_COLUMN));
+        assertEquals("5", result.get("Amount"));
+        assertFalse("null values must be skipped", result.containsKey("Ignored"));
+    }
+
+    /**
+     * Verifies toStringParameters returns an empty map when given null.
+     *
+     * @throws Exception if reflection fails
+     */
+    @Test
+    @SuppressWarnings("unchecked")
+    public void testToStringParametersWithNull() throws Exception {
+        Map<String, String> result = (Map<String, String>) invokePrivate("toStringParameters",
+                new Class<?>[] { Map.class }, (Object) null);
+
+        assertTrue("Result should be empty for null input", result.isEmpty());
     }
 }
