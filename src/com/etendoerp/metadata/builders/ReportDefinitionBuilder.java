@@ -36,6 +36,11 @@ public class ReportDefinitionBuilder extends Builder {
 
     private final ReportDefinition report;
 
+    /**
+     * Creates a new ReportDefinitionBuilder for the given report definition.
+     *
+     * @param report the OBUIAPP_Report entity to build export flags JSON for
+     */
     public ReportDefinitionBuilder(ReportDefinition report) {
         this.report = report;
     }
