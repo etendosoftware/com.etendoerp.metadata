@@ -9,7 +9,7 @@
  * "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
  * implied. See the License for the specific language governing rights
  * and limitations under the License.
- * All portions are Copyright © 2021–2025 FUTIT SERVICES, S.L
+ * All portions are Copyright © 2021-2026 FUTIT SERVICES, S.L
  * All Rights Reserved.
  * Contributor(s): Futit Services S.L.
  *************************************************************************
@@ -17,13 +17,17 @@
 
 package com.etendoerp.metadata.exceptions;
 
+/**
+ * Exception indicating that the request is unauthorized due to invalid or missing credentials (HTTP 401).
+ */
 public class UnauthorizedException extends RuntimeException {
-    private final static String DEFAULT_MESSAGE = "Invalid or missing token";
+    private static final String DEFAULT_MESSAGE = "Invalid or missing token";
 
     public UnauthorizedException(String message) {
         super(message.isEmpty() ? DEFAULT_MESSAGE : message);
     }
 
+    /** Creates a new UnauthorizedException with the default message. */
     public UnauthorizedException() {
         super(DEFAULT_MESSAGE);
     }

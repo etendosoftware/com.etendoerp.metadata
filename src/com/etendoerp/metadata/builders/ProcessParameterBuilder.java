@@ -1,3 +1,19 @@
+/*
+ *************************************************************************
+ * The contents of this file are subject to the Etendo License
+ * (the "License"), you may not use this file except in compliance with
+ * the License.
+ * You may obtain a copy of the License at
+ * https://github.com/etendosoftware/etendo_core/blob/main/legal/Etendo_license.txt
+ * Software distributed under the License is distributed on an
+ * "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
+ * implied. See the License for the specific language governing rights
+ * and limitations under the License.
+ * All portions are Copyright © 2021-2026 FUTIT SERVICES, S.L
+ * All Rights Reserved.
+ * Contributor(s): Futit Services S.L.
+ *************************************************************************
+ */
 package com.etendoerp.metadata.builders;
 
 import org.codehaus.jettison.json.JSONException;
@@ -40,6 +56,16 @@ public class ProcessParameterBuilder extends Builder {
                 && LIST_REFERENCE_ID.contains(parameter.getReference().getId());
     }
 
+    private static boolean isButtonParameter(ProcessParameter parameter) {
+        return parameter != null && parameter.getReference() != null &&
+               BUTTON_REFERENCE_ID.equals(parameter.getReference().getId());
+    }
+
+    private static boolean isButtonListParameter(ProcessParameter parameter) {
+        return parameter != null && parameter.getReference() != null &&
+               BUTTON_LIST_REFERENCE_ID.equals(parameter.getReference().getId());
+    }
+
     @Override
     public JSONObject toJSON() throws JSONException {
         ProcessParameter currentParameter = this.parameter;
@@ -54,7 +80,7 @@ public class ProcessParameterBuilder extends Builder {
         }
 
         // List reference
-        if (isListParameter(currentParameter)) {
+        if ((isListParameter(currentParameter) || isButtonListParameter(currentParameter) || isButtonParameter(currentParameter)) && currentParameter.getReferenceSearchKey() != null) {
             json.put(
                     "refList",
                     getListInfo(currentParameter.getReferenceSearchKey(), language)

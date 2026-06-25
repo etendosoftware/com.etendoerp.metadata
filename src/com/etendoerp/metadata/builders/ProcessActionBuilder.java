@@ -9,7 +9,7 @@
  * "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
  * implied. See the License for the specific language governing rights
  * and limitations under the License.
- * All portions are Copyright © 2021–2025 FUTIT SERVICES, S.L
+ * All portions are Copyright © 2021-2026 FUTIT SERVICES, S.L
  * All Rights Reserved.
  * Contributor(s): Futit Services S.L.
  *************************************************************************
@@ -32,9 +32,17 @@ import org.openbravo.model.ad.ui.Process;
 import org.openbravo.model.ad.ui.ProcessParameter;
 import org.openbravo.service.json.DataResolvingMode;
 
+/**
+ * Builds a JSON representation of a legacy process action and its parameters.
+ */
 public class ProcessActionBuilder extends Builder {
     private final Process process;
 
+    /**
+     * Creates a new ProcessActionBuilder for the given process.
+     *
+     * @param process the legacy process entity to build JSON for
+     */
     public ProcessActionBuilder(Process process) {
         this.process = process;
     }
@@ -47,6 +55,14 @@ public class ProcessActionBuilder extends Builder {
         return parameter != null && parameter.getReference() != null && LIST_REFERENCE_ID.contains(parameter.getReference().getId());
     }
 
+    /**
+     * Builds a JSON object for a field-level process button, enriching it with display logic and field metadata.
+     *
+     * @param field   the field containing the process button
+     * @param process the process linked to the field, or {@code null}
+     * @return a JSON object with process and field metadata
+     * @throws JSONException if there is an error during JSON construction
+     */
     public static JSONObject getFieldProcess(Field field, Process process) throws JSONException {
         if (process == null) {
             return new JSONObject();

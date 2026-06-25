@@ -9,7 +9,7 @@
  * "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
  * implied. See the License for the specific language governing rights
  * and limitations under the License.
- * All portions are Copyright © 2021–2025 FUTIT SERVICES, S.L
+ * All portions are Copyright © 2021-2026 FUTIT SERVICES, S.L
  * All Rights Reserved.
  * Contributor(s): Futit Services S.L.
  *************************************************************************
@@ -41,10 +41,18 @@ import org.openbravo.dal.core.OBContext;
 import com.etendoerp.metadata.exceptions.NotFoundException;
 import com.etendoerp.metadata.exceptions.UnauthorizedException;
 
+/**
+ * Builds a JSON representation of a window including its tabs and role-based access permissions.
+ */
 public class WindowBuilder extends Builder {
     private static final Map<String, Boolean> tabAllowedCache = new ConcurrentHashMap<>();
     private final String id;
 
+    /**
+     * Creates a new WindowBuilder for the window with the given ID.
+     *
+     * @param id the database ID of the window to build
+     */
     public WindowBuilder(String id) {
         this.id = id;
     }
@@ -102,6 +110,14 @@ public class WindowBuilder extends Builder {
         }
 
         return new JSONArray(result);
+    }
+
+    /**
+     * Clears the cache used to store whether a tab is allowed for the current context.
+     * This forces a re-evaluation of tab access permissions on subsequent requests.
+     */
+    public static void clearTabAllowedCache() {
+        tabAllowedCache.clear();
     }
 
     private static boolean isTabAllowedCached(Tab tab) {
