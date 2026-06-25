@@ -9,7 +9,7 @@
  * "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
  * implied. See the License for the specific language governing rights
  * and limitations under the License.
- * All portions are Copyright © 2021–2025 FUTIT SERVICES, S.L
+ * All portions are Copyright © 2021-2026 FUTIT SERVICES, S.L
  * All Rights Reserved.
  * Contributor(s): Futit Services S.L.
  *************************************************************************
@@ -33,6 +33,12 @@ import java.io.IOException;
  * Creates a new {@code WindowService} instance using the given request and response.
  */
 public class WindowService extends MetadataService {
+    /**
+     * Creates a new WindowService.
+     *
+     * @param request  the HTTP request
+     * @param response the HTTP response
+     */
     public WindowService(HttpServletRequest request, HttpServletResponse response) {
         super(request, response);
     }

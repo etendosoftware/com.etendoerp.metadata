@@ -1,8 +1,27 @@
+/*
+ *************************************************************************
+ * The contents of this file are subject to the Etendo License
+ * (the "License"), you may not use this file except in compliance with
+ * the License.
+ * You may obtain a copy of the License at
+ * https://github.com/etendosoftware/etendo_core/blob/main/legal/Etendo_license.txt
+ * Software distributed under the License is distributed on an
+ * "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
+ * implied. See the License for the specific language governing rights
+ * and limitations under the License.
+ * All portions are Copyright © 2021-2026 FUTIT SERVICES, S.L
+ * All Rights Reserved.
+ * Contributor(s): Futit Services S.L.
+ *************************************************************************
+ */
 package com.etendoerp.metadata.http;
 
 import com.auth0.jwt.interfaces.Claim;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.etendoerp.metadata.data.RequestVariables;
+import com.etendoerp.metadata.exceptions.InternalServerException;
+import com.etendoerp.metadata.utils.LegacyPaths;
+import com.etendoerp.metadata.utils.LegacyUtils;
 import com.smf.securewebservices.utils.SecureWebServicesUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.LogManager;
@@ -44,6 +63,7 @@ import static com.etendoerp.metadata.utils.LegacyPaths.MANUAL_PROCESS;
  * It provides compatibility for WAD-generated windows and processes by wrapping
  * requests and responses to inject necessary scripts and handle authentication.
  */
+@SuppressWarnings("java:S1075")
 public class LegacyProcessServlet extends HttpSecureAppServlet {
     private static final Logger log = LogManager.getLogger();
     private static final String JWT_TOKEN = "#JWT_TOKEN";
@@ -327,6 +347,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
                 authenticateWithToken(wrappedRequest, token);
             }
             preprocessRequest(req, wrappedRequest);
+            handleCreateFromSession(req, path, req.getSession(true));
 
             wrappedRequest.getRequestDispatcher(path).include(wrappedRequest, responseWrapper);
 
@@ -522,7 +543,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
     /**
      * Creates a new session in the database (AD_Session table).
      * This method is a duplication of the logic found in
-     * {@link org.openbravo.authentication.AuthenticationManager#createDBSession(HttpServletRequest, String, String, String)}.
+     * {@link org.openbravo.authentication.AuthenticationManager# createDBSession(HttpServletRequest, String, String, String)}.
      *
      * The duplication is necessary because the original method in
      * AuthenticationManager is 'protected'
@@ -864,5 +885,25 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         }
         matcher.appendTail(result);
         return result.toString();
+    }
+
+    private static void handleCreateFromSession(HttpServletRequest req, String path, HttpSession session) {
+        if (LegacyPaths.CREATE_FROM_HTML.equals(path) && "SAVE".equals(req.getParameter("Command"))) {
+            String windowId = req.getParameter("inpWindowId");
+            String tableId = req.getParameter("inpTableId");
+            String sessionKey = "CREATEFROM|TABID";
+
+            if (!LegacyUtils.isMutableSessionAttribute(sessionKey)) {
+                throw new InternalServerException("Attempt to set forbidden session key: " + sessionKey);
+            }
+
+            String tabId = LegacyUtils.findTabIdByWindowAndTable(windowId, tableId);
+            if (tabId != null) {
+                session.setAttribute(sessionKey, tabId);
+            } else {
+                log.warn("Could not resolve tabId for windowId={}, tableId={}. " +
+                         "CreateFrom|tabId will not be set in session.", windowId, tableId);
+            }
+        }
     }
 }

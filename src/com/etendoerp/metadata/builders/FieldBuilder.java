@@ -9,7 +9,7 @@
  * "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
  * implied. See the License for the specific language governing rights
  * and limitations under the License.
- * All portions are Copyright © 2021–2025 FUTIT SERVICES, S.L
+ * All portions are Copyright © 2021-2026 FUTIT SERVICES, S.L
  * All Rights Reserved.
  * Contributor(s): Futit Services S.L.
  *************************************************************************
@@ -23,8 +23,8 @@ import java.util.stream.Collectors;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
-import org.hibernate.criterion.Restrictions;
 import org.openbravo.base.exception.OBException;
+import org.openbravo.client.application.ApplicationConstants;
 import org.openbravo.base.model.Entity;
 import org.openbravo.base.model.ModelProvider;
 import org.openbravo.base.model.Property;
@@ -41,7 +41,6 @@ import org.openbravo.database.ConnectionProvider;
 import org.openbravo.erpCommon.utility.ComboTableData;
 import org.openbravo.erpCommon.utility.Utility;
 import org.openbravo.model.ad.access.FieldAccess;
-import org.openbravo.model.ad.access.WindowAccess;
 import org.openbravo.model.ad.datamodel.Column;
 import org.openbravo.model.ad.domain.Reference;
 import org.openbravo.model.ad.domain.ReferencedTree;
@@ -60,7 +59,6 @@ import org.openbravo.userinterface.selector.SelectorField;
 import com.etendoerp.etendorx.utils.DataSourceUtils;
 import com.etendoerp.metadata.data.ReferenceSelectors;
 import com.etendoerp.metadata.utils.Constants;
-import org.openbravo.model.ad.ui.Window;
 
 /**
  * Abstract base class for building field metadata in JSON format.
@@ -311,6 +309,23 @@ public abstract class FieldBuilder extends Builder {
         selectorInfo.put("extraSearchFields", getExtraSearchFields(selector));
         selectorInfo.put(Constants.DISPLAY_FIELD_PROPERTY, getDisplayField(selector));
         selectorInfo.put(Constants.VALUE_FIELD_PROPERTY, getValueField(selector));
+
+        if (selector.getProcessDefintion() != null) {
+            selectorInfo.put("hasProcessDefinitionRelated", true);
+            selectorInfo.put("processDefinitionId", selector.getProcessDefintion().getId());
+        }
+
+        JSONArray gridColumns = new JSONArray();
+        for (SelectorField selectorField : selector.getOBUISELSelectorFieldList()) {
+            if (selectorField.isActive() && selectorField.isShowingrid()) {
+                gridColumns.put(buildGridColumn(selectorField));
+            }
+        }
+        selectorInfo.put("gridColumns", gridColumns);
+
+        if (gridColumns.length() > 0) {
+            selectorInfo.put("hasTableRelated", true);
+        }
 
         return selectorInfo;
     }
@@ -664,6 +679,46 @@ public abstract class FieldBuilder extends Builder {
     }
 
     /**
+     * Resolves the reference ID for a selector field by checking, in order:
+     * the field's own reference, its column reference, and its datasource field reference.
+     *
+     * @param selectorField The selector field to resolve the reference ID for
+     * @return The reference ID string, or null if none is found
+     */
+    private static String resolveReferenceId(SelectorField selectorField) {
+        if (selectorField.getReference() != null) {
+            return selectorField.getReference().getId();
+        }
+        if (selectorField.getColumn() != null) {
+            return selectorField.getColumn().getReference().getId();
+        }
+        if (selectorField.getObserdsDatasourceField() != null
+                && selectorField.getObserdsDatasourceField().getReference() != null) {
+            return selectorField.getObserdsDatasourceField().getReference().getId();
+        }
+        return null;
+    }
+
+    /**
+     * Builds a grid column JSON object from a selector field.
+     *
+     * @param selectorField The selector field to build the column for
+     * @return JSONObject with the column metadata
+     * @throws JSONException if there's an error creating the JSON structure
+     */
+    private static JSONObject buildGridColumn(SelectorField selectorField) throws JSONException {
+        JSONObject column = new JSONObject();
+        column.put("id", selectorField.getId());
+        column.put("header", selectorField.get(SelectorField.PROPERTY_NAME, OBContext.getOBContext().getLanguage()));
+        column.put("accessorKey", getPropertyOrDataSourceField(selectorField));
+        column.put("enableSorting", selectorField.isSortable());
+        column.put("enableFiltering", selectorField.isFilterable());
+        column.put("referenceId", resolveReferenceId(selectorField));
+        column.put("sortNo", selectorField.getSortno());
+        return column;
+    }
+
+    /**
      * Generates the input name for a database column.
      * Used for form input field naming in the UI.
      *
@@ -689,12 +744,15 @@ public abstract class FieldBuilder extends Builder {
     protected static String getHqlName(Field field) {
         try {
             Column fieldColumn = field.getColumn();
-            String dbTableName = fieldColumn.getTable().getDBTableName();
-            String dbColumnName = fieldColumn.getDBColumnName();
-            String[] names = DataSourceUtils.getHQLColumnName(true, dbTableName, dbColumnName);
+            // Only attempt DAL entity lookup for physical table-based tables (not HQL or other virtual types)
+            if (ApplicationConstants.TABLEBASEDTABLE.equals(fieldColumn.getTable().getDataOriginType())) {
+                String dbTableName = fieldColumn.getTable().getDBTableName();
+                String dbColumnName = fieldColumn.getDBColumnName();
+                String[] names = DataSourceUtils.getHQLColumnName(true, dbTableName, dbColumnName);
 
-            if (names.length > 0) {
-                return names[0];
+                if (names.length > 0) {
+                    return names[0];
+                }
             }
         } catch (Exception e) {
             logger.warn(e.getMessage(), e);

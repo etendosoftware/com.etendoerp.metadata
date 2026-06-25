@@ -3,13 +3,13 @@
     <table name="ETMETA_TOOLBAR_BUTTON_WINDOW" primaryKey="ETMETA_TB_BTN_WIN_PK">
       <column name="ETMETA_TB_BTN_WIN_ID" primaryKey="true" required="true" type="VARCHAR" size="32" autoIncrement="false">
         <default/>
-        <onCreateDefault/>
+        <onCreateDefault><![CDATA[2635BF2045584681BCA3AC4F0F3598BC]]></onCreateDefault>
       </column>
-      <column name="ETMETA_TOOLBAR_BUTTON_ID" primaryKey="false" required="true" type="VARCHAR" size="32" autoIncrement="false">
+      <column name="ETMETA_TOOLBAR_BUTTON_ID" primaryKey="false" required="false" type="VARCHAR" size="32" autoIncrement="false">
         <default/>
         <onCreateDefault/>
       </column>
-      <column name="AD_WINDOW_ID" primaryKey="false" required="true" type="VARCHAR" size="32" autoIncrement="false">
+      <column name="AD_WINDOW_ID" primaryKey="false" required="false" type="VARCHAR" size="32" autoIncrement="false">
         <default/>
         <onCreateDefault/>
       </column>
@@ -22,16 +22,16 @@
         <onCreateDefault/>
       </column>
       <column name="CREATEDBY" primaryKey="false" required="true" type="VARCHAR" size="32" autoIncrement="false">
-        <default/>
-        <onCreateDefault/>
+        <default><![CDATA[0]]></default>
+        <onCreateDefault><![CDATA['0']]></onCreateDefault>
       </column>
       <column name="UPDATED" primaryKey="false" required="true" type="TIMESTAMP" size="7" autoIncrement="false">
         <default><![CDATA[SYSDATE]]></default>
         <onCreateDefault/>
       </column>
       <column name="UPDATEDBY" primaryKey="false" required="true" type="VARCHAR" size="32" autoIncrement="false">
-        <default/>
-        <onCreateDefault/>
+        <default><![CDATA[0]]></default>
+        <onCreateDefault><![CDATA['0']]></onCreateDefault>
       </column>
       <column name="AD_CLIENT_ID" primaryKey="false" required="true" type="VARCHAR" size="32" autoIncrement="false">
         <default><![CDATA[0]]></default>

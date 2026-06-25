@@ -9,7 +9,7 @@
  * "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
  * implied. See the License for the specific language governing rights
  * and limitations under the License.
- * All portions are Copyright © 2021–2025 FUTIT SERVICES, S.L
+ * All portions are Copyright © 2021-2026 FUTIT SERVICES, S.L
  * All Rights Reserved.
  * Contributor(s): Futit Services S.L.
  *************************************************************************
@@ -18,12 +18,18 @@
 package com.etendoerp.metadata.utils;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 /**
+ * Shared path and configuration constants for the metadata module.
+ *
  * @author luuchorocha
  */
+@SuppressWarnings("java:S1075")
 public class Constants {
+    private Constants() { }
+
     public static final String MODULE_BASE_PATH = "/meta";
     public static final String SERVLET_PATH = "/forward";
     public static final String LEGACY_PATH = "/legacy";
@@ -55,12 +61,14 @@ public class Constants {
     public static final String RESPONSE_VALUES = "response";
     private static final String SELECTOR_REFERENCE_ID = "95E2A8B50A254B2AAE6774B8C2F28120";
     public static final String BUTTON_REFERENCE_ID = "28";
+    public static final String BUTTON_LIST_REFERENCE_ID = "FF80818132F94B500132F9575619000A";
     private static final String SEARCH_REFERENCE_ID = "30";
     private static final String TABLE_DIR_REFERENCE_ID = "19";
     private static final String TABLE_REFERENCE_ID = "18";
     private static final String TREE_REFERENCE_ID = "8C57A4A2E05F4261A1FADF47C30398AD";
-    public static final List<String> SELECTOR_REFERENCES = Arrays.asList(TABLE_REFERENCE_ID, TABLE_DIR_REFERENCE_ID,
-            SEARCH_REFERENCE_ID, SELECTOR_REFERENCE_ID, TREE_REFERENCE_ID);
+    public static final List<String> SELECTOR_REFERENCES = Collections.unmodifiableList(Arrays.asList(
+            TABLE_REFERENCE_ID, TABLE_DIR_REFERENCE_ID,
+            SEARCH_REFERENCE_ID, SELECTOR_REFERENCE_ID, TREE_REFERENCE_ID));
     public static final String WINDOW_REFERENCE_ID = "FF80818132D8F0F30132D9BC395D0038";
     public static final String FORM_CLOSE_TAG = "</FORM>";
     public static final String FRAMESET_CLOSE_TAG = "</FRAMESET>";
@@ -72,13 +80,22 @@ public class Constants {
     public static final String PATCH = "PATCH";
     public static final String DELETE = "DELETE";
     public static final String LOCATION_PATH = "/location/";
+    public static final String EMAIL_PATH = "/email";
+    public static final String EMAIL_SEND_PATH = "/email/send";
+    public static final String EMAIL_CONFIG_PATH = "/email/config";
+    public static final String EMAIL_ATTACHMENTS_PATH = "/email/attachments";
     public static final String TOOLBAR_PATH = "/toolbar";
+    public static final String SAVED_VIEW_PATH = "/saved-views";
     public static final String REPORT_AND_PROCESS_PATH = "/report-and-process/";
     public static final String PROCESS_PATH = "/process/";
     public static final String PROCESS_EXECUTION_PATH = "/process-execution";
     public static final String LOCALE_KEY = "Locale";
     public static final String DEFAULT_LOCALE = "en_US";
     public static final String PUBLIC_JS_PATH = "/web/js/";
+    public static final String DASHBOARD_PATH = "/dashboard/";
+    public static final String WIDGET_DATA_PATH = "/widget/";
+    public static final String WIDGET_CLASSES_PATH = "/widget/classes";
+    public static final String FAVORITES_PATH = "/favorites/";
 
     // Audit Fields
     public static final String CREATION_DATE = "creationDate";

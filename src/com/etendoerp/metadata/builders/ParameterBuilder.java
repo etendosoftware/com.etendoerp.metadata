@@ -9,7 +9,7 @@
  * "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
  * implied. See the License for the specific language governing rights
  * and limitations under the License.
- * All portions are Copyright © 2021–2025 FUTIT SERVICES, S.L
+ * All portions are Copyright © 2021-2026 FUTIT SERVICES, S.L
  * All Rights Reserved.
  * Contributor(s): Futit Services S.L.
  *************************************************************************
@@ -32,11 +32,16 @@ import static com.etendoerp.metadata.builders.FieldBuilder.getSelectorInfo;
 import static com.etendoerp.metadata.utils.Constants.*;
 
 /**
- * @author luuchorocha
+ * Builds a JSON representation of a process definition parameter including selector and list info.
  */
 public class ParameterBuilder extends Builder {
     private final Parameter parameter;
 
+    /**
+     * Creates a new ParameterBuilder for the given parameter.
+     *
+     * @param parameter the process definition parameter to build JSON for
+     */
     public ParameterBuilder(Parameter parameter) {
         this.parameter = parameter;
     }
@@ -47,8 +52,15 @@ public class ParameterBuilder extends Builder {
     }
 
     private static boolean isListParameter(Parameter parameter) {
-        return parameter != null && parameter.getReference() != null && LIST_REFERENCE_ID.contains(
-            parameter.getReference().getId());
+        return parameter != null && parameter.getReference() != null &&
+               (LIST_REFERENCE_ID.equals(parameter.getReference().getId()) ||
+                BUTTON_REFERENCE_ID.equals(parameter.getReference().getId()));
+    }
+
+
+    private static boolean isButtonListParameter(Parameter parameter) {
+        return parameter != null && parameter.getReference() != null &&
+               BUTTON_LIST_REFERENCE_ID.equals(parameter.getReference().getId());
     }
 
     private static boolean isWindowReference(Parameter parameter) {
@@ -64,6 +76,7 @@ public class ParameterBuilder extends Builder {
         addDisplayLogicExpression(json, parameter);
         addSelectorInfo(json, parameter);
         addListInfo(json, parameter);
+        addButtonListInfo(json, parameter);
         addWindowInfo(json, parameter);
 
         return json;
@@ -85,7 +98,7 @@ public class ParameterBuilder extends Builder {
         try {
             String displayLogic = parameter.getDisplayLogic();
             if (displayLogic != null && !displayLogic.isBlank()) {
-                DynamicExpressionParser parser = new DynamicExpressionParser(displayLogic, parameter, false);
+                DynamicExpressionParser parser = new DynamicExpressionParser(displayLogic, parameter, true);
                 json.put("displayLogicExpression", parser.getJSExpression());
             }
         } catch (Exception e) {
@@ -110,6 +123,16 @@ public class ParameterBuilder extends Builder {
             }
         } catch (Exception e) {
             logger.warn("Error building refList for parameter {}: {}", parameter.getId(), e.getMessage(), e);
+        }
+    }
+
+    private void addButtonListInfo(JSONObject json, Parameter parameter) {
+        try {
+            if (isButtonListParameter(parameter) && parameter.getReferenceSearchKey() != null) {
+                json.put("refList", getListInfo(parameter.getReferenceSearchKey(), language));
+            }
+        } catch (Exception e) {
+            logger.warn("Error building refList for BUTTON_LIST parameter {}: {}", parameter.getId(), e.getMessage(), e);
         }
     }
 

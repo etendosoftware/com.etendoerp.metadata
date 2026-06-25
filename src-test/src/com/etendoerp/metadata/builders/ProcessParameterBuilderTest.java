@@ -1,3 +1,19 @@
+/*
+ *************************************************************************
+ * The contents of this file are subject to the Etendo License
+ * (the "License"), you may not use this file except in compliance with
+ * the License.
+ * You may obtain a copy of the License at
+ * https://github.com/etendosoftware/etendo_core/blob/main/legal/Etendo_license.txt
+ * Software distributed under the License is distributed on an
+ * "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
+ * implied. See the License for the specific language governing rights
+ * and limitations under the License.
+ * All portions are Copyright © 2021-2026 FUTIT SERVICES, S.L
+ * All Rights Reserved.
+ * Contributor(s): Futit Services S.L.
+ *************************************************************************
+ */
 package com.etendoerp.metadata.builders;
 
 import static com.etendoerp.metadata.MetadataTestConstants.*;
@@ -320,5 +336,35 @@ class ProcessParameterBuilderTest {
             assertTrue(result.getBoolean(IS_RANGE_STRING));
             assertEquals(SPECIFIC_PARAM_ID_STRING, result.getString(VALUE_FORMAT_STRING));
         }
+    }
+
+    /**
+     * Tests toJSON with a button reference parameter.
+     * Verifies that refList is added for button references.
+     */
+    @Test
+    void testToJSONWithButtonParameter() throws JSONException {
+        when(reference.getId()).thenReturn(Constants.BUTTON_REFERENCE_ID);
+        when(referenceSearchKey.getADListList()).thenReturn(Collections.emptyList());
+
+        JSONObject result = executeToJSON(null);
+
+        assertNotNull(result);
+        assertTrue(result.has(REF_LIST_STRING), "Result should contain refList for button reference");
+    }
+
+    /**
+     * Tests toJSON with a button list reference parameter.
+     * Verifies that refList is added for button list references.
+     */
+    @Test
+    void testToJSONWithButtonListParameter() throws JSONException {
+        when(reference.getId()).thenReturn(Constants.BUTTON_LIST_REFERENCE_ID);
+        when(referenceSearchKey.getADListList()).thenReturn(Collections.emptyList());
+
+        JSONObject result = executeToJSON(null);
+
+        assertNotNull(result);
+        assertTrue(result.has(REF_LIST_STRING), "Result should contain refList for button list reference");
     }
 }
