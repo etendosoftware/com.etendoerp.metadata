@@ -84,6 +84,32 @@ public class CallAsyncProcessDispatchTest {
         return modelObject;
     }
 
+    /** Invokes applyResultToInstance with the given result under a mocked OBDal singleton. */
+    private void invokeApplyResultToInstance(ProcessInstance pInstance, Object result) throws Exception {
+        OBDal mockOBDal = mock(OBDal.class);
+        try (MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class)) {
+            obDalStatic.when(OBDal::getInstance).thenReturn(mockOBDal);
+            invokePrivate(APPLY_RESULT_TO_INSTANCE_METHOD,
+                    new Class<?>[] { ProcessInstance.class, Object.class }, pInstance, result);
+        }
+    }
+
+    /**
+     * Builds an OBError of the given type/message, runs applyResultToInstance and
+     * asserts the result code and message it sets on the instance.
+     */
+    private void assertObErrorMapsTo(String type, String message, long expectedResult) throws Exception {
+        ProcessInstance pInstance = mock(ProcessInstance.class);
+        OBError result = new OBError();
+        result.setType(type);
+        result.setMessage(message);
+
+        invokeApplyResultToInstance(pInstance, result);
+
+        verify(pInstance).setResult(expectedResult);
+        verify(pInstance).setErrorMsg(message);
+    }
+
     // ========== dispatch (resolveJavaClassName / hasJavaClass / hasProcedure) Tests ==========
 
     /**
@@ -216,20 +242,7 @@ public class CallAsyncProcessDispatchTest {
      */
     @Test
     public void testApplyResultToInstanceSuccess() throws Exception {
-        ProcessInstance pInstance = mock(ProcessInstance.class);
-        OBError result = new OBError();
-        result.setType("Success");
-        result.setMessage("Exported");
-
-        OBDal mockOBDal = mock(OBDal.class);
-        try (MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class)) {
-            obDalStatic.when(OBDal::getInstance).thenReturn(mockOBDal);
-            invokePrivate(APPLY_RESULT_TO_INSTANCE_METHOD,
-                    new Class<?>[] { ProcessInstance.class, Object.class }, pInstance, result);
-        }
-
-        verify(pInstance).setResult(1L);
-        verify(pInstance).setErrorMsg("Exported");
+        assertObErrorMapsTo("Success", "Exported", 1L);
     }
 
     /**
@@ -239,20 +252,7 @@ public class CallAsyncProcessDispatchTest {
      */
     @Test
     public void testApplyResultToInstanceError() throws Exception {
-        ProcessInstance pInstance = mock(ProcessInstance.class);
-        OBError result = new OBError();
-        result.setType("Error");
-        result.setMessage("Boom");
-
-        OBDal mockOBDal = mock(OBDal.class);
-        try (MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class)) {
-            obDalStatic.when(OBDal::getInstance).thenReturn(mockOBDal);
-            invokePrivate(APPLY_RESULT_TO_INSTANCE_METHOD,
-                    new Class<?>[] { ProcessInstance.class, Object.class }, pInstance, result);
-        }
-
-        verify(pInstance).setResult(0L);
-        verify(pInstance).setErrorMsg("Boom");
+        assertObErrorMapsTo("Error", "Boom", 0L);
     }
 
     /**
@@ -264,12 +264,7 @@ public class CallAsyncProcessDispatchTest {
     public void testApplyResultToInstanceNonError() throws Exception {
         ProcessInstance pInstance = mock(ProcessInstance.class);
 
-        OBDal mockOBDal = mock(OBDal.class);
-        try (MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class)) {
-            obDalStatic.when(OBDal::getInstance).thenReturn(mockOBDal);
-            invokePrivate(APPLY_RESULT_TO_INSTANCE_METHOD,
-                    new Class<?>[] { ProcessInstance.class, Object.class }, pInstance, (Object) null);
-        }
+        invokeApplyResultToInstance(pInstance, null);
 
         verify(pInstance).setResult(1L);
         verify(pInstance).setErrorMsg(null);
