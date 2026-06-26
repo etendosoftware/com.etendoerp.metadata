@@ -51,6 +51,12 @@ public final class LegacyMessageProtocol {
      */
     public static final String ACTION_OPEN_LEGACY_REPORT = "openLegacyReport";
 
+    /**
+     * Carries the record picked in a Classic search/selector popup back to the parent.
+     * Payload shape: {@code {action: "SAVE"|"CLEAR", id: string, identifier: string}}.
+     */
+    public static final String ACTION_SELECTOR_VALUE_PICKED = "selectorValuePicked";
+
     private LegacyMessageProtocol() {
     }
 }
