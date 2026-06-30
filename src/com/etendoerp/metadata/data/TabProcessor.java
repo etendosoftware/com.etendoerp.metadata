@@ -197,10 +197,16 @@ public class TabProcessor {
    */
   public static JSONObject getTabFields(Tab tab) {
     Map<String, Tab> tabCache = new HashMap<>();
-    Set<String> accessibleWindowIds = loadAccessibleWindowIds();
+    // holder[0] is null until the first field is processed; loadAccessibleWindowIds() is never
+    // called on a cache hit because getFields() returns before invoking the fieldMapper lambda.
+    @SuppressWarnings("unchecked")
+    Set<String>[] holder = new Set[]{null};
     return getFields(tab.getId(), tab.getUpdated().toString(), tab.getADFieldList(), TabProcessor::isFieldAccessible,
         Field::getColumn, Field::getEtmetaCustomjs, Field::getClientclass, Field::getName,
-        Field::setName, (field, withCol) -> getJSONField(field, withCol, tabCache, accessibleWindowIds), fieldCache);
+        Field::setName, (field, withCol) -> {
+          if (holder[0] == null) holder[0] = loadAccessibleWindowIds();
+          return getJSONField(field, withCol, tabCache, holder[0]);
+        }, fieldCache);
   }
 
   /**
@@ -211,14 +217,18 @@ public class TabProcessor {
    */
   public static JSONObject getTabFields(TabAccess tabAccess) {
     Map<String, Tab> tabCache = new HashMap<>();
-    Set<String> accessibleWindowIds = loadAccessibleWindowIds();
+    @SuppressWarnings("unchecked")
+    Set<String>[] holder = new Set[]{null};
     return getFields(tabAccess.getId(), tabAccess.getUpdated().toString(), tabAccess.getADFieldAccessList(),
         TabProcessor::isFieldAccessAccessible, fieldAccess -> fieldAccess.getField().getColumn(),
         fieldAccess -> fieldAccess.getField().getEtmetaCustomjs(),
         fieldAccess -> fieldAccess.getField().getClientclass(),
         fieldAccess -> fieldAccess.getField().getName(),
         (fieldAccess, name) -> fieldAccess.getField().setName(name),
-        (access, withCol) -> getJSONField(access, withCol, tabCache, accessibleWindowIds), fieldAccessCache);
+        (access, withCol) -> {
+          if (holder[0] == null) holder[0] = loadAccessibleWindowIds();
+          return getJSONField(access, withCol, tabCache, holder[0]);
+        }, fieldAccessCache);
   }
 
   /**
