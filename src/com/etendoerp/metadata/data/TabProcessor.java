@@ -171,11 +171,13 @@ public class TabProcessor {
 
     if (customJs != null && clientClass != null && fieldName != null && processors.nameSetter != null) {
       String fieldKey = fieldName + "_" + clientClass;
-      // Set a new name for the field, appending "Canva" to it
-      // In the future, Canva may become another word if we need it to.
       String newFieldName = fieldName + " " + "Canva";
+      // Set the display name, build the JSON, then restore the original name so
+      // cached entity objects (e.g. from ADCS) are not permanently mutated.
       processors.nameSetter.accept(fieldLike, newFieldName);
-      result.put(fieldKey, processors.fieldMapper.apply(fieldLike, false));
+      JSONObject fieldJson = processors.fieldMapper.apply(fieldLike, false);
+      processors.nameSetter.accept(fieldLike, fieldName);
+      result.put(fieldKey, fieldJson);
     } else {
       logger.warn("Field has null column and null custom javascript - skipping field: {}", fieldLike);
     }
