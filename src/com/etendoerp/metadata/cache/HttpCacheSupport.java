@@ -79,7 +79,9 @@ public final class HttpCacheSupport {
      * @return true if the request may be answered with a conditional GET check
      */
     public static boolean isCacheable(HttpServletRequest req, String normalizedPath) {
-        return CACHEABLE_METHODS.contains(req.getMethod()) && CACHEABLE_PATHS.contains(normalizedPath);
+        String method = req.getMethod();
+
+        return method != null && CACHEABLE_METHODS.contains(method) && CACHEABLE_PATHS.contains(normalizedPath);
     }
 
     /**

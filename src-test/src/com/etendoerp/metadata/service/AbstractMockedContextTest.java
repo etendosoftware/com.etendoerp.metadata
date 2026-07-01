@@ -30,8 +30,8 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mockStatic;
-import static org.mockito.Mockito.when;
 
 /**
  * Base class for unit tests that need mocked OBContext and OBDal statics.
@@ -52,7 +52,7 @@ public abstract class AbstractMockedContextTest {
     @BeforeEach
     protected void setUpResponseWriter() throws Exception {
         responseCapture = new StringWriter();
-        when(response.getWriter()).thenReturn(new PrintWriter(responseCapture));
+        lenient().when(response.getWriter()).thenReturn(new PrintWriter(responseCapture));
     }
 
     /**
@@ -67,7 +67,7 @@ public abstract class AbstractMockedContextTest {
             ctxMock.when(() -> OBContext.setAdminMode(anyBoolean())).thenAnswer(inv -> null);
             ctxMock.when(OBContext::restorePreviousMode).thenAnswer(inv -> null);
             dalMock.when(OBDal::getInstance).thenReturn(obDal);
-            when(obDal.getSession()).thenReturn(session);
+            lenient().when(obDal.getSession()).thenReturn(session);
             action.run();
         }
     }
