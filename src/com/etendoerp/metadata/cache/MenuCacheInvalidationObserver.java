@@ -23,6 +23,7 @@ import org.openbravo.base.model.Entity;
 import org.openbravo.base.model.ModelProvider;
 import org.openbravo.client.kernel.event.EntityDeleteEvent;
 import org.openbravo.client.kernel.event.EntityNewEvent;
+import org.openbravo.client.kernel.event.EntityPersistenceEvent;
 import org.openbravo.client.kernel.event.EntityPersistenceEventObserver;
 import org.openbravo.client.kernel.event.EntityUpdateEvent;
 
@@ -81,20 +82,23 @@ class MenuCacheInvalidationObserver extends EntityPersistenceEventObserver {
       ModelProvider.getInstance().getEntityByTableId(MODEL_OBJECT_MAPPING_TABLE_ID) };
 
   public void onNew(@Observes EntityNewEvent event) {
-    if (!isValidEvent(event)) {
-      return;
-    }
-    MenuBuilder.clearMenuCache();
+    invalidate(event);
   }
 
   public void onUpdate(@Observes EntityUpdateEvent event) {
-    if (!isValidEvent(event)) {
-      return;
-    }
-    MenuBuilder.clearMenuCache();
+    invalidate(event);
   }
 
   public void onDelete(@Observes EntityDeleteEvent event) {
+    invalidate(event);
+  }
+
+  /**
+   * Invalidates the menu cache when the event targets one of the observed entities.
+   *
+   * @param event The persistence event.
+   */
+  private void invalidate(EntityPersistenceEvent event) {
     if (!isValidEvent(event)) {
       return;
     }

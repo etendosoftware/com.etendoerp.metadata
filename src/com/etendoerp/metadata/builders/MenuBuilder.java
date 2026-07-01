@@ -24,6 +24,7 @@ import java.util.stream.Collectors;
 
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
+import org.openbravo.base.weld.WeldUtils;
 import org.openbravo.client.application.GlobalMenu;
 import org.openbravo.client.application.MenuManager;
 import org.openbravo.client.application.MenuManager.MenuOption;
@@ -57,15 +58,18 @@ public class MenuBuilder extends Builder {
     private Map<String, ModelImplementationMapping> defaultMappingsByProcess;
 
     /**
-     * Constructor for MenuBuilder.
-     * Initializes the MenuManager and sets global menu options if necessary.
+     * Constructor for MenuBuilder. Points the thread-local {@link MenuManager} at the shared,
+     * CDI-managed {@link GlobalMenu} singleton so it participates in the standard menu-cache
+     * invalidation.
      */
     public MenuBuilder() {
-        try {
-            manager.get().getMenu();
-        } catch (NullPointerException e) {
-            manager.get().setGlobalMenuOptions(new GlobalMenu());
-        }
+        // Point the (thread-local) MenuManager at the CDI @ApplicationScoped GlobalMenu singleton
+        // (the same instance MenuCacheHandler invalidates) instead of a per-thread new GlobalMenu().
+        // A per-thread instance is invisible to the classic menu-cache invalidation, so its internal
+        // tree would go stale and the rebuilt menu JSON would show outdated names/structure depending
+        // on which pooled thread served the request. Resolved via WeldUtils because MenuBuilder is
+        // instantiated outside a CDI scope that would allow @Inject (same pattern as LabelsBuilder).
+        manager.get().setGlobalMenuOptions(WeldUtils.getInstanceFromStaticBeanManager(GlobalMenu.class));
     }
 
     /**

@@ -30,7 +30,6 @@ import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
@@ -58,6 +57,7 @@ import org.mockito.Mock;
 import org.mockito.MockedConstruction;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.openbravo.base.weld.WeldUtils;
 import org.openbravo.client.application.GlobalMenu;
 import org.openbravo.client.application.MenuManager;
 import org.openbravo.client.application.MenuManager.MenuOption;
@@ -98,6 +98,9 @@ class MenuBuilderTest {
 
   @Mock
   private Role role;
+
+  @Mock
+  private GlobalMenu globalMenu;
 
   private static final String TEST_ROLE_ID = "TEST_ROLE_ID";
   private static final String TEST_LANG_ID = "TEST_LANG_ID";
@@ -158,22 +161,37 @@ class MenuBuilderTest {
     lenient().when(language.getId()).thenReturn(TEST_LANG_ID);
   }
 
+  /**
+   * Stubs the CDI lookup performed by the {@code MenuBuilder} constructor so it resolves to the
+   * shared {@link GlobalMenu} mock instead of hitting the real bean manager.
+   *
+   * @param weldStatic The mocked static WeldUtils.
+   */
+  private void stubWeld(MockedStatic<WeldUtils> weldStatic) {
+    weldStatic.when(() -> WeldUtils.getInstanceFromStaticBeanManager(GlobalMenu.class))
+        .thenReturn(globalMenu);
+  }
+
   private void withMenuBuilder(MenuBuilderConsumer action) throws JSONException {
     try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
+        MockedStatic<WeldUtils> weldStatic = mockStatic(WeldUtils.class);
         MockedConstruction<MenuManager> ignored = mockConstruction(MenuManager.class,
             (mock, context) -> when(mock.getMenu()).thenReturn(rootMenuOption))) {
       stubContext(obContextStatic);
+      stubWeld(weldStatic);
       action.accept(new MenuBuilder());
     }
   }
 
   private void withMenuBuilderAndUtility(MenuBuilderConsumer action) throws JSONException {
     try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
+        MockedStatic<WeldUtils> weldStatic = mockStatic(WeldUtils.class);
         MockedStatic<Utility> ignoredUtility = mockStatic(Utility.class);
         MockedStatic<OBDal> dalStatic = mockStatic(OBDal.class);
         MockedConstruction<MenuManager> ignored = mockConstruction(MenuManager.class,
             (mock, context) -> when(mock.getMenu()).thenReturn(rootMenuOption))) {
       stubContext(obContextStatic);
+      stubWeld(weldStatic);
       dalStatic.when(OBDal::getInstance).thenReturn(obDal);
       action.accept(new MenuBuilder());
     }
@@ -181,10 +199,12 @@ class MenuBuilderTest {
 
   private void withMenuBuilderAndDal(MenuBuilderConsumer action) throws JSONException {
     try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
+        MockedStatic<WeldUtils> weldStatic = mockStatic(WeldUtils.class);
         MockedStatic<OBDal> dalStatic = mockStatic(OBDal.class);
         MockedConstruction<MenuManager> ignored = mockConstruction(MenuManager.class,
             (mock, context) -> when(mock.getMenu()).thenReturn(rootMenuOption))) {
       stubContext(obContextStatic);
+      stubWeld(weldStatic);
       dalStatic.when(OBDal::getInstance).thenReturn(obDal);
       action.accept(new MenuBuilder());
     }
@@ -256,25 +276,25 @@ class MenuBuilderTest {
   }
 
   /**
-   * Test constructor of MenuBuilder when MenuManager throws a
-   * NullPointerException.
-   * This test ensures that the MenuBuilder can still be constructed even if the
-   * MenuManager throws a NullPointerException, which is a common scenario in
-   * real-world applications.
+   * Verifies that the constructor points the MenuManager at the shared, CDI-managed
+   * {@link GlobalMenu} singleton (resolved via {@link WeldUtils}) rather than a per-thread
+   * instance. Sharing the singleton is what lets the classic menu-cache invalidation reach the
+   * tree the new-UI menu is rebuilt from, so a renamed window/menu is reflected on any thread.
    */
   @Test
-  void testConstructorWithNullPointerException() {
+  void testConstructorUsesSharedGlobalMenuSingleton() {
     try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
-        MockedConstruction<MenuManager> ignored = mockConstruction(MenuManager.class,
-            (mock, context) -> {
-              when(mock.getMenu()).thenThrow(new NullPointerException());
-              doNothing().when(mock).setGlobalMenuOptions(any(GlobalMenu.class));
-            })) {
+        MockedStatic<WeldUtils> weldStatic = mockStatic(WeldUtils.class);
+        MockedConstruction<MenuManager> managerConstruction = mockConstruction(MenuManager.class)) {
 
       obContextStatic.when(OBContext::getOBContext).thenReturn(obContext);
       when(obContext.getLanguage()).thenReturn(language);
+      stubWeld(weldStatic);
 
-      assertDoesNotThrow(MenuBuilder::new);
+      new MenuBuilder();
+
+      MenuManager constructedManager = managerConstruction.constructed().get(0);
+      verify(constructedManager).setGlobalMenuOptions(globalMenu);
     }
   }
 
