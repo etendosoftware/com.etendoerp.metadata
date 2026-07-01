@@ -35,16 +35,25 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
+import org.hibernate.Session;
+import org.hibernate.query.Query;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -53,10 +62,9 @@ import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-import java.util.HashMap;
-import java.util.Map;
 
 import org.openbravo.dal.core.OBContext;
+import org.openbravo.dal.service.OBDal;
 import org.openbravo.erpCommon.utility.DimensionDisplayUtility;
 import org.openbravo.model.ad.access.Role;
 import org.openbravo.model.ad.access.RoleOrganization;
@@ -147,11 +155,27 @@ class SessionBuilderTest {
   @Mock
   private Warehouse warehouse2;
 
+  @Mock
+  private OBDal obDal;
+
+  @Mock
+  private Session session;
+
+  @Mock
+  private Query<UserRoles> rolesQuery;
+
+  @Mock
+  private Query<OrgWarehouse> warehousesQuery;
+
+  private MockedStatic<OBDal> obDalStatic;
+
   /**
    * Sets up the necessary mocks and their behaviors before each test.
    */
   @BeforeEach
   void setUp() {
+    SessionBuilder.clearRolesCache();
+
     // Setup basic context mocks
     when(obContext.getUser()).thenReturn(user);
     when(obContext.getRole()).thenReturn(role);
@@ -168,8 +192,21 @@ class SessionBuilderTest {
     when(warehouse.getId()).thenReturn(WAREHOUSE_ID);
     when(language.getLanguage()).thenReturn(LANGUAGE_CODE);
 
+    // Mock the HQL join-fetch query that replaces user.getADUserRolesList()
+    obDalStatic = mockStatic(OBDal.class);
+    obDalStatic.when(OBDal::getInstance).thenReturn(obDal);
+    when(obDal.getSession()).thenReturn(session);
+    when(session.createQuery(anyString(), eq(UserRoles.class))).thenReturn(rolesQuery);
+    when(rolesQuery.setParameter(anyString(), any())).thenReturn(rolesQuery);
+    when(rolesQuery.list()).thenReturn(Arrays.asList(userRole1, userRole2));
+
+    // Mock the batched warehouses-by-organization query that replaces
+    // organization.getOrganizationWarehouseList()
+    when(session.createQuery(anyString(), eq(OrgWarehouse.class))).thenReturn(warehousesQuery);
+    when(warehousesQuery.setParameter(anyString(), any())).thenReturn(warehousesQuery);
+    when(warehousesQuery.list()).thenReturn(Arrays.asList(orgWarehouse1, orgWarehouse2));
+
     // Setup user roles
-    when(user.getADUserRolesList()).thenReturn(Arrays.asList(userRole1, userRole2));
     when(userRole1.getRole()).thenReturn(role1);
     when(userRole2.getRole()).thenReturn(role2);
 
@@ -197,14 +234,13 @@ class SessionBuilderTest {
     // Setup organizations
     when(org1.getId()).thenReturn("org1-id");
     when(org1.get(eq(Organization.PROPERTY_NAME), any(), eq("org1-id"))).thenReturn("Organization 1");
-    when(org1.getOrganizationWarehouseList()).thenReturn(Arrays.asList(orgWarehouse1));
-
     when(org2.getId()).thenReturn("org2-id");
     when(org2.get(eq(Organization.PROPERTY_NAME), any(), eq("org2-id"))).thenReturn("Organization 2");
-    when(org2.getOrganizationWarehouseList()).thenReturn(Arrays.asList(orgWarehouse2));
 
-    // Setup org warehouses
+    // Setup org warehouses (now resolved through the batched query result, grouped by organization)
+    when(orgWarehouse1.getOrganization()).thenReturn(org1);
     when(orgWarehouse1.getWarehouse()).thenReturn(warehouse1);
+    when(orgWarehouse2.getOrganization()).thenReturn(org2);
     when(orgWarehouse2.getWarehouse()).thenReturn(warehouse2);
 
     // Setup warehouses
@@ -212,6 +248,12 @@ class SessionBuilderTest {
     when(warehouse1.get(eq(Warehouse.PROPERTY_NAME), any(), eq("warehouse1-id"))).thenReturn("Warehouse 1");
     when(warehouse2.getId()).thenReturn("warehouse2-id");
     when(warehouse2.get(eq(Warehouse.PROPERTY_NAME), any(), eq("warehouse2-id"))).thenReturn("Warehouse 2");
+  }
+
+  @AfterEach
+  void tearDown() {
+    obDalStatic.close();
+    SessionBuilder.clearRolesCache();
   }
 
 
@@ -260,6 +302,10 @@ class SessionBuilderTest {
 
       JSONArray roles = result.getJSONArray(ROLES);
       assertEquals(2, roles.length());
+
+      // The role tree must come from a single batched query, not per-role lazy navigation
+      verify(session, times(1)).createQuery(anyString(), eq(UserRoles.class));
+      verify(session, times(1)).createQuery(anyString(), eq(OrgWarehouse.class));
     }
   }
 
@@ -271,7 +317,7 @@ class SessionBuilderTest {
    */
   @Test
   void testToJSONWithEmptyUserRoles() throws JSONException {
-    when(user.getADUserRolesList()).thenReturn(Collections.emptyList());
+    when(rolesQuery.list()).thenReturn(Collections.emptyList());
 
     try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
          MockedStatic<Utils> utilsStatic = mockStatic(Utils.class)) {
@@ -328,7 +374,7 @@ class SessionBuilderTest {
    */
   @Test
   void testGetRolesHandlesExceptionGracefully() throws JSONException {
-    when(user.getADUserRolesList()).thenThrow(new RuntimeException(DATABASE_ERROR));
+    when(rolesQuery.list()).thenThrow(new RuntimeException(DATABASE_ERROR));
 
     try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
          MockedStatic<Utils> utilsStatic = mockStatic(Utils.class)) {
@@ -347,7 +393,9 @@ class SessionBuilderTest {
 
 
   /**
-   * Ensures organization retrieval per role handles exceptions and results in an empty organizations array for the affected role.
+   * Ensures organization retrieval per role handles exceptions and results in an empty organizations
+   * array for the affected role, while the other role (with an independent organization tree) is
+   * unaffected.
    *
    * @throws JSONException if JSON operations fail during assertions or building
    */
@@ -370,26 +418,35 @@ class SessionBuilderTest {
 
       // The role with exception should have empty organizations array
       boolean foundRoleWithEmptyOrgs = false;
+      boolean foundRoleWithWarehouses = false;
       for (int i = 0; i < roles.length(); i++) {
         JSONObject roleObj = roles.getJSONObject(i);
         if (roleObj.has(ORGANIZATIONS) && roleObj.getJSONArray(ORGANIZATIONS).length() == 0) {
           foundRoleWithEmptyOrgs = true;
-          break;
+        }
+        if (roleObj.has(ORGANIZATIONS) && roleObj.getJSONArray(ORGANIZATIONS).length() > 0) {
+          JSONObject orgObj = roleObj.getJSONArray(ORGANIZATIONS).getJSONObject(0);
+          if (orgObj.has(WAREHOUSES) && orgObj.getJSONArray(WAREHOUSES).length() > 0) {
+            foundRoleWithWarehouses = true;
+          }
         }
       }
       assertTrue(foundRoleWithEmptyOrgs);
+      // role2's organization tree is independent of role1's failure and must still resolve warehouses
+      assertTrue(foundRoleWithWarehouses);
     }
   }
 
 
   /**
-   * Ensures warehouse retrieval per organization handles exceptions and yields an empty warehouses array for the affected organization.
+   * Ensures that when the batched warehouse query fails, every organization gets an empty
+   * warehouses array while role and organization data remain intact.
    *
    * @throws JSONException if JSON operations fail during assertions or building
    */
   @Test
   void testGetWarehousesHandlesExceptionGracefully() throws JSONException {
-    when(org1.getOrganizationWarehouseList()).thenThrow(new RuntimeException(DATABASE_ERROR));
+    when(warehousesQuery.list()).thenThrow(new RuntimeException(DATABASE_ERROR));
 
     try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
          MockedStatic<Utils> utilsStatic = mockStatic(Utils.class)) {
@@ -404,21 +461,83 @@ class SessionBuilderTest {
       JSONArray roles = result.getJSONArray(ROLES);
       assertEquals(2, roles.length());
 
-      // Find the role with organization that has error and verify it has empty warehouses
-      boolean foundOrgWithEmptyWarehouses = false;
       for (int i = 0; i < roles.length(); i++) {
         JSONObject roleObj = roles.getJSONObject(i);
         JSONArray orgs = roleObj.getJSONArray(ORGANIZATIONS);
-        for (int j = 0; j < orgs.length(); j++) {
-          JSONObject orgObj = orgs.getJSONObject(j);
-          if (orgObj.has(WAREHOUSES) && orgObj.getJSONArray(WAREHOUSES).length() == 0) {
-            foundOrgWithEmptyWarehouses = true;
-            break;
-          }
-        }
-        if (foundOrgWithEmptyWarehouses) break;
+        assertEquals(1, orgs.length());
+        JSONObject orgObj = orgs.getJSONObject(0);
+        assertTrue(orgObj.has(WAREHOUSES));
+        assertEquals(0, orgObj.getJSONArray(WAREHOUSES).length());
       }
-      assertTrue(foundOrgWithEmptyWarehouses);
+    }
+  }
+
+  /**
+   * Ensures that a role whose organization list cannot be read does not prevent other roles'
+   * organizations from being resolved when the warehouse batch collects organization ids.
+   *
+   * @throws JSONException if JSON operations fail during assertions or building
+   */
+  @Test
+  void testWarehouseBatchIsolatesPerRoleOrganizationFailures() throws JSONException {
+    when(role1.getADRoleOrganizationList()).thenThrow(new RuntimeException(DATABASE_ERROR));
+
+    try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
+         MockedStatic<Utils> utilsStatic = mockStatic(Utils.class)) {
+
+      obContextStatic.when(OBContext::getOBContext).thenReturn(obContext);
+      utilsStatic.when(() -> Utils.getJsonObject(any())).thenReturn(new JSONObject());
+
+      SessionBuilder sessionBuilder = new SessionBuilder();
+      sessionBuilder.toJSON();
+
+      // Only org2's id (role1's org list could not be read) should reach the batch query
+      verify(warehousesQuery).setParameter(eq("orgIds"), eq(Collections.singleton("org2-id")));
+    }
+  }
+
+  /**
+   * Verifies that a second toJSON() call for the same user reuses the cached roles tree instead
+   * of issuing the HQL queries again.
+   *
+   * @throws JSONException if JSON operations fail during assertions or building
+   */
+  @Test
+  void testRolesAreCachedAcrossCalls() throws JSONException {
+    try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
+         MockedStatic<Utils> utilsStatic = mockStatic(Utils.class)) {
+
+      obContextStatic.when(OBContext::getOBContext).thenReturn(obContext);
+      utilsStatic.when(() -> Utils.getJsonObject(any())).thenReturn(new JSONObject());
+
+      SessionBuilder sessionBuilder = new SessionBuilder();
+      JSONObject first = sessionBuilder.toJSON();
+      JSONObject second = sessionBuilder.toJSON();
+
+      assertEquals(first.getJSONArray(ROLES).length(), second.getJSONArray(ROLES).length());
+      verify(session, times(1)).createQuery(anyString(), eq(UserRoles.class));
+    }
+  }
+
+  /**
+   * Verifies that clearRolesCache() forces the roles tree to be rebuilt from the database again.
+   *
+   * @throws JSONException if JSON operations fail during assertions or building
+   */
+  @Test
+  void testClearRolesCacheForcesRebuild() throws JSONException {
+    try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
+         MockedStatic<Utils> utilsStatic = mockStatic(Utils.class)) {
+
+      obContextStatic.when(OBContext::getOBContext).thenReturn(obContext);
+      utilsStatic.when(() -> Utils.getJsonObject(any())).thenReturn(new JSONObject());
+
+      SessionBuilder sessionBuilder = new SessionBuilder();
+      sessionBuilder.toJSON();
+      SessionBuilder.clearRolesCache();
+      sessionBuilder.toJSON();
+
+      verify(session, times(2)).createQuery(anyString(), eq(UserRoles.class));
     }
   }
 
