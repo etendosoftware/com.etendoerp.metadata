@@ -23,15 +23,20 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -45,6 +50,7 @@ import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.hibernate.Session;
 import org.hibernate.query.NativeQuery;
+import org.hibernate.query.Query;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -58,6 +64,7 @@ import org.openbravo.client.application.MenuManager.MenuOption;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.erpCommon.utility.Utility;
+import org.openbravo.model.ad.access.Role;
 import org.openbravo.model.ad.domain.ModelImplementation;
 import org.openbravo.model.ad.domain.ModelImplementationMapping;
 import org.openbravo.model.ad.system.Language;
@@ -89,6 +96,11 @@ class MenuBuilderTest {
   @Mock
   private OBDal obDal;
 
+  @Mock
+  private Role role;
+
+  private static final String TEST_ROLE_ID = "TEST_ROLE_ID";
+  private static final String TEST_LANG_ID = "TEST_LANG_ID";
   private static final String PROCESS_URL = "processUrl";
   private static final String PROCESS_ID = "processId";
   private static final String IS_REPORT = "isReport";
@@ -126,14 +138,31 @@ class MenuBuilderTest {
     Field managerField = MenuBuilder.class.getDeclaredField("manager");
     managerField.setAccessible(true);
     ((ThreadLocal<?>) managerField.get(null)).remove();
+    MenuBuilder.clearMenuCache();
+  }
+
+  /**
+   * Wires the shared OBContext stubs used by every builder helper: the static
+   * {@code getOBContext()} accessor, the language (read by the {@code Builder} superclass
+   * constructor) and the role/language identifiers used to compose the menu cache key. The
+   * role and identifier stubs are lenient because constructor-only tests never reach the
+   * cache-key path.
+   *
+   * @param obContextStatic The mocked static OBContext.
+   */
+  private void stubContext(MockedStatic<OBContext> obContextStatic) {
+    obContextStatic.when(OBContext::getOBContext).thenReturn(obContext);
+    when(obContext.getLanguage()).thenReturn(language);
+    lenient().when(obContext.getRole()).thenReturn(role);
+    lenient().when(role.getId()).thenReturn(TEST_ROLE_ID);
+    lenient().when(language.getId()).thenReturn(TEST_LANG_ID);
   }
 
   private void withMenuBuilder(MenuBuilderConsumer action) throws JSONException {
     try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
         MockedConstruction<MenuManager> ignored = mockConstruction(MenuManager.class,
             (mock, context) -> when(mock.getMenu()).thenReturn(rootMenuOption))) {
-      obContextStatic.when(OBContext::getOBContext).thenReturn(obContext);
-      when(obContext.getLanguage()).thenReturn(language);
+      stubContext(obContextStatic);
       action.accept(new MenuBuilder());
     }
   }
@@ -141,10 +170,11 @@ class MenuBuilderTest {
   private void withMenuBuilderAndUtility(MenuBuilderConsumer action) throws JSONException {
     try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
         MockedStatic<Utility> ignoredUtility = mockStatic(Utility.class);
+        MockedStatic<OBDal> dalStatic = mockStatic(OBDal.class);
         MockedConstruction<MenuManager> ignored = mockConstruction(MenuManager.class,
             (mock, context) -> when(mock.getMenu()).thenReturn(rootMenuOption))) {
-      obContextStatic.when(OBContext::getOBContext).thenReturn(obContext);
-      when(obContext.getLanguage()).thenReturn(language);
+      stubContext(obContextStatic);
+      dalStatic.when(OBDal::getInstance).thenReturn(obDal);
       action.accept(new MenuBuilder());
     }
   }
@@ -154,11 +184,45 @@ class MenuBuilderTest {
         MockedStatic<OBDal> dalStatic = mockStatic(OBDal.class);
         MockedConstruction<MenuManager> ignored = mockConstruction(MenuManager.class,
             (mock, context) -> when(mock.getMenu()).thenReturn(rootMenuOption))) {
-      obContextStatic.when(OBContext::getOBContext).thenReturn(obContext);
-      when(obContext.getLanguage()).thenReturn(language);
+      stubContext(obContextStatic);
       dalStatic.when(OBDal::getInstance).thenReturn(obDal);
       action.accept(new MenuBuilder());
     }
+  }
+
+  /**
+   * Stubs the raw Hibernate query used by {@code MenuBuilder.loadDefaultMappings()} so it
+   * returns the supplied default mappings. Mirrors the batch-load path (a single typed
+   * {@code createQuery(...).list()}), which replaces the previous per-process lazy iteration.
+   *
+   * @param mappings The default mappings the query must return.
+   */
+  @SuppressWarnings("unchecked")
+  private void setupDefaultMappingsQuery(List<ModelImplementationMapping> mappings) {
+    Query<ModelImplementationMapping> mappingsQuery = mock(Query.class);
+    when(obDal.getSession()).thenReturn(session);
+    when(session.createQuery(anyString(), eq(ModelImplementationMapping.class))).thenReturn(mappingsQuery);
+    when(mappingsQuery.list()).thenReturn(mappings);
+  }
+
+  /**
+   * Builds a default {@link ModelImplementationMapping} mock wired to the given process id and
+   * mapping name, replicating the {@code modelObject.process.id} navigation that
+   * {@code loadDefaultMappings()} uses to index the mapping.
+   *
+   * @param processId   The owning process id.
+   * @param mappingName The mapping name (used as the process URL).
+   * @return The configured mapping mock.
+   */
+  private ModelImplementationMapping mockDefaultMapping(String processId, String mappingName) {
+    ModelImplementationMapping mim = mock(ModelImplementationMapping.class);
+    ModelImplementation mi = mock(ModelImplementation.class);
+    org.openbravo.model.ad.ui.Process owner = mock(org.openbravo.model.ad.ui.Process.class);
+    when(mim.getModelObject()).thenReturn(mi);
+    when(mi.getProcess()).thenReturn(owner);
+    when(owner.getId()).thenReturn(processId);
+    lenient().when(mim.getMappingName()).thenReturn(mappingName);
+    return mim;
   }
 
   private void setupViewMenuOption(MenuOption childOption, Menu childMenu, String menuId) {
@@ -309,8 +373,6 @@ class MenuBuilderTest {
     MenuOption childOption = mock(MenuOption.class);
     Menu childMenu = mock(Menu.class);
     org.openbravo.model.ad.ui.Process process = mock(org.openbravo.model.ad.ui.Process.class);
-    ModelImplementation mi = mock(ModelImplementation.class);
-    ModelImplementationMapping mim = mock(ModelImplementationMapping.class);
 
     when(rootMenuOption.getChildren()).thenReturn(List.of(childOption));
     when(childOption.getMenu()).thenReturn(childMenu);
@@ -322,10 +384,7 @@ class MenuBuilderTest {
     when(process.getId()).thenReturn(AD_PROCESS_ID);
     when(process.isActive()).thenReturn(true);
     when(process.getUIPattern()).thenReturn(STANDARD);
-    when(process.getADModelImplementationList()).thenReturn(List.of(mi));
-    when(mi.getADModelImplementationMappingList()).thenReturn(List.of(mim));
-    when(mim.isDefault()).thenReturn(true);
-    when(mim.getMappingName()).thenReturn(MAPPING_URL);
+    setupDefaultMappingsQuery(List.of(mockDefaultMapping(AD_PROCESS_ID, MAPPING_URL)));
 
     withMenuBuilderAndUtility(builder -> {
       JSONObject result = builder.toJSON();
@@ -346,8 +405,6 @@ class MenuBuilderTest {
     MenuOption childOption = mock(MenuOption.class);
     Menu childMenu = mock(Menu.class);
     org.openbravo.model.ad.ui.Process process = mock(org.openbravo.model.ad.ui.Process.class);
-    ModelImplementation mi = mock(ModelImplementation.class);
-    ModelImplementationMapping mim = mock(ModelImplementationMapping.class);
 
     when(rootMenuOption.getChildren()).thenReturn(List.of(childOption));
     when(childOption.getMenu()).thenReturn(childMenu);
@@ -358,10 +415,7 @@ class MenuBuilderTest {
     when(process.getId()).thenReturn(AD_REPORT_ID);
     when(process.isActive()).thenReturn(true);
     when(process.isReport()).thenReturn(true);
-    when(process.getADModelImplementationList()).thenReturn(List.of(mi));
-    when(mi.getADModelImplementationMappingList()).thenReturn(List.of(mim));
-    when(mim.isDefault()).thenReturn(true);
-    when(mim.getMappingName()).thenReturn(REPORT_URL);
+    setupDefaultMappingsQuery(List.of(mockDefaultMapping(AD_REPORT_ID, REPORT_URL)));
 
     withMenuBuilderAndUtility(builder -> {
       JSONObject result = builder.toJSON();
@@ -393,12 +447,108 @@ class MenuBuilderTest {
     when(process.isActive()).thenReturn(true);
     when(process.isExternalService()).thenReturn(true);
     when(process.getServiceType()).thenReturn("PS");
-    when(process.getADModelImplementationList()).thenReturn(new ArrayList<>());
+    setupDefaultMappingsQuery(Collections.emptyList());
 
     withMenuBuilderAndUtility(builder -> {
       JSONObject result = builder.toJSON();
       JSONObject pentahoMenu = result.getJSONArray("menu").getJSONObject(0);
       assertEquals(PENTAHO_URL + AD_PENTAHO_ID, pentahoMenu.getString(PROCESS_URL));
+    });
+  }
+
+  /**
+   * Builds a Standard, active process menu entry wired to the given menu and process ids.
+   * Centralises the boilerplate shared by the batch-loading tests.
+   *
+   * @param menuId    The menu entry id.
+   * @param processId The process id.
+   * @return The configured MenuOption.
+   */
+  private MenuOption mockProcessEntry(String menuId, String processId) {
+    MenuOption option = mock(MenuOption.class);
+    Menu menu = mock(Menu.class);
+    org.openbravo.model.ad.ui.Process process = mock(org.openbravo.model.ad.ui.Process.class);
+    when(option.getMenu()).thenReturn(menu);
+    when(option.getType()).thenReturn(MenuManager.MenuEntryType.Process);
+    when(menu.getId()).thenReturn(menuId);
+    when(menu.getProcess()).thenReturn(process);
+    when(process.getId()).thenReturn(processId);
+    when(process.isActive()).thenReturn(true);
+    when(process.getUIPattern()).thenReturn(STANDARD);
+    return option;
+  }
+
+  /**
+   * Verifies the N+1 fix: resolving default mappings for several process entries executes the
+   * batch query exactly once (it is loaded lazily on the first process and memoised), instead of
+   * one lazy load per process. The batch runs on the raw Hibernate session, which applies no
+   * active/client/organization filter, matching the original lazy-collection semantics.
+   *
+   * @throws JSONException if there is an error during JSON construction
+   */
+  @Test
+  void testDefaultMappingsQueryRunsOnceForMultipleProcesses() throws JSONException {
+    MenuOption firstProcess = mockProcessEntry("MENU_1", "PROC_1");
+    MenuOption secondProcess = mockProcessEntry("MENU_2", "PROC_2");
+    when(rootMenuOption.getChildren()).thenReturn(List.of(firstProcess, secondProcess));
+    setupDefaultMappingsQuery(
+        List.of(mockDefaultMapping("PROC_1", MAPPING_URL), mockDefaultMapping("PROC_2", REPORT_URL)));
+
+    withMenuBuilderAndUtility(builder -> {
+      builder.toJSON();
+      verify(session, times(1)).createQuery(anyString(), eq(ModelImplementationMapping.class));
+    });
+  }
+
+  /**
+   * Verifies that a second build for the same role and language is served from the cache: the
+   * cached JSON instance is returned verbatim rather than rebuilt.
+   *
+   * @throws JSONException if there is an error during JSON construction
+   */
+  @Test
+  void testCacheHitReturnsSameMenuInstance() throws JSONException {
+    when(rootMenuOption.getChildren()).thenReturn(Collections.emptyList());
+
+    withMenuBuilder(builder -> {
+      JSONObject first = builder.toJSON();
+      JSONObject second = builder.toJSON();
+      assertSame(first, second);
+    });
+  }
+
+  /**
+   * Verifies that a different role produces a different cache key and therefore a freshly built
+   * menu (cache miss), so roles never share cached menus.
+   *
+   * @throws JSONException if there is an error during JSON construction
+   */
+  @Test
+  void testCacheMissForDifferentRoleRebuildsMenu() throws JSONException {
+    when(rootMenuOption.getChildren()).thenReturn(Collections.emptyList());
+
+    withMenuBuilder(builder -> {
+      when(role.getId()).thenReturn("ROLE_A", "ROLE_B");
+      JSONObject first = builder.toJSON();
+      JSONObject second = builder.toJSON();
+      assertNotSame(first, second);
+    });
+  }
+
+  /**
+   * Verifies that clearing the menu cache forces the next build to reconstruct the JSON.
+   *
+   * @throws JSONException if there is an error during JSON construction
+   */
+  @Test
+  void testClearMenuCacheForcesRebuild() throws JSONException {
+    when(rootMenuOption.getChildren()).thenReturn(Collections.emptyList());
+
+    withMenuBuilder(builder -> {
+      JSONObject first = builder.toJSON();
+      MenuBuilder.clearMenuCache();
+      JSONObject second = builder.toJSON();
+      assertNotSame(first, second);
     });
   }
 

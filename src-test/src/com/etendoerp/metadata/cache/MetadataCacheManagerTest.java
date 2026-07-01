@@ -27,6 +27,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 import com.etendoerp.metadata.builders.FieldBuilderWithColumn;
+import com.etendoerp.metadata.builders.MenuBuilder;
 import com.etendoerp.metadata.builders.WindowBuilder;
 import com.etendoerp.metadata.data.TabProcessor;
 
@@ -43,7 +44,8 @@ class MetadataCacheManagerTest {
     try (
         MockedStatic<TabProcessor> tabProcessorMock = mockStatic(TabProcessor.class);
         MockedStatic<WindowBuilder> windowBuilderMock = mockStatic(WindowBuilder.class);
-        MockedStatic<FieldBuilderWithColumn> fieldBuilderMock = mockStatic(FieldBuilderWithColumn.class)
+        MockedStatic<FieldBuilderWithColumn> fieldBuilderMock = mockStatic(FieldBuilderWithColumn.class);
+        MockedStatic<MenuBuilder> menuBuilderMock = mockStatic(MenuBuilder.class)
     ) {
       MetadataCacheManager.invalidateAll();
 
@@ -51,6 +53,7 @@ class MetadataCacheManagerTest {
       tabProcessorMock.verify(TabProcessor::clearFieldAccessCache, times(1));
       windowBuilderMock.verify(WindowBuilder::clearTabAllowedCache, times(1));
       fieldBuilderMock.verify(FieldBuilderWithColumn::clearWindowAccessCache, times(1));
+      menuBuilderMock.verify(MenuBuilder::clearMenuCache, times(1));
     }
   }
 
@@ -59,7 +62,8 @@ class MetadataCacheManagerTest {
     try (
         MockedStatic<TabProcessor> tabProcessorMock = mockStatic(TabProcessor.class);
         MockedStatic<WindowBuilder> windowBuilderMock = mockStatic(WindowBuilder.class);
-        MockedStatic<FieldBuilderWithColumn> fieldBuilderMock = mockStatic(FieldBuilderWithColumn.class)
+        MockedStatic<FieldBuilderWithColumn> fieldBuilderMock = mockStatic(FieldBuilderWithColumn.class);
+        MockedStatic<MenuBuilder> menuBuilderMock = mockStatic(MenuBuilder.class)
     ) {
       MetadataCacheManager.invalidateAll();
       MetadataCacheManager.invalidateAll();
@@ -68,6 +72,7 @@ class MetadataCacheManagerTest {
       tabProcessorMock.verify(TabProcessor::clearFieldAccessCache, times(2));
       windowBuilderMock.verify(WindowBuilder::clearTabAllowedCache, times(2));
       fieldBuilderMock.verify(FieldBuilderWithColumn::clearWindowAccessCache, times(2));
+      menuBuilderMock.verify(MenuBuilder::clearMenuCache, times(2));
     }
   }
 }
