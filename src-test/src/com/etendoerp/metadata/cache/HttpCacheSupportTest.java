@@ -49,6 +49,10 @@ import com.etendoerp.metadata.utils.Constants;
 @ExtendWith(MockitoExtension.class)
 class HttpCacheSupportTest extends AbstractMockedContextTest {
 
+    private static final String ROLE_ID = "role-1";
+    private static final String LANGUAGE_ID = "lang-1";
+    private static final String QUOTED_ETAG = "\"abc123\"";
+
     @Mock Role role;
     @Mock User user;
     @Mock Language language;
@@ -77,8 +81,8 @@ class HttpCacheSupportTest extends AbstractMockedContextTest {
 
     @Test
     void computeETagForMenuIsPresentAndStable() throws Exception {
-        when(role.getId()).thenReturn("role-1");
-        when(language.getId()).thenReturn("lang-1");
+        when(role.getId()).thenReturn(ROLE_ID);
+        when(language.getId()).thenReturn(LANGUAGE_ID);
         when(obContext.getRole()).thenReturn(role);
         when(obContext.getLanguage()).thenReturn(language);
         when(session.createQuery(anyString(), eq(Date.class))).thenReturn(query);
@@ -96,8 +100,8 @@ class HttpCacheSupportTest extends AbstractMockedContextTest {
 
     @Test
     void computeETagForMenuChangesWhenMaxUpdatedChanges() throws Exception {
-        when(role.getId()).thenReturn("role-1");
-        when(language.getId()).thenReturn("lang-1");
+        when(role.getId()).thenReturn(ROLE_ID);
+        when(language.getId()).thenReturn(LANGUAGE_ID);
         when(obContext.getRole()).thenReturn(role);
         when(obContext.getLanguage()).thenReturn(language);
         when(session.createQuery(anyString(), eq(Date.class))).thenReturn(query);
@@ -126,7 +130,7 @@ class HttpCacheSupportTest extends AbstractMockedContextTest {
     @Test
     void computeETagForSessionUsesUserAndRole() throws Exception {
         when(user.getId()).thenReturn("user-1");
-        when(role.getId()).thenReturn("role-1");
+        when(role.getId()).thenReturn(ROLE_ID);
         when(obContext.getUser()).thenReturn(user);
         when(obContext.getRole()).thenReturn(role);
         when(session.createQuery(argThat(s -> s != null && s.contains("ADRole")), eq(Date.class)))
@@ -152,7 +156,7 @@ class HttpCacheSupportTest extends AbstractMockedContextTest {
 
     @Test
     void computeETagForLabelsUsesLanguageAndModuleVersions() throws Exception {
-        when(language.getId()).thenReturn("lang-1");
+        when(language.getId()).thenReturn(LANGUAGE_ID);
         when(obContext.getLanguage()).thenReturn(language);
         when(session.createQuery(anyString(), eq(Date.class))).thenReturn(query);
         when(query.uniqueResult()).thenReturn(new Date(9000L));
@@ -175,28 +179,28 @@ class HttpCacheSupportTest extends AbstractMockedContextTest {
 
     @Test
     void matchesReturnsTrueForWildcard() {
-        assertTrue(HttpCacheSupport.matches("*", "\"abc123\""));
+        assertTrue(HttpCacheSupport.matches("*", QUOTED_ETAG));
     }
 
     @Test
     void matchesReturnsTrueForExactSingleValue() {
-        assertTrue(HttpCacheSupport.matches("\"abc123\"", "\"abc123\""));
+        assertTrue(HttpCacheSupport.matches(QUOTED_ETAG, QUOTED_ETAG));
     }
 
     @Test
     void matchesReturnsTrueForCommaSeparatedMultiValue() {
-        assertTrue(HttpCacheSupport.matches("\"zzz\", \"abc123\", \"yyy\"", "\"abc123\""));
+        assertTrue(HttpCacheSupport.matches("\"zzz\", " + QUOTED_ETAG + ", \"yyy\"", QUOTED_ETAG));
     }
 
     @Test
     void matchesReturnsFalseForMismatch() {
-        assertFalse(HttpCacheSupport.matches("\"other\"", "\"abc123\""));
+        assertFalse(HttpCacheSupport.matches("\"other\"", QUOTED_ETAG));
     }
 
     @Test
     void matchesReturnsFalseForNullOrBlankHeader() {
-        assertFalse(HttpCacheSupport.matches(null, "\"abc123\""));
-        assertFalse(HttpCacheSupport.matches("", "\"abc123\""));
+        assertFalse(HttpCacheSupport.matches(null, QUOTED_ETAG));
+        assertFalse(HttpCacheSupport.matches("", QUOTED_ETAG));
     }
 
     private HttpServletRequest mockRequest(String method) {

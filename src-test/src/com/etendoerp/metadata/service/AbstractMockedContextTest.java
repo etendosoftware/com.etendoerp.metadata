@@ -72,6 +72,7 @@ public abstract class AbstractMockedContextTest {
         }
     }
 
+    /** A {@link Runnable}-like action that may throw a checked {@link Exception}. */
     @FunctionalInterface
     public interface ThrowingRunnable {
         /**
