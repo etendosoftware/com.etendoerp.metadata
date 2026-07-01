@@ -22,6 +22,8 @@ import java.util.List;
 @ExtendWith(MockitoExtension.class)
 class ADCacheProviderTest {
 
+    private static final String WELD_NOT_AVAILABLE = "Weld not available";
+
     @Test
     void getWindowReturnsFromCache() {
         var adcs = mock(ApplicationDictionaryCachedStructures.class);
@@ -88,7 +90,7 @@ class ADCacheProviderTest {
         try (MockedStatic<WeldUtils> weld = mockStatic(WeldUtils.class)) {
             weld.when(() -> WeldUtils.getInstanceFromStaticBeanManager(
                     ApplicationDictionaryCachedStructures.class))
-                .thenThrow(new RuntimeException("Weld not available"));
+                .thenThrow(new RuntimeException(WELD_NOT_AVAILABLE));
 
             assertNull(ADCacheProvider.getWindow("123"));
         }
@@ -99,7 +101,7 @@ class ADCacheProviderTest {
         try (MockedStatic<WeldUtils> weld = mockStatic(WeldUtils.class)) {
             weld.when(() -> WeldUtils.getInstanceFromStaticBeanManager(
                     ApplicationDictionaryCachedStructures.class))
-                .thenThrow(new RuntimeException("Weld not available"));
+                .thenThrow(new RuntimeException(WELD_NOT_AVAILABLE));
 
             assertNull(ADCacheProvider.getTab("456"));
         }
@@ -112,7 +114,7 @@ class ADCacheProviderTest {
         try (MockedStatic<WeldUtils> weld = mockStatic(WeldUtils.class)) {
             weld.when(() -> WeldUtils.getInstanceFromStaticBeanManager(
                     ApplicationDictionaryCachedStructures.class))
-                .thenThrow(new RuntimeException("Weld not available"));
+                .thenThrow(new RuntimeException(WELD_NOT_AVAILABLE));
 
             assertNull(ADCacheProvider.getFieldsOfTab(tab));
         }
@@ -123,7 +125,7 @@ class ADCacheProviderTest {
         try (MockedStatic<WeldUtils> weld = mockStatic(WeldUtils.class)) {
             weld.when(() -> WeldUtils.getInstanceFromStaticBeanManager(
                     ApplicationDictionaryCachedStructures.class))
-                .thenThrow(new RuntimeException("Weld not available"));
+                .thenThrow(new RuntimeException(WELD_NOT_AVAILABLE));
 
             assertNull(ADCacheProvider.getTable("789"));
         }

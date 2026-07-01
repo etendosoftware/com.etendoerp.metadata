@@ -42,6 +42,9 @@ public class ADCacheProvider {
 
     /**
      * Returns a fully initialized Window from the cache, or null if unavailable.
+     *
+     * @param windowId the database ID of the window to retrieve
+     * @return the cached {@link Window}, or {@code null} if the cache is unavailable
      */
     public static Window getWindow(String windowId) {
         ApplicationDictionaryCachedStructures adcs = getADCS();
@@ -50,6 +53,9 @@ public class ADCacheProvider {
 
     /**
      * Returns a fully initialized Tab from the cache, or null if unavailable.
+     *
+     * @param tabId the database ID of the tab to retrieve
+     * @return the cached {@link Tab}, or {@code null} if the cache is unavailable
      */
     public static Tab getTab(String tabId) {
         ApplicationDictionaryCachedStructures adcs = getADCS();
@@ -59,6 +65,9 @@ public class ADCacheProvider {
     /**
      * Returns the fully initialized fields for a tab from the cache,
      * or null if unavailable.
+     *
+     * @param tab the tab whose fields to retrieve
+     * @return the cached field list, or {@code null} if the cache is unavailable
      */
     public static List<Field> getFieldsOfTab(Tab tab) {
         ApplicationDictionaryCachedStructures adcs = getADCS();
@@ -67,6 +76,9 @@ public class ADCacheProvider {
 
     /**
      * Returns a fully initialized Table from the cache, or null if unavailable.
+     *
+     * @param tableId the database ID of the table to retrieve
+     * @return the cached {@link Table}, or {@code null} if the cache is unavailable
      */
     public static Table getTable(String tableId) {
         ApplicationDictionaryCachedStructures adcs = getADCS();
