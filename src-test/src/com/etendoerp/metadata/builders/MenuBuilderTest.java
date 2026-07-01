@@ -53,6 +53,8 @@ import org.hibernate.query.Query;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mock;
 import org.mockito.MockedConstruction;
 import org.mockito.MockedStatic;
@@ -119,6 +121,9 @@ class MenuBuilderTest {
   private static final String VIEW_MENU = "View Menu";
   private static final String VIEW_DESC = "View Desc";
   private static final String VIEW_ID = "viewId";
+  private static final String VIEW_MENU_ID = "VIEW_MENU_ID";
+  private static final String FORM_MENU_ID = "FORM_MENU_ID";
+  private static final String FORM_URL = "formUrl";
   private static final String WINDOW_TYPE = "windowType";
   private static final String WINDOW_MENU_ID = "WINDOW_MENU_ID";
   private static final String WINDOW_ID = "WINDOW_ID_VAL";
@@ -573,63 +578,42 @@ class MenuBuilderTest {
   }
 
   /**
-   * Tests addViewInfo with a fully qualified classname.
-   * The simple name (after the last dot) must be used as viewId.
+   * Tests addViewInfo across its three derivation paths, all emitting {@code type = "View"}:
+   * a fully qualified classname yields its simple name as viewId; a null classname falls back to
+   * the view name; and an empty query result leaves viewId unset. {@code rowPresent} distinguishes
+   * "a row with a null classname" from "no row at all".
    *
+   * @param rowPresent     Whether the native query returns a view row.
+   * @param className      The classname column of the returned row (null when absent).
+   * @param viewName       The name column of the returned row.
+   * @param expectedViewId The expected viewId, or null when it must be omitted.
    * @throws JSONException if there is an error during JSON construction
    */
-  @Test
-  void testAddViewInfoWithFullyQualifiedClassname() throws JSONException {
+  @ParameterizedTest
+  @CsvSource(nullValues = "NULL", value = {
+      "true, com.example.MyViewClassName, MyViewName, MyViewClassName",
+      "true, NULL, SimpleViewName, SimpleViewName",
+      "false, NULL, NULL, NULL"
+  })
+  void testAddViewInfoDerivesViewId(boolean rowPresent, String className, String viewName,
+      String expectedViewId) throws JSONException {
     MenuOption childOption = mock(MenuOption.class);
     Menu childMenu = mock(Menu.class);
-    setupViewMenuOption(childOption, childMenu, "VIEW_MENU_ID");
-    Object[] viewRow = { "com.example.MyViewClassName", "MyViewName" };
-    setupQueryMock(Collections.singletonList(viewRow));
+    setupViewMenuOption(childOption, childMenu, VIEW_MENU_ID);
+    List<Object[]> rows = rowPresent
+        ? Collections.singletonList(new Object[] { className, viewName })
+        : Collections.emptyList();
+    setupQueryMock(rows);
 
     withMenuBuilderAndDal(builder -> {
       JSONObject result = builder.toJSON();
       JSONObject viewMenu = result.getJSONArray("menu").getJSONObject(0);
       assertEquals("View", viewMenu.getString("type"));
-      assertEquals("MyViewClassName", viewMenu.getString(VIEW_ID));
-    });
-  }
-
-  /**
-   * Tests addViewInfo when classname is null: falls back to the view name.
-   *
-   * @throws JSONException if there is an error during JSON construction
-   */
-  @Test
-  void testAddViewInfoFallsBackToNameWhenClassnameIsNull() throws JSONException {
-    MenuOption childOption = mock(MenuOption.class);
-    Menu childMenu = mock(Menu.class);
-    setupViewMenuOption(childOption, childMenu, "VIEW_MENU_ID_2");
-    Object[] viewRow = { null, "SimpleViewName" };
-    setupQueryMock(Collections.singletonList(viewRow));
-
-    withMenuBuilderAndDal(builder -> {
-      JSONObject result = builder.toJSON();
-      JSONObject viewMenu = result.getJSONArray("menu").getJSONObject(0);
-      assertEquals("SimpleViewName", viewMenu.getString(VIEW_ID));
-    });
-  }
-
-  /**
-   * Tests addViewInfo when no view data is found: viewId must not be set.
-   *
-   * @throws JSONException if there is an error during JSON construction
-   */
-  @Test
-  void testAddViewInfoWithEmptyResultDoesNotSetViewId() throws JSONException {
-    MenuOption childOption = mock(MenuOption.class);
-    Menu childMenu = mock(Menu.class);
-    setupViewMenuOption(childOption, childMenu, "VIEW_MENU_ID_3");
-    setupQueryMock(Collections.emptyList());
-
-    withMenuBuilderAndDal(builder -> {
-      JSONObject result = builder.toJSON();
-      JSONObject viewMenu = result.getJSONArray("menu").getJSONObject(0);
-      assertFalse(viewMenu.has(VIEW_ID));
+      if (expectedViewId == null) {
+        assertFalse(viewMenu.has(VIEW_ID));
+      } else {
+        assertEquals(expectedViewId, viewMenu.getString(VIEW_ID));
+      }
     });
   }
 
@@ -638,136 +622,50 @@ class MenuBuilderTest {
   // -------------------------------------------------------------------------
 
   /**
-   * Tests addFormInfo with a fully qualified Java class name.
-   * The simple class name (after the last dot) must be used in the formUrl.
+   * Tests addFormInfo across its Java-class-name derivation paths: a fully qualified name and a
+   * simple name both yield a {@code /ad_forms/<SimpleName>.html} formUrl, while a null or empty
+   * class name sets only formId and omits formUrl. {@code formId} is always emitted verbatim.
    *
+   * @param javaClassName   The form's Java class name (null/empty for the formId-only cases).
+   * @param formId          The form id, expected verbatim in the JSON.
+   * @param expectedFormUrl The expected formUrl, or null when it must be omitted.
    * @throws JSONException if there is an error during JSON construction
    */
-  @Test
-  void testAddFormInfoWithFullyQualifiedClassName() throws JSONException {
+  @ParameterizedTest
+  @CsvSource(nullValues = "NULL", value = {
+      "org.openbravo.erpCommon.ad_forms.SomeForm, FORM_ABC_123, /ad_forms/SomeForm.html",
+      "SimpleFormClass, FORM_SIMPLE_456, /ad_forms/SimpleFormClass.html",
+      "NULL, FORM_NULL_789, NULL",
+      "'', FORM_EMPTY_000, NULL"
+  })
+  void testAddFormInfoDerivesFormUrlFromJavaClassName(String javaClassName, String formId,
+      String expectedFormUrl) throws JSONException {
     MenuOption childOption = mock(MenuOption.class);
     Menu childMenu = mock(Menu.class);
     Form mockForm = mock(Form.class);
-    String menuId = "FORM_FQ_ID";
 
     when(rootMenuOption.getChildren()).thenReturn(List.of(childOption));
     when(childOption.getMenu()).thenReturn(childMenu);
     when(childOption.getType()).thenReturn(MenuManager.MenuEntryType.External);
-    when(childMenu.getId()).thenReturn(menuId);
-    when(childMenu.get(Menu.PROPERTY_ETMETAICON, language, menuId)).thenReturn(FORM_ICON);
-    when(childMenu.get(Menu.PROPERTY_NAME, language, menuId)).thenReturn("Form Menu");
-    when(childMenu.get(Menu.PROPERTY_DESCRIPTION, language, menuId)).thenReturn("Form Desc");
+    when(childMenu.getId()).thenReturn(FORM_MENU_ID);
+    when(childMenu.get(Menu.PROPERTY_ETMETAICON, language, FORM_MENU_ID)).thenReturn(FORM_ICON);
+    when(childMenu.get(Menu.PROPERTY_NAME, language, FORM_MENU_ID)).thenReturn("Form Menu");
+    when(childMenu.get(Menu.PROPERTY_DESCRIPTION, language, FORM_MENU_ID)).thenReturn("Form Desc");
     when(childMenu.getURL()).thenReturn("/form/url");
     when(childMenu.getAction()).thenReturn("F");
     when(childMenu.getSpecialForm()).thenReturn(mockForm);
-    when(mockForm.getId()).thenReturn("FORM_ABC_123");
-    when(mockForm.getJavaClassName()).thenReturn("org.openbravo.erpCommon.ad_forms.SomeForm");
+    when(mockForm.getId()).thenReturn(formId);
+    when(mockForm.getJavaClassName()).thenReturn(javaClassName);
 
     withMenuBuilder(builder -> {
       JSONObject result = builder.toJSON();
       JSONObject formMenu = result.getJSONArray("menu").getJSONObject(0);
-      assertEquals("FORM_ABC_123", formMenu.getString(FORM_ID));
-      assertEquals("/ad_forms/SomeForm.html", formMenu.getString("formUrl"));
-    });
-  }
-
-  /**
-   * Tests addFormInfo with a simple class name (no package prefix).
-   * The class name itself must be used directly in the formUrl path.
-   *
-   * @throws JSONException if there is an error during JSON construction
-   */
-  @Test
-  void testAddFormInfoWithSimpleClassName() throws JSONException {
-    MenuOption childOption = mock(MenuOption.class);
-    Menu childMenu = mock(Menu.class);
-    Form mockForm = mock(Form.class);
-    String menuId = "FORM_SIMPLE_ID";
-
-    when(rootMenuOption.getChildren()).thenReturn(List.of(childOption));
-    when(childOption.getMenu()).thenReturn(childMenu);
-    when(childOption.getType()).thenReturn(MenuManager.MenuEntryType.External);
-    when(childMenu.getId()).thenReturn(menuId);
-    when(childMenu.get(Menu.PROPERTY_ETMETAICON, language, menuId)).thenReturn(FORM_ICON);
-    when(childMenu.get(Menu.PROPERTY_NAME, language, menuId)).thenReturn("Simple Form Menu");
-    when(childMenu.get(Menu.PROPERTY_DESCRIPTION, language, menuId)).thenReturn("Simple Desc");
-    when(childMenu.getURL()).thenReturn("/simple/url");
-    when(childMenu.getAction()).thenReturn("F");
-    when(childMenu.getSpecialForm()).thenReturn(mockForm);
-    when(mockForm.getId()).thenReturn("FORM_SIMPLE_456");
-    when(mockForm.getJavaClassName()).thenReturn("SimpleFormClass");
-
-    withMenuBuilder(builder -> {
-      JSONObject result = builder.toJSON();
-      JSONObject formMenu = result.getJSONArray("menu").getJSONObject(0);
-      assertEquals("FORM_SIMPLE_456", formMenu.getString(FORM_ID));
-      assertEquals("/ad_forms/SimpleFormClass.html", formMenu.getString("formUrl"));
-    });
-  }
-
-  /**
-   * Tests addFormInfo when the form has a null Java class name.
-   * Only formId must be set; formUrl must be absent.
-   *
-   * @throws JSONException if there is an error during JSON construction
-   */
-  @Test
-  void testAddFormInfoWithNullClassNameSetsOnlyFormId() throws JSONException {
-    MenuOption childOption = mock(MenuOption.class);
-    Menu childMenu = mock(Menu.class);
-    Form mockForm = mock(Form.class);
-    String menuId = "FORM_NULL_CLS_ID";
-
-    when(rootMenuOption.getChildren()).thenReturn(List.of(childOption));
-    when(childOption.getMenu()).thenReturn(childMenu);
-    when(childOption.getType()).thenReturn(MenuManager.MenuEntryType.External);
-    when(childMenu.getId()).thenReturn(menuId);
-    when(childMenu.get(Menu.PROPERTY_ETMETAICON, language, menuId)).thenReturn(FORM_ICON);
-    when(childMenu.get(Menu.PROPERTY_NAME, language, menuId)).thenReturn("Null Class Form");
-    when(childMenu.get(Menu.PROPERTY_DESCRIPTION, language, menuId)).thenReturn("Null Class Desc");
-    when(childMenu.getURL()).thenReturn("/null/url");
-    when(childMenu.getAction()).thenReturn("F");
-    when(childMenu.getSpecialForm()).thenReturn(mockForm);
-    when(mockForm.getId()).thenReturn("FORM_NULL_789");
-    when(mockForm.getJavaClassName()).thenReturn(null);
-
-    withMenuBuilder(builder -> {
-      JSONObject result = builder.toJSON();
-      JSONObject formMenu = result.getJSONArray("menu").getJSONObject(0);
-      assertEquals("FORM_NULL_789", formMenu.getString(FORM_ID));
-    });
-  }
-
-  /**
-   * Tests addFormInfo when the form has an empty Java class name.
-   * Only formId must be set; formUrl must be absent.
-   *
-   * @throws JSONException if there is an error during JSON construction
-   */
-  @Test
-  void testAddFormInfoWithEmptyClassNameSetsOnlyFormId() throws JSONException {
-    MenuOption childOption = mock(MenuOption.class);
-    Menu childMenu = mock(Menu.class);
-    Form mockForm = mock(Form.class);
-    String menuId = "FORM_EMPTY_CLS_ID";
-
-    when(rootMenuOption.getChildren()).thenReturn(List.of(childOption));
-    when(childOption.getMenu()).thenReturn(childMenu);
-    when(childOption.getType()).thenReturn(MenuManager.MenuEntryType.External);
-    when(childMenu.getId()).thenReturn(menuId);
-    when(childMenu.get(Menu.PROPERTY_ETMETAICON, language, menuId)).thenReturn(FORM_ICON);
-    when(childMenu.get(Menu.PROPERTY_NAME, language, menuId)).thenReturn("Empty Class Form");
-    when(childMenu.get(Menu.PROPERTY_DESCRIPTION, language, menuId)).thenReturn("Empty Class Desc");
-    when(childMenu.getURL()).thenReturn("/empty/url");
-    when(childMenu.getAction()).thenReturn("F");
-    when(childMenu.getSpecialForm()).thenReturn(mockForm);
-    when(mockForm.getId()).thenReturn("FORM_EMPTY_000");
-    when(mockForm.getJavaClassName()).thenReturn("");
-
-    withMenuBuilder(builder -> {
-      JSONObject result = builder.toJSON();
-      JSONObject formMenu = result.getJSONArray("menu").getJSONObject(0);
-      assertEquals("FORM_EMPTY_000", formMenu.getString(FORM_ID));
+      assertEquals(formId, formMenu.getString(FORM_ID));
+      if (expectedFormUrl == null) {
+        assertFalse(formMenu.has(FORM_URL));
+      } else {
+        assertEquals(expectedFormUrl, formMenu.getString(FORM_URL));
+      }
     });
   }
 

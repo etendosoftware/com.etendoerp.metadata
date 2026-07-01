@@ -16,6 +16,9 @@
  */
 package com.etendoerp.metadata.cache;
 
+import static com.etendoerp.metadata.cache.PersistenceEventTestFactory.deleteEvent;
+import static com.etendoerp.metadata.cache.PersistenceEventTestFactory.newEvent;
+import static com.etendoerp.metadata.cache.PersistenceEventTestFactory.updateEvent;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.mock;
@@ -32,10 +35,6 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.openbravo.base.model.Entity;
 import org.openbravo.base.model.ModelProvider;
-import org.openbravo.base.structure.BaseOBObject;
-import org.openbravo.client.kernel.event.EntityDeleteEvent;
-import org.openbravo.client.kernel.event.EntityNewEvent;
-import org.openbravo.client.kernel.event.EntityUpdateEvent;
 import org.openbravo.dal.core.TriggerHandler;
 
 import com.etendoerp.metadata.builders.MenuBuilder;
@@ -67,7 +66,7 @@ class MenuCacheInvalidationObserverTest {
       MenuCacheInvalidationObserver observer = new MenuCacheInvalidationObserver();
       Entity observedEntity = observer.getObservedEntities()[0];
 
-      observer.onNew(createNewEvent(observedEntity));
+      observer.onNew(newEvent(observedEntity));
 
       menuBuilderMock.verify(MenuBuilder::clearMenuCache, times(1));
     }
@@ -85,7 +84,7 @@ class MenuCacheInvalidationObserverTest {
       MenuCacheInvalidationObserver observer = new MenuCacheInvalidationObserver();
       Entity observedEntity = observer.getObservedEntities()[0];
 
-      observer.onUpdate(createUpdateEvent(observedEntity));
+      observer.onUpdate(updateEvent(observedEntity));
 
       menuBuilderMock.verify(MenuBuilder::clearMenuCache, times(1));
     }
@@ -103,7 +102,7 @@ class MenuCacheInvalidationObserverTest {
       MenuCacheInvalidationObserver observer = new MenuCacheInvalidationObserver();
       Entity observedEntity = observer.getObservedEntities()[0];
 
-      observer.onDelete(createDeleteEvent(observedEntity));
+      observer.onDelete(deleteEvent(observedEntity));
 
       menuBuilderMock.verify(MenuBuilder::clearMenuCache, times(1));
     }
@@ -122,7 +121,7 @@ class MenuCacheInvalidationObserverTest {
       MenuCacheInvalidationObserver observer = new MenuCacheInvalidationObserver();
       Entity observedEntity = observer.getObservedEntities()[0];
 
-      observer.onNew(createNewEvent(observedEntity));
+      observer.onNew(newEvent(observedEntity));
 
       menuBuilderMock.verify(MenuBuilder::clearMenuCache, never());
     }
@@ -139,7 +138,7 @@ class MenuCacheInvalidationObserverTest {
 
       MenuCacheInvalidationObserver observer = new MenuCacheInvalidationObserver();
 
-      observer.onNew(createNewEvent(mock(Entity.class)));
+      observer.onNew(newEvent(mock(Entity.class)));
 
       menuBuilderMock.verify(MenuBuilder::clearMenuCache, never());
     }
@@ -180,29 +179,5 @@ class MenuCacheInvalidationObserverTest {
     TriggerHandler mockTriggerHandler = mock(TriggerHandler.class);
     triggerMock.when(TriggerHandler::getInstance).thenReturn(mockTriggerHandler);
     when(mockTriggerHandler.isDisabled()).thenReturn(false);
-  }
-
-  private EntityNewEvent createNewEvent(Entity targetEntity) {
-    EntityNewEvent event = mock(EntityNewEvent.class);
-    BaseOBObject targetInstance = mock(BaseOBObject.class);
-    when(event.getTargetInstance()).thenReturn(targetInstance);
-    when(targetInstance.getEntity()).thenReturn(targetEntity);
-    return event;
-  }
-
-  private EntityUpdateEvent createUpdateEvent(Entity targetEntity) {
-    EntityUpdateEvent event = mock(EntityUpdateEvent.class);
-    BaseOBObject targetInstance = mock(BaseOBObject.class);
-    when(event.getTargetInstance()).thenReturn(targetInstance);
-    when(targetInstance.getEntity()).thenReturn(targetEntity);
-    return event;
-  }
-
-  private EntityDeleteEvent createDeleteEvent(Entity targetEntity) {
-    EntityDeleteEvent event = mock(EntityDeleteEvent.class);
-    BaseOBObject targetInstance = mock(BaseOBObject.class);
-    when(event.getTargetInstance()).thenReturn(targetInstance);
-    when(targetInstance.getEntity()).thenReturn(targetEntity);
-    return event;
   }
 }

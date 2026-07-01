@@ -69,7 +69,23 @@ public class MenuBuilder extends Builder {
         // tree would go stale and the rebuilt menu JSON would show outdated names/structure depending
         // on which pooled thread served the request. Resolved via WeldUtils because MenuBuilder is
         // instantiated outside a CDI scope that would allow @Inject (same pattern as LabelsBuilder).
-        manager.get().setGlobalMenuOptions(WeldUtils.getInstanceFromStaticBeanManager(GlobalMenu.class));
+        manager.get().setGlobalMenuOptions(resolveGlobalMenu());
+    }
+
+    /**
+     * Resolves the shared CDI {@link GlobalMenu} singleton (the instance the classic menu-cache
+     * invalidation targets). Falls back to a standalone instance only when the CDI container is not
+     * available, e.g. in a unit-test harness where Weld is not bootstrapped; in a running server the
+     * static bean manager is always present, so the shared singleton is always returned.
+     *
+     * @return the CDI-managed GlobalMenu, or a standalone instance when no container is available.
+     */
+    private static GlobalMenu resolveGlobalMenu() {
+        try {
+            return WeldUtils.getInstanceFromStaticBeanManager(GlobalMenu.class);
+        } catch (IllegalStateException e) {
+            return new GlobalMenu();
+        }
     }
 
     /**
