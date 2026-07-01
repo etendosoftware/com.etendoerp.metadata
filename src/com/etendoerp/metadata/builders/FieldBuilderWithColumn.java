@@ -41,6 +41,7 @@ import org.openbravo.model.ad.ui.Tab;
 import org.openbravo.model.ad.ui.Window;
 import org.openbravo.service.json.DataResolvingMode;
 
+import static com.etendoerp.metadata.utils.Utils.getAnyReferencedTab;
 import static com.etendoerp.metadata.utils.Utils.getReferencedTab;
 import org.openbravo.base.model.domaintype.DomainType;
 import org.openbravo.dal.core.OBContext;
@@ -221,8 +222,14 @@ public class FieldBuilderWithColumn extends FieldBuilder {
 
         json.put(REFERENCED_ENTITY, entityName);
         if (referencedTab != null) {
-            json.put(REFERENCED_WINDOW_ID, referencedTab.getWindow().getId());
-            json.put(REFERENCED_TAB_ID, referencedTab.getId());
+            Window win = referencedTab.getWindow();
+            if (win != null) {
+                json.put(REFERENCED_WINDOW_ID, win.getId());
+                json.put(REFERENCED_TAB_ID, referencedTab.getId());
+            } else {
+                json.put(REFERENCED_WINDOW_ID, JSONObject.NULL);
+                json.put(REFERENCED_TAB_ID, JSONObject.NULL);
+            }
         } else {
             json.put(REFERENCED_WINDOW_ID, JSONObject.NULL);
             json.put(REFERENCED_TAB_ID, JSONObject.NULL);
@@ -236,17 +243,32 @@ public class FieldBuilderWithColumn extends FieldBuilder {
 
     /**
      * Returns the Tab for the given entity, using the request-scoped tabCache when available.
+     * Uses a two-phase lookup to preserve the original addReferencedProperty behavior:
+     * first without an active filter, then with active=true as fallback when no Window is found.
      * Null results are cached to prevent repeated queries for entities with no registered Tab.
      */
     private Tab resolveTab(String entityName, Property referenced) {
         if (tabCache == null) {
-            return getReferencedTab(referenced);
+            return resolveTabTwoPhase(referenced);
         }
         if (tabCache.containsKey(entityName)) {
             return tabCache.get(entityName);
         }
-        Tab tab = getReferencedTab(referenced);
+        Tab tab = resolveTabTwoPhase(referenced);
         tabCache.put(entityName, tab);
+        return tab;
+    }
+
+    private static Tab resolveTabTwoPhase(Property referenced) {
+        // Phase 1: no active filter — matches original addReferencedProperty behavior
+        Tab tab = getAnyReferencedTab(referenced);
+        // Phase 2: if no tab or tab has no window, fallback to active-only lookup
+        if (tab == null || tab.getWindow() == null) {
+            Tab fallback = getReferencedTab(referenced);
+            if (fallback != null) {
+                tab = fallback;
+            }
+        }
         return tab;
     }
 

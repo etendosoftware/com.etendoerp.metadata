@@ -345,7 +345,7 @@ public class TabProcessor {
       }
       return result;
     } catch (Exception e) {
-      logger.warn("Error loading accessible window IDs: {}", e.getMessage());
+      logger.warn("Error loading accessible window IDs: {}", e.getMessage(), e);
       return Collections.emptySet();
     }
   }
