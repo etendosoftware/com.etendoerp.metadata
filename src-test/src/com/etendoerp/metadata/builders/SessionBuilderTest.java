@@ -91,6 +91,7 @@ class SessionBuilderTest {
   private static final String KEY_ACCT_CENTRALLY = "$IsAcctDimCentrally";
   private static final String KEY_BP_APP_L = "$Element_BP_APP_L";
   private static final String KEY_PR_APP_L = "$Element_PR_APP_L";
+  private static final String ORG2_ID = "org2-id";
 
   @Mock
   private OBContext obContext;
@@ -234,8 +235,8 @@ class SessionBuilderTest {
     // Setup organizations
     when(org1.getId()).thenReturn("org1-id");
     when(org1.get(eq(Organization.PROPERTY_NAME), any(), eq("org1-id"))).thenReturn("Organization 1");
-    when(org2.getId()).thenReturn("org2-id");
-    when(org2.get(eq(Organization.PROPERTY_NAME), any(), eq("org2-id"))).thenReturn("Organization 2");
+    when(org2.getId()).thenReturn(ORG2_ID);
+    when(org2.get(eq(Organization.PROPERTY_NAME), any(), eq(ORG2_ID))).thenReturn("Organization 2");
 
     // Setup org warehouses (now resolved through the batched query result, grouped by organization)
     when(orgWarehouse1.getOrganization()).thenReturn(org1);
@@ -492,7 +493,7 @@ class SessionBuilderTest {
       sessionBuilder.toJSON();
 
       // Only org2's id (role1's org list could not be read) should reach the batch query
-      verify(warehousesQuery).setParameter(eq("orgIds"), eq(Collections.singleton("org2-id")));
+      verify(warehousesQuery).setParameter(eq("orgIds"), eq(Collections.singleton(ORG2_ID)));
     }
   }
 

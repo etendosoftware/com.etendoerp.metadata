@@ -16,6 +16,10 @@
  */
 package com.etendoerp.metadata.cache;
 
+import static com.etendoerp.metadata.cache.EntityPersistenceEventTestSupport.createDeleteEvent;
+import static com.etendoerp.metadata.cache.EntityPersistenceEventTestSupport.createNewEvent;
+import static com.etendoerp.metadata.cache.EntityPersistenceEventTestSupport.createUpdateEvent;
+import static com.etendoerp.metadata.cache.EntityPersistenceEventTestSupport.setupMocks;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.mock;
@@ -32,7 +36,6 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.openbravo.base.model.Entity;
 import org.openbravo.base.model.ModelProvider;
-import org.openbravo.base.structure.BaseOBObject;
 import org.openbravo.client.kernel.event.EntityDeleteEvent;
 import org.openbravo.client.kernel.event.EntityNewEvent;
 import org.openbravo.client.kernel.event.EntityUpdateEvent;
@@ -61,7 +64,7 @@ class SessionCacheInvalidationObserverTest {
         MockedStatic<TriggerHandler> triggerMock = mockStatic(TriggerHandler.class);
         MockedStatic<SessionBuilder> sessionBuilderMock = mockStatic(SessionBuilder.class)
     ) {
-      setupMocks(modelProviderMock, triggerMock);
+      setupMocks(modelProviderMock, triggerMock, OBSERVED_ENTITY_NAMES);
 
       SessionCacheInvalidationObserver observer = new SessionCacheInvalidationObserver();
       Entity observedEntity = observer.getObservedEntities()[0];
@@ -80,7 +83,7 @@ class SessionCacheInvalidationObserverTest {
         MockedStatic<TriggerHandler> triggerMock = mockStatic(TriggerHandler.class);
         MockedStatic<SessionBuilder> sessionBuilderMock = mockStatic(SessionBuilder.class)
     ) {
-      setupMocks(modelProviderMock, triggerMock);
+      setupMocks(modelProviderMock, triggerMock, OBSERVED_ENTITY_NAMES);
 
       SessionCacheInvalidationObserver observer = new SessionCacheInvalidationObserver();
       Entity observedEntity = observer.getObservedEntities()[0];
@@ -99,7 +102,7 @@ class SessionCacheInvalidationObserverTest {
         MockedStatic<TriggerHandler> triggerMock = mockStatic(TriggerHandler.class);
         MockedStatic<SessionBuilder> sessionBuilderMock = mockStatic(SessionBuilder.class)
     ) {
-      setupMocks(modelProviderMock, triggerMock);
+      setupMocks(modelProviderMock, triggerMock, OBSERVED_ENTITY_NAMES);
 
       SessionCacheInvalidationObserver observer = new SessionCacheInvalidationObserver();
       Entity observedEntity = observer.getObservedEntities()[0];
@@ -118,7 +121,7 @@ class SessionCacheInvalidationObserverTest {
         MockedStatic<TriggerHandler> triggerMock = mockStatic(TriggerHandler.class);
         MockedStatic<SessionBuilder> sessionBuilderMock = mockStatic(SessionBuilder.class)
     ) {
-      setupMocks(modelProviderMock, triggerMock);
+      setupMocks(modelProviderMock, triggerMock, OBSERVED_ENTITY_NAMES);
 
       TriggerHandler mockTriggerHandler = TriggerHandler.getInstance();
       when(mockTriggerHandler.isDisabled()).thenReturn(true);
@@ -140,7 +143,7 @@ class SessionCacheInvalidationObserverTest {
         MockedStatic<TriggerHandler> triggerMock = mockStatic(TriggerHandler.class);
         MockedStatic<SessionBuilder> sessionBuilderMock = mockStatic(SessionBuilder.class)
     ) {
-      setupMocks(modelProviderMock, triggerMock);
+      setupMocks(modelProviderMock, triggerMock, OBSERVED_ENTITY_NAMES);
 
       Entity unrelatedEntity = mock(Entity.class);
 
@@ -159,7 +162,7 @@ class SessionCacheInvalidationObserverTest {
         MockedStatic<ModelProvider> modelProviderMock = mockStatic(ModelProvider.class);
         MockedStatic<TriggerHandler> triggerMock = mockStatic(TriggerHandler.class)
     ) {
-      setupMocks(modelProviderMock, triggerMock);
+      setupMocks(modelProviderMock, triggerMock, OBSERVED_ENTITY_NAMES);
 
       SessionCacheInvalidationObserver observer = new SessionCacheInvalidationObserver();
       Entity[] entities = observer.getObservedEntities();
@@ -167,51 +170,5 @@ class SessionCacheInvalidationObserverTest {
       assertNotNull(entities);
       assertEquals(OBSERVED_ENTITY_NAMES.length, entities.length);
     }
-  }
-
-  /**
-   * Sets up ModelProvider and TriggerHandler mocks.
-   * Returns the first observed entity mock for use in event creation.
-   */
-  private Entity setupMocks(MockedStatic<ModelProvider> modelProviderMock,
-      MockedStatic<TriggerHandler> triggerMock) {
-    ModelProvider mockProvider = mock(ModelProvider.class);
-    modelProviderMock.when(ModelProvider::getInstance).thenReturn(mockProvider);
-
-    Entity[] entityMocks = new Entity[OBSERVED_ENTITY_NAMES.length];
-    for (int i = 0; i < OBSERVED_ENTITY_NAMES.length; i++) {
-      entityMocks[i] = mock(Entity.class);
-      when(mockProvider.getEntity(OBSERVED_ENTITY_NAMES[i])).thenReturn(entityMocks[i]);
-    }
-
-    TriggerHandler mockTriggerHandler = mock(TriggerHandler.class);
-    triggerMock.when(TriggerHandler::getInstance).thenReturn(mockTriggerHandler);
-    when(mockTriggerHandler.isDisabled()).thenReturn(false);
-
-    return entityMocks[0];
-  }
-
-  private EntityNewEvent createNewEvent(Entity targetEntity) {
-    EntityNewEvent event = mock(EntityNewEvent.class);
-    BaseOBObject targetInstance = mock(BaseOBObject.class);
-    when(event.getTargetInstance()).thenReturn(targetInstance);
-    when(targetInstance.getEntity()).thenReturn(targetEntity);
-    return event;
-  }
-
-  private EntityUpdateEvent createUpdateEvent(Entity targetEntity) {
-    EntityUpdateEvent event = mock(EntityUpdateEvent.class);
-    BaseOBObject targetInstance = mock(BaseOBObject.class);
-    when(event.getTargetInstance()).thenReturn(targetInstance);
-    when(targetInstance.getEntity()).thenReturn(targetEntity);
-    return event;
-  }
-
-  private EntityDeleteEvent createDeleteEvent(Entity targetEntity) {
-    EntityDeleteEvent event = mock(EntityDeleteEvent.class);
-    BaseOBObject targetInstance = mock(BaseOBObject.class);
-    when(event.getTargetInstance()).thenReturn(targetInstance);
-    when(targetInstance.getEntity()).thenReturn(targetEntity);
-    return event;
   }
 }
