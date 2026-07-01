@@ -238,6 +238,11 @@ public final class MetadataTestConstants {
   public static final String ENTITY_NAME_PROPERTY = "entityName";
   public static final String IDENTIFIER_PROPERTY = "identifier";
 
+  public static final String ETAG_HEADER = "ETag";
+  public static final String CACHE_CONTROL_HEADER = "Cache-Control";
+  public static final String IF_NONE_MATCH_HEADER = "If-None-Match";
+  public static final String CACHE_CONTROL_PRIVATE_MUST_REVALIDATE = "private, must-revalidate";
+
   /**
    * Private constructor to prevent instantiation of this utility class.
    * This class is not meant to be instantiated, as it only contains static constants.

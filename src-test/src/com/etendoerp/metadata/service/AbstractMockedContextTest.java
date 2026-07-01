@@ -38,19 +38,19 @@ import static org.mockito.Mockito.when;
  * Provides common mock fields, response capture, and a helper to run test
  * logic inside a properly wired static-mock scope.
  */
-abstract class AbstractMockedContextTest {
+public abstract class AbstractMockedContextTest {
 
-    @Mock HttpServletRequest  request;
-    @Mock HttpServletResponse response;
-    @Mock OBContext obContext;
-    @Mock OBDal     obDal;
-    @Mock Session   session;
+    @Mock protected HttpServletRequest  request;
+    @Mock protected HttpServletResponse response;
+    @Mock protected OBContext obContext;
+    @Mock protected OBDal     obDal;
+    @Mock protected Session   session;
 
     /** Captures the text written to {@code response.getWriter()}. */
-    StringWriter responseCapture;
+    protected StringWriter responseCapture;
 
     @BeforeEach
-    void setUpResponseWriter() throws Exception {
+    protected void setUpResponseWriter() throws Exception {
         responseCapture = new StringWriter();
         when(response.getWriter()).thenReturn(new PrintWriter(responseCapture));
     }
@@ -60,7 +60,7 @@ abstract class AbstractMockedContextTest {
      * and {@link OBDal#getInstance()} return the mocked instances, and
      * {@code obDal.getSession()} returns the mocked session.
      */
-    void runWithMockedContext(ThrowingRunnable action) throws Exception {
+    protected void runWithMockedContext(ThrowingRunnable action) throws Exception {
         try (MockedStatic<OBContext> ctxMock = mockStatic(OBContext.class);
              MockedStatic<OBDal> dalMock = mockStatic(OBDal.class)) {
             ctxMock.when(OBContext::getOBContext).thenReturn(obContext);
@@ -73,7 +73,7 @@ abstract class AbstractMockedContextTest {
     }
 
     @FunctionalInterface
-    interface ThrowingRunnable {
+    public interface ThrowingRunnable {
         /**
          * Executes the test action, allowing checked exceptions for test convenience.
          *

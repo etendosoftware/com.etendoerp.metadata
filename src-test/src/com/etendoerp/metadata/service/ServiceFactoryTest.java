@@ -222,6 +222,13 @@ class ServiceFactoryTest {
 
 
 
+  @Test
+  void normalizePathStripsMetaAndSwsPrefixes() {
+    assertEquals("/menu", ServiceFactory.normalizePath(mockRequestWithPath("/com.etendoerp.metadata.meta/menu")));
+    assertEquals("/menu", ServiceFactory.normalizePath(mockRequestWithPath("/com.etendoerp.metadata.sws/menu")));
+    assertEquals("", ServiceFactory.normalizePath(mockRequestWithPath(null)));
+  }
+
   /** Helper to create a mock HttpServletRequest with the specified path info. */
   private HttpServletRequest mockRequestWithPath(String path) {
     HttpServletRequest req = mock(HttpServletRequest.class);
