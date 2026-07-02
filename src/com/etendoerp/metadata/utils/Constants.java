@@ -50,6 +50,12 @@ public class Constants {
     public static final String TREE_DATASOURCE = "90034CAE96E847D78FBEF6D38CB1930D";
     public static final String DATASOURCE_PROPERTY = "datasourceName";
     public static final String SELECTOR_DEFINITION_PROPERTY = "_selectorDefinitionId";
+    /**
+     * Selector JSON key carrying the Classic info-window URL (e.g. {@code /info/Product.html})
+     * for a Search reference. When present, the new UI opens that page inside an iframe popup
+     * (legacy delegation) instead of the native React selector modal.
+     */
+    public static final String LEGACY_SEARCH_URL = "legacySearchUrl";
     public static final String FIELD_ID_PROPERTY = "fieldId";
     public static final String DISPLAY_FIELD_PROPERTY = "displayField";
     public static final String VALUE_FIELD_PROPERTY = "valueField";
@@ -86,6 +92,13 @@ public class Constants {
     public static final String PUT = "PUT";
     public static final String PATCH = "PATCH";
     public static final String DELETE = "DELETE";
+    public static final String HEAD = "HEAD";
+
+    // HTTP caching headers
+    public static final String ETAG_HEADER = "ETag";
+    public static final String CACHE_CONTROL_HEADER = "Cache-Control";
+    public static final String IF_NONE_MATCH_HEADER = "If-None-Match";
+    public static final String CACHE_CONTROL_PRIVATE_MUST_REVALIDATE = "private, must-revalidate";
     public static final String LOCATION_PATH = "/location/";
     public static final String EMAIL_PATH = "/email";
     public static final String EMAIL_SEND_PATH = "/email/send";

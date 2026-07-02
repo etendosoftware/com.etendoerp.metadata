@@ -87,12 +87,60 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
     private static final String META_LEGACY_PATH = "/meta/legacy";
     private static final String WEB_PATH = "/web/";
     private static final String SRC_REPLACE_STRING = "src=\"";
+    /** Path segment identifying a Classic info-window (search/selector) page. */
+    private static final String INFO_PATH_SEGMENT = "info/";
+    /** Function present only in Classic search/selector popups; gates the selector shim. */
+    private static final String VALIDATE_SELECTOR_MARKER = "validateSelector";
 
     private static final String RECEIVE_AND_POST_MESSAGE_SCRIPT = "<script>window.addEventListener(\"message\", (event) => {"
             +
             "if (event.data?.type === \"" + LegacyMessageProtocol.MESSAGE_TYPE + "\" && window.parent) {" +
             "window.parent.postMessage({ type: \"fromIframe\", action: event.data.action }, \"*\");" +
             "}});</script>";
+
+    /**
+     * Script injected into Classic search/selector popups (e.g. {@code /info/Product.html})
+     * opened by the new UI (via {@code window.open}). The Classic popup delivers the picked
+     * row by calling {@code theOpener.closeSearch(action, key, text, params)}, where
+     * {@code theOpener = parent.opener || getFrame('LayoutMDI')}.
+     *
+     * <p>In a {@code window.open} popup, {@code parent.opener} is the cross-origin new-UI
+     * window, so {@code theOpener.closeSearch} would throw a security error. This shim
+     * (installed on {@code load}, after {@code searchs.js} has declared its own functions)
+     * therefore: (1) captures the opener, (2) nulls {@code window.opener} so
+     * {@code parent.opener} becomes falsy and {@code validateSelector} falls through to
+     * {@code getFrame}, (3) makes {@code getFrame} return a stub whose {@code closeSearch}
+     * {@code postMessage}s {@code {action,id,identifier}} back to the captured opener (or the
+     * parent, when embedded in an iframe). Real frame lookups (e.g. {@code frameMenu}, used
+     * for number formatting) are preserved.
+     *
+     * <p>OK ({@code validateSelector('SAVE')}), Cancel ({@code validateSelector('CLEAR')}) and
+     * double-click all route through the page's {@code validateSelector}, which resolves
+     * {@code theOpener = parent.opener || getFrame('LayoutMDI')} and calls
+     * {@code theOpener.closeSearch}. To guarantee delivery without depending on a stale
+     * {@code window.opener}, the shim WRAPS {@code validateSelector} to null {@code window.opener}
+     * immediately before delegating (so {@code parent.opener} is falsy and {@code theOpener}
+     * falls to our {@code getFrame} stub), while preserving each selector's own key/text
+     * extraction. After posting, {@code stub.closeSearch} calls {@code window.close()} so the
+     * script-opened popup closes itself (covers OK/Cancel/double-click deterministically).
+     */
+    private static final String SELECTOR_POPUP_SHIM_SCRIPT = "<script>(function(){" +
+            "var opener=window.opener;" +
+            "function pick(action,key,text){try{(opener||window.parent).postMessage({type:'"
+            + LegacyMessageProtocol.MESSAGE_TYPE + "',action:'"
+            + LegacyMessageProtocol.ACTION_SELECTOR_VALUE_PICKED
+            + "',payload:{action:action,id:key,identifier:text}},'*');}catch(e){}}" +
+            "var stub={closeSearch:function(action,key,text){pick(action,key,text);try{window.close();}catch(e){}}};" +
+            "function install(){" +
+            "window.closeSearch=stub.closeSearch;" +
+            "var real=window.getFrame;" +
+            "window.getFrame=function(name){try{var f=real?real(name):null;if(f)return f;}catch(e){}return stub;};" +
+            "var origValidate=window.validateSelector;" +
+            "if(typeof origValidate==='function'){window.validateSelector=function(){"
+            + "try{window.opener=null;}catch(e){}return origValidate.apply(this,arguments);};}" +
+            "}" +
+            "if(document.readyState==='complete'){install();}else{window.addEventListener('load',install);}" +
+            "})();</script>";
 
     /**
      * JS-array literal listing the {@code Command} prefixes the legacy framework uses
@@ -280,6 +328,10 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
      */
     private static final String COMMAND_PARAM = "Command";
     private static final String PROCESS_COMMAND_PREFIX = "PROCESS";
+    /** Dojo DataGrid info-selector data commands; their responses are XML, not HTML. */
+    private static final String COMMAND_STRUCTURE = "STRUCTURE";
+    private static final String COMMAND_DATA = "DATA";
+    private static final String XML_UTF8_CONTENT_TYPE = "text/xml; charset=UTF-8";
 
     /**
      * Patterns used to extract the popup title, message and message-type class
@@ -925,8 +977,31 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
                 return;
             }
         }
+        // Dojo DataGrid info-selector data requests (Command=STRUCTURE|DATA) return XML
+        // but the legacy servlet leaves the Content-Type unset; serve them as XML so the
+        // browser exposes responseXML (otherwise the grid stays empty).
+        if (isXmlDataCommand()) {
+            res.setContentType(XML_UTF8_CONTENT_TYPE);
+            res.setCharacterEncoding(UTF8_CHARSET);
+            return;
+        }
         res.setContentType(HTML_UTF8_CONTENT_TYPE);
         res.setCharacterEncoding(UTF8_CHARSET);
+    }
+
+    /**
+     * Tells whether the current request is a Dojo DataGrid data request
+     * ({@code Command=STRUCTURE} or {@code Command=DATA}) whose response is XML.
+     *
+     * @return {@code true} when the {@code Command} parameter is STRUCTURE or DATA
+     */
+    private static boolean isXmlDataCommand() {
+        HttpServletRequest req = RequestContext.get().getRequest();
+        if (req == null) {
+            return false;
+        }
+        String command = req.getParameter(COMMAND_PARAM);
+        return COMMAND_STRUCTURE.equals(command) || COMMAND_DATA.equals(command);
     }
 
     /**
@@ -1800,6 +1875,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
                 .replace("href=\"../web/", "href=\"" + contextPath + WEB_PATH);
 
         responseString = injectFrameMenuShim(responseString);
+        responseString = injectSelectorPopupShim(path, responseString);
 
         if (responseString.contains(FRAMESET_CLOSE_TAG)) {
             return responseString.replace(HEAD_CLOSE_TAG, RECEIVE_AND_POST_MESSAGE_SCRIPT.concat(HEAD_CLOSE_TAG));
@@ -1841,6 +1917,37 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             return responseString;
         }
         return responseString.replace(HEAD_CLOSE_TAG, SHOW_PROCESS_MESSAGE_SCRIPT.concat(HEAD_CLOSE_TAG));
+    }
+
+    /**
+     * Injects {@link #SELECTOR_POPUP_SHIM_SCRIPT} into Classic search/selector popups so the
+     * picked record is forwarded to the parent window via {@code postMessage} instead of the
+     * Classic {@code opener.closeSearch} call. Only standalone info-window pages are targeted
+     * (gated by {@link #isSelectorPopupPage(String, String)}); regular process/report forms
+     * are left untouched.
+     *
+     * @param path           the requested resource path
+     * @param responseString the HTML response after previous injections
+     * @return the HTML with the shim injected before {@code </HEAD>}, or the original HTML
+     *         when the page is not a selector popup
+     */
+    private String injectSelectorPopupShim(String path, String responseString) {
+        if (!isSelectorPopupPage(path, responseString) || !responseString.contains(HEAD_CLOSE_TAG)) {
+            return responseString;
+        }
+        return responseString.replace(HEAD_CLOSE_TAG, SELECTOR_POPUP_SHIM_SCRIPT.concat(HEAD_CLOSE_TAG));
+    }
+
+    /**
+     * Tells whether the response is a Classic search/selector popup page: it lives under the
+     * {@code info/} path and defines the {@code validateSelector} delivery function.
+     *
+     * @param path           the requested resource path
+     * @param responseString the captured HTML response
+     * @return {@code true} when both the path segment and the marker function are present
+     */
+    private static boolean isSelectorPopupPage(String path, String responseString) {
+        return path != null && path.contains(INFO_PATH_SEGMENT) && responseString.contains(VALIDATE_SELECTOR_MARKER);
     }
 
     private String injectCodeAfterFunctionCall(String originalRes, String originalFunctionCall, String newFunctionCall,

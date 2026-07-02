@@ -20,25 +20,35 @@ package com.etendoerp.metadata.data;
 import static com.etendoerp.metadata.utils.Utils.evaluateDisplayLogicAtServerLevel;
 import static org.openbravo.client.application.process.BaseProcessActionHandler.hasAccess;
 
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
 import com.etendoerp.metadata.builders.FieldBuilderWithoutColumn;
+import com.etendoerp.metadata.cache.ADCacheProvider;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
+import org.hibernate.criterion.Restrictions;
 import org.openbravo.base.exception.OBException;
 import org.openbravo.base.model.Entity;
 import org.openbravo.base.model.ModelProvider;
 import org.openbravo.base.model.Property;
 import org.openbravo.client.application.Process;
 import org.openbravo.dal.core.OBContext;
+import org.openbravo.dal.service.OBCriteria;
+import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.access.FieldAccess;
+import org.openbravo.model.ad.access.Role;
 import org.openbravo.model.ad.access.TabAccess;
+import org.openbravo.model.ad.access.WindowAccess;
 import org.openbravo.model.ad.datamodel.Column;
 import org.openbravo.model.ad.ui.Field;
 import org.openbravo.model.ad.ui.Tab;
@@ -170,11 +180,13 @@ public class TabProcessor {
 
     if (customJs != null && clientClass != null && fieldName != null && processors.nameSetter != null) {
       String fieldKey = fieldName + "_" + clientClass;
-      // Set a new name for the field, appending "Canva" to it
-      // In the future, Canva may become another word if we need it to.
       String newFieldName = fieldName + " " + "Canva";
+      // Set the display name, build the JSON, then restore the original name so
+      // cached entity objects (e.g. from ADCS) are not permanently mutated.
       processors.nameSetter.accept(fieldLike, newFieldName);
-      result.put(fieldKey, processors.fieldMapper.apply(fieldLike, false));
+      JSONObject fieldJson = processors.fieldMapper.apply(fieldLike, false);
+      processors.nameSetter.accept(fieldLike, fieldName);
+      result.put(fieldKey, fieldJson);
     } else {
       logger.warn("Field has null column and null custom javascript - skipping field: {}", fieldLike);
     }
@@ -187,9 +199,27 @@ public class TabProcessor {
    * @return a JSON object mapping field names to their JSON representations
    */
   public static JSONObject getTabFields(Tab tab) {
-    return getFields(tab.getId(), tab.getUpdated().toString(), tab.getADFieldList(), TabProcessor::isFieldAccessible,
+    // Use ADCS-cached fields if available (avoids lazy-loading tab.getADFieldList()).
+    // Defensive copy: ADCS fields are shared across threads; getFields() may mutate
+    // field names via nameSetter for custom JS fields.
+    List<Field> fields = ADCacheProvider.getFieldsOfTab(tab);
+    if (fields != null) {
+      fields = new java.util.ArrayList<>(fields);
+    } else {
+      fields = tab.getADFieldList();
+    }
+
+    Map<String, Tab> tabCache = new HashMap<>();
+    // holder[0] is null until the first field is processed; loadAccessibleWindowIds() is never
+    // called on a cache hit because getFields() returns before invoking the fieldMapper lambda.
+    @SuppressWarnings("unchecked")
+    Set<String>[] holder = new Set[]{null};
+    return getFields(tab.getId(), tab.getUpdated().toString(), fields, TabProcessor::isFieldAccessible,
         Field::getColumn, Field::getEtmetaCustomjs, Field::getClientclass, Field::getName,
-        Field::setName, TabProcessor::getJSONField, fieldCache);
+        Field::setName, (field, withCol) -> {
+          if (holder[0] == null) holder[0] = loadAccessibleWindowIds();
+          return getJSONField(field, withCol, tabCache, holder[0]);
+        }, fieldCache);
   }
 
   /**
@@ -213,13 +243,19 @@ public class TabProcessor {
    * @return a JSON object mapping field names to their JSON representations
    */
   public static JSONObject getTabFields(TabAccess tabAccess, List<FieldAccess> fieldAccessList) {
+    Map<String, Tab> tabCache = new HashMap<>();
+    @SuppressWarnings("unchecked")
+    Set<String>[] holder = new Set[]{null};
     return getFields(tabAccess.getId(), tabAccess.getUpdated().toString(), fieldAccessList,
         TabProcessor::isFieldAccessAccessible, fieldAccess -> fieldAccess.getField().getColumn(),
         fieldAccess -> fieldAccess.getField().getEtmetaCustomjs(),
         fieldAccess -> fieldAccess.getField().getClientclass(),
         fieldAccess -> fieldAccess.getField().getName(),
         (fieldAccess, name) -> fieldAccess.getField().setName(name),
-        TabProcessor::getJSONField, fieldAccessCache);
+        (access, withCol) -> {
+          if (holder[0] == null) holder[0] = loadAccessibleWindowIds();
+          return getJSONField(access, withCol, tabCache, holder[0]);
+        }, fieldAccessCache);
   }
 
   /**
@@ -259,11 +295,7 @@ public class TabProcessor {
   }
 
   /**
-   * Converts a Field entity to its JSON representation.
-   *
-   * @param field      the field to convert
-   * @param withColumn {@code true} to use column-based builder, {@code false} for column-less builder
-   * @return the JSON representation of the field
+   * Converts a Field entity to its JSON representation (no cache — for isolated callers).
    */
   public static JSONObject getJSONField(Field field, boolean withColumn) {
     try {
@@ -273,20 +305,14 @@ public class TabProcessor {
       return new FieldBuilderWithoutColumn(field, null).toJSON();
     } catch (JSONException e) {
       logger.warn(e.getMessage(), e);
-
       return new JSONObject();
     }
   }
 
   /**
-   * Converts a FieldAccess entity to its JSON representation.
-   *
-   * @param access     the field access record to convert
-   * @param withColumn {@code true} to use column-based builder, {@code false} for column-less builder
-   * @return the JSON representation of the field
+   * Converts a FieldAccess entity to its JSON representation (no cache — for isolated callers).
    */
   public static JSONObject getJSONField(FieldAccess access, boolean withColumn) {
-
     try {
       if (withColumn) {
         return new FieldBuilderWithColumn(access.getField(), access).toJSON();
@@ -294,8 +320,60 @@ public class TabProcessor {
       return new FieldBuilderWithoutColumn(access.getField(), access).toJSON();
     } catch (JSONException e) {
       logger.warn(e.getMessage(), e);
-
       return new JSONObject();
+    }
+  }
+
+  private static JSONObject getJSONField(Field field, boolean withColumn,
+      Map<String, Tab> tabCache, Set<String> accessibleWindowIds) {
+    try {
+      if (withColumn) {
+        return new FieldBuilderWithColumn(field, null, tabCache, accessibleWindowIds).toJSON();
+      }
+      return new FieldBuilderWithoutColumn(field, null).toJSON();
+    } catch (JSONException e) {
+      logger.warn(e.getMessage(), e);
+      return new JSONObject();
+    }
+  }
+
+  private static JSONObject getJSONField(FieldAccess access, boolean withColumn,
+      Map<String, Tab> tabCache, Set<String> accessibleWindowIds) {
+    try {
+      if (withColumn) {
+        return new FieldBuilderWithColumn(access.getField(), access, tabCache, accessibleWindowIds).toJSON();
+      }
+      return new FieldBuilderWithoutColumn(access.getField(), access).toJSON();
+    } catch (JSONException e) {
+      logger.warn(e.getMessage(), e);
+      return new JSONObject();
+    }
+  }
+
+  /**
+   * Loads all window IDs accessible to the current role in a single query.
+   * Returns an empty set if the role cannot be resolved.
+   */
+  private static Set<String> loadAccessibleWindowIds() {
+    try {
+      OBContext context = OBContext.getOBContext();
+      Role role = context != null ? context.getRole() : null;
+      if (role == null) {
+        return Collections.emptySet();
+      }
+      OBCriteria<WindowAccess> criteria = OBDal.getReadOnlyInstance().createCriteria(WindowAccess.class);
+      criteria.add(Restrictions.eq(WindowAccess.PROPERTY_ROLE, role));
+      criteria.add(Restrictions.eq(WindowAccess.PROPERTY_ACTIVE, true));
+      Set<String> result = new HashSet<>();
+      for (WindowAccess wa : criteria.list()) {
+        if (wa.getWindow() != null) {
+          result.add(wa.getWindow().getId());
+        }
+      }
+      return result;
+    } catch (Exception e) {
+      logger.warn("Error loading accessible window IDs: {}", e.getMessage(), e);
+      return Collections.emptySet();
     }
   }
 

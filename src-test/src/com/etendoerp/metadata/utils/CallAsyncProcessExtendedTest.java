@@ -20,9 +20,7 @@ package com.etendoerp.metadata.utils;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
@@ -34,9 +32,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
-import java.sql.SQLException;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
@@ -45,14 +41,12 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.MockedStatic;
 import org.mockito.junit.MockitoJUnitRunner;
-import org.openbravo.base.exception.OBException;
 import org.openbravo.base.provider.OBProvider;
 import org.openbravo.base.session.OBPropertiesProvider;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.access.Role;
 import org.openbravo.model.ad.access.User;
-import org.openbravo.model.ad.process.Parameter;
 import org.openbravo.model.ad.process.ProcessInstance;
 import org.openbravo.model.ad.system.Client;
 import org.openbravo.model.ad.system.Language;
@@ -62,7 +56,9 @@ import org.openbravo.model.common.enterprise.Warehouse;
 
 /**
  * Extended tests for {@link CallAsyncProcess} covering ContextValues,
- * hydrateContext, executeProcedure branches, and runInBackground error paths.
+ * hydrateContext, executeProcedure branches, callProcess and runInBackground
+ * error paths. Dispatch, bundle-param, result-application and parameter
+ * stringification tests live in {@code CallAsyncProcessDispatchTest}.
  */
 @RunWith(MockitoJUnitRunner.Silent.class)
 public class CallAsyncProcessExtendedTest {
@@ -430,7 +426,7 @@ public class CallAsyncProcessExtendedTest {
         CallAsyncProcess instance = CallAsyncProcess.getInstance();
         Method method = CallAsyncProcess.class.getDeclaredMethod("runInBackground",
                 String.class, String.class,
-                Class.forName(CONTEXT_VALUES_CLASS), Boolean.class);
+                Class.forName(CONTEXT_VALUES_CLASS), Boolean.class, Map.class);
         method.setAccessible(true);
 
         OBDal mockOBDal = mock(OBDal.class);
@@ -441,7 +437,7 @@ public class CallAsyncProcessExtendedTest {
              MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class)) {
             obDalStatic.when(OBDal::getInstance).thenReturn(mockOBDal);
 
-            method.invoke(instance, pInstanceId, processId, null, null);
+            method.invoke(instance, pInstanceId, processId, null, null, null);
 
             verify(mockOBDal).rollbackAndClose();
         }

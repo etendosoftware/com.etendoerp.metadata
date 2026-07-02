@@ -41,6 +41,7 @@ import org.openbravo.model.ad.ui.Window;
 import org.openbravo.service.json.DataResolvingMode;
 
 import org.openbravo.dal.core.OBContext;
+import com.etendoerp.metadata.cache.ADCacheProvider;
 import com.etendoerp.metadata.exceptions.NotFoundException;
 import com.etendoerp.metadata.exceptions.UnauthorizedException;
 
@@ -62,7 +63,10 @@ public class WindowBuilder extends Builder {
 
     private static WindowAccess getWindowAccess(String id) {
         OBDal dal = OBDal.getReadOnlyInstance();
-        Window adWindow = dal.get(Window.class, id);
+        Window adWindow = ADCacheProvider.getWindow(id);
+        if (adWindow == null) {
+            adWindow = dal.get(Window.class, id);
+        }
 
         if (adWindow == null) {
             throw new NotFoundException("Window with ID " + id + " not found.");
