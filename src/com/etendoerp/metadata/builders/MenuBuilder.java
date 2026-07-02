@@ -17,11 +17,14 @@
 
 package com.etendoerp.metadata.builders;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
+import org.openbravo.base.weld.WeldUtils;
 import org.openbravo.client.application.GlobalMenu;
 import org.openbravo.client.application.MenuManager;
 import org.openbravo.client.application.MenuManager.MenuOption;
@@ -29,7 +32,6 @@ import org.openbravo.client.application.Process;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.erpCommon.utility.Utility;
-import org.openbravo.model.ad.domain.ModelImplementation;
 import org.openbravo.model.ad.domain.ModelImplementationMapping;
 import org.openbravo.model.ad.system.Language;
 import org.openbravo.model.ad.ui.Form;
@@ -37,6 +39,7 @@ import org.openbravo.model.ad.ui.Menu;
 import org.openbravo.model.ad.ui.Window;
 
 import com.etendoerp.metadata.utils.Constants;
+import com.etendoerp.redis.interfaces.CachedConcurrentMap;
 
 /**
  * Builder class for generating Menu metadata in JSON format.
@@ -46,15 +49,42 @@ import com.etendoerp.metadata.utils.Constants;
 public class MenuBuilder extends Builder {
     private static final ThreadLocal<MenuManager> manager = ThreadLocal.withInitial(MenuManager::new);
 
+    private static final String MENU_CACHE = "MENU_METADATA";
+    private static final String CACHE_KEY_SEPARATOR = "_";
+    private static final String DEFAULT_MAPPINGS_HQL = "select mim from ADModelImplementationMapping mim "
+        + "where mim.default = true and mim.modelObject.process is not null";
+    private static final CachedConcurrentMap<String, JSONObject> menuCache = new CachedConcurrentMap<>(MENU_CACHE);
+
+    private Map<String, ModelImplementationMapping> defaultMappingsByProcess;
+
     /**
-     * Constructor for MenuBuilder.
-     * Initializes the MenuManager and sets global menu options if necessary.
+     * Constructor for MenuBuilder. Points the thread-local {@link MenuManager} at the shared,
+     * CDI-managed {@link GlobalMenu} singleton so it participates in the standard menu-cache
+     * invalidation.
      */
     public MenuBuilder() {
+        // Point the (thread-local) MenuManager at the CDI @ApplicationScoped GlobalMenu singleton
+        // (the same instance MenuCacheHandler invalidates) instead of a per-thread new GlobalMenu().
+        // A per-thread instance is invisible to the classic menu-cache invalidation, so its internal
+        // tree would go stale and the rebuilt menu JSON would show outdated names/structure depending
+        // on which pooled thread served the request. Resolved via WeldUtils because MenuBuilder is
+        // instantiated outside a CDI scope that would allow @Inject (same pattern as LabelsBuilder).
+        manager.get().setGlobalMenuOptions(resolveGlobalMenu());
+    }
+
+    /**
+     * Resolves the shared CDI {@link GlobalMenu} singleton (the instance the classic menu-cache
+     * invalidation targets). Falls back to a standalone instance only when the CDI container is not
+     * available, e.g. in a unit-test harness where Weld is not bootstrapped; in a running server the
+     * static bean manager is always present, so the shared singleton is always returned.
+     *
+     * @return the CDI-managed GlobalMenu, or a standalone instance when no container is available.
+     */
+    private static GlobalMenu resolveGlobalMenu() {
         try {
-            manager.get().getMenu();
-        } catch (NullPointerException e) {
-            manager.get().setGlobalMenuOptions(new GlobalMenu());
+            return WeldUtils.getInstanceFromStaticBeanManager(GlobalMenu.class);
+        } catch (IllegalStateException e) {
+            return new GlobalMenu();
         }
     }
 
@@ -63,6 +93,16 @@ public class MenuBuilder extends Builder {
      */
     public void unload() {
         manager.remove(); // Compliant
+    }
+
+    /**
+     * Clears the cached menu JSON for every role and language. Invoked when Application
+     * Dictionary entities that compose the menu change (see
+     * {@code MenuCacheInvalidationObserver}) or on a full metadata cache reset
+     * (see {@code MetadataCacheManager#invalidateAll()}).
+     */
+    public static void clearMenuCache() {
+        menuCache.clear();
     }
 
     /**
@@ -106,20 +146,40 @@ public class MenuBuilder extends Builder {
     }
 
     /**
-     * Retrieves the default model implementation mapping for a given process.
+     * Retrieves the default model implementation mapping for a given process from the batch
+     * loaded map, resolving it in O(1). The map is loaded lazily on the first process entry
+     * and reused for the rest of the menu, so the whole build performs a single query instead
+     * of the previous per-process N+1 lazy iteration.
      *
      * @param process The process to search for mappings.
      * @return The default ModelImplementationMapping, or null if none is found.
      */
     private ModelImplementationMapping getDefaultMapping(org.openbravo.model.ad.ui.Process process) {
-        for (ModelImplementation mi : process.getADModelImplementationList()) {
-            for (ModelImplementationMapping mim : mi.getADModelImplementationMappingList()) {
-                if (mim.isDefault()) {
-                    return mim;
-                }
-            }
+        if (defaultMappingsByProcess == null) {
+            defaultMappingsByProcess = loadDefaultMappings();
         }
-        return null;
+        return defaultMappingsByProcess.get(process.getId());
+    }
+
+    /**
+     * Loads every default {@link ModelImplementationMapping} in a single query and indexes it
+     * by process id. Uses the raw Hibernate session (as {@link #addViewInfo} does) so no
+     * active/client/organization filter is applied, preserving the semantics of the original
+     * lazy-collection iteration (which included inactive rows). When a process has more than one
+     * default mapping, the first one returned by the query wins, matching the previous
+     * "first default found" behavior.
+     *
+     * @return A map from process id to its default ModelImplementationMapping.
+     */
+    private Map<String, ModelImplementationMapping> loadDefaultMappings() {
+        Map<String, ModelImplementationMapping> result = new HashMap<>();
+        List<ModelImplementationMapping> mappings = OBDal.getInstance().getSession()
+            .createQuery(DEFAULT_MAPPINGS_HQL, ModelImplementationMapping.class)
+            .list();
+        for (ModelImplementationMapping mim : mappings) {
+            result.putIfAbsent(mim.getModelObject().getProcess().getId(), mim);
+        }
+        return result;
     }
 
     /**
@@ -295,17 +355,47 @@ public class MenuBuilder extends Builder {
     }
 
     /**
-     * Generates the complete menu metadata in JSON format.
+     * Generates the complete menu metadata in JSON format. The result is cached per role and
+     * language: on a cache hit the menu tree is not traversed again, avoiding the JSON build
+     * and its per-entry queries.
      *
      * @return A JSONObject containing the menu metadata.
      * @throws JSONException If an error occurs while generating the JSON.
      */
     @Override
     public JSONObject toJSON() throws JSONException {
+        String cacheKey = buildCacheKey(OBContext.getOBContext());
+        JSONObject cached = menuCache.get(cacheKey);
+        if (cached != null) {
+            return cached;
+        }
+        JSONObject result = buildMenuJson();
+        menuCache.put(cacheKey, result);
+        return result;
+    }
+
+    /**
+     * Builds the cache key for the menu JSON. The menu structure depends only on role and
+     * language, so both compose the key.
+     *
+     * @param context The current OB context.
+     * @return The cache key {@code "roleId_languageId"}.
+     */
+    private String buildCacheKey(OBContext context) {
+        return context.getRole().getId() + CACHE_KEY_SEPARATOR + context.getLanguage().getId();
+    }
+
+    /**
+     * Traverses the menu tree and builds its JSON representation. Extracted from
+     * {@link #toJSON()} so the traversal (and its queries) run only on a cache miss.
+     *
+     * @return A JSONObject containing the menu metadata.
+     * @throws JSONException If an error occurs while generating the JSON.
+     */
+    private JSONObject buildMenuJson() throws JSONException {
         JSONObject result = new JSONObject();
         MenuOption menu = manager.get().getMenu();
         result.put("menu", menu.getChildren().stream().map(this::toJSON).collect(Collectors.toList()));
-
         return result;
     }
 }

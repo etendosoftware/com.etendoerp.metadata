@@ -24,7 +24,9 @@ import java.util.UUID;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import com.etendoerp.metadata.cache.HttpCacheSupport;
 import com.etendoerp.metadata.service.ServiceFactory;
+import com.etendoerp.metadata.utils.Constants;
 import com.etendoerp.metadata.utils.Utils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -57,6 +59,23 @@ public class MetadataServlet extends BaseWebService {
     @Override
     protected void process(HttpServletRequest req, HttpServletResponse res) throws IOException {
         try {
+            String normalizedPath = ServiceFactory.normalizePath(req);
+
+            if (HttpCacheSupport.isCacheable(req, normalizedPath)) {
+                String etag = HttpCacheSupport.computeETag(normalizedPath);
+
+                if (etag != null) {
+                    res.setHeader(Constants.CACHE_CONTROL_HEADER, Constants.CACHE_CONTROL_PRIVATE_MUST_REVALIDATE);
+                    res.setHeader(Constants.ETAG_HEADER, etag);
+
+                    if (HttpCacheSupport.matches(req.getHeader(Constants.IF_NONE_MATCH_HEADER), etag)) {
+                        res.setStatus(HttpServletResponse.SC_NOT_MODIFIED);
+
+                        return;
+                    }
+                }
+            }
+
             ServiceFactory.getService(req, res).process();
         } catch (Throwable t) {
             handleException(req, res, t);
