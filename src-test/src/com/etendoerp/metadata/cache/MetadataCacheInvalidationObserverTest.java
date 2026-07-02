@@ -16,9 +16,11 @@
  */
 package com.etendoerp.metadata.cache;
 
+import static com.etendoerp.metadata.cache.PersistenceEventTestFactory.deleteEvent;
+import static com.etendoerp.metadata.cache.PersistenceEventTestFactory.newEvent;
+import static com.etendoerp.metadata.cache.PersistenceEventTestFactory.updateEvent;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
@@ -33,7 +35,6 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.openbravo.base.model.Entity;
 import org.openbravo.base.model.ModelProvider;
-import org.openbravo.base.structure.BaseOBObject;
 import org.openbravo.client.kernel.event.EntityDeleteEvent;
 import org.openbravo.client.kernel.event.EntityNewEvent;
 import org.openbravo.client.kernel.event.EntityUpdateEvent;
@@ -70,7 +71,7 @@ class MetadataCacheInvalidationObserverTest {
       MetadataCacheInvalidationObserver observer = new MetadataCacheInvalidationObserver();
       Entity observedEntity = observer.getObservedEntities()[0];
 
-      EntityNewEvent event = createNewEvent(observedEntity);
+      EntityNewEvent event = newEvent(observedEntity);
       observer.onNew(event);
 
       tabProcessorMock.verify(TabProcessor::clearFieldCache, times(1));
@@ -94,7 +95,7 @@ class MetadataCacheInvalidationObserverTest {
       MetadataCacheInvalidationObserver observer = new MetadataCacheInvalidationObserver();
       Entity observedEntity = observer.getObservedEntities()[0];
 
-      EntityUpdateEvent event = createUpdateEvent(observedEntity);
+      EntityUpdateEvent event = updateEvent(observedEntity);
       observer.onUpdate(event);
 
       tabProcessorMock.verify(TabProcessor::clearFieldCache, times(1));
@@ -115,7 +116,7 @@ class MetadataCacheInvalidationObserverTest {
       MetadataCacheInvalidationObserver observer = new MetadataCacheInvalidationObserver();
       Entity observedEntity = observer.getObservedEntities()[0];
 
-      EntityDeleteEvent event = createDeleteEvent(observedEntity);
+      EntityDeleteEvent event = deleteEvent(observedEntity);
       observer.onDelete(event);
 
       tabProcessorMock.verify(TabProcessor::clearFieldCache, times(1));
@@ -139,7 +140,7 @@ class MetadataCacheInvalidationObserverTest {
       MetadataCacheInvalidationObserver observer = new MetadataCacheInvalidationObserver();
       Entity observedEntity = observer.getObservedEntities()[0];
 
-      EntityNewEvent event = createNewEvent(observedEntity);
+      EntityNewEvent event = newEvent(observedEntity);
       observer.onNew(event);
 
       tabProcessorMock.verify(TabProcessor::clearFieldCache, never());
@@ -161,7 +162,7 @@ class MetadataCacheInvalidationObserverTest {
 
       MetadataCacheInvalidationObserver observer = new MetadataCacheInvalidationObserver();
 
-      EntityNewEvent event = createNewEvent(unrelatedEntity);
+      EntityNewEvent event = newEvent(unrelatedEntity);
       observer.onNew(event);
 
       tabProcessorMock.verify(TabProcessor::clearFieldCache, never());
@@ -204,29 +205,5 @@ class MetadataCacheInvalidationObserverTest {
     when(mockTriggerHandler.isDisabled()).thenReturn(false);
 
     return entityMocks[0];
-  }
-
-  private EntityNewEvent createNewEvent(Entity targetEntity) {
-    EntityNewEvent event = mock(EntityNewEvent.class);
-    BaseOBObject targetInstance = mock(BaseOBObject.class);
-    when(event.getTargetInstance()).thenReturn(targetInstance);
-    when(targetInstance.getEntity()).thenReturn(targetEntity);
-    return event;
-  }
-
-  private EntityUpdateEvent createUpdateEvent(Entity targetEntity) {
-    EntityUpdateEvent event = mock(EntityUpdateEvent.class);
-    BaseOBObject targetInstance = mock(BaseOBObject.class);
-    when(event.getTargetInstance()).thenReturn(targetInstance);
-    when(targetInstance.getEntity()).thenReturn(targetEntity);
-    return event;
-  }
-
-  private EntityDeleteEvent createDeleteEvent(Entity targetEntity) {
-    EntityDeleteEvent event = mock(EntityDeleteEvent.class);
-    BaseOBObject targetInstance = mock(BaseOBObject.class);
-    when(event.getTargetInstance()).thenReturn(targetInstance);
-    when(targetInstance.getEntity()).thenReturn(targetEntity);
-    return event;
   }
 }

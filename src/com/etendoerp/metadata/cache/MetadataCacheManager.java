@@ -21,6 +21,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import com.etendoerp.metadata.builders.FieldBuilderWithColumn;
+import com.etendoerp.metadata.builders.MenuBuilder;
 import com.etendoerp.metadata.builders.WindowBuilder;
 import com.etendoerp.metadata.data.TabProcessor;
 
@@ -36,7 +37,7 @@ public class MetadataCacheManager {
   }
 
   /**
-   * Invalidates all metadata caches: field, field access, tab allowed, and window access.
+   * Invalidates all metadata caches: field, field access, tab allowed, window access, and menu.
    * Called by {@link MetadataCacheInvalidationObserver} when Application Dictionary entities change.
    */
   public static void invalidateAll() {
@@ -45,5 +46,6 @@ public class MetadataCacheManager {
     TabProcessor.clearFieldAccessCache();
     WindowBuilder.clearTabAllowedCache();
     FieldBuilderWithColumn.clearWindowAccessCache();
+    MenuBuilder.clearMenuCache();
   }
 }
