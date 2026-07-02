@@ -36,17 +36,18 @@ import org.openbravo.dal.service.OBDal;
 import org.openbravo.data.Sqlc;
 import org.openbravo.model.ad.access.FieldAccess;
 import org.openbravo.model.ad.datamodel.Column;
-import org.openbravo.model.ad.datamodel.Table;
 import org.openbravo.model.ad.ui.Field;
 import org.openbravo.model.ad.ui.Process;
 import org.openbravo.model.ad.ui.Tab;
 import org.openbravo.model.ad.ui.Window;
 import org.openbravo.service.json.DataResolvingMode;
 
+import static com.etendoerp.metadata.utils.Utils.getAnyReferencedTab;
 import static com.etendoerp.metadata.utils.Utils.getReferencedTab;
 import org.openbravo.base.model.domaintype.DomainType;
 import org.openbravo.dal.core.OBContext;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.openbravo.model.ad.access.WindowAccess;
 import org.openbravo.model.ad.access.Role;
@@ -88,16 +89,31 @@ public class FieldBuilderWithColumn extends FieldBuilder {
     private static final String IS_REFERENCED_WINDOW_ACCESSIBLE = "isReferencedWindowAccessible";
     private static final String NULL_STRING = "null";
 
+    private final Map<String, Tab> tabCache;
+    private final Set<String> accessibleWindowIds;
+
     /**
-     * Constructs a FieldBuilderWithColumn for fields that have associated database
-     * columns.
-     *
-     * @param field       The UI field entity with an associated database column
-     * @param fieldAccess The field access permissions (can be null for default
-     *                    permissions)
+     * Constructs a FieldBuilderWithColumn without a request-scoped cache (backward-compatible).
      */
     public FieldBuilderWithColumn(Field field, FieldAccess fieldAccess) {
+        this(field, fieldAccess, null, null);
+    }
+
+    /**
+     * Constructs a FieldBuilderWithColumn with a shared request-scoped Tab cache and
+     * a pre-loaded set of accessible window IDs, reducing repeated DB lookups across
+     * fields in the same tab build.
+     *
+     * @param field               The UI field entity with an associated database column
+     * @param fieldAccess         The field access permissions (can be null)
+     * @param tabCache            Mutable map shared across all fields in the tab build; keyed by entity name
+     * @param accessibleWindowIds Pre-loaded set of window IDs accessible to the current role
+     */
+    public FieldBuilderWithColumn(Field field, FieldAccess fieldAccess,
+            Map<String, Tab> tabCache, Set<String> accessibleWindowIds) {
         super(field, fieldAccess);
+        this.tabCache = tabCache;
+        this.accessibleWindowIds = accessibleWindowIds;
     }
 
     /**
@@ -120,8 +136,7 @@ public class FieldBuilderWithColumn extends FieldBuilder {
 
             // Add column-specific properties
             addColumnSpecificProperties(field);
-            addReferencedProperty(field);
-            addReferencedTableInfo(field);
+            resolveAndAddReferenceInfo(field);
             addReadOnlyLogic(field);
             addProcessInfo(field);
             addSelectorReferenceList(field);
@@ -183,46 +198,79 @@ public class FieldBuilderWithColumn extends FieldBuilder {
     }
 
     /**
-     * Adds referenced entity information to the field JSON for foreign key fields.
-     * Determines the referenced entity, window, and tab for navigation purposes.
-     * Only processes fields that have a referenced property (foreign key
-     * relationship).
-     * Any errors during retrieval are silently ignored to avoid breaking the JSON
-     * structure.
+     * Resolves the referenced entity for FK fields in a single pass, caching the Tab lookup
+     * by entity name within the current tab build to avoid repeated DB queries.
+     * Also finds the color property in the same traversal.
      *
      * @param field The field that may reference another entity
      * @throws JSONException if there's an error updating the JSON structure
      */
-    private void addReferencedProperty(Field field) throws JSONException {
-        Property referenced = null;
-
+    private void resolveAndAddReferenceInfo(Field field) throws JSONException {
+        Property referenced;
         try {
             referenced = KernelUtils.getProperty(field).getReferencedProperty();
         } catch (Exception e) {
-            // If any error occurs while getting the referenced property, skip adding
-            // referenced property info
-            String errorMessage = String.format("Error retrieving referenced property for field %s: %s",
-                    field.getId(), e.getMessage());
-            logger.warn(errorMessage, e);
+            logger.warn("Error retrieving referenced property for field {}: {}", field.getId(), e.getMessage(), e);
             return;
         }
 
-        if (referenced != null) {
-            String tableId = referenced.getEntity().getTableId();
-            Table table = ADCacheProvider.getTable(tableId);
-            if (table == null) {
-                table = OBDal.getInstance().get(Table.class, tableId);
-            }
-            Tab referencedTab = (Tab) OBDal.getInstance().createCriteria(Tab.class).add(
-                    Restrictions.eq(Tab.PROPERTY_TABLE, table)).setMaxResults(1).uniqueResult();
-            Window referencedWindow = referencedTab != null ? referencedTab.getWindow() : null;
-            String tabId = referencedTab != null ? referencedTab.getId() : null;
-            String windowId = referencedWindow != null ? referencedWindow.getId() : null;
-
-            json.put(REFERENCED_ENTITY, referenced.getEntity().getName());
-            json.put(REFERENCED_WINDOW_ID, windowId);
-            json.put(REFERENCED_TAB_ID, tabId);
+        if (referenced == null) {
+            return;
         }
+
+        String entityName = referenced.getEntity().getName();
+        Tab referencedTab = resolveTab(entityName, referenced);
+
+        json.put(REFERENCED_ENTITY, entityName);
+        if (referencedTab != null) {
+            Window win = referencedTab.getWindow();
+            if (win != null) {
+                json.put(REFERENCED_WINDOW_ID, win.getId());
+                json.put(REFERENCED_TAB_ID, referencedTab.getId());
+            } else {
+                json.put(REFERENCED_WINDOW_ID, JSONObject.NULL);
+                json.put(REFERENCED_TAB_ID, JSONObject.NULL);
+            }
+        } else {
+            json.put(REFERENCED_WINDOW_ID, JSONObject.NULL);
+            json.put(REFERENCED_TAB_ID, JSONObject.NULL);
+        }
+
+        Property colorProp = findColorProperty(referenced.getEntity());
+        if (colorProp != null) {
+            json.put(Constants.COLOR_FIELD_NAME, colorProp.getName());
+        }
+    }
+
+    /**
+     * Returns the Tab for the given entity, using the request-scoped tabCache when available.
+     * Uses a two-phase lookup to preserve the original addReferencedProperty behavior:
+     * first without an active filter, then with active=true as fallback when no Window is found.
+     * Null results are cached to prevent repeated queries for entities with no registered Tab.
+     */
+    private Tab resolveTab(String entityName, Property referenced) {
+        if (tabCache == null) {
+            return resolveTabTwoPhase(referenced);
+        }
+        if (tabCache.containsKey(entityName)) {
+            return tabCache.get(entityName);
+        }
+        Tab tab = resolveTabTwoPhase(referenced);
+        tabCache.put(entityName, tab);
+        return tab;
+    }
+
+    private static Tab resolveTabTwoPhase(Property referenced) {
+        // Phase 1: no active filter — matches original addReferencedProperty behavior
+        Tab tab = getAnyReferencedTab(referenced);
+        // Phase 2: if no tab or tab has no window, fallback to active-only lookup
+        if (tab == null || tab.getWindow() == null) {
+            Tab fallback = getReferencedTab(referenced);
+            if (fallback != null) {
+                tab = fallback;
+            }
+        }
+        return tab;
     }
 
     /**
@@ -266,51 +314,6 @@ public class FieldBuilderWithColumn extends FieldBuilder {
             }
         } else {
             return false;
-        }
-    }
-
-    /**
-     * Adds referenced table information using utility methods.
-     * Alternative approach to addReferencedProperty that uses
-     * Utils.getReferencedTab.
-     * Provides referenced entity, window, and tab information for foreign key
-     * fields.
-     * Any errors during retrieval are silently ignored to avoid breaking the JSON
-     * structure.
-     *
-     * @param field The field that may reference another table
-     * @throws JSONException if there's an error updating the JSON structure
-     */
-    private void addReferencedTableInfo(Field field) throws JSONException {
-        Property referenced = null;
-
-        try {
-            referenced = KernelUtils.getProperty(field).getReferencedProperty();
-        } catch (Exception e) {
-            // If any error occurs while getting the referenced property, skip adding
-            // referenced table info
-            String errorMessage = String.format("Error retrieving referenced property for field %s: %s",
-                    field.getId(), e.getMessage());
-            logger.warn(errorMessage, e);
-            return;
-        }
-
-        if (referenced != null) {
-            // Only resolve via Utils if addReferencedProperty did not already set a valid window ID
-            if (!json.has(REFERENCED_WINDOW_ID) || json.isNull(REFERENCED_WINDOW_ID)) {
-                Tab referencedTab = getReferencedTab(referenced);
-
-                if (referencedTab != null) {
-                    json.put(REFERENCED_ENTITY, referenced.getEntity().getName());
-                    json.put(REFERENCED_WINDOW_ID, referencedTab.getWindow().getId());
-                    json.put(REFERENCED_TAB_ID, referencedTab.getId());
-                }
-            }
-
-            Property colorProp = findColorProperty(referenced.getEntity());
-            if (colorProp != null) {
-                json.put(Constants.COLOR_FIELD_NAME, colorProp.getName());
-            }
         }
     }
 
@@ -509,7 +512,9 @@ public class FieldBuilderWithColumn extends FieldBuilder {
             String windowId = json.optString(REFERENCED_WINDOW_ID);
 
             if (StringUtils.isNotEmpty(windowId) && !StringUtils.equals(windowId, NULL_STRING)) {
-                boolean isAccessible = isWindowAccessible(windowId);
+                boolean isAccessible = accessibleWindowIds != null
+                        ? accessibleWindowIds.contains(windowId)
+                        : isWindowAccessible(windowId);
                 json.put(IS_REFERENCED_WINDOW_ACCESSIBLE, isAccessible);
             } else {
                 json.put(IS_REFERENCED_WINDOW_ACCESSIBLE, false);
