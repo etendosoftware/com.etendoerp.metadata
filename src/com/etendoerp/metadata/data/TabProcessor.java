@@ -27,6 +27,7 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 
 import com.etendoerp.metadata.builders.FieldBuilderWithoutColumn;
+import com.etendoerp.metadata.cache.ADCacheProvider;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.codehaus.jettison.json.JSONException;
@@ -170,11 +171,13 @@ public class TabProcessor {
 
     if (customJs != null && clientClass != null && fieldName != null && processors.nameSetter != null) {
       String fieldKey = fieldName + "_" + clientClass;
-      // Set a new name for the field, appending "Canva" to it
-      // In the future, Canva may become another word if we need it to.
       String newFieldName = fieldName + " " + "Canva";
+      // Set the display name, build the JSON, then restore the original name so
+      // cached entity objects (e.g. from ADCS) are not permanently mutated.
       processors.nameSetter.accept(fieldLike, newFieldName);
-      result.put(fieldKey, processors.fieldMapper.apply(fieldLike, false));
+      JSONObject fieldJson = processors.fieldMapper.apply(fieldLike, false);
+      processors.nameSetter.accept(fieldLike, fieldName);
+      result.put(fieldKey, fieldJson);
     } else {
       logger.warn("Field has null column and null custom javascript - skipping field: {}", fieldLike);
     }
@@ -187,7 +190,17 @@ public class TabProcessor {
    * @return a JSON object mapping field names to their JSON representations
    */
   public static JSONObject getTabFields(Tab tab) {
-    return getFields(tab.getId(), tab.getUpdated().toString(), tab.getADFieldList(), TabProcessor::isFieldAccessible,
+    // Use ADCS-cached fields if available (avoids lazy-loading tab.getADFieldList()).
+    // Defensive copy: ADCS fields are shared across threads; getFields() may mutate
+    // field names via nameSetter for custom JS fields.
+    List<Field> fields = ADCacheProvider.getFieldsOfTab(tab);
+    if (fields != null) {
+      fields = new java.util.ArrayList<>(fields);
+    } else {
+      fields = tab.getADFieldList();
+    }
+
+    return getFields(tab.getId(), tab.getUpdated().toString(), fields, TabProcessor::isFieldAccessible,
         Field::getColumn, Field::getEtmetaCustomjs, Field::getClientclass, Field::getName,
         Field::setName, TabProcessor::getJSONField, fieldCache);
   }

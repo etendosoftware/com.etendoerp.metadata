@@ -17,6 +17,7 @@
 
 package com.etendoerp.metadata.builders;
 
+import com.etendoerp.metadata.cache.ADCacheProvider;
 import com.etendoerp.metadata.data.ReferenceSelectors;
 import com.etendoerp.metadata.utils.Constants;
 import com.etendoerp.metadata.utils.LegacyUtils;
@@ -208,7 +209,10 @@ public class FieldBuilderWithColumn extends FieldBuilder {
 
         if (referenced != null) {
             String tableId = referenced.getEntity().getTableId();
-            Table table = OBDal.getInstance().get(Table.class, tableId);
+            Table table = ADCacheProvider.getTable(tableId);
+            if (table == null) {
+                table = OBDal.getInstance().get(Table.class, tableId);
+            }
             Tab referencedTab = (Tab) OBDal.getInstance().createCriteria(Tab.class).add(
                     Restrictions.eq(Tab.PROPERTY_TABLE, table)).setMaxResults(1).uniqueResult();
             Window referencedWindow = referencedTab != null ? referencedTab.getWindow() : null;
@@ -552,7 +556,10 @@ public class FieldBuilderWithColumn extends FieldBuilder {
     private boolean checkAccessInDB(Role role, String windowId) {
         try {
             OBDal dal = OBDal.getReadOnlyInstance();
-            Window window = dal.get(Window.class, windowId);
+            Window window = ADCacheProvider.getWindow(windowId);
+            if (window == null) {
+                window = dal.get(Window.class, windowId);
+            }
 
             if (window == null) {
                 return false;
