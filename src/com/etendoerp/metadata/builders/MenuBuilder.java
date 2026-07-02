@@ -83,7 +83,9 @@ public class MenuBuilder extends Builder {
     private static GlobalMenu resolveGlobalMenu() {
         try {
             return WeldUtils.getInstanceFromStaticBeanManager(GlobalMenu.class);
-        } catch (IllegalStateException e) {
+        } catch (RuntimeException e) {
+            // IllegalStateException when Weld isn't bootstrapped; NullPointerException when no
+            // ServletContext is registered at all (e.g. a plain unit-test harness).
             return new GlobalMenu();
         }
     }
