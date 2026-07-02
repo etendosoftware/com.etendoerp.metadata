@@ -92,6 +92,13 @@ public class Constants {
     public static final String PUT = "PUT";
     public static final String PATCH = "PATCH";
     public static final String DELETE = "DELETE";
+    public static final String HEAD = "HEAD";
+
+    // HTTP caching headers
+    public static final String ETAG_HEADER = "ETag";
+    public static final String CACHE_CONTROL_HEADER = "Cache-Control";
+    public static final String IF_NONE_MATCH_HEADER = "If-None-Match";
+    public static final String CACHE_CONTROL_PRIVATE_MUST_REVALIDATE = "private, must-revalidate";
     public static final String LOCATION_PATH = "/location/";
     public static final String EMAIL_PATH = "/email";
     public static final String EMAIL_SEND_PATH = "/email/send";

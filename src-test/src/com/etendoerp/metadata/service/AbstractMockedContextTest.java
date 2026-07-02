@@ -30,29 +30,29 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mockStatic;
-import static org.mockito.Mockito.when;
 
 /**
  * Base class for unit tests that need mocked OBContext and OBDal statics.
  * Provides common mock fields, response capture, and a helper to run test
  * logic inside a properly wired static-mock scope.
  */
-abstract class AbstractMockedContextTest {
+public abstract class AbstractMockedContextTest {
 
-    @Mock HttpServletRequest  request;
-    @Mock HttpServletResponse response;
-    @Mock OBContext obContext;
-    @Mock OBDal     obDal;
-    @Mock Session   session;
+    @Mock protected HttpServletRequest  request;
+    @Mock protected HttpServletResponse response;
+    @Mock protected OBContext obContext;
+    @Mock protected OBDal     obDal;
+    @Mock protected Session   session;
 
     /** Captures the text written to {@code response.getWriter()}. */
-    StringWriter responseCapture;
+    protected StringWriter responseCapture;
 
     @BeforeEach
-    void setUpResponseWriter() throws Exception {
+    protected void setUpResponseWriter() throws Exception {
         responseCapture = new StringWriter();
-        when(response.getWriter()).thenReturn(new PrintWriter(responseCapture));
+        lenient().when(response.getWriter()).thenReturn(new PrintWriter(responseCapture));
     }
 
     /**
@@ -60,20 +60,21 @@ abstract class AbstractMockedContextTest {
      * and {@link OBDal#getInstance()} return the mocked instances, and
      * {@code obDal.getSession()} returns the mocked session.
      */
-    void runWithMockedContext(ThrowingRunnable action) throws Exception {
+    protected void runWithMockedContext(ThrowingRunnable action) throws Exception {
         try (MockedStatic<OBContext> ctxMock = mockStatic(OBContext.class);
              MockedStatic<OBDal> dalMock = mockStatic(OBDal.class)) {
             ctxMock.when(OBContext::getOBContext).thenReturn(obContext);
             ctxMock.when(() -> OBContext.setAdminMode(anyBoolean())).thenAnswer(inv -> null);
             ctxMock.when(OBContext::restorePreviousMode).thenAnswer(inv -> null);
             dalMock.when(OBDal::getInstance).thenReturn(obDal);
-            when(obDal.getSession()).thenReturn(session);
+            lenient().when(obDal.getSession()).thenReturn(session);
             action.run();
         }
     }
 
+    /** A {@link Runnable}-like action that may throw a checked {@link Exception}. */
     @FunctionalInterface
-    interface ThrowingRunnable {
+    public interface ThrowingRunnable {
         /**
          * Executes the test action, allowing checked exceptions for test convenience.
          *

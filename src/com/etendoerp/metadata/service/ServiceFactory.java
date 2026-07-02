@@ -147,6 +147,21 @@ public final class ServiceFactory {
     }
 
     /**
+     * Normalizes the request's path info by stripping the legacy SWS/meta servlet-name
+     * prefixes, so it can be matched against the exact/prefix routing tables.
+     *
+     * @param req the incoming HTTP request
+     * @return the normalized path, or an empty string if the request has no path info
+     */
+    public static String normalizePath(final HttpServletRequest req) {
+        return req.getPathInfo() != null
+                ? req.getPathInfo()
+                    .replace("/com.etendoerp.metadata.meta/", "/")
+                    .replace("/com.etendoerp.metadata.sws/", "/")
+                : "";
+    }
+
+    /**
      * Returns the MetadataService that handles the given request path.
      *
      * @param req the incoming HTTP request
@@ -154,11 +169,7 @@ public final class ServiceFactory {
      * @return the matching service instance
      */
     public static MetadataService getService(final HttpServletRequest req, final HttpServletResponse res) {
-        final String path = req.getPathInfo() != null
-                ? req.getPathInfo()
-                    .replace("/com.etendoerp.metadata.meta/", "/")
-                    .replace("/com.etendoerp.metadata.sws/", "/")
-                : "";
+        final String path = normalizePath(req);
 
         // Check exact matches first
         if (EXACT_MATCH_SERVICES.containsKey(path)) {
