@@ -19,17 +19,20 @@ package com.etendoerp.metadata.builders;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.hibernate.criterion.Restrictions;
 import org.openbravo.dal.service.OBDal;
+import org.openbravo.model.ad.access.FieldAccess;
 import org.openbravo.model.ad.access.Role;
 import org.openbravo.model.ad.access.TabAccess;
 import org.openbravo.model.ad.access.WindowAccess;
@@ -91,14 +94,63 @@ public class WindowBuilder extends Builder {
         return windowAccess;
     }
 
+    /**
+     * Loads all {@link TabAccess} entries for the given window access, eagerly fetching their
+     * associated {@link Tab} in the same round-trip to avoid an N+1 query pattern when the
+     * caller iterates and calls {@link TabAccess#getTab()} for every entry.
+     *
+     * @param windowAccess the window access whose tab accesses should be loaded
+     * @return all tab accesses (active and inactive) for the given window access, with tabs
+     *         pre-fetched
+     */
+    private static List<TabAccess> getTabAccessesWithTabs(WindowAccess windowAccess) {
+        OBDal dal = OBDal.getReadOnlyInstance();
+        Map<String, Object> params = new HashMap<>();
+        params.put("windowAccessId", windowAccess.getId());
+        return dal.createQuery(TabAccess.class,
+                "as ta left join fetch ta.tab where ta.windowAccess.id = :windowAccessId", params)
+                .setFilterOnActive(false)
+                .list();
+    }
+
+    /**
+     * Batch-loads all {@link FieldAccess} entries for the given tab accesses in a single query,
+     * eagerly fetching their associated {@link org.openbravo.model.ad.ui.Field}, and groups the
+     * result by tab access ID. This avoids the N+1 pattern of calling
+     * {@link TabAccess#getADFieldAccessList()} once per tab.
+     *
+     * @param tabAccesses the tab accesses whose field accesses should be loaded
+     * @return a map from tab access ID to its list of field accesses
+     */
+    private static Map<String, List<FieldAccess>> getFieldAccessesByTabAccessId(List<TabAccess> tabAccesses) {
+        if (tabAccesses.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        List<String> tabAccessIds = tabAccesses.stream().map(TabAccess::getId).collect(Collectors.toList());
+        OBDal dal = OBDal.getReadOnlyInstance();
+        Map<String, Object> params = new HashMap<>();
+        params.put("tabAccessIds", tabAccessIds);
+        List<FieldAccess> fieldAccesses = dal.createQuery(FieldAccess.class,
+                "as fa left join fetch fa.tabAccess left join fetch fa.field where fa.tabAccess.id in (:tabAccessIds)",
+                params)
+                .setFilterOnActive(false)
+                .list();
+
+        return fieldAccesses.stream().collect(Collectors.groupingBy(fa -> fa.getTabAccess().getId()));
+    }
+
     private static JSONArray createTabsJson(List<TabAccess> tabAccesses, List<Tab> tabs, boolean isWindowReadOnly) {
         final List<JSONObject> result = new ArrayList<>();
         final Set<String> processedTabIds = new HashSet<>();
+        final Map<String, List<FieldAccess>> fieldAccessesByTabAccessId = getFieldAccessesByTabAccessId(tabAccesses);
 
         for (TabAccess tabAccess : tabAccesses) {
             Tab tab = tabAccess.getTab();
             if (tabAccess.isActive() && tabAccess.isAllowRead() && isTabAllowedCached(tab)) {
-                result.add(new TabBuilder(tab, tabAccess, isWindowReadOnly).toJSON());
+                List<FieldAccess> fieldAccesses = fieldAccessesByTabAccessId.getOrDefault(tabAccess.getId(),
+                        Collections.emptyList());
+                result.add(new TabBuilder(tab, tabAccess, isWindowReadOnly, fieldAccesses).toJSON());
                 processedTabIds.add(tab.getId());
             }
         }
@@ -134,7 +186,7 @@ public class WindowBuilder extends Builder {
                 : OBDal.getReadOnlyInstance().get(Window.class, id);
 
         List<TabAccess> tabAccesses = windowAccess != null
-                ? windowAccess.getADTabAccessList()
+                ? getTabAccessesWithTabs(windowAccess)
                 : Collections.emptyList();
 
         JSONObject windowJson = converter.toJsonObject(window, DataResolvingMode.FULL_TRANSLATABLE);

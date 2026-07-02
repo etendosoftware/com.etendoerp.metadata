@@ -583,6 +583,33 @@ class TabBuilderTest {
     }
 
     /**
+     * Tests that the 4-arg constructor uses the pre-loaded field access list instead of lazily
+     * calling {@code tabAccess.getADFieldAccessList()}, as used by {@link WindowBuilder} to
+     * batch-load field access data for a whole window in a single query.
+     */
+    @Test
+    void getFieldsUsesPreloadedFieldAccessListWhenPresent() throws Exception {
+        TestContext ctx = setupTestContext();
+        TabAccess mockTabAccess = mock(TabAccess.class);
+        FieldAccess mockFieldAccess = mock(FieldAccess.class);
+
+        setupBasicMocks(ctx.context, ctx.language, ctx.tab, ctx.table, ctx.kernelUtils, List.of());
+
+        JSONObject fieldsFromAccess = new JSONObject();
+        fieldsFromAccess.put("field1", new JSONObject());
+
+        executeTabBuilderTestWithPreloadedFieldAccess(ctx.context, ctx.kernelUtils, ctx.tab, fieldsFromAccess,
+                mockTabAccess, List.of(mockFieldAccess),
+                result -> {
+                    try {
+                        assertTrue(result.getJSONObject(FIELDS_KEY).has("field1"));
+                    } catch (JSONException e) {
+                        fail(JSON_EXCEPTION + ": " + e.getMessage());
+                    }
+                });
+    }
+
+    /**
      * Tests that hasTree and all tree-related properties are included in the JSON
      * when the tab has isTreeIncluded = true and a full TableTree configuration.
      */
@@ -821,6 +848,42 @@ class TabBuilderTest {
             JSONObject result = tabBuilder.toJSON();
 
             assertions.accept(result);
+        } catch (Exception e) {
+            String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getName();
+            fail("Unexpected exception: " + msg);
+        }
+    }
+
+    /**
+     * Executes a TabBuilder test using the 4-arg constructor with a pre-loaded field access list,
+     * as used by {@link WindowBuilder} to avoid per-tab field access queries.
+     */
+    private void executeTabBuilderTestWithPreloadedFieldAccess(OBContext mockContext, KernelUtils mockKernelUtils,
+            Tab mockTab, JSONObject tabFields, TabAccess tabAccess, List<FieldAccess> preloadedFieldAccessList,
+            Consumer<JSONObject> assertions) {
+        try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
+                MockedStatic<KernelUtils> mockedKernelUtils = mockStatic(KernelUtils.class);
+                MockedStatic<TabProcessor> mockedTabProcessor = mockStatic(TabProcessor.class);
+                MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class,
+                        (mock, context) -> {
+                            JSONObject tabJson = new JSONObject();
+                            tabJson.put("entityName", TEST_TABLE_NAME);
+                            when(mock.toJsonObject(any(), any())).thenReturn(tabJson);
+                        })) {
+
+            mockedOBContext.when(OBContext::getOBContext).thenReturn(mockContext);
+            mockedKernelUtils.when(KernelUtils::getInstance).thenReturn(mockKernelUtils);
+
+            mockedTabProcessor.when(() -> TabProcessor.getTabFields(any(Tab.class))).thenReturn(tabFields);
+            mockedTabProcessor.when(() -> TabProcessor.getTabFields(any(TabAccess.class), any(List.class)))
+                    .thenReturn(tabFields);
+
+            TabBuilder tabBuilder = new TabBuilder(mockTab, tabAccess, false, preloadedFieldAccessList);
+            JSONObject result = tabBuilder.toJSON();
+
+            assertions.accept(result);
+
+            verify(tabAccess, never()).getADFieldAccessList();
         } catch (Exception e) {
             String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getName();
             fail("Unexpected exception: " + msg);

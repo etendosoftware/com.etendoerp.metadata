@@ -199,7 +199,21 @@ public class TabProcessor {
    * @return a JSON object mapping field names to their JSON representations
    */
   public static JSONObject getTabFields(TabAccess tabAccess) {
-    return getFields(tabAccess.getId(), tabAccess.getUpdated().toString(), tabAccess.getADFieldAccessList(),
+    return getTabFields(tabAccess, tabAccess.getADFieldAccessList());
+  }
+
+  /**
+   * Returns the fields JSON for a tab access record, applying role-level field access restrictions,
+   * using an explicitly supplied field access list instead of lazily loading it from
+   * {@code tabAccess}. Used when the caller has already batch-loaded field access records for
+   * several tabs at once, to avoid a per-tab query.
+   *
+   * @param tabAccess       the tab access record used for cache keying and access checks
+   * @param fieldAccessList the field access records to process
+   * @return a JSON object mapping field names to their JSON representations
+   */
+  public static JSONObject getTabFields(TabAccess tabAccess, List<FieldAccess> fieldAccessList) {
+    return getFields(tabAccess.getId(), tabAccess.getUpdated().toString(), fieldAccessList,
         TabProcessor::isFieldAccessAccessible, fieldAccess -> fieldAccess.getField().getColumn(),
         fieldAccess -> fieldAccess.getField().getEtmetaCustomjs(),
         fieldAccess -> fieldAccess.getField().getClientclass(),
