@@ -23,7 +23,6 @@ import static org.mockito.Mockito.*;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.function.Consumer;
 
 import org.apache.commons.lang3.StringUtils;
 import org.codehaus.jettison.json.JSONArray;
@@ -40,15 +39,12 @@ import org.openbravo.client.kernel.KernelUtils;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.model.ad.access.FieldAccess;
 import org.openbravo.model.ad.access.TabAccess;
-import org.openbravo.service.json.DataToJsonConverter;
 import org.openbravo.model.ad.datamodel.Column;
 import org.openbravo.model.ad.datamodel.Table;
 import org.openbravo.model.ad.system.Language;
-import org.openbravo.model.ad.ui.Field;
 import org.openbravo.model.ad.ui.Tab;
 import org.openbravo.model.ad.utility.TableTree;
 import org.openbravo.dal.security.EntityAccessChecker;
-import org.openbravo.base.model.Entity;
 import com.etendoerp.metadata.data.TabProcessor;
 import com.etendoerp.metadata.exceptions.InternalServerException;
 
@@ -56,19 +52,7 @@ import com.etendoerp.metadata.exceptions.InternalServerException;
  * Unit tests for TabBuilder
  */
 @ExtendWith(MockitoExtension.class)
-class TabBuilderTest {
-
-    // Column IDs and DB names
-    private static final String CREATED_ID = "Created";
-    private static final String CREATED_BY_ID = "CreatedBy";
-    private static final String UPDATED_ID = "Updated";
-    private static final String UPDATED_BY_ID = "UpdatedBy";
-
-    // Column display names
-    private static final String CREATION_DATE_NAME = "Creation Date";
-    private static final String CREATED_BY_NAME = "Created By";
-    private static final String UPDATED_NAME = "Updated";
-    private static final String UPDATED_BY_NAME = "Updated By";
+class TabBuilderTest extends TabBuilderTestBase {
 
     // Field names (HQL property names)
     private static final String CREATION_DATE_FIELD = "creationDate";
@@ -92,11 +76,9 @@ class TabBuilderTest {
     private static final String RO_PATTERN = "RO";
     private static final String PARENT_COLUMN_KEY = "parentColumns";
     private static final String OBUIAPP_CAN_ADD_KEY = "obuiappCanAdd";
+    private static final String FIELD1_KEY = "field1";
 
     // Test data
-    private static final String TEST_TABLE_NAME = "TestTable";
-    private static final String TEST_DESCRIPTION = "Test description";
-    private static final String TEST_HELP = "Test help";
     private static final String AD_USER_ENTITY = "ADUser";
     private static final String CUSTOM_CREATION_DATE_NAME = "Custom Creation Date";
     private static final String OBUIAPP_CAN_ADD_MISSING = "obuiappCanAdd should be present in JSON";
@@ -404,7 +386,7 @@ class TabBuilderTest {
             try {
                 assertEquals(filterClause, result.getString("filter"));
                 assertEquals(displayLogic, result.getString("displayLogic"));
-                assertEquals(TEST_TABLE_NAME, result.getString("entityName"));
+                assertEquals(TEST_TABLE_NAME, result.getString(ENTITY_NAME_KEY));
             } catch (JSONException e) {
                 fail(JSON_EXCEPTION + ": " + e.getMessage());
             }
@@ -444,7 +426,7 @@ class TabBuilderTest {
         when(ctx.tab.getDisplayLogic()).thenReturn(displayLogic);
 
         try (MockedConstruction<DynamicExpressionParser> mockedParser = mockConstruction(DynamicExpressionParser.class,
-                (mock, context) -> 
+                (mock, context) ->
                     when(mock.getJSExpression()).thenReturn(parsedExpression)
                 )) {
 
@@ -469,11 +451,11 @@ class TabBuilderTest {
         when(ctx.tab.getDisplayLogic()).thenReturn(displayLogic);
 
         try (MockedConstruction<DynamicExpressionParser> mockedParser = mockConstruction(DynamicExpressionParser.class,
-                (mock, context) -> 
+                (mock, context) ->
                     when(mock.getJSExpression()).thenThrow(new RuntimeException("Parse error"))
                 )) {
 
-            executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), result -> 
+            executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), result ->
                 assertFalse(result.has("displayLogicExpression"))
             );
         }
@@ -570,12 +552,12 @@ class TabBuilderTest {
         setupBasicMocks(ctx.context, ctx.language, ctx.tab, ctx.table, ctx.kernelUtils, List.of());
 
         JSONObject fieldsFromAccess = new JSONObject();
-        fieldsFromAccess.put("field1", new JSONObject());
+        fieldsFromAccess.put(FIELD1_KEY, new JSONObject());
 
         executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, fieldsFromAccess, false, mockTabAccess,
                 result -> {
                     try {
-                        assertTrue(result.getJSONObject(FIELDS_KEY).has("field1"));
+                        assertTrue(result.getJSONObject(FIELDS_KEY).has(FIELD1_KEY));
                     } catch (JSONException e) {
                         fail(JSON_EXCEPTION + ": " + e.getMessage());
                     }
@@ -596,13 +578,13 @@ class TabBuilderTest {
         setupBasicMocks(ctx.context, ctx.language, ctx.tab, ctx.table, ctx.kernelUtils, List.of());
 
         JSONObject fieldsFromAccess = new JSONObject();
-        fieldsFromAccess.put("field1", new JSONObject());
+        fieldsFromAccess.put(FIELD1_KEY, new JSONObject());
 
         executeTabBuilderTestWithPreloadedFieldAccess(ctx.context, ctx.kernelUtils, ctx.tab, fieldsFromAccess,
                 mockTabAccess, List.of(mockFieldAccess),
                 result -> {
                     try {
-                        assertTrue(result.getJSONObject(FIELDS_KEY).has("field1"));
+                        assertTrue(result.getJSONObject(FIELDS_KEY).has(FIELD1_KEY));
                     } catch (JSONException e) {
                         fail(JSON_EXCEPTION + ": " + e.getMessage());
                     }
@@ -796,190 +778,5 @@ class TabBuilderTest {
                 fail(JSON_EXCEPTION + ": " + e.getMessage());
             }
         });
-    }
-
-    // Helper methods
-
-    /**
-     * Executes a TabBuilder test with common mock setup
-     */
-    private void executeTabBuilderTest(OBContext mockContext, KernelUtils mockKernelUtils,
-            Tab mockTab, JSONObject tabFields,
-            Consumer<JSONObject> assertions) {
-        executeTabBuilderTest(mockContext, mockKernelUtils, mockTab, tabFields, false, null, null, assertions);
-    }
-
-    private void executeTabBuilderTest(OBContext mockContext, KernelUtils mockKernelUtils,
-            Tab mockTab, JSONObject tabFields,
-            boolean isWindowReadOnly, TabAccess tabAccess,
-            Consumer<JSONObject> assertions) {
-        executeTabBuilderTest(mockContext, mockKernelUtils, mockTab, tabFields, isWindowReadOnly, tabAccess, null,
-                assertions);
-    }
-
-    @SuppressWarnings("java:S107")
-    private void executeTabBuilderTest(OBContext mockContext, KernelUtils mockKernelUtils,
-            Tab mockTab, JSONObject tabFields,
-            boolean isWindowReadOnly, TabAccess tabAccess,
-            Consumer<MockedStatic<TabProcessor>> extraMocking,
-            Consumer<JSONObject> assertions) {
-        try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
-                MockedStatic<KernelUtils> mockedKernelUtils = mockStatic(KernelUtils.class);
-                MockedStatic<TabProcessor> mockedTabProcessor = mockStatic(TabProcessor.class);
-                MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class,
-                        (mock, context) -> {
-                            JSONObject tabJson = new JSONObject();
-                            tabJson.put("entityName", TEST_TABLE_NAME);
-                            when(mock.toJsonObject(any(), any())).thenReturn(tabJson);
-                        })) {
-
-            mockedOBContext.when(OBContext::getOBContext).thenReturn(mockContext);
-            mockedKernelUtils.when(KernelUtils::getInstance).thenReturn(mockKernelUtils);
-
-            // Mock both because getFields() might fall back to tab if access is empty
-            mockedTabProcessor.when(() -> TabProcessor.getTabFields(any(Tab.class))).thenReturn(tabFields);
-            mockedTabProcessor.when(() -> TabProcessor.getTabFields(any(TabAccess.class))).thenReturn(tabFields);
-
-            if (extraMocking != null) {
-                extraMocking.accept(mockedTabProcessor);
-            }
-
-            TabBuilder tabBuilder = new TabBuilder(mockTab, tabAccess, isWindowReadOnly);
-            JSONObject result = tabBuilder.toJSON();
-
-            assertions.accept(result);
-        } catch (Exception e) {
-            String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getName();
-            fail("Unexpected exception: " + msg);
-        }
-    }
-
-    /**
-     * Executes a TabBuilder test using the 4-arg constructor with a pre-loaded field access list,
-     * as used by {@link WindowBuilder} to avoid per-tab field access queries.
-     */
-    private void executeTabBuilderTestWithPreloadedFieldAccess(OBContext mockContext, KernelUtils mockKernelUtils,
-            Tab mockTab, JSONObject tabFields, TabAccess tabAccess, List<FieldAccess> preloadedFieldAccessList,
-            Consumer<JSONObject> assertions) {
-        try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
-                MockedStatic<KernelUtils> mockedKernelUtils = mockStatic(KernelUtils.class);
-                MockedStatic<TabProcessor> mockedTabProcessor = mockStatic(TabProcessor.class);
-                MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class,
-                        (mock, context) -> {
-                            JSONObject tabJson = new JSONObject();
-                            tabJson.put("entityName", TEST_TABLE_NAME);
-                            when(mock.toJsonObject(any(), any())).thenReturn(tabJson);
-                        })) {
-
-            mockedOBContext.when(OBContext::getOBContext).thenReturn(mockContext);
-            mockedKernelUtils.when(KernelUtils::getInstance).thenReturn(mockKernelUtils);
-
-            mockedTabProcessor.when(() -> TabProcessor.getTabFields(any(Tab.class))).thenReturn(tabFields);
-            mockedTabProcessor.when(() -> TabProcessor.getTabFields(any(TabAccess.class), any(List.class)))
-                    .thenReturn(tabFields);
-
-            TabBuilder tabBuilder = new TabBuilder(mockTab, tabAccess, false, preloadedFieldAccessList);
-            JSONObject result = tabBuilder.toJSON();
-
-            assertions.accept(result);
-
-            verify(tabAccess, never()).getADFieldAccessList();
-        } catch (Exception e) {
-            String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getName();
-            fail("Unexpected exception: " + msg);
-        }
-    }
-
-    private TestContext setupTestContext() {
-        OBContext mockContext = mock(OBContext.class);
-        return new TestContext(mockContext, mock(Language.class), mock(Tab.class), mock(Table.class),
-                mock(KernelUtils.class));
-    }
-
-    private Column createMockColumn(String id, String dbName, String name) {
-        Column column = mock(Column.class);
-        when(column.getId()).thenReturn(id);
-        when(column.getDBColumnName()).thenReturn(dbName);
-        when(column.getName()).thenReturn(name);
-        when(column.getDescription()).thenReturn(TEST_DESCRIPTION);
-        when(column.getHelpComment()).thenReturn(TEST_HELP);
-        when(column.isMandatory()).thenReturn(true);
-        when(column.getIdentifier()).thenReturn(name);
-        return column;
-    }
-
-    private Column createMockColumnLenient(String id, String dbName, String name) {
-        Column column = mock(Column.class);
-        lenient().when(column.getId()).thenReturn(id);
-        lenient().when(column.getDBColumnName()).thenReturn(dbName);
-        lenient().when(column.getName()).thenReturn(name);
-        lenient().when(column.getDescription()).thenReturn(TEST_DESCRIPTION);
-        lenient().when(column.getHelpComment()).thenReturn(TEST_HELP);
-        lenient().when(column.isMandatory()).thenReturn(true);
-        lenient().when(column.getIdentifier()).thenReturn(name);
-        return column;
-    }
-
-    private List<Column> createAllAuditColumns() {
-        return List.of(
-                createMockColumn(CREATED_ID, CREATED_ID, CREATION_DATE_NAME),
-                createMockColumn(CREATED_BY_ID, CREATED_BY_ID, CREATED_BY_NAME),
-                createMockColumn(UPDATED_ID, UPDATED_ID, UPDATED_NAME),
-                createMockColumn(UPDATED_BY_ID, UPDATED_BY_ID, UPDATED_BY_NAME));
-    }
-
-    private List<Column> createAllAuditColumnsLenient() {
-        return List.of(
-                createMockColumnLenient(CREATED_ID, CREATED_ID, CREATION_DATE_NAME),
-                createMockColumnLenient(CREATED_BY_ID, CREATED_BY_ID, CREATED_BY_NAME),
-                createMockColumnLenient(UPDATED_ID, UPDATED_ID, UPDATED_NAME),
-                createMockColumnLenient(UPDATED_BY_ID, UPDATED_BY_ID, UPDATED_BY_NAME));
-    }
-
-    private void setupBasicMocks(OBContext mockContext, Language mockLanguage, Tab mockTab,
-            Table mockTable, KernelUtils mockKernelUtils, List<Column> columns) {
-        Entity mockEntity = mock(Entity.class);
-        lenient().when(mockTab.getEntity()).thenReturn(mockEntity);
-        lenient().when(mockTab.getIdentifier()).thenReturn("MockTabIdentifier");
-        lenient().when(mockTab.getId()).thenReturn("MockTabId");
-        when(mockContext.getLanguage()).thenReturn(mockLanguage);
-        when(mockTab.getFilterClause()).thenReturn("");
-        when(mockTab.getDisplayLogic()).thenReturn("");
-        when(mockTab.getTable()).thenReturn(mockTable);
-        when(mockTable.getName()).thenReturn(TEST_TABLE_NAME);
-        when(mockTable.getADColumnList()).thenReturn(columns);
-        when(mockTab.getTabLevel()).thenReturn(0L);
-        when(mockKernelUtils.getParentTab(mockTab)).thenReturn(null);
-    }
-
-    private void setupBasicMocksLenient(OBContext mockContext, Language mockLanguage, Tab mockTab,
-            Table mockTable, KernelUtils mockKernelUtils, List<Column> columns) {
-        lenient().when(mockContext.getLanguage()).thenReturn(mockLanguage);
-        lenient().when(mockTab.getFilterClause()).thenReturn("");
-        lenient().when(mockTab.getDisplayLogic()).thenReturn("");
-        lenient().when(mockTab.getTable()).thenReturn(mockTable);
-        lenient().when(mockTable.getName()).thenReturn(TEST_TABLE_NAME);
-        lenient().when(mockTable.getADColumnList()).thenReturn(columns);
-        lenient().when(mockTab.getTabLevel()).thenReturn(0L);
-        lenient().when(mockKernelUtils.getParentTab(mockTab)).thenReturn(null);
-    }
-
-    /**
-     * Context holder for test mocks
-     */
-    private static class TestContext {
-        final OBContext context;
-        final Language language;
-        final Tab tab;
-        final Table table;
-        final KernelUtils kernelUtils;
-
-        TestContext(OBContext context, Language language, Tab tab, Table table, KernelUtils kernelUtils) {
-            this.context = context;
-            this.language = language;
-            this.tab = tab;
-            this.table = table;
-            this.kernelUtils = kernelUtils;
-        }
     }
 }
