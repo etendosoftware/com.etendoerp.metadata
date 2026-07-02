@@ -20,6 +20,8 @@ package com.etendoerp.metadata.builders;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import java.util.Optional;
+
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
@@ -122,12 +124,34 @@ public abstract class FieldBuilder extends Builder {
     public static JSONObject getSelectorInfo(String fieldId, Reference ref) throws JSONException {
         ReferenceSelectors result = getReferenceSelectors(ref);
 
+        JSONObject selectorInfo;
         if (result.selector != null) {
-            return addSelectorInfo(fieldId, result.selector);
+            selectorInfo = addSelectorInfo(fieldId, result.selector);
         } else if (result.treeSelector != null) {
-            return addTreeSelectorInfo(fieldId, result.treeSelector);
+            selectorInfo = addTreeSelectorInfo(fieldId, result.treeSelector);
         } else {
-            return addComboTableSelectorInfo(fieldId);
+            selectorInfo = addComboTableSelectorInfo(fieldId);
+        }
+
+        addLegacySearchUrl(selectorInfo, ref);
+
+        return selectorInfo;
+    }
+
+    /**
+     * Adds the Classic info-window URL of a Search reference to the selector JSON, when one
+     * exists. The new UI uses it to open the legacy selector popup inside an iframe instead
+     * of the native React modal. References without a Search info-window mapping (e.g. plain
+     * TableDir combos) are left untouched.
+     *
+     * @param selectorInfo the selector JSON being built
+     * @param ref          the field/parameter reference (may be {@code null})
+     * @throws JSONException if the value cannot be written into the JSON object
+     */
+    private static void addLegacySearchUrl(JSONObject selectorInfo, Reference ref) throws JSONException {
+        Optional<String> legacySearchUrl = LegacyProcessResolver.resolveSearchPopupUrl(ref);
+        if (legacySearchUrl.isPresent()) {
+            selectorInfo.put(Constants.LEGACY_SEARCH_URL, legacySearchUrl.get());
         }
     }
 

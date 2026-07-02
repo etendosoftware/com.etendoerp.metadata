@@ -21,13 +21,17 @@ import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.client.application.Parameter;
 import org.openbravo.client.application.Process;
+import org.openbravo.client.application.ReportDefinition;
 import org.openbravo.service.json.DataResolvingMode;
+
+import java.util.List;
 
 /**
  * Builds a JSON representation of an OBUIAPP process definition and its parameters.
  */
 public class ProcessDefinitionBuilder extends Builder {
     private static final String PARAMETERS = "parameters";
+    private static final String REPORT = "report";
     /** Key auto-emitted by DataToJsonConverter from the ORM property name (legacy casing). */
     private static final String ETMETA_ONLOAD_RAW = "eTMETAOnload";
     /** Key the converter may emit for the custom-component flag with the legacy ETMETA casing. */
@@ -77,6 +81,11 @@ public class ProcessDefinitionBuilder extends Builder {
         putValueOrNull(processJSON, ETMETA_ON_REFRESH, process.getEtmetaOnRefresh());
         putValueOrNull(processJSON, ETMETA_PAYSCRIPT_LOGIC, process.getEtmetaPayscriptLogic());
         putValueOrNull(processJSON, ETMETA_CUSTOM_COMPONENT, process.isEtmetaCustomComponent());
+
+        List<ReportDefinition> reports = process.getOBUIAPPReportList();
+        if (!reports.isEmpty()) {
+            processJSON.put(REPORT, new ReportDefinitionBuilder(reports.get(0)).toJSON());
+        }
 
         return processJSON;
     }

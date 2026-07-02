@@ -21,6 +21,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
@@ -30,13 +31,20 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.openbravo.base.exception.OBException;
 import org.openbravo.base.provider.OBProvider;
+import org.openbravo.base.secureApp.VariablesSecureApp;
 import org.openbravo.base.session.OBPropertiesProvider;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
+import org.openbravo.data.Sqlc;
+import org.openbravo.database.ConnectionProvider;
+import org.openbravo.erpCommon.utility.OBError;
+import org.openbravo.model.ad.domain.ModelImplementation;
 import org.openbravo.model.ad.process.Parameter;
 import org.openbravo.model.ad.process.ProcessInstance;
 import org.openbravo.model.ad.ui.Process;
+import org.openbravo.scheduling.ProcessBundle;
 import org.openbravo.service.db.CallProcess;
+import org.openbravo.service.db.DalConnectionProvider;
 
 /**
  * Service class to execute database processes asynchronously.
@@ -46,6 +54,12 @@ public class CallAsyncProcess extends CallProcess {
 
   private static final Logger log = LogManager.getLogger(CallAsyncProcess.class);
   public static final String PROCESSING_MSG = "Processing in background...";
+  /** {@link OBError#getType()} value returned by a process that failed. */
+  private static final String ERROR_TYPE = "Error";
+  private static final long RESULT_SUCCESS = 1L;
+  private static final long RESULT_ERROR = 0L;
+  /** AD_Model_Object action that designates the process implementation class. */
+  private static final String MODEL_OBJECT_PROCESS_ACTION = "P";
   private static CallAsyncProcess instance = new CallAsyncProcess();
   private ExecutorService executorService = Executors.newFixedThreadPool(10);
 
@@ -125,10 +139,13 @@ public class CallAsyncProcess extends CallProcess {
       final String pInstanceId = pInstance.getId();
       final String processId = process.getId();
       final ContextValues contextValues = new ContextValues(OBContext.getOBContext());
+      // Captured for the Java-process branch, which reads them from the bundle
+      // (the PL/SQL branch reads them from AD_PInstance_Para saved above).
+      final Map<String, String> bundleParameters = toStringParameters(parameters);
 
       // 2. ASYNC PHASE: Submit to Executor
-      executorService.submit(() -> 
-        runInBackground(pInstanceId, processId, contextValues, doCommit)
+      executorService.submit(() ->
+        runInBackground(pInstanceId, processId, contextValues, doCommit, bundleParameters)
       );
 
       return pInstance;
@@ -137,7 +154,8 @@ public class CallAsyncProcess extends CallProcess {
     }
   }
 
-  private void runInBackground(String pInstanceId, String processId, ContextValues contextValues, Boolean doCommit) {
+  private void runInBackground(String pInstanceId, String processId, ContextValues contextValues,
+      Boolean doCommit, Map<String, String> parameters) {
     try {
       hydrateContext(contextValues);
       OBContext.setAdminMode();
@@ -149,9 +167,10 @@ public class CallAsyncProcess extends CallProcess {
         throw new OBException("Async Execution Failed: Process Instance or Definition not found.");
       }
 
-      // Execute DB Logic (Replicated from CallProcess)
-      executeProcedure(pInstance, process, doCommit);
-      
+      // Dispatch by implementation type, mirroring Classic ProcessBundle.init():
+      // Java class, PL/SQL stored procedure, or none.
+      executeByType(pInstance, process, contextValues, doCommit, parameters);
+
       OBDal.getInstance().commitAndClose();
     } catch (Exception e) {
       try {
@@ -173,6 +192,179 @@ public class CallAsyncProcess extends CallProcess {
     } finally {
       OBContext.restorePreviousMode();
     }
+  }
+
+  /**
+   * Routes the execution to the right implementation, replicating Classic's
+   * {@code ProcessBundle.init()} dispatch: a process backed by a Java class runs
+   * through the scheduling framework, one with a stored procedure keeps the
+   * PL/SQL path, and one with neither fails with a readable message instead of
+   * building invalid SQL ({@code SELECT * FROM null(?)}).
+   *
+   * @param pInstance the process instance to update with the result
+   * @param process the process definition being executed
+   * @param contextValues the captured session context used to build the bundle
+   * @param doCommit forwarded to the PL/SQL procedure when applicable
+   * @param parameters the process parameters keyed by DB column name
+   * @throws Exception if the Java process or the PL/SQL procedure execution fails
+   */
+  private void executeByType(ProcessInstance pInstance, Process process, ContextValues contextValues,
+      Boolean doCommit, Map<String, String> parameters) throws Exception {
+    if (hasJavaClass(process)) {
+      executeJavaProcess(pInstance, process, contextValues, parameters);
+    } else if (hasProcedure(process)) {
+      executeProcedure(pInstance, process, doCommit);
+    } else {
+      failNoImplementation(pInstance, process);
+    }
+  }
+
+  /**
+   * Returns true when the process resolves to a Java class implementation.
+   *
+   * @param process the process definition
+   * @return true if a Java class is configured
+   */
+  private boolean hasJavaClass(Process process) {
+    return resolveJavaClassName(process) != null;
+  }
+
+  /**
+   * Resolves the Java class name the way Classic does, mirroring
+   * {@code COALESCE(AD_Process.classname, AD_Model_Object.classname)}: the process'
+   * own class name takes precedence, otherwise the class of its process-action
+   * ({@code 'P'}) model object.
+   *
+   * @param process the process definition
+   * @return the Java class name, or null when the process has none
+   */
+  private String resolveJavaClassName(Process process) {
+    String fromProcess = process.getJavaClassName();
+    if (fromProcess != null && !fromProcess.isEmpty()) {
+      return fromProcess;
+    }
+    for (ModelImplementation modelObject : process.getADModelImplementationList()) {
+      if (MODEL_OBJECT_PROCESS_ACTION.equals(modelObject.getAction())) {
+        String className = modelObject.getJavaClassName();
+        if (className != null && !className.isEmpty()) {
+          return className;
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Returns true when the process defines a non-empty stored procedure name.
+   *
+   * @param process the process definition
+   * @return true if a stored procedure is configured
+   */
+  private boolean hasProcedure(Process process) {
+    String procedure = process.getProcedure();
+    return procedure != null && !procedure.isEmpty();
+  }
+
+  /**
+   * Runs a Java process the way Classic's {@code DefaultJob} does: it resolves the
+   * bundle (so its process class is known), instantiates the class by reflection
+   * (legacy processes such as those in {@code org.openbravo.service.db} are excluded
+   * from CDI scanning, so Weld cannot resolve them) and calls {@code execute}. The
+   * resulting {@link OBError} is written back to the process instance so the status
+   * endpoint can report it. The {@link ProcessBundle} is built only here (not on the
+   * PL/SQL path) so its DB resolution stays out of the stored-procedure branch.
+   *
+   * @param pInstance the process instance to update with the result
+   * @param process the process definition being executed
+   * @param contextValues the captured session context used to build the bundle
+   * @param parameters the process parameters keyed by DB column name
+   * @throws Exception if the bundle cannot be built or the process execution fails
+   */
+  private void executeJavaProcess(ProcessInstance pInstance, Process process, ContextValues contextValues,
+      Map<String, String> parameters) throws Exception {
+    VariablesSecureApp vars = new VariablesSecureApp(contextValues.userId, contextValues.clientId,
+        contextValues.orgId, contextValues.roleId, contextValues.languageId);
+    ConnectionProvider connectionProvider = new DalConnectionProvider(false);
+    ProcessBundle bundle = new ProcessBundle(process.getId(), vars).init(connectionProvider);
+    populateBundleParams(bundle, parameters);
+
+    org.openbravo.scheduling.Process processInstance = bundle.getProcessClass()
+        .getDeclaredConstructor()
+        .newInstance();
+    processInstance.execute(bundle);
+    applyResultToInstance(pInstance, bundle.getResult());
+  }
+
+  /**
+   * Populates the bundle params using the same column-name to key transformation
+   * Classic's generated servlets use ({@code Sqlc.TransformaNombreColumna}), so
+   * each Java process finds the keys it expects (e.g. AD_Client_ID -> adClientId).
+   *
+   * @param bundle the bundle whose params map is filled
+   * @param parameters the process parameters keyed by DB column name
+   */
+  private void populateBundleParams(ProcessBundle bundle, Map<String, String> parameters) {
+    if (parameters == null) {
+      return;
+    }
+    Map<String, Object> bundleParams = bundle.getParams();
+    for (Map.Entry<String, String> entry : parameters.entrySet()) {
+      bundleParams.put(Sqlc.TransformaNombreColumna(entry.getKey()), entry.getValue());
+    }
+  }
+
+  /**
+   * Maps the {@link OBError} produced by a Java process onto the process instance
+   * result code and message. A missing result is treated as success.
+   *
+   * @param pInstance the process instance to update
+   * @param result the bundle result (expected to be an {@link OBError})
+   */
+  private void applyResultToInstance(ProcessInstance pInstance, Object result) {
+    if (result instanceof OBError) {
+      OBError error = (OBError) result;
+      boolean isError = ERROR_TYPE.equalsIgnoreCase(error.getType());
+      pInstance.setResult(isError ? RESULT_ERROR : RESULT_SUCCESS);
+      pInstance.setErrorMsg(error.getMessage());
+    } else {
+      pInstance.setResult(RESULT_SUCCESS);
+      pInstance.setErrorMsg(null);
+    }
+    OBDal.getInstance().save(pInstance);
+  }
+
+  /**
+   * Marks the process instance as failed when the process has neither a stored
+   * procedure nor a Java class, avoiding the invalid {@code SELECT * FROM null(?)}.
+   *
+   * @param pInstance the process instance to update
+   * @param process the process definition without an implementation
+   */
+  private void failNoImplementation(ProcessInstance pInstance, Process process) {
+    pInstance.setResult(RESULT_ERROR);
+    pInstance.setErrorMsg("Process '" + process.getName()
+        + "' has no stored procedure or Java class to execute.");
+    OBDal.getInstance().save(pInstance);
+  }
+
+  /**
+   * Converts the raw parameter map into a string-valued map for the Java-process
+   * bundle, skipping null values.
+   *
+   * @param parameters the raw parameters (values may be String, Date, BigDecimal)
+   * @return a map of column name to string value
+   */
+  private Map<String, String> toStringParameters(Map<String, ?> parameters) {
+    Map<String, String> result = new HashMap<>();
+    if (parameters == null) {
+      return result;
+    }
+    for (Map.Entry<String, ?> entry : parameters.entrySet()) {
+      if (entry.getValue() != null) {
+        result.put(entry.getKey(), String.valueOf(entry.getValue()));
+      }
+    }
+    return result;
   }
 
   private void executeProcedure(ProcessInstance pInstance, Process process, Boolean doCommit) throws SQLException {

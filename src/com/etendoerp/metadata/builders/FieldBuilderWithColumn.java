@@ -17,6 +17,7 @@
 
 package com.etendoerp.metadata.builders;
 
+import com.etendoerp.metadata.cache.ADCacheProvider;
 import com.etendoerp.metadata.data.ReferenceSelectors;
 import com.etendoerp.metadata.utils.Constants;
 import com.etendoerp.metadata.utils.LegacyUtils;
@@ -560,7 +561,10 @@ public class FieldBuilderWithColumn extends FieldBuilder {
     private boolean checkAccessInDB(Role role, String windowId) {
         try {
             OBDal dal = OBDal.getReadOnlyInstance();
-            Window window = dal.get(Window.class, windowId);
+            Window window = ADCacheProvider.getWindow(windowId);
+            if (window == null) {
+                window = dal.get(Window.class, windowId);
+            }
 
             if (window == null) {
                 return false;

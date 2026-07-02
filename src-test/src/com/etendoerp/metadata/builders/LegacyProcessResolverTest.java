@@ -83,6 +83,9 @@ class LegacyProcessResolverTest {
     private static final String ACTION_PROCESS = "P";
     private static final String ACTION_REPORT = "R";
     private static final String ACTION_CALLOUT = "C";
+    private static final String ACTION_SEARCH = "S";
+    private static final String PRODUCT_INFO_URL = "/info/Product.html";
+    private static final String OTHER_INFO_URL = "/info/Other.html";
 
     private static final String RESCHEDULE_KEY = "Reschedule";
     private static final String C_INVOICE_ID = "C_Invoice_ID";
@@ -144,6 +147,71 @@ class LegacyProcessResolverTest {
 
         assertTrue(params.isPresent());
         assertEquals(PROCESS_INVOICE_DERIVED_URL, extractUrl(params));
+    }
+
+    /**
+     * A {@code null} reference has no info-window mapping, so the resolver returns empty
+     * and the selector metadata omits {@code legacySearchUrl}.
+     */
+    @Test
+    void resolveSearchPopupUrlReturnsEmptyForNullReference() {
+        assertTrue(LegacyProcessResolver.resolveSearchPopupUrl(null).isEmpty());
+    }
+
+    /**
+     * A Search reference (e.g. "Product (by Price and Warehouse)") whose default Search
+     * {@code AD_Model_Object} maps to {@code /info/Product.html} resolves to that URL.
+     */
+    @Test
+    void resolveSearchPopupUrlReturnsMappingForSearchReference() {
+        ModelImplementationMapping mapping = mockMapping(PRODUCT_INFO_URL, true);
+        ModelImplementation impl = mockImpl(ACTION_SEARCH, null, true, List.of(mapping));
+        Reference ref = mockReferenceWithImpls(List.of(impl));
+
+        Optional<String> url = LegacyProcessResolver.resolveSearchPopupUrl(ref);
+
+        assertTrue(url.isPresent());
+        assertEquals(PRODUCT_INFO_URL, url.get());
+    }
+
+    /**
+     * Only Search ({@code action='S'}) implementations qualify: a reference whose model
+     * objects are Process/Report implementations yields no selector popup URL.
+     */
+    @Test
+    void resolveSearchPopupUrlIgnoresNonSearchImplementations() {
+        ModelImplementationMapping mapping = mockMapping(PRODUCT_INFO_URL, true);
+        ModelImplementation processImpl = mockImpl(ACTION_PROCESS, null, true, List.of(mapping));
+        Reference ref = mockReferenceWithImpls(List.of(processImpl));
+
+        assertTrue(LegacyProcessResolver.resolveSearchPopupUrl(ref).isEmpty());
+    }
+
+    /**
+     * When a Search implementation exposes several mappings, the one flagged as default
+     * must win over the non-default one.
+     */
+    @Test
+    void resolveSearchPopupUrlPrefersDefaultMapping() {
+        ModelImplementationMapping nonDefault = mockMapping(OTHER_INFO_URL, false);
+        ModelImplementationMapping defaultMapping = mockMapping(PRODUCT_INFO_URL, true);
+        ModelImplementation impl = mockImpl(ACTION_SEARCH, null, true, List.of(nonDefault, defaultMapping));
+        Reference ref = mockReferenceWithImpls(List.of(impl));
+
+        assertEquals(PRODUCT_INFO_URL, LegacyProcessResolver.resolveSearchPopupUrl(ref).orElse(null));
+    }
+
+    /**
+     * Blank mapping names are skipped so the resolver never emits an empty selector URL.
+     */
+    @Test
+    void resolveSearchPopupUrlSkipsBlankMappingNames() {
+        ModelImplementationMapping blank = mockMapping("   ", true);
+        ModelImplementationMapping valid = mockMapping(PRODUCT_INFO_URL, false);
+        ModelImplementation impl = mockImpl(ACTION_SEARCH, null, true, List.of(blank, valid));
+        Reference ref = mockReferenceWithImpls(List.of(impl));
+
+        assertEquals(PRODUCT_INFO_URL, LegacyProcessResolver.resolveSearchPopupUrl(ref).orElse(null));
     }
 
     /**
@@ -525,6 +593,12 @@ class LegacyProcessResolverTest {
         when(mapping.getMappingName()).thenReturn(name);
         when(mapping.isDefault()).thenReturn(isDefault);
         return mapping;
+    }
+
+    private Reference mockReferenceWithImpls(List<ModelImplementation> impls) {
+        Reference ref = mock(Reference.class);
+        when(ref.getADModelImplementationList()).thenReturn(impls);
+        return ref;
     }
 
     private Field mockFieldWithProcess(Process process, String columnName, String keyColumnName) {
