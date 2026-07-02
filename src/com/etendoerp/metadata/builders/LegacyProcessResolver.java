@@ -88,6 +88,7 @@ public class LegacyProcessResolver {
     // --- AD_MODEL_OBJECT.Action values of interest ---
     private static final String ACTION_PROCESS = "P";
     private static final String ACTION_REPORT = "R";
+    private static final String ACTION_SEARCH = "S";
 
     // --- AD_Reference IDs excluded from the additional-parameters snapshot.
     //     Classic submits every hidden input (including Button-typed columns whose value is
@@ -333,6 +334,39 @@ public class LegacyProcessResolver {
                 .filter(name -> !name.isBlank())
                 .findFirst()
                 .orElse(null);
+    }
+
+    /**
+     * Resolves the Classic info-window URL (e.g. {@code /info/Product.html}) backing a
+     * Search ({@code reference 30}) reference, so the new UI can delegate the selector
+     * popup to the legacy gray UI inside an iframe.
+     *
+     * <p>Walks the reference's {@code AD_MODEL_OBJECT → AD_MODEL_OBJECT_MAPPING} hierarchy,
+     * keeping only Search implementations ({@code action = 'S'}) and preferring the rows
+     * flagged as default. Mirrors {@link #resolveUrlFromMappings(Process)} but anchored on
+     * an {@code AD_Reference} instead of an {@code AD_Process}.
+     *
+     * @param ref the Search reference to resolve (may be {@code null})
+     * @return the first non-blank {@code MappingName}, or empty when the reference has no
+     *         Search info-window mapping
+     */
+    public static Optional<String> resolveSearchPopupUrl(Reference ref) {
+        if (ref == null) {
+            return Optional.empty();
+        }
+        return ref.getADModelImplementationList().stream()
+                .filter(LegacyProcessResolver::isSearchImpl)
+                .sorted(Comparator.comparing(ModelImplementation::isDefault, DEFAULT_FIRST))
+                .flatMap(mi -> mi.getADModelImplementationMappingList().stream())
+                .sorted(Comparator.comparing(ModelImplementationMapping::isDefault, DEFAULT_FIRST))
+                .map(ModelImplementationMapping::getMappingName)
+                .filter(Objects::nonNull)
+                .filter(name -> !name.isBlank())
+                .findFirst();
+    }
+
+    private static boolean isSearchImpl(ModelImplementation mi) {
+        return ACTION_SEARCH.equals(mi.getAction());
     }
 
     /**
