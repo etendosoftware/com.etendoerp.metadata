@@ -55,6 +55,7 @@ public class TabBuilder extends Builder {
   private final Tab tab;
   private final TabAccess tabAccess;
   private final boolean isWindowReadOnly;
+  private final List<FieldAccess> preloadedFieldAccessList;
 
   /**
    * Constructs a TabBuilder for the given tab.
@@ -70,9 +71,27 @@ public class TabBuilder extends Builder {
    *                         {@code uIPattern = "RO"} regardless of the tab-level access settings
    */
   public TabBuilder(Tab tab, TabAccess tabAccess, boolean isWindowReadOnly) {
+    this(tab, tabAccess, isWindowReadOnly, null);
+  }
+
+  /**
+   * Constructs a TabBuilder for the given tab, using a pre-loaded field access list instead of
+   * lazily fetching it from {@code tabAccess}. Used by {@link WindowBuilder} to batch-load field
+   * access data for all tabs of a window in a single query, avoiding an N+1 query pattern.
+   *
+   * @param tab                      the tab entity to build JSON for
+   * @param tabAccess                the role-specific tab access configuration, or {@code null}
+   * @param isWindowReadOnly         {@code true} if the parent window was resolved as read-only
+   * @param preloadedFieldAccessList the field access records for this tab, already loaded by the
+   *                                 caller; or {@code null} to fall back to lazily fetching them
+   *                                 from {@code tabAccess}
+   */
+  public TabBuilder(Tab tab, TabAccess tabAccess, boolean isWindowReadOnly,
+      List<FieldAccess> preloadedFieldAccessList) {
     this.tab = tab;
     this.tabAccess = tabAccess;
     this.isWindowReadOnly = isWindowReadOnly;
+    this.preloadedFieldAccessList = preloadedFieldAccessList;
   }
 
   public JSONObject toJSON() {
@@ -201,12 +220,16 @@ public class TabBuilder extends Builder {
   }
 
   private JSONObject getFields() throws JSONException {
-    List<FieldAccess> adFieldAccessList = tabAccess != null ? tabAccess.getADFieldAccessList() : null;
-
-    if (adFieldAccessList == null || adFieldAccessList.isEmpty()) {
-      return TabProcessor.getTabFields(tab);
+    if (preloadedFieldAccessList != null) {
+      return preloadedFieldAccessList.isEmpty()
+          ? TabProcessor.getTabFields(tab)
+          : TabProcessor.getTabFields(tabAccess, preloadedFieldAccessList);
     }
-    return TabProcessor.getTabFields(tabAccess);
+
+    List<FieldAccess> adFieldAccessList = tabAccess != null ? tabAccess.getADFieldAccessList() : null;
+    return (adFieldAccessList == null || adFieldAccessList.isEmpty())
+        ? TabProcessor.getTabFields(tab)
+        : TabProcessor.getTabFields(tabAccess);
   }
 
   /**
