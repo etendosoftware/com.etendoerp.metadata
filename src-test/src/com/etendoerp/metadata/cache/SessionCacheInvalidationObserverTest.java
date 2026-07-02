@@ -41,86 +41,76 @@ import org.openbravo.client.kernel.event.EntityNewEvent;
 import org.openbravo.client.kernel.event.EntityUpdateEvent;
 import org.openbravo.dal.core.TriggerHandler;
 
-import com.etendoerp.metadata.builders.FieldBuilderWithColumn;
-import com.etendoerp.metadata.builders.WindowBuilder;
-import com.etendoerp.metadata.data.TabProcessor;
+import com.etendoerp.metadata.builders.SessionBuilder;
 
 /**
- * Unit tests for {@link MetadataCacheInvalidationObserver}.
- * Verifies that entity persistence events trigger cache invalidation.
+ * Unit tests for {@link SessionCacheInvalidationObserver}.
+ * Verifies that entity persistence events on the role/organization/warehouse tree
+ * trigger the session roles cache invalidation.
  */
 @MockitoSettings(strictness = Strictness.LENIENT)
 @ExtendWith(MockitoExtension.class)
-class MetadataCacheInvalidationObserverTest {
+class SessionCacheInvalidationObserverTest {
 
   private static final String[] OBSERVED_ENTITY_NAMES = {
-      "ADWindow", "ADTab", "ADField", "ADColumn",
-      "ADWindowAccess", "ADTabAccess", "ADFieldAccess"
+      "ADUserRoles", "ADRoleOrganization", "OrganizationWarehouse",
+      "ADRole", "Organization", "Warehouse", "ADClient"
   };
 
   @Test
-  void onNewInvalidatesCachesForValidEvent() {
+  void onNewInvalidatesRolesCacheForValidEvent() {
     try (
         MockedStatic<ModelProvider> modelProviderMock = mockStatic(ModelProvider.class);
         MockedStatic<TriggerHandler> triggerMock = mockStatic(TriggerHandler.class);
-        MockedStatic<TabProcessor> tabProcessorMock = mockStatic(TabProcessor.class);
-        MockedStatic<WindowBuilder> windowBuilderMock = mockStatic(WindowBuilder.class);
-        MockedStatic<FieldBuilderWithColumn> fieldBuilderMock = mockStatic(FieldBuilderWithColumn.class)
+        MockedStatic<SessionBuilder> sessionBuilderMock = mockStatic(SessionBuilder.class)
     ) {
       setupMocks(modelProviderMock, triggerMock, OBSERVED_ENTITY_NAMES);
 
-      MetadataCacheInvalidationObserver observer = new MetadataCacheInvalidationObserver();
+      SessionCacheInvalidationObserver observer = new SessionCacheInvalidationObserver();
       Entity observedEntity = observer.getObservedEntities()[0];
 
       EntityNewEvent event = createNewEvent(observedEntity);
       observer.onNew(event);
 
-      tabProcessorMock.verify(TabProcessor::clearFieldCache, times(1));
-      tabProcessorMock.verify(TabProcessor::clearFieldAccessCache, times(1));
-      windowBuilderMock.verify(WindowBuilder::clearTabAllowedCache, times(1));
-      fieldBuilderMock.verify(FieldBuilderWithColumn::clearWindowAccessCache, times(1));
+      sessionBuilderMock.verify(SessionBuilder::clearRolesCache, times(1));
     }
   }
 
   @Test
-  void onUpdateInvalidatesCachesForValidEvent() {
+  void onUpdateInvalidatesRolesCacheForValidEvent() {
     try (
         MockedStatic<ModelProvider> modelProviderMock = mockStatic(ModelProvider.class);
         MockedStatic<TriggerHandler> triggerMock = mockStatic(TriggerHandler.class);
-        MockedStatic<TabProcessor> tabProcessorMock = mockStatic(TabProcessor.class);
-        MockedStatic<WindowBuilder> windowBuilderMock = mockStatic(WindowBuilder.class);
-        MockedStatic<FieldBuilderWithColumn> fieldBuilderMock = mockStatic(FieldBuilderWithColumn.class)
+        MockedStatic<SessionBuilder> sessionBuilderMock = mockStatic(SessionBuilder.class)
     ) {
       setupMocks(modelProviderMock, triggerMock, OBSERVED_ENTITY_NAMES);
 
-      MetadataCacheInvalidationObserver observer = new MetadataCacheInvalidationObserver();
+      SessionCacheInvalidationObserver observer = new SessionCacheInvalidationObserver();
       Entity observedEntity = observer.getObservedEntities()[0];
 
       EntityUpdateEvent event = createUpdateEvent(observedEntity);
       observer.onUpdate(event);
 
-      tabProcessorMock.verify(TabProcessor::clearFieldCache, times(1));
+      sessionBuilderMock.verify(SessionBuilder::clearRolesCache, times(1));
     }
   }
 
   @Test
-  void onDeleteInvalidatesCachesForValidEvent() {
+  void onDeleteInvalidatesRolesCacheForValidEvent() {
     try (
         MockedStatic<ModelProvider> modelProviderMock = mockStatic(ModelProvider.class);
         MockedStatic<TriggerHandler> triggerMock = mockStatic(TriggerHandler.class);
-        MockedStatic<TabProcessor> tabProcessorMock = mockStatic(TabProcessor.class);
-        MockedStatic<WindowBuilder> windowBuilderMock = mockStatic(WindowBuilder.class);
-        MockedStatic<FieldBuilderWithColumn> fieldBuilderMock = mockStatic(FieldBuilderWithColumn.class)
+        MockedStatic<SessionBuilder> sessionBuilderMock = mockStatic(SessionBuilder.class)
     ) {
       setupMocks(modelProviderMock, triggerMock, OBSERVED_ENTITY_NAMES);
 
-      MetadataCacheInvalidationObserver observer = new MetadataCacheInvalidationObserver();
+      SessionCacheInvalidationObserver observer = new SessionCacheInvalidationObserver();
       Entity observedEntity = observer.getObservedEntities()[0];
 
       EntityDeleteEvent event = createDeleteEvent(observedEntity);
       observer.onDelete(event);
 
-      tabProcessorMock.verify(TabProcessor::clearFieldCache, times(1));
+      sessionBuilderMock.verify(SessionBuilder::clearRolesCache, times(1));
     }
   }
 
@@ -129,22 +119,20 @@ class MetadataCacheInvalidationObserverTest {
     try (
         MockedStatic<ModelProvider> modelProviderMock = mockStatic(ModelProvider.class);
         MockedStatic<TriggerHandler> triggerMock = mockStatic(TriggerHandler.class);
-        MockedStatic<TabProcessor> tabProcessorMock = mockStatic(TabProcessor.class);
-        MockedStatic<WindowBuilder> windowBuilderMock = mockStatic(WindowBuilder.class);
-        MockedStatic<FieldBuilderWithColumn> fieldBuilderMock = mockStatic(FieldBuilderWithColumn.class)
+        MockedStatic<SessionBuilder> sessionBuilderMock = mockStatic(SessionBuilder.class)
     ) {
       setupMocks(modelProviderMock, triggerMock, OBSERVED_ENTITY_NAMES);
 
       TriggerHandler mockTriggerHandler = TriggerHandler.getInstance();
       when(mockTriggerHandler.isDisabled()).thenReturn(true);
 
-      MetadataCacheInvalidationObserver observer = new MetadataCacheInvalidationObserver();
+      SessionCacheInvalidationObserver observer = new SessionCacheInvalidationObserver();
       Entity observedEntity = observer.getObservedEntities()[0];
 
       EntityNewEvent event = createNewEvent(observedEntity);
       observer.onNew(event);
 
-      tabProcessorMock.verify(TabProcessor::clearFieldCache, never());
+      sessionBuilderMock.verify(SessionBuilder::clearRolesCache, never());
     }
   }
 
@@ -153,20 +141,18 @@ class MetadataCacheInvalidationObserverTest {
     try (
         MockedStatic<ModelProvider> modelProviderMock = mockStatic(ModelProvider.class);
         MockedStatic<TriggerHandler> triggerMock = mockStatic(TriggerHandler.class);
-        MockedStatic<TabProcessor> tabProcessorMock = mockStatic(TabProcessor.class);
-        MockedStatic<WindowBuilder> windowBuilderMock = mockStatic(WindowBuilder.class);
-        MockedStatic<FieldBuilderWithColumn> fieldBuilderMock = mockStatic(FieldBuilderWithColumn.class)
+        MockedStatic<SessionBuilder> sessionBuilderMock = mockStatic(SessionBuilder.class)
     ) {
       setupMocks(modelProviderMock, triggerMock, OBSERVED_ENTITY_NAMES);
 
       Entity unrelatedEntity = mock(Entity.class);
 
-      MetadataCacheInvalidationObserver observer = new MetadataCacheInvalidationObserver();
+      SessionCacheInvalidationObserver observer = new SessionCacheInvalidationObserver();
 
       EntityNewEvent event = createNewEvent(unrelatedEntity);
       observer.onNew(event);
 
-      tabProcessorMock.verify(TabProcessor::clearFieldCache, never());
+      sessionBuilderMock.verify(SessionBuilder::clearRolesCache, never());
     }
   }
 
@@ -178,7 +164,7 @@ class MetadataCacheInvalidationObserverTest {
     ) {
       setupMocks(modelProviderMock, triggerMock, OBSERVED_ENTITY_NAMES);
 
-      MetadataCacheInvalidationObserver observer = new MetadataCacheInvalidationObserver();
+      SessionCacheInvalidationObserver observer = new SessionCacheInvalidationObserver();
       Entity[] entities = observer.getObservedEntities();
 
       assertNotNull(entities);
