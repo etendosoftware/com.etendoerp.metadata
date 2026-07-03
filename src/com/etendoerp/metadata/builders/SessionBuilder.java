@@ -64,7 +64,8 @@ public class SessionBuilder extends Builder {
             + " join fetch ro.client cl"
             + " left join fetch ro.aDRoleOrganizationList roOrg"
             + " left join fetch roOrg.organization org"
-            + " where ur.userContact.id = :userId";
+            + " where ur.userContact.id = :userId"
+            + " order by ro.name, org.name";
 
     /**
      * Loads the warehouses for every organization referenced by the user's roles in a single
@@ -74,7 +75,8 @@ public class SessionBuilder extends Builder {
     private static final String WAREHOUSES_BY_ORGANIZATION_HQL =
         "select distinct ow from OrganizationWarehouse ow"
             + " join fetch ow.warehouse w"
-            + " where ow.organization.id in (:orgIds)";
+            + " where ow.organization.id in (:orgIds)"
+            + " order by w.name";
 
     /**
      * Clears the cached roles tree for every user. Invoked by
