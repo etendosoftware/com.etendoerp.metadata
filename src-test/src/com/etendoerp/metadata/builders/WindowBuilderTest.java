@@ -24,9 +24,16 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.ArrayList;
@@ -46,6 +53,8 @@ import org.mockito.quality.Strictness;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBCriteria;
 import org.openbravo.dal.service.OBDal;
+import org.openbravo.dal.service.OBQuery;
+import org.openbravo.model.ad.access.FieldAccess;
 import org.openbravo.model.ad.access.Role;
 import org.openbravo.model.ad.access.TabAccess;
 import org.openbravo.model.ad.access.WindowAccess;
@@ -79,6 +88,14 @@ class WindowBuilderTest {
   private Role mockRole;
   @Mock
   private OBCriteria<WindowAccess> mockCriteria;
+  @Mock
+  private OBQuery<TabAccess> mockTabAccessQuery;
+  @Mock
+  private OBQuery<FieldAccess> mockFieldAccessQuery;
+
+  // Test data
+  private static final String WINDOW_TYPE = "windowType";
+  private static final String WINDOW_TYPE_VALUE = "OBUIAPP_PickAndExecute";
 
   /**
    * Sets up the basic mock behavior before each test.
@@ -97,6 +114,14 @@ class WindowBuilderTest {
     when(mockContext.getLanguage()).thenReturn(mockLanguage);
     when(mockContext.getRole()).thenReturn(mockRole);
     when(mockRole.getName()).thenReturn(ROLE_NAME);
+
+    when(mockOBDal.createQuery(eq(TabAccess.class), anyString(), anyMap())).thenReturn(mockTabAccessQuery);
+    when(mockTabAccessQuery.setFilterOnActive(anyBoolean())).thenReturn(mockTabAccessQuery);
+    when(mockTabAccessQuery.list()).thenReturn(new ArrayList<>());
+
+    when(mockOBDal.createQuery(eq(FieldAccess.class), anyString(), anyMap())).thenReturn(mockFieldAccessQuery);
+    when(mockFieldAccessQuery.setFilterOnActive(anyBoolean())).thenReturn(mockFieldAccessQuery);
+    when(mockFieldAccessQuery.list()).thenReturn(new ArrayList<>());
   }
 
   /**
@@ -114,7 +139,6 @@ class WindowBuilderTest {
     
     if (hasAccess) {
       when(mockWindowAccess.getWindow()).thenReturn(mockWindow);
-      when(mockWindowAccess.getADTabAccessList()).thenReturn(new ArrayList<>());
       when(mockWindow.getADTabList()).thenReturn(new ArrayList<>());
     }
   }
@@ -269,6 +293,52 @@ class WindowBuilderTest {
   }
 
   /**
+   * Builds a {@link DataToJsonConverter} mock that emits a JSON containing the
+   * {@code windowType} field with the supplied value. Mirrors the production
+   * behaviour of {@code DataToJsonConverter.toJsonObject(window, FULL_TRANSLATABLE)}.
+   *
+   * @param windowType The window type value the converter should expose.
+   * @return A MockedConstruction of DataToJsonConverter pre-wired with the field.
+   */
+  private MockedConstruction<DataToJsonConverter> createConverterMockWithWindowType(String windowType) {
+    return mockConstruction(DataToJsonConverter.class, (mock, context) -> {
+      JSONObject windowJson = new JSONObject();
+      windowJson.put("id", WINDOW_ID);
+      windowJson.put("name", "Test Window");
+      windowJson.put(WINDOW_TYPE, windowType);
+      when(mock.toJsonObject(any(), any())).thenReturn(windowJson);
+    });
+  }
+
+  /**
+   * Defensive regression test: when the {@link DataToJsonConverter} exposes the
+   * {@code windowType} property of the window, the {@link WindowBuilder} output
+   * must preserve it. This guarantees that the client can read
+   * {@code windowType} from {@code /meta/window/{id}} for any window type.
+   *
+   * @throws Exception if any unexpected error occurs during the test execution.
+   */
+  @Test
+  void toJSONExposesWindowTypeWhenConverterEmitsIt() throws Exception {
+    setupWindowAccess(true, true);
+    WindowBuilder windowBuilder;
+    JSONObject result;
+    try (MockedStatic<OBContext> ignored1 = createOBContextMock();
+         MockedConstruction<DataToJsonConverter> ignored2 = createConverterMockWithWindowType(WINDOW_TYPE_VALUE)) {
+      windowBuilder = new WindowBuilder(WINDOW_ID);
+    }
+    try (MockedStatic<OBContext> ignored1 = createOBContextMock();
+         MockedStatic<OBDal> ignored2 = createOBDalMock();
+         MockedConstruction<DataToJsonConverter> ignored3 = createConverterMockWithWindowType(WINDOW_TYPE_VALUE)) {
+      result = windowBuilder.toJSON();
+    }
+
+    assertNotNull(result);
+    assertTrue(result.has(WINDOW_TYPE));
+    assertEquals(WINDOW_TYPE_VALUE, result.getString(WINDOW_TYPE));
+  }
+
+  /**
    * Tests that the toJSON method returns valid JSON with tabs when the user has authorized access.
    * This test mocks the OBDal, OBContext, and DataToJsonConverter to simulate a scenario
    * where the current role is authorized for the specified window and tabs.
@@ -382,6 +452,49 @@ class WindowBuilderTest {
   }
 
   /**
+   * Tests that, for a window with several tab accesses, tabs and their field accesses are loaded
+   * via a single batched query each rather than one query per tab (the N+1 pattern this refactor
+   * eliminates). Also verifies the lazy {@code WindowAccess#getADTabAccessList()} collection is no
+   * longer touched.
+   *
+   * @throws Exception if any unexpected error occurs during the test execution.
+   */
+  @Test
+  void toJSONWithMultipleTabAccessesLoadsTabsAndFieldsInBatchedQueries() throws Exception {
+    setupWindowAccess(true, true);
+
+    List<TabAccess> tabAccesses = new ArrayList<>();
+    for (int i = 0; i < 3; i++) {
+      TabAccess mockTabAccess = mock(TabAccess.class);
+      Tab mockTab = mock(Tab.class);
+      when(mockTabAccess.isActive()).thenReturn(true);
+      when(mockTabAccess.isAllowRead()).thenReturn(true);
+      when(mockTabAccess.getTab()).thenReturn(mockTab);
+      when(mockTab.getId()).thenReturn(TAB_ID_HYPHEN + i);
+      when(mockTab.getDisplayLogic()).thenReturn(null);
+      tabAccesses.add(mockTabAccess);
+    }
+    when(mockTabAccessQuery.list()).thenReturn(tabAccesses);
+
+    WindowBuilder windowBuilder = createWindowBuilder();
+    JSONObject result;
+    try (MockedStatic<OBContext> ignored = createOBContextMock();
+         MockedStatic<OBDal> ignored3 = createOBDalMock();
+         MockedConstruction<DataToJsonConverter> ignored1 = createDataToJsonConverterMock();
+         MockedConstruction<TabBuilder> ignored2 = createTabBuilderMock(TAB_ID_HYPHEN)) {
+      result = windowBuilder.toJSON();
+    }
+
+    assertNotNull(result);
+    JSONArray tabs = result.getJSONArray("tabs");
+    assertEquals(3, tabs.length());
+
+    verify(mockOBDal, times(1)).createQuery(eq(TabAccess.class), anyString(), anyMap());
+    verify(mockOBDal, times(1)).createQuery(eq(FieldAccess.class), anyString(), anyMap());
+    verify(mockWindowAccess, never()).getADTabAccessList();
+  }
+
+  /**
    * Tests that when the current role has no explicit WindowAccess but at least one other role does,
    * toJSON() returns valid JSON (implicit read-only fallback path) instead of throwing.
    * This covers the getWindowAccess() null-return path introduced to prevent privilege escalation.
@@ -442,7 +555,7 @@ class WindowBuilderTest {
     Tab mockTab = mock(Tab.class);
 
     List<TabAccess> tabAccessList = List.of(mockTabAccess);
-    when(mockWindowAccess.getADTabAccessList()).thenReturn(tabAccessList);
+    when(mockTabAccessQuery.list()).thenReturn(tabAccessList);
 
     when(mockTabAccess.isActive()).thenReturn(isActive);
     when(mockTabAccess.isAllowRead()).thenReturn(allowRead);

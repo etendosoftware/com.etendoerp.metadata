@@ -16,6 +16,36 @@
  */
 package com.etendoerp.metadata.builders;
 
+import static com.etendoerp.metadata.MetadataTestConstants.CONVERTER;
+import static com.etendoerp.metadata.MetadataTestConstants.COULD_NOT_SET_CONVERTER_FIELD;
+import static com.etendoerp.metadata.MetadataTestConstants.ETMETA_ONLOAD;
+import static com.etendoerp.metadata.MetadataTestConstants.ETMETA_ONLOAD_TYPO;
+import static com.etendoerp.metadata.MetadataTestConstants.ETMETA_ONPROCESS;
+import static com.etendoerp.metadata.MetadataTestConstants.ETMETA_ON_REFRESH;
+import static com.etendoerp.metadata.MetadataTestConstants.ETMETA_PAYSCRIPT_LOGIC;
+import static com.etendoerp.metadata.MetadataTestConstants.ON_LOAD;
+import static com.etendoerp.metadata.MetadataTestConstants.ON_PROCESS;
+import static com.etendoerp.metadata.MetadataTestConstants.PARAM1_COLUMN;
+import static com.etendoerp.metadata.MetadataTestConstants.PARAM2_COLUMN;
+import static com.etendoerp.metadata.MetadataTestConstants.PARAMETERS;
+import static com.etendoerp.metadata.MetadataTestConstants.TEST_PROCESS_ID;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mockConstruction;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.when;
+import static org.mockito.quality.Strictness.LENIENT;
+
+import java.lang.reflect.Field;
+import java.util.ArrayList;
+import java.util.List;
+
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.junit.jupiter.api.AfterEach;
@@ -34,28 +64,32 @@ import org.openbravo.model.ad.system.Language;
 import org.openbravo.service.json.DataResolvingMode;
 import org.openbravo.service.json.DataToJsonConverter;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import static com.etendoerp.metadata.MetadataTestConstants.CONVERTER;
-import static com.etendoerp.metadata.MetadataTestConstants.COULD_NOT_SET_CONVERTER_FIELD;
-import static com.etendoerp.metadata.MetadataTestConstants.ON_LOAD;
-import static com.etendoerp.metadata.MetadataTestConstants.ON_PROCESS;
-import static com.etendoerp.metadata.MetadataTestConstants.PARAM1_COLUMN;
-import static com.etendoerp.metadata.MetadataTestConstants.PARAM2_COLUMN;
-import static com.etendoerp.metadata.MetadataTestConstants.PARAMETERS;
-import static com.etendoerp.metadata.MetadataTestConstants.TEST_PROCESS_ID;
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
-import static org.mockito.quality.Strictness.LENIENT;
-
 /**
- * Unit tests for ProcessDefinitionBuilder class - Fixed version that handles Openbravo dependencies
+ * Unit tests for ProcessDefinitionBuilder.
+ * <p>
+ * The builder emits the process-level JS-hook columns ({@code etmetaOnload},
+ * {@code etmetaOnprocess}, {@code etmetaOnRefresh}, {@code etmetaPayscriptLogic}
+ * and {@code etmetaCustomComponent}) <em>explicitly from the entity getters</em>,
+ * not from the {@link DataToJsonConverter} output. This guarantees the keys are
+ * present regardless of the role's derived-read access to {@code OBUIAPP_Process}
+ * (the converter skips non-derived-readable properties for business roles). The
+ * builder also drops the converter's legacy-cased raw keys ({@code eTMETAOnload} /
+ * {@code eTMETACustomComponent}). The custom-component flag is exercised in
+ * {@link ProcessDefinitionBuilderCustomComponentTest}.
  */
-@MockitoSettings (strictness = LENIENT)
+@MockitoSettings(strictness = LENIENT)
 @ExtendWith(MockitoExtension.class)
 public class ProcessDefinitionBuilderTest {
+
+  private static final String ID = "id";
+  private static final String NAME = "name";
+  private static final String PROCESS_NAME_VALUE = "Test Process";
+  private static final String SCRIPT_ONLOAD = "onLoadScript";
+  private static final String SCRIPT_ONPROCESS = "onProcessScript";
+  private static final String SCRIPT_ONREFRESH = "onRefreshScript";
+  private static final String SCRIPT_PAYSCRIPT = "payScriptLogic";
+  private static final String PARAM1_ID_VALUE = "param1Id";
+  private static final String PARAM2_ID_VALUE = "param2Id";
 
   @Mock
   private Process mockProcess;
@@ -78,16 +112,15 @@ public class ProcessDefinitionBuilderTest {
   private MockedStatic<OBContext> mockedOBContextStatic;
 
   /**
-   * Sets up the test environment before each test case.
-   * Mocks static methods and initializes common mock behaviors.
+   * Sets up the OBContext static mock (required by {@code Builder}'s constructor)
+   * and wires the default two-parameter list on the shared {@code mockProcess}.
+   * Individual tests override these stubs when they need empty lists.
    */
   @BeforeEach
   void setUp() {
     mockedOBContextStatic = mockStatic(OBContext.class);
-
     when(mockOBContext.getLanguage()).thenReturn(mockLanguage);
     when(mockLanguage.getLanguage()).thenReturn("en_US");
-
     mockedOBContextStatic.when(OBContext::getOBContext).thenReturn(mockOBContext);
 
     List<Parameter> parameterList = new ArrayList<>();
@@ -97,19 +130,90 @@ public class ProcessDefinitionBuilderTest {
     when(mockProcess.getOBUIAPPParameterList()).thenReturn(parameterList);
     when(mockParameter1.getDBColumnName()).thenReturn(PARAM1_COLUMN);
     when(mockParameter2.getDBColumnName()).thenReturn(PARAM2_COLUMN);
-    when(mockProcess.getETMETAOnload()).thenReturn("onLoadScript");
-    when(mockProcess.getEtmetaOnprocess()).thenReturn("onProcessScript");
   }
 
   /**
-   * Cleans up the test environment after each test case.
-   * Closes any mocked static methods to avoid side effects.
+   * Closes the OBContext static mock to avoid leaking it across tests.
    */
   @AfterEach
   void tearDown() {
     if (mockedOBContextStatic != null) {
       mockedOBContextStatic.close();
     }
+  }
+
+  /**
+   * Injects {@link #mockConverter} into the private {@code converter} field of
+   * the supplied builder via reflection, failing the test if it cannot be set.
+   */
+  private void injectConverter(ProcessDefinitionBuilder builder) {
+    injectConverter(builder, mockConverter);
+  }
+
+  /**
+   * Injects an arbitrary converter (including {@code null}) into the private
+   * {@code converter} field of the supplied builder.
+   */
+  private void injectConverter(ProcessDefinitionBuilder builder, DataToJsonConverter converter) {
+    try {
+      Field converterField = Builder.class.getDeclaredField(CONVERTER);
+      converterField.setAccessible(true);
+      converterField.set(builder, converter);
+    } catch (Exception e) {
+      fail(COULD_NOT_SET_CONVERTER_FIELD + e.getMessage());
+    }
+  }
+
+  /**
+   * Builds a {@link ProcessDefinitionBuilder} with {@link #mockConverter}
+   * injected and stubbed to return the supplied JSON for the Process under
+   * test. Centralizes the repeated wiring used by every test.
+   */
+  private ProcessDefinitionBuilder newBuilderWithConverterReturning(JSONObject converterJson) {
+    ProcessDefinitionBuilder builder = new ProcessDefinitionBuilder(mockProcess);
+    injectConverter(builder);
+    when(mockConverter.toJsonObject(eq(mockProcess), eq(DataResolvingMode.FULL_TRANSLATABLE)))
+        .thenReturn(converterJson);
+    return builder;
+  }
+
+  /**
+   * Stubs the four string-valued process-level hook getters on {@link #mockProcess}
+   * with the canonical script constants, so a test can assert each hook is published
+   * under its public key from the entity.
+   */
+  private void stubProcessHookGetters() {
+    when(mockProcess.getETMETAOnload()).thenReturn(SCRIPT_ONLOAD);
+    when(mockProcess.getEtmetaOnprocess()).thenReturn(SCRIPT_ONPROCESS);
+    when(mockProcess.getEtmetaOnRefresh()).thenReturn(SCRIPT_ONREFRESH);
+    when(mockProcess.getEtmetaPayscriptLogic()).thenReturn(SCRIPT_PAYSCRIPT);
+  }
+
+  /**
+   * Asserts the four string-valued process-level hooks hold their canonical script
+   * values in the resulting payload.
+   *
+   * @param result the JSON produced by the builder
+   * @throws JSONException if reading the resulting JSON object fails
+   */
+  private static void assertProcessHookValues(JSONObject result) throws JSONException {
+    assertEquals(SCRIPT_ONLOAD, result.getString(ETMETA_ONLOAD));
+    assertEquals(SCRIPT_ONPROCESS, result.getString(ETMETA_ONPROCESS));
+    assertEquals(SCRIPT_ONREFRESH, result.getString(ETMETA_ON_REFRESH));
+    assertEquals(SCRIPT_PAYSCRIPT, result.getString(ETMETA_PAYSCRIPT_LOGIC));
+  }
+
+  /**
+   * Asserts that {@code key} is present in {@code json} and holds {@link JSONObject#NULL}.
+   * Encapsulates the always-present / JSON-null contract assertion so it is not
+   * repeated (with its message strings) once per metadata key.
+   *
+   * @param json the JSON object under test
+   * @param key  the metadata key that must always be present with a JSON-null value
+   */
+  private static void assertPresentAndNull(JSONObject json, String key) {
+    assertTrue(json.has(key), key + " must always be present in the payload");
+    assertEquals(JSONObject.NULL, json.opt(key), key + " must hold JSON null when the column is empty");
   }
 
   /**
@@ -122,139 +226,151 @@ public class ProcessDefinitionBuilderTest {
   }
 
   /**
-   * Tests that the toJSON method correctly converts a Process with parameters and scripts to JSON.
-   * Ensures that the resulting JSON contains the expected fields and values.
+   * Happy path: parameters are nested under {@code parameters}, each process-level
+   * hook is published under its public key from the entity getter, the typo'd raw
+   * key is absent, and the legacy {@code onLoad}/{@code onProcess} keys are not added.
    *
    * @throws JSONException if there is an error creating or manipulating JSON objects
    */
   @Test
   void testToJSONWithParametersAndScripts() throws JSONException {
-    JSONObject mockProcessJSON = new JSONObject();
-    mockProcessJSON.put("id", TEST_PROCESS_ID);
-    mockProcessJSON.put("name", "Test Process");
+    JSONObject converterJson = new JSONObject();
+    converterJson.put(ID, TEST_PROCESS_ID);
+    converterJson.put(NAME, PROCESS_NAME_VALUE);
+
+    stubProcessHookGetters();
 
     JSONObject mockParamJSON1 = new JSONObject();
-    mockParamJSON1.put("id", "param1Id");
-
+    mockParamJSON1.put(ID, PARAM1_ID_VALUE);
     JSONObject mockParamJSON2 = new JSONObject();
-    mockParamJSON2.put("id", "param2Id");
+    mockParamJSON2.put(ID, PARAM2_ID_VALUE);
 
     try (MockedConstruction<ParameterBuilder> ignored = mockConstruction(ParameterBuilder.class,
         (mock, context) -> when(mock.toJSON()).thenReturn(
             context.arguments().get(0) == mockParameter1 ? mockParamJSON1 : mockParamJSON2
         ))) {
 
-      ProcessDefinitionBuilder builder = new ProcessDefinitionBuilder(mockProcess);
-
-      try {
-        java.lang.reflect.Field converterField = Builder.class.getDeclaredField(CONVERTER);
-        converterField.setAccessible(true);
-        converterField.set(builder, mockConverter);
-      } catch (Exception e) {
-        fail(COULD_NOT_SET_CONVERTER_FIELD + e.getMessage());
-      }
-
-      when(mockConverter.toJsonObject(eq(mockProcess), eq(DataResolvingMode.FULL_TRANSLATABLE)))
-          .thenReturn(mockProcessJSON);
-
-      JSONObject result = builder.toJSON();
+      JSONObject result = newBuilderWithConverterReturning(converterJson).toJSON();
 
       assertNotNull(result);
-      assertEquals(TEST_PROCESS_ID, result.getString("id"));
-      assertEquals("Test Process", result.getString("name"));
-      assertEquals("onLoadScript", result.getString(ON_LOAD));
-      assertEquals("onProcessScript", result.getString(ON_PROCESS));
+      assertEquals(TEST_PROCESS_ID, result.getString(ID));
+      assertEquals(PROCESS_NAME_VALUE, result.getString(NAME));
+
+      // Hooks are emitted from the entity getters; the typo'd raw key never survives.
+      assertProcessHookValues(result);
+      assertNull(result.opt(ETMETA_ONLOAD_TYPO));
+
+      // Legacy duplicate keys are not added.
+      assertNull(result.opt(ON_LOAD));
+      assertNull(result.opt(ON_PROCESS));
 
       assertTrue(result.has(PARAMETERS));
       JSONObject parameters = result.getJSONObject(PARAMETERS);
       assertTrue(parameters.has(PARAM1_COLUMN));
       assertTrue(parameters.has(PARAM2_COLUMN));
-
-      assertEquals("param1Id", parameters.getJSONObject(PARAM1_COLUMN).getString("id"));
-      assertEquals("param2Id", parameters.getJSONObject(PARAM2_COLUMN).getString("id"));
+      assertEquals(PARAM1_ID_VALUE, parameters.getJSONObject(PARAM1_COLUMN).getString(ID));
+      assertEquals(PARAM2_ID_VALUE, parameters.getJSONObject(PARAM2_COLUMN).getString(ID));
     }
   }
 
   /**
-   * Tests that the toJSON method correctly handles an empty parameter list and null scripts.
-   * Ensures that the resulting JSON contains an empty parameters object and null values for onLoad and onProcess.
+   * Tests an empty parameter list: the parameters JSON is empty, the legacy and
+   * typo'd keys never appear, and the always-present hook keys are emitted (null
+   * here, since the entity getters return null).
    *
    * @throws JSONException if there is an error creating or manipulating JSON objects
    */
   @Test
   void testToJSONWithEmptyParameterList() throws JSONException {
     when(mockProcess.getOBUIAPPParameterList()).thenReturn(new ArrayList<>());
-    when(mockProcess.getETMETAOnload()).thenReturn(null);
-    when(mockProcess.getEtmetaOnprocess()).thenReturn(null);
 
-    JSONObject mockProcessJSON = new JSONObject();
-    mockProcessJSON.put("id", TEST_PROCESS_ID);
+    JSONObject converterJson = new JSONObject();
+    converterJson.put(ID, TEST_PROCESS_ID);
 
-    ProcessDefinitionBuilder builder = new ProcessDefinitionBuilder(mockProcess);
-
-    try {
-      java.lang.reflect.Field converterField = Builder.class.getDeclaredField(CONVERTER);
-      converterField.setAccessible(true);
-      converterField.set(builder, mockConverter);
-    } catch (Exception e) {
-      fail(COULD_NOT_SET_CONVERTER_FIELD + e.getMessage());
-    }
-
-    when(mockConverter.toJsonObject(eq(mockProcess), eq(DataResolvingMode.FULL_TRANSLATABLE)))
-        .thenReturn(mockProcessJSON);
-
-    JSONObject result = builder.toJSON();
+    JSONObject result = newBuilderWithConverterReturning(converterJson).toJSON();
 
     assertNotNull(result);
-    assertEquals(TEST_PROCESS_ID, result.getString("id"));
+    assertEquals(TEST_PROCESS_ID, result.getString(ID));
 
     assertTrue(result.has(PARAMETERS));
-    JSONObject parameters = result.getJSONObject(PARAMETERS);
-    assertEquals(0, parameters.length());
+    assertEquals(0, result.getJSONObject(PARAMETERS).length());
 
+    // Legacy keys are never added; the typo'd raw key never survives.
     assertNull(result.opt(ON_LOAD));
     assertNull(result.opt(ON_PROCESS));
+    assertNull(result.opt(ETMETA_ONLOAD_TYPO));
+    // The hook key is still present (null) even when the column is empty.
+    assertPresentAndNull(result, ETMETA_ONLOAD);
   }
 
   /**
-   * Tests that the toJSON method correctly handles null scripts.
-   * Ensures that the resulting JSON does not contain onLoad and onProcess fields.
+   * Regression for the derived-read gate: a business role's converter omits the
+   * non-derived-readable {@code em_etmeta_*} properties entirely (and may leave a
+   * stale value under the typo'd raw key). The builder must still publish every
+   * hook from the entity getters and drop the raw key.
    *
    * @throws JSONException if there is an error creating or manipulating JSON objects
    */
   @Test
-  void testToJSONWithNullScripts() throws JSONException {
-    when(mockProcess.getETMETAOnload()).thenReturn(null);
-    when(mockProcess.getEtmetaOnprocess()).thenReturn(null);
+  void testToJSONEmitsHooksFromEntityWhenConverterOmitsThem() throws JSONException {
+    when(mockProcess.getOBUIAPPParameterList()).thenReturn(new ArrayList<>());
+    stubProcessHookGetters();
 
-    JSONObject mockProcessJSON = new JSONObject();
-    mockProcessJSON.put("id", TEST_PROCESS_ID);
+    // Converter returns no etmeta keys (gate), except a stale value under the raw key.
+    JSONObject converterJson = new JSONObject();
+    converterJson.put(ID, TEST_PROCESS_ID);
+    converterJson.put(ETMETA_ONLOAD_TYPO, "staleConverterValue");
 
-    JSONObject mockParamJSON = new JSONObject();
-    mockParamJSON.put("id", "paramId");
+    JSONObject result = newBuilderWithConverterReturning(converterJson).toJSON();
 
-    try (MockedConstruction<ParameterBuilder> ignored = mockConstruction(ParameterBuilder.class,
-        (mock, context) -> when(mock.toJSON()).thenReturn(mockParamJSON))) {
+    assertNull(result.opt(ETMETA_ONLOAD_TYPO));
+    assertProcessHookValues(result);
+  }
 
-      ProcessDefinitionBuilder builder = new ProcessDefinitionBuilder(mockProcess);
+  /**
+   * Locks the stable null-vs-absent contract for the four string-valued process-level
+   * {@code etmeta*} keys: when every column is empty the builder keeps all four keys
+   * present (never absent) with {@link JSONObject#NULL}. A downstream FE consumer can
+   * therefore rely on the keys always existing and only test for {@code null}.
+   *
+   * @throws JSONException if there is an error creating or manipulating JSON objects
+   */
+  @Test
+  void testToJSONKeepsAllProcessEtmetaKeysPresentWhenColumnsEmpty() throws JSONException {
+    when(mockProcess.getOBUIAPPParameterList()).thenReturn(new ArrayList<>());
 
-      try {
-        java.lang.reflect.Field converterField = Builder.class.getDeclaredField(CONVERTER);
-        converterField.setAccessible(true);
-        converterField.set(builder, mockConverter);
-      } catch (Exception e) {
-        fail(COULD_NOT_SET_CONVERTER_FIELD + e.getMessage());
-      }
+    JSONObject converterJson = new JSONObject();
+    converterJson.put(ID, TEST_PROCESS_ID);
 
-      when(mockConverter.toJsonObject(eq(mockProcess), eq(DataResolvingMode.FULL_TRANSLATABLE)))
-          .thenReturn(mockProcessJSON);
+    JSONObject result = newBuilderWithConverterReturning(converterJson).toJSON();
 
-      JSONObject result = builder.toJSON();
+    assertNotNull(result);
+    // The typo'd raw key must not survive.
+    assertNull(result.opt(ETMETA_ONLOAD_TYPO));
+    // All four string-valued process-level hooks remain present and null.
+    assertPresentAndNull(result, ETMETA_ONLOAD);
+    assertPresentAndNull(result, ETMETA_ONPROCESS);
+    assertPresentAndNull(result, ETMETA_ON_REFRESH);
+    assertPresentAndNull(result, ETMETA_PAYSCRIPT_LOGIC);
+  }
 
-      assertNotNull(result);
-      assertNull(result.opt(ON_LOAD));
-      assertNull(result.opt(ON_PROCESS));
-    }
+  /**
+   * Verifies the builder does not re-introduce the legacy {@code onLoad} or
+   * {@code onProcess} keys (which were previously added explicitly).
+   *
+   * @throws JSONException if there is an error creating or manipulating JSON objects
+   */
+  @Test
+  void testToJSONDropsLegacyKeys() throws JSONException {
+    when(mockProcess.getOBUIAPPParameterList()).thenReturn(new ArrayList<>());
+
+    JSONObject converterJson = new JSONObject();
+    converterJson.put(ID, TEST_PROCESS_ID);
+
+    JSONObject result = newBuilderWithConverterReturning(converterJson).toJSON();
+
+    assertNull(result.opt(ON_LOAD));
+    assertNull(result.opt(ON_PROCESS));
   }
 
   /**
@@ -263,14 +379,7 @@ public class ProcessDefinitionBuilderTest {
   @Test
   void testToJSONThrowsRuntimeException() {
     ProcessDefinitionBuilder builder = new ProcessDefinitionBuilder(mockProcess);
-
-    try {
-      java.lang.reflect.Field converterField = Builder.class.getDeclaredField(CONVERTER);
-      converterField.setAccessible(true);
-      converterField.set(builder, mockConverter);
-    } catch (Exception e) {
-      fail(COULD_NOT_SET_CONVERTER_FIELD + e.getMessage());
-    }
+    injectConverter(builder);
 
     when(mockConverter.toJsonObject(eq(mockProcess), eq(DataResolvingMode.FULL_TRANSLATABLE)))
         .thenThrow(new RuntimeException("Test exception"));
@@ -293,14 +402,7 @@ public class ProcessDefinitionBuilderTest {
   @Test
   void testToJSONWithNullConverter() {
     ProcessDefinitionBuilder builder = new ProcessDefinitionBuilder(mockProcess);
-
-    try {
-      java.lang.reflect.Field converterField = Builder.class.getDeclaredField(CONVERTER);
-      converterField.setAccessible(true);
-      converterField.set(builder, null);
-    } catch (Exception e) {
-      fail(COULD_NOT_SET_CONVERTER_FIELD + e.getMessage());
-    }
+    injectConverter(builder, null);
 
     assertThrows(NullPointerException.class, builder::toJSON);
   }

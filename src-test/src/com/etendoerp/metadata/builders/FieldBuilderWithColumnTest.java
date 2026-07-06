@@ -16,8 +16,12 @@
  */
 package com.etendoerp.metadata.builders;
 
-import static com.etendoerp.metadata.MetadataTestConstants.COLUMN_ID;
 import static com.etendoerp.metadata.MetadataTestConstants.FIELD_ID;
+import static com.etendoerp.metadata.builders.FieldBuilderWithColumnTestHelpers.invokePrivate;
+import static com.etendoerp.metadata.builders.FieldBuilderWithColumnTestHelpers.mockDataToJsonConverter;
+import static com.etendoerp.metadata.builders.FieldBuilderWithColumnTestHelpers.setJson;
+import static com.etendoerp.metadata.builders.FieldBuilderWithColumnTestHelpers.setupOBDalWithTabCriteria;
+import static com.etendoerp.metadata.builders.FieldBuilderWithColumnTestHelpers.setupWindowAccessMocks;
 import static com.etendoerp.metadata.MetadataTestConstants.LIST_ID;
 import static com.etendoerp.metadata.MetadataTestConstants.REF_LIST;
 import static com.etendoerp.metadata.MetadataTestConstants.TABLE_ID;
@@ -31,9 +35,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Answers.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.mockStatic;
@@ -44,9 +48,9 @@ import static org.mockito.Mockito.when;
 import java.util.Collections;
 import java.util.List;
 
+import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
-import org.hibernate.criterion.Criterion;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -74,22 +78,28 @@ import org.openbravo.model.ad.domain.Reference;
 import org.openbravo.model.ad.system.Language;
 import org.openbravo.model.ad.ui.Field;
 import org.openbravo.model.ad.ui.FieldGroup;
+import org.openbravo.model.ad.ui.FieldGroupTrl;
 import org.openbravo.model.ad.ui.Process;
 import org.openbravo.model.ad.ui.Tab;
 import org.openbravo.model.ad.ui.Window;
 import org.openbravo.service.json.DataResolvingMode;
 import org.openbravo.service.json.DataToJsonConverter;
 
-import java.lang.reflect.Method;
 import java.util.Map;
 
+import org.openbravo.model.ad.domain.ReferencedTree;
+import org.openbravo.userinterface.selector.Selector;
+import org.openbravo.userinterface.selector.SelectorField;
+
 import com.etendoerp.etendorx.utils.DataSourceUtils;
+import com.etendoerp.metadata.data.ReferenceSelectors;
 import com.etendoerp.metadata.utils.Constants;
 import com.etendoerp.metadata.utils.LegacyUtils;
 import com.etendoerp.metadata.utils.Utils;
 
 @MockitoSettings(strictness = Strictness.LENIENT)
 @ExtendWith(MockitoExtension.class)
+@SuppressWarnings("java:S1448")
 class FieldBuilderWithColumnTest {
 
     @Mock
@@ -126,6 +136,9 @@ class FieldBuilderWithColumnTest {
     private OBCriteria<Tab> criteria;
     @Mock
     private OBContext obContext;
+    private static final String PAYMENT_TERMS = "paymentTerms";
+    private static final String SELECTOR_KEY = "selector";
+    private static final String OUT_FIELDS_KEY = "outFields";
     private static final String BUTTON_REF_LIST_STRING = "buttonRefList";
     private static final String WINDOW_ID_STRING = "window-id";
     private static final String ROLE_ID_STRING = "role-id";
@@ -136,7 +149,11 @@ class FieldBuilderWithColumnTest {
 
     private static final String IS_REFERENCE_WINDOW_STRING = "isReferencedWindowAccessible";
     private static final String FIELD_GROUP_COLLAPSED = "fieldGroupCollapsed";
+    private static final String FIELD_GROUP_NAME = "fieldGroupName";
+    private static final String LANG_ES = "es_ES";
+    private static final String FIELD_GROUP_BASE_NAME = "Main Information";
     private static final String PROP_REFERENCED_WINDOW_ID = "referencedWindowId";
+    private static final String GRID_DISPLAY_LOGIC_EXPRESSION = "gridDisplayLogicExpression";
 
     private FieldBuilderWithColumn fieldBuilder;
 
@@ -181,49 +198,6 @@ class FieldBuilderWithColumnTest {
     /* Helpers */
     /* ---------------------------------------------------------------------- */
 
-    private MockedConstruction<DataToJsonConverter> mockDataToJsonConverter() throws JSONException {
-        return mockConstruction(DataToJsonConverter.class,
-                (mock, context) -> {
-                    JSONObject base = new JSONObject().put("id", FIELD_ID);
-                    when(mock.toJsonObject(any(Field.class),
-                            eq(DataResolvingMode.FULL_TRANSLATABLE)))
-                            .thenReturn(base);
-                    when(mock.toJsonObject(any(Column.class),
-                            eq(DataResolvingMode.FULL_TRANSLATABLE)))
-                            .thenReturn(new JSONObject().put("id", COLUMN_ID));
-                });
-    }
-
-    private void setupWindowAccessMocks(String windowId, OBCriteria<WindowAccess> criteriaMock,
-            WindowAccess windowAccess) {
-        when(obDal.get(Window.class, windowId)).thenReturn(mock(Window.class));
-        when(obDal.createCriteria(WindowAccess.class)).thenReturn(criteriaMock);
-        when(criteriaMock.add(any())).thenReturn(criteriaMock);
-        when(criteriaMock.setMaxResults(1)).thenReturn(criteriaMock);
-        when(criteriaMock.uniqueResult()).thenReturn(windowAccess);
-    }
-
-    private void setupOBDalWithTabCriteria() {
-        when(obDal.get(eq(Table.class), any())).thenReturn(table);
-        when(obDal.createCriteria(Tab.class)).thenReturn(criteria);
-        when(criteria.add(any(Criterion.class))).thenReturn(criteria);
-        when(criteria.setMaxResults(anyInt())).thenReturn(criteria);
-        when(criteria.uniqueResult()).thenReturn(null);
-    }
-
-    private Object invokePrivate(Object target, String methodName, Class<?>[] parameterTypes, Object... args)
-            throws ReflectiveOperationException {
-        Method method = target.getClass().getDeclaredMethod(methodName, parameterTypes);
-        method.setAccessible(true);
-        return method.invoke(target, args);
-    }
-
-    private void setJson(FieldBuilder builder, JSONObject json) throws ReflectiveOperationException {
-        java.lang.reflect.Field jsonField = FieldBuilder.class.getDeclaredField("json");
-        jsonField.setAccessible(true);
-        jsonField.set(builder, json);
-    }
-
     private void runWindowAccessTest(WindowAccess windowAccess,
             WindowAccessTestAction action) throws Exception {
         Role role = mock(Role.class);
@@ -238,7 +212,7 @@ class FieldBuilderWithColumnTest {
             mockedOBContext.when(OBContext::getOBContext).thenReturn(obContext);
             when(obContext.getRole()).thenReturn(role);
             mockedOBDal.when(OBDal::getReadOnlyInstance).thenReturn(obDal);
-            setupWindowAccessMocks(WINDOW_ID_STRING, criteriaMock, windowAccess);
+            setupWindowAccessMocks(obDal, WINDOW_ID_STRING, criteriaMock, windowAccess);
 
             fieldBuilder = new FieldBuilderWithColumn(field, fieldAccess);
             action.execute(fieldBuilder, role);
@@ -301,7 +275,7 @@ class FieldBuilderWithColumnTest {
                     .thenReturn(new String[] { TEST_FIELD });
 
             mockedOBDal.when(OBDal::getInstance).thenReturn(obDal);
-            setupOBDalWithTabCriteria();
+            setupOBDalWithTabCriteria(obDal, table, criteria);
 
             if (extraMocks != null) {
                 extraMocks.run();
@@ -333,9 +307,10 @@ class FieldBuilderWithColumnTest {
     @Test
     void testToJSONWithLegacyProcess() throws JSONException {
         try (MockedStatic<LegacyUtils> legacy = mockStatic(LegacyUtils.class);
+                MockedStatic<LegacyProcessResolver> resolver = mockStatic(LegacyProcessResolver.class);
                 MockedStatic<ProcessActionBuilder> builder = mockStatic(ProcessActionBuilder.class)) {
 
-            legacy.when(() -> LegacyUtils.isLegacyProcess(FIELD_ID)).thenReturn(true);
+            resolver.when(() -> LegacyProcessResolver.isLegacy(field)).thenReturn(true);
             legacy.when(() -> LegacyUtils.getLegacyProcess(FIELD_ID)).thenReturn(process);
 
             builder.when(() -> ProcessActionBuilder.getFieldProcess(field, process))
@@ -367,6 +342,51 @@ class FieldBuilderWithColumnTest {
                 null);
 
         assertNotNull(result);
+    }
+
+    /**
+     * Asserts that when the field has a non-blank {@code displaylogicgrid}
+     * (such as the {@code @ACCT_DIMENSION_DISPLAY@} placeholder classic UI
+     * rewrites per field), the resulting JSON exposes the rewritten
+     * expression under {@code gridDisplayLogicExpression}.
+     */
+    @Test
+    void testToJSONWithGridDisplayLogic() throws JSONException {
+        String rewritten = "(context.$IsAcctDimCentrally === 'Y' && context['$Element_BP_APP_L'] === 'Y')";
+        when(field.getDisplaylogicgrid()).thenReturn("@ACCT_DIMENSION_DISPLAY@");
+
+        JSONObject result = executeWithExpressionParser(rewritten, null);
+
+        assertTrue(result.has(GRID_DISPLAY_LOGIC_EXPRESSION));
+        assertEquals(rewritten, result.getString(GRID_DISPLAY_LOGIC_EXPRESSION));
+    }
+
+    /**
+     * Asserts that {@code gridDisplayLogicExpression} is omitted when the
+     * field's {@code displaylogicgrid} column is {@code null} (the typical
+     * case for non-accounting-dimension fields).
+     */
+    @Test
+    void testToJSONWithoutGridDisplayLogicWhenNull() throws JSONException {
+        when(field.getDisplaylogicgrid()).thenReturn(null);
+
+        JSONObject result = executeToJSON(null);
+
+        assertFalse(result.has(GRID_DISPLAY_LOGIC_EXPRESSION));
+    }
+
+    /**
+     * Asserts that {@code gridDisplayLogicExpression} is omitted when the
+     * field's {@code displaylogicgrid} column is blank, matching the
+     * defensive guard in {@code FieldBuilder#addGridDisplayLogic}.
+     */
+    @Test
+    void testToJSONWithoutGridDisplayLogicWhenBlank() throws JSONException {
+        when(field.getDisplaylogicgrid()).thenReturn("   ");
+
+        JSONObject result = executeToJSON(null);
+
+        assertFalse(result.has(GRID_DISPLAY_LOGIC_EXPRESSION));
     }
 
     @Test
@@ -442,7 +462,7 @@ class FieldBuilderWithColumnTest {
             when(obContext.getLanguage()).thenReturn(language);
 
             mockedOBDal.when(OBDal::getInstance).thenReturn(obDal);
-            setupOBDalWithTabCriteria();
+            setupOBDalWithTabCriteria(obDal, table, criteria);
 
             mockedUtils.when(() -> Utils.getReferencedTab(any(Property.class))).thenReturn(null);
 
@@ -674,5 +694,145 @@ class FieldBuilderWithColumnTest {
         JSONObject result = executeToJSON(null);
 
         assertFalse(result.has(FIELD_GROUP_COLLAPSED));
+        assertFalse(result.has(FIELD_GROUP_NAME));
+    }
+
+    @Test
+    void testFieldGroupNameWithMatchingTranslationIsSerializedInJSON() throws JSONException {
+        FieldGroup fieldGroup = mock(FieldGroup.class);
+        FieldGroupTrl trl = mock(FieldGroupTrl.class);
+        Language trlLanguage = mock(Language.class);
+
+        when(language.getId()).thenReturn(LANG_ES);
+        when(trlLanguage.getId()).thenReturn(LANG_ES);
+        when(trl.getLanguage()).thenReturn(trlLanguage);
+        when(trl.getName()).thenReturn("Información Principal");
+        when(fieldGroup.getADFieldGroupTrlList()).thenReturn(List.of(trl));
+        when(fieldGroup.isCollapsed()).thenReturn(Boolean.FALSE);
+        when(field.getFieldGroup()).thenReturn(fieldGroup);
+
+        JSONObject result = executeToJSON(null);
+
+        assertTrue(result.has(FIELD_GROUP_NAME));
+        assertEquals("Información Principal", result.getString(FIELD_GROUP_NAME));
+    }
+
+    @Test
+    void testFieldGroupNameFallsBackToBaseNameWhenNoMatchingTranslation() throws JSONException {
+        FieldGroup fieldGroup = mock(FieldGroup.class);
+        FieldGroupTrl trl = mock(FieldGroupTrl.class);
+        Language trlLanguage = mock(Language.class);
+
+        when(language.getId()).thenReturn(LANG_ES);
+        when(trlLanguage.getId()).thenReturn("en_US");
+        when(trl.getLanguage()).thenReturn(trlLanguage);
+        when(trl.getName()).thenReturn(FIELD_GROUP_BASE_NAME);
+        when(fieldGroup.getADFieldGroupTrlList()).thenReturn(List.of(trl));
+        when(fieldGroup.getName()).thenReturn(FIELD_GROUP_BASE_NAME);
+        when(fieldGroup.isCollapsed()).thenReturn(Boolean.FALSE);
+        when(field.getFieldGroup()).thenReturn(fieldGroup);
+
+        JSONObject result = executeToJSON(null);
+
+        assertTrue(result.has(FIELD_GROUP_NAME));
+        assertEquals(FIELD_GROUP_BASE_NAME, result.getString(FIELD_GROUP_NAME));
+    }
+
+    @Test
+    void testFieldGroupNameFallsBackToBaseNameWhenTranslationListIsEmpty() throws JSONException {
+        FieldGroup fieldGroup = mock(FieldGroup.class);
+
+        when(language.getId()).thenReturn(LANG_ES);
+        when(fieldGroup.getADFieldGroupTrlList()).thenReturn(Collections.emptyList());
+        when(fieldGroup.getName()).thenReturn("Dimensions");
+        when(fieldGroup.isCollapsed()).thenReturn(Boolean.TRUE);
+        when(field.getFieldGroup()).thenReturn(fieldGroup);
+
+        JSONObject result = executeToJSON(null);
+
+        assertTrue(result.has(FIELD_GROUP_NAME));
+        assertEquals("Dimensions", result.getString(FIELD_GROUP_NAME));
+    }
+
+    private JSONObject invokeAddComboSelectInfoAndGetJson(
+            ReferenceSelectors selectors,
+            MockedStatic<FieldBuilder> mockedFieldBuilder) throws Exception {
+
+        mockedFieldBuilder.when(() -> FieldBuilder.getSelectorInfo(anyString(), any()))
+                .thenReturn(new JSONObject());
+        mockedFieldBuilder.when(() -> FieldBuilder.getReferenceSelectors(any()))
+                .thenReturn(selectors);
+
+        fieldBuilder = new FieldBuilderWithColumn(field, fieldAccess);
+        invokePrivate(fieldBuilder, "addComboSelectInfo",
+                new Class<?>[] { Field.class }, field);
+
+        java.lang.reflect.Field jsonField = FieldBuilder.class.getDeclaredField("json");
+        jsonField.setAccessible(true);
+        return (JSONObject) jsonField.get(fieldBuilder);
+    }
+
+    @Test
+    void testAddComboSelectInfoIncludesOutFieldsForObuiselSelector() throws Exception {
+        Selector mockSelector = mock(Selector.class);
+
+        SelectorField outSf = mock(SelectorField.class);
+        when(outSf.isOutfield()).thenReturn(true);
+        when(outSf.isActive()).thenReturn(true);
+        when(outSf.getProperty()).thenReturn(PAYMENT_TERMS);
+        when(outSf.getSuffix()).thenReturn(null);
+        when(mockSelector.getOBUISELSelectorFieldList()).thenReturn(List.of(outSf));
+
+        Field targetField = mock(Field.class);
+        Column targetCol = mock(Column.class);
+        when(targetField.getObuiselOutfield()).thenReturn(outSf);
+        when(targetField.getColumn()).thenReturn(targetCol);
+        when(targetCol.getDBColumnName()).thenReturn("C_PaymentTerm_ID");
+        when(targetField.getName()).thenReturn("Payment Terms");
+        when(tab.getADFieldList()).thenReturn(List.of(targetField));
+
+        when(reference.getId()).thenReturn("95E2A8B50A254B2AAE6774B8C2F28120");
+
+        try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
+             MockedStatic<FieldBuilder> mockedFieldBuilder = mockStatic(FieldBuilder.class, CALLS_REAL_METHODS);
+             MockedConstruction<DataToJsonConverter> ignored = mockDataToJsonConverter()) {
+
+            mockedOBContext.when(OBContext::getOBContext).thenReturn(obContext);
+            mockedFieldBuilder.when(() -> FieldBuilder.getPropertyOrDataSourceField(outSf))
+                    .thenReturn(PAYMENT_TERMS);
+            mockedFieldBuilder.when(() -> FieldBuilder.getHqlName(targetField))
+                    .thenReturn(PAYMENT_TERMS);
+
+            JSONObject json = invokeAddComboSelectInfoAndGetJson(
+                    new ReferenceSelectors(mockSelector, null), mockedFieldBuilder);
+
+            assertTrue(json.has(SELECTOR_KEY));
+            JSONObject selectorJson = json.getJSONObject(SELECTOR_KEY);
+            assertTrue(selectorJson.has(OUT_FIELDS_KEY));
+            JSONArray outFields = selectorJson.getJSONArray(OUT_FIELDS_KEY);
+            assertEquals(1, outFields.length());
+            assertEquals("field", outFields.getJSONObject(0).getString("type"));
+            assertEquals(PAYMENT_TERMS, outFields.getJSONObject(0).getString("selectorFieldProperty"));
+        }
+    }
+
+    @Test
+    void testAddComboSelectInfoTreeSelectorDoesNotIncludeOutFields() throws Exception {
+        when(reference.getId()).thenReturn("8C57A4A2E05F4261A1FADF47C30398AD");
+        ReferencedTree mockTree = mock(ReferencedTree.class);
+
+        try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
+             MockedStatic<FieldBuilder> mockedFieldBuilder = mockStatic(FieldBuilder.class, CALLS_REAL_METHODS);
+             MockedConstruction<DataToJsonConverter> ignored = mockDataToJsonConverter()) {
+
+            mockedOBContext.when(OBContext::getOBContext).thenReturn(obContext);
+
+            JSONObject json = invokeAddComboSelectInfoAndGetJson(
+                    new ReferenceSelectors(null, mockTree), mockedFieldBuilder);
+
+            if (json.has(SELECTOR_KEY)) {
+                assertFalse(json.getJSONObject(SELECTOR_KEY).has(OUT_FIELDS_KEY));
+            }
+        }
     }
 }

@@ -722,6 +722,36 @@ class TabProcessorTest {
   }
 
   /**
+   * Tests getTabFields(TabAccess, List&lt;FieldAccess&gt;) processes the explicitly supplied field
+   * access list instead of lazily loading it from the tab access, which is what
+   * {@link WindowBuilder} relies on to batch-load field access data for a whole window in a
+   * single query.
+   *
+   * @throws JSONException if JSON processing fails during field building
+   */
+  @Test
+  void testGetTabFieldsWithExplicitFieldAccessListProcessesSuppliedList() throws JSONException {
+    TabAccess mockTabAccess = mock(TabAccess.class);
+    when(mockTabAccess.getId()).thenReturn(TEST_TAB_ID);
+    when(mockTabAccess.getUpdated()).thenReturn(TEST_DATE);
+
+    JSONObject expectedJSON = new JSONObject();
+    expectedJSON.put(FIELD_ACCESS_ID, "preloadedField");
+
+    try (MockedConstruction<FieldBuilderWithColumn> mockedConstruction = mockConstruction(
+        FieldBuilderWithColumn.class,
+        (mock, context) -> when(mock.toJSON()).thenReturn(expectedJSON))) {
+
+      JSONObject result = TabProcessor.getTabFields(mockTabAccess, List.of(mockFieldAccess));
+
+      assertNotNull(result);
+      assertTrue(result.has(TEST_PROPERTY_NAME));
+      assertEquals(expectedJSON, result.get(TEST_PROPERTY_NAME));
+      verify(mockTabAccess, never()).getADFieldAccessList();
+    }
+  }
+
+  /**
    * Tests getTabFields(TabAccess) returns an empty result when the FieldAccess is
    * not active.
    * The isFieldAccessAccessible predicate checks fieldAccess.isActive() first.

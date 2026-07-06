@@ -20,6 +20,8 @@ package com.etendoerp.metadata.builders;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import java.util.Optional;
+
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
@@ -48,6 +50,7 @@ import org.openbravo.model.ad.system.Language;
 import org.openbravo.model.ad.ui.Field;
 import org.openbravo.model.ad.ui.Process;
 import org.openbravo.model.ad.ui.ProcessParameter;
+import org.openbravo.model.ad.ui.Tab;
 import org.openbravo.service.datasource.DataSource;
 import org.openbravo.service.datasource.DatasourceField;
 import org.openbravo.service.db.DalConnectionProvider;
@@ -59,6 +62,7 @@ import org.openbravo.userinterface.selector.SelectorField;
 import com.etendoerp.etendorx.utils.DataSourceUtils;
 import com.etendoerp.metadata.data.ReferenceSelectors;
 import com.etendoerp.metadata.utils.Constants;
+import com.etendoerp.metadata.utils.SelectorPropertiesUtil;
 
 /**
  * Abstract base class for building field metadata in JSON format.
@@ -120,12 +124,34 @@ public abstract class FieldBuilder extends Builder {
     public static JSONObject getSelectorInfo(String fieldId, Reference ref) throws JSONException {
         ReferenceSelectors result = getReferenceSelectors(ref);
 
+        JSONObject selectorInfo;
         if (result.selector != null) {
-            return addSelectorInfo(fieldId, result.selector);
+            selectorInfo = addSelectorInfo(fieldId, result.selector);
         } else if (result.treeSelector != null) {
-            return addTreeSelectorInfo(fieldId, result.treeSelector);
+            selectorInfo = addTreeSelectorInfo(fieldId, result.treeSelector);
         } else {
-            return addComboTableSelectorInfo(fieldId);
+            selectorInfo = addComboTableSelectorInfo(fieldId);
+        }
+
+        addLegacySearchUrl(selectorInfo, ref);
+
+        return selectorInfo;
+    }
+
+    /**
+     * Adds the Classic info-window URL of a Search reference to the selector JSON, when one
+     * exists. The new UI uses it to open the legacy selector popup inside an iframe instead
+     * of the native React modal. References without a Search info-window mapping (e.g. plain
+     * TableDir combos) are left untouched.
+     *
+     * @param selectorInfo the selector JSON being built
+     * @param ref          the field/parameter reference (may be {@code null})
+     * @throws JSONException if the value cannot be written into the JSON object
+     */
+    private static void addLegacySearchUrl(JSONObject selectorInfo, Reference ref) throws JSONException {
+        Optional<String> legacySearchUrl = LegacyProcessResolver.resolveSearchPopupUrl(ref);
+        if (legacySearchUrl.isPresent()) {
+            selectorInfo.put(Constants.LEGACY_SEARCH_URL, legacySearchUrl.get());
         }
     }
 
@@ -303,7 +329,7 @@ public abstract class FieldBuilder extends Builder {
         // For now we only support suggestion style search (only drop down)
         selectorInfo.put(JsonConstants.TEXTMATCH_PARAMETER, selector.getSuggestiontextmatchstyle());
 
-        setSelectorProperties(selector.getOBUISELSelectorFieldList(), selector.getDisplayfield(),
+        SelectorPropertiesUtil.setSelectorProperties(selector.getOBUISELSelectorFieldList(), selector.getDisplayfield(),
                 selector.getValuefield(), selectorInfo);
 
         selectorInfo.put("extraSearchFields", getExtraSearchFields(selector));
@@ -318,7 +344,7 @@ public abstract class FieldBuilder extends Builder {
         JSONArray gridColumns = new JSONArray();
         for (SelectorField selectorField : selector.getOBUISELSelectorFieldList()) {
             if (selectorField.isActive() && selectorField.isShowingrid()) {
-                gridColumns.put(buildGridColumn(selectorField));
+                gridColumns.put(SelectorPropertiesUtil.buildGridColumn(selectorField));
             }
         }
         selectorInfo.put("gridColumns", gridColumns);
@@ -331,125 +357,79 @@ public abstract class FieldBuilder extends Builder {
     }
 
     /**
-     * Configures selector properties including selected, derived, and additional
-     * properties.
-     * Analyzes selector fields to determine which properties should be included in
-     * queries
-     * and which should be available for display and searching.
+     * Adds out-field mappings to the selector JSON for a custom OBUISEL selector.
+     * Iterates selector fields marked as out-fields and resolves target mappings
+     * from the tab's field list.
      *
-     * @param fields       List of selector field configurations
-     * @param displayField The field used for display (can be null)
-     * @param valueField   The field used for values (can be null)
-     * @param selectorInfo The JSON object to populate with property configurations
+     * Two types of out-field entries are produced:
+     * <ul>
+     *   <li>{@code "field"} — the selector field is referenced by an AD_Field in the tab
+     *       via {@code obuiselOutfield}. The frontend uses this to set a form field value directly.</li>
+     *   <li>{@code "calloutInput"} — the selector field has a suffix but no AD_Field references it.
+     *       The frontend uses this to populate the callout payload.</li>
+     * </ul>
+     *
+     * If no out-field entries are produced, the {@code "outFields"} key is omitted from the JSON.
+     *
+     * @param selectorJson The selector JSON object to augment with out-fields
+     * @param selector     The OBUISEL selector entity
+     * @param tab          The tab containing the field that uses this selector
      * @throws JSONException if there's an error updating the JSON structure
      */
-    private static void setSelectorProperties(List<SelectorField> fields, SelectorField displayField,
-            SelectorField valueField, JSONObject selectorInfo) throws JSONException {
-        String valueFieldProperty = valueField != null ? getValueField(
-                valueField.getObuiselSelector()) : JsonConstants.IDENTIFIER;
-        String displayFieldProperty = displayField != null ? getDisplayField(
-                displayField.getObuiselSelector()) : JsonConstants.IDENTIFIER;
+    public static void addOutFields(JSONObject selectorJson, Selector selector, Tab tab)
+            throws JSONException {
+        List<SelectorField> outFields = selector.getOBUISELSelectorFieldList().stream()
+                .filter(sf -> Boolean.TRUE.equals(sf.isOutfield()) && Boolean.TRUE.equals(sf.isActive()))
+                .collect(Collectors.toList());
 
-        StringBuilder selectedProperties = new StringBuilder(JsonConstants.ID);
-        StringBuilder derivedProperties = new StringBuilder();
-        StringBuilder extraProperties = new StringBuilder(valueFieldProperty);
-
-        if (displayField != null && !JsonConstants.IDENTIFIER.equals(displayFieldProperty)) {
-            appendWithComma(extraProperties, displayFieldProperty);
-            appendWithComma(selectedProperties, displayFieldProperty);
-        }
-
-        SelectorPropertiesBuilder propertiesBuilder = new SelectorPropertiesBuilder(
-                selectedProperties, derivedProperties, extraProperties);
-
-        for (SelectorField field : fields) {
-            processSelectorField(field, displayField, valueField, displayFieldProperty, valueFieldProperty,
-                    propertiesBuilder);
-        }
-
-        selectorInfo.put(JsonConstants.SELECTEDPROPERTIES_PARAMETER, selectedProperties.toString());
-        selectorInfo.put(JsonConstants.ADDITIONAL_PROPERTIES_PARAMETER, extraProperties + "," + derivedProperties);
-    }
-
-    /**
-     * Processes an individual selector field and categorizes it into selected,
-     * derived, or extra properties.
-     *
-     * @param field                The selector field to process.
-     * @param displayField         The configured display field for the selector.
-     * @param valueField           The configured value field for the selector.
-     * @param displayFieldProperty The property name of the display field.
-     * @param valueFieldProperty   The property name of the value field.
-     * @param propertiesBuilder    Builder containing the StringBuilders for
-     *                             selected, derived, and extra properties.
-     */
-    private static void processSelectorField(SelectorField field, SelectorField displayField, SelectorField valueField,
-            String displayFieldProperty, String valueFieldProperty, SelectorPropertiesBuilder propertiesBuilder) {
-        String fieldName = getPropertyOrDataSourceField(field);
-
-        if (JsonConstants.ID.equals(fieldName) || JsonConstants.IDENTIFIER.equals(fieldName)) {
+        if (outFields.isEmpty()) {
             return;
         }
 
-        if (fieldName.contains(JsonConstants.FIELD_SEPARATOR)) {
-            appendWithComma(propertiesBuilder.derivedProperties, fieldName);
-        } else {
-            appendWithComma(propertiesBuilder.selectedProperties, fieldName);
+        List<Field> tabFields = tab.getADFieldList();
+        JSONArray outFieldsArray = new JSONArray();
+
+        for (SelectorField sf : outFields) {
+            String selectorFieldProperty = getPropertyOrDataSourceField(sf);
+            List<Field> matchedFields = tabFields.stream()
+                    .filter(f -> sf.equals(f.getObuiselOutfield()))
+                    .collect(Collectors.toList());
+
+            if (!matchedFields.isEmpty()) {
+                for (Field matchedField : matchedFields) {
+                    outFieldsArray.put(buildOutFieldEntry(
+                            "field", selectorFieldProperty, matchedField, sf.getSuffix()));
+                }
+            } else if (sf.getSuffix() != null && !sf.getSuffix().isEmpty()) {
+                outFieldsArray.put(buildCalloutInputEntry(selectorFieldProperty, sf.getSuffix()));
+            }
         }
 
-        if (isExtraProperty(field, displayField, valueField, fieldName, displayFieldProperty, valueFieldProperty)) {
-            appendWithComma(propertiesBuilder.extraProperties, fieldName);
+        if (outFieldsArray.length() > 0) {
+            selectorJson.put("outFields", outFieldsArray);
         }
     }
 
-    /**
-     * Determines if a selector field should be considered an extra property.
-     *
-     * @param field                The selector field to check.
-     * @param displayField         The configured display field.
-     * @param valueField           The configured value field.
-     * @param fieldName            The name of the field being checked.
-     * @param displayFieldProperty The property name of the display field.
-     * @param valueFieldProperty   The property name of the value field.
-     * @return true if the field is an extra property, false otherwise.
-     */
-    private static boolean isExtraProperty(SelectorField field, SelectorField displayField, SelectorField valueField,
-            String fieldName, String displayFieldProperty, String valueFieldProperty) {
-        return field.isOutfield() &&
-                (displayField == null || fieldName.equals(displayFieldProperty)) &&
-                (valueField == null || fieldName.equals(valueFieldProperty));
+    private static JSONObject buildOutFieldEntry(String type, String selectorFieldProperty,
+            Field targetField, String suffix) throws JSONException {
+        JSONObject entry = new JSONObject();
+        entry.put("type", type);
+        entry.put("selectorFieldProperty", selectorFieldProperty);
+        entry.put("targetColumnName", targetField.getColumn().getDBColumnName());
+        entry.put("targetHqlName", getHqlName(targetField));
+        entry.put("suffix", suffix);
+        return entry;
     }
 
-    /**
-     * Appends a value to a StringBuilder, adding a comma separator if the
-     * StringBuilder is not empty.
-     *
-     * @param sb    The StringBuilder to append to.
-     * @param value The value to append.
-     */
-    private static void appendWithComma(StringBuilder sb, String value) {
-        if (sb.length() > 0) {
-            sb.append(",");
-        }
-        sb.append(value);
-    }
-
-    /**
-     * Helper class to group selector property builders.
-     * Encapsulates the StringBuilders used to accumulate selected, derived, and
-     * extra properties.
-     */
-    private static class SelectorPropertiesBuilder {
-        final StringBuilder selectedProperties;
-        final StringBuilder derivedProperties;
-        final StringBuilder extraProperties;
-
-        SelectorPropertiesBuilder(StringBuilder selectedProperties, StringBuilder derivedProperties,
-                StringBuilder extraProperties) {
-            this.selectedProperties = selectedProperties;
-            this.derivedProperties = derivedProperties;
-            this.extraProperties = extraProperties;
-        }
+    private static JSONObject buildCalloutInputEntry(String selectorFieldProperty, String suffix)
+            throws JSONException {
+        JSONObject entry = new JSONObject();
+        entry.put("type", "calloutInput");
+        entry.put("selectorFieldProperty", selectorFieldProperty);
+        entry.put("targetColumnName", (Object) null);
+        entry.put("targetHqlName", (Object) null);
+        entry.put("suffix", suffix);
+        return entry;
     }
 
     /**
@@ -679,46 +659,6 @@ public abstract class FieldBuilder extends Builder {
     }
 
     /**
-     * Resolves the reference ID for a selector field by checking, in order:
-     * the field's own reference, its column reference, and its datasource field reference.
-     *
-     * @param selectorField The selector field to resolve the reference ID for
-     * @return The reference ID string, or null if none is found
-     */
-    private static String resolveReferenceId(SelectorField selectorField) {
-        if (selectorField.getReference() != null) {
-            return selectorField.getReference().getId();
-        }
-        if (selectorField.getColumn() != null) {
-            return selectorField.getColumn().getReference().getId();
-        }
-        if (selectorField.getObserdsDatasourceField() != null
-                && selectorField.getObserdsDatasourceField().getReference() != null) {
-            return selectorField.getObserdsDatasourceField().getReference().getId();
-        }
-        return null;
-    }
-
-    /**
-     * Builds a grid column JSON object from a selector field.
-     *
-     * @param selectorField The selector field to build the column for
-     * @return JSONObject with the column metadata
-     * @throws JSONException if there's an error creating the JSON structure
-     */
-    private static JSONObject buildGridColumn(SelectorField selectorField) throws JSONException {
-        JSONObject column = new JSONObject();
-        column.put("id", selectorField.getId());
-        column.put("header", selectorField.get(SelectorField.PROPERTY_NAME, OBContext.getOBContext().getLanguage()));
-        column.put("accessorKey", getPropertyOrDataSourceField(selectorField));
-        column.put("enableSorting", selectorField.isSortable());
-        column.put("enableFiltering", selectorField.isFilterable());
-        column.put("referenceId", resolveReferenceId(selectorField));
-        column.put("sortNo", selectorField.getSortno());
-        return column;
-    }
-
-    /**
      * Generates the input name for a database column.
      * Used for form input field naming in the UI.
      *
@@ -777,6 +717,7 @@ public abstract class FieldBuilder extends Builder {
             addAccessProperties(fieldAccess);
             addHqlName(field);
             addDisplayLogic(field);
+            addGridDisplayLogic(field);
             addIsAuditField(field);
             addFieldGroupCollapsed(field);
         } catch (Exception e) {
@@ -820,9 +761,12 @@ public abstract class FieldBuilder extends Builder {
     }
 
     /**
-     * Adds the fieldGroupCollapsed property to the field JSON when the field belongs
-     * to a FieldGroup. Reflects the FieldGroup's isCollapsed configuration so the
-     * frontend can initialize the section's expanded/collapsed state correctly.
+     * Adds the fieldGroupCollapsed and fieldGroupName properties to the field JSON
+     * when the field belongs to a FieldGroup. fieldGroupCollapsed reflects the
+     * FieldGroup's isCollapsed configuration so the frontend can initialize the
+     * section's expanded/collapsed state correctly. fieldGroupName is the translated
+     * name of the FieldGroup in the user's current language, falling back to the base
+     * name when no translation exists.
      *
      * @param field The field being processed
      * @throws JSONException if an error occurs while adding the property
@@ -831,7 +775,18 @@ public abstract class FieldBuilder extends Builder {
         org.openbravo.model.ad.ui.FieldGroup fg = field.getFieldGroup();
         if (fg != null) {
             json.put("fieldGroupCollapsed", Boolean.TRUE.equals(fg.isCollapsed()));
+            json.put("fieldGroupName", getTranslatedFieldGroupName(fg));
         }
+    }
+
+    private String getTranslatedFieldGroupName(org.openbravo.model.ad.ui.FieldGroup fg) {
+        String langId = lang.getId();
+        for (org.openbravo.model.ad.ui.FieldGroupTrl trl : fg.getADFieldGroupTrlList()) {
+            if (langId.equals(trl.getLanguage().getId())) {
+                return trl.getName();
+            }
+        }
+        return fg.getName();
     }
 
     /**
@@ -893,6 +848,26 @@ public abstract class FieldBuilder extends Builder {
         if (displayLogic != null && !displayLogic.isBlank()) {
             DynamicExpressionParser parser = new DynamicExpressionParser(displayLogic, field.getTab(), field);
             json.put("displayLogicExpression", parser.getJSExpression());
+        }
+    }
+
+    /**
+     * Adds the grid display logic expression to the field JSON if configured.
+     * Mirrors {@link #addDisplayLogic} but operates on the field's
+     * {@code displaylogicgrid} column, which classic UI feeds through the same
+     * {@link DynamicExpressionParser} so placeholders like
+     * {@code @ACCT_DIMENSION_DISPLAY@} are rewritten per field. Without this the
+     * client receives the raw placeholder and cannot evaluate it.
+     *
+     * @param field The field that may have a grid display logic configured
+     * @throws JSONException if there's an error updating the JSON structure
+     */
+    private void addGridDisplayLogic(Field field) throws JSONException {
+        String gridDisplayLogic = field.getDisplaylogicgrid();
+
+        if (gridDisplayLogic != null && !gridDisplayLogic.isBlank()) {
+            DynamicExpressionParser parser = new DynamicExpressionParser(gridDisplayLogic, field.getTab(), field);
+            json.put("gridDisplayLogicExpression", parser.getJSExpression());
         }
     }
 }

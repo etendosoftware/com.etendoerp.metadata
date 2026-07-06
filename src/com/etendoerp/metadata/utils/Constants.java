@@ -50,6 +50,12 @@ public class Constants {
     public static final String TREE_DATASOURCE = "90034CAE96E847D78FBEF6D38CB1930D";
     public static final String DATASOURCE_PROPERTY = "datasourceName";
     public static final String SELECTOR_DEFINITION_PROPERTY = "_selectorDefinitionId";
+    /**
+     * Selector JSON key carrying the Classic info-window URL (e.g. {@code /info/Product.html})
+     * for a Search reference. When present, the new UI opens that page inside an iframe popup
+     * (legacy delegation) instead of the native React selector modal.
+     */
+    public static final String LEGACY_SEARCH_URL = "legacySearchUrl";
     public static final String FIELD_ID_PROPERTY = "fieldId";
     public static final String DISPLAY_FIELD_PROPERTY = "displayField";
     public static final String VALUE_FIELD_PROPERTY = "valueField";
@@ -70,6 +76,13 @@ public class Constants {
             TABLE_REFERENCE_ID, TABLE_DIR_REFERENCE_ID,
             SEARCH_REFERENCE_ID, SELECTOR_REFERENCE_ID, TREE_REFERENCE_ID));
     public static final String WINDOW_REFERENCE_ID = "FF80818132D8F0F30132D9BC395D0038";
+    /**
+     * OBUISEL_Multi Selector Reference base id. Process Definition parameters
+     * carrying this reference render as multi-record pickers in the new UI and
+     * must include the same `selector` JSON block as standard selectors so the
+     * client can resolve datasource + grid columns.
+     */
+    public static final String MULTI_SELECTOR_REFERENCE_ID = "87E6CFF8F71548AFA33F181C317970B5";
     public static final String FORM_CLOSE_TAG = "</FORM>";
     public static final String FRAMESET_CLOSE_TAG = "</FRAMESET>";
     public static final String HEAD_CLOSE_TAG = "</HEAD>";
@@ -79,6 +92,13 @@ public class Constants {
     public static final String PUT = "PUT";
     public static final String PATCH = "PATCH";
     public static final String DELETE = "DELETE";
+    public static final String HEAD = "HEAD";
+
+    // HTTP caching headers
+    public static final String ETAG_HEADER = "ETag";
+    public static final String CACHE_CONTROL_HEADER = "Cache-Control";
+    public static final String IF_NONE_MATCH_HEADER = "If-None-Match";
+    public static final String CACHE_CONTROL_PRIVATE_MUST_REVALIDATE = "private, must-revalidate";
     public static final String LOCATION_PATH = "/location/";
     public static final String EMAIL_PATH = "/email";
     public static final String EMAIL_SEND_PATH = "/email/send";
@@ -95,7 +115,7 @@ public class Constants {
     public static final String DASHBOARD_PATH = "/dashboard/";
     public static final String WIDGET_DATA_PATH = "/widget/";
     public static final String WIDGET_CLASSES_PATH = "/widget/classes";
-    public static final String FAVORITES_PATH = "/favorites/";
+    public static final String FAVORITES_PATH = "/favorites";
 
     // Audit Fields
     public static final String CREATION_DATE = "creationDate";
@@ -112,4 +132,29 @@ public class Constants {
     // Color
     public static final String COLOR_REFERENCE_ID = "27";
     public static final String COLOR_FIELD_NAME = "colorFieldName";
+
+    // Window types
+    public static final String JSON_WINDOW_TYPE_KEY = "windowType";
+    // === Legacy process action JSON keys ===
+    //
+    // Keys used to serialize {@link com.etendoerp.metadata.builders.LegacyProcessParams}
+    // into the JSON payload that {@code ProcessActionBuilder} attaches to the
+    // {@code processAction} field of every legacy-iframe button. These values must
+    // remain stable; the client reads them in
+    // {@code client/packages/MainUI/utils/processes/manual/utils.ts:tryResolveFromApi}.
+
+    /** Classic HTML page URL (e.g. {@code /SalesOrder/Header_Edition.html}). */
+    public static final String LEGACY_URL = "url";
+    /** WAD {@code Command} parameter value (e.g. {@code BUTTONDocAction104} or {@code DEFAULT}). */
+    public static final String LEGACY_COMMAND = "command";
+    /** DB name of the tab's primary-key column, sent as {@code keyColumnName} query param. */
+    public static final String LEGACY_KEY_COLUMN_NAME = "keyColumnName";
+    /** DB name of the tab's primary-key column, sent as {@code inpkeyColumnId} query param. */
+    public static final String LEGACY_INP_KEY_COLUMN_ID = "inpkeyColumnId";
+    /**
+     * Snapshot of {@code inp*} column-name placeholders. Each entry follows
+     * {@code "inp<camelCaseColumn>" → "$record.<jpaProperty>[!coercion]"}; the client
+     * resolves the {@code $record.*} placeholders at button-click time.
+     */
+    public static final String LEGACY_ADDITIONAL_PARAMETERS = "additionalParameters";
 }

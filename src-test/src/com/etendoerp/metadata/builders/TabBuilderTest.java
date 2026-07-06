@@ -23,7 +23,6 @@ import static org.mockito.Mockito.*;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.function.Consumer;
 
 import org.apache.commons.lang3.StringUtils;
 import org.codehaus.jettison.json.JSONArray;
@@ -40,14 +39,12 @@ import org.openbravo.client.kernel.KernelUtils;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.model.ad.access.FieldAccess;
 import org.openbravo.model.ad.access.TabAccess;
-import org.openbravo.service.json.DataToJsonConverter;
 import org.openbravo.model.ad.datamodel.Column;
 import org.openbravo.model.ad.datamodel.Table;
 import org.openbravo.model.ad.system.Language;
-import org.openbravo.model.ad.ui.Field;
 import org.openbravo.model.ad.ui.Tab;
+import org.openbravo.model.ad.utility.TableTree;
 import org.openbravo.dal.security.EntityAccessChecker;
-import org.openbravo.base.model.Entity;
 import com.etendoerp.metadata.data.TabProcessor;
 import com.etendoerp.metadata.exceptions.InternalServerException;
 
@@ -55,19 +52,7 @@ import com.etendoerp.metadata.exceptions.InternalServerException;
  * Unit tests for TabBuilder
  */
 @ExtendWith(MockitoExtension.class)
-class TabBuilderTest {
-
-    // Column IDs and DB names
-    private static final String CREATED_ID = "Created";
-    private static final String CREATED_BY_ID = "CreatedBy";
-    private static final String UPDATED_ID = "Updated";
-    private static final String UPDATED_BY_ID = "UpdatedBy";
-
-    // Column display names
-    private static final String CREATION_DATE_NAME = "Creation Date";
-    private static final String CREATED_BY_NAME = "Created By";
-    private static final String UPDATED_NAME = "Updated";
-    private static final String UPDATED_BY_NAME = "Updated By";
+class TabBuilderTest extends TabBuilderTestBase {
 
     // Field names (HQL property names)
     private static final String CREATION_DATE_FIELD = "creationDate";
@@ -90,13 +75,18 @@ class TabBuilderTest {
     private static final String READ_ONLY_KEY = "readOnly";
     private static final String RO_PATTERN = "RO";
     private static final String PARENT_COLUMN_KEY = "parentColumns";
+    private static final String OBUIAPP_CAN_ADD_KEY = "obuiappCanAdd";
+    private static final String FIELD1_KEY = "field1";
 
     // Test data
-    private static final String TEST_TABLE_NAME = "TestTable";
-    private static final String TEST_DESCRIPTION = "Test description";
-    private static final String TEST_HELP = "Test help";
     private static final String AD_USER_ENTITY = "ADUser";
     private static final String CUSTOM_CREATION_DATE_NAME = "Custom Creation Date";
+    private static final String OBUIAPP_CAN_ADD_MISSING = "obuiappCanAdd should be present in JSON";
+    private static final String HAS_TREE_KEY = "hasTree";
+    private static final String TABLE_TREE_ID_KEY = "tableTreeId";
+    private static final String TREE_STRUCTURE_KEY = "treeStructure";
+    private static final String HQL_WHERE_KEY = "hqlWhereClauseForRootNodes";
+    private static final String HAS_TREE_SHOULD_BE_TRUE = "hasTree should be true";
 
     /**
      * Tests that audit fields are automatically added to the fields JSON
@@ -396,7 +386,7 @@ class TabBuilderTest {
             try {
                 assertEquals(filterClause, result.getString("filter"));
                 assertEquals(displayLogic, result.getString("displayLogic"));
-                assertEquals(TEST_TABLE_NAME, result.getString("entityName"));
+                assertEquals(TEST_TABLE_NAME, result.getString(ENTITY_NAME_KEY));
             } catch (JSONException e) {
                 fail(JSON_EXCEPTION + ": " + e.getMessage());
             }
@@ -436,7 +426,7 @@ class TabBuilderTest {
         when(ctx.tab.getDisplayLogic()).thenReturn(displayLogic);
 
         try (MockedConstruction<DynamicExpressionParser> mockedParser = mockConstruction(DynamicExpressionParser.class,
-                (mock, context) -> 
+                (mock, context) ->
                     when(mock.getJSExpression()).thenReturn(parsedExpression)
                 )) {
 
@@ -461,11 +451,11 @@ class TabBuilderTest {
         when(ctx.tab.getDisplayLogic()).thenReturn(displayLogic);
 
         try (MockedConstruction<DynamicExpressionParser> mockedParser = mockConstruction(DynamicExpressionParser.class,
-                (mock, context) -> 
+                (mock, context) ->
                     when(mock.getJSExpression()).thenThrow(new RuntimeException("Parse error"))
                 )) {
 
-            executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), result -> 
+            executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), result ->
                 assertFalse(result.has("displayLogicExpression"))
             );
         }
@@ -562,164 +552,231 @@ class TabBuilderTest {
         setupBasicMocks(ctx.context, ctx.language, ctx.tab, ctx.table, ctx.kernelUtils, List.of());
 
         JSONObject fieldsFromAccess = new JSONObject();
-        fieldsFromAccess.put("field1", new JSONObject());
+        fieldsFromAccess.put(FIELD1_KEY, new JSONObject());
 
         executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, fieldsFromAccess, false, mockTabAccess,
                 result -> {
                     try {
-                        assertTrue(result.getJSONObject(FIELDS_KEY).has("field1"));
+                        assertTrue(result.getJSONObject(FIELDS_KEY).has(FIELD1_KEY));
                     } catch (JSONException e) {
                         fail(JSON_EXCEPTION + ": " + e.getMessage());
                     }
                 });
     }
 
-    // Helper methods
+    /**
+     * Tests that the 4-arg constructor uses the pre-loaded field access list instead of lazily
+     * calling {@code tabAccess.getADFieldAccessList()}, as used by {@link WindowBuilder} to
+     * batch-load field access data for a whole window in a single query.
+     */
+    @Test
+    void getFieldsUsesPreloadedFieldAccessListWhenPresent() throws Exception {
+        TestContext ctx = setupTestContext();
+        TabAccess mockTabAccess = mock(TabAccess.class);
+        FieldAccess mockFieldAccess = mock(FieldAccess.class);
+
+        setupBasicMocks(ctx.context, ctx.language, ctx.tab, ctx.table, ctx.kernelUtils, List.of());
+
+        JSONObject fieldsFromAccess = new JSONObject();
+        fieldsFromAccess.put(FIELD1_KEY, new JSONObject());
+
+        executeTabBuilderTestWithPreloadedFieldAccess(ctx.context, ctx.kernelUtils, ctx.tab, fieldsFromAccess,
+                mockTabAccess, List.of(mockFieldAccess),
+                result -> {
+                    try {
+                        assertTrue(result.getJSONObject(FIELDS_KEY).has(FIELD1_KEY));
+                    } catch (JSONException e) {
+                        fail(JSON_EXCEPTION + ": " + e.getMessage());
+                    }
+                });
+    }
 
     /**
-     * Executes a TabBuilder test with common mock setup
+     * Tests that hasTree and all tree-related properties are included in the JSON
+     * when the tab has isTreeIncluded = true and a full TableTree configuration.
      */
-    private void executeTabBuilderTest(OBContext mockContext, KernelUtils mockKernelUtils,
-            Tab mockTab, JSONObject tabFields,
-            Consumer<JSONObject> assertions) {
-        executeTabBuilderTest(mockContext, mockKernelUtils, mockTab, tabFields, false, null, null, assertions);
-    }
+    @Test
+    void toJSONIncludesFullTreePropertiesWhenHasTreeIsTrue() throws Exception {
+        TestContext ctx = setupTestContext();
+        TableTree mockTableTree = mock(TableTree.class);
+        String treeId = "tree-001";
+        String treeStructure = "LP";
+        String hqlWhere = "it.parent is null";
+        String tableId = "table-001";
 
-    private void executeTabBuilderTest(OBContext mockContext, KernelUtils mockKernelUtils,
-            Tab mockTab, JSONObject tabFields,
-            boolean isWindowReadOnly, TabAccess tabAccess,
-            Consumer<JSONObject> assertions) {
-        executeTabBuilderTest(mockContext, mockKernelUtils, mockTab, tabFields, isWindowReadOnly, tabAccess, null,
-                assertions);
-    }
+        setupBasicMocks(ctx.context, ctx.language, ctx.tab, ctx.table, ctx.kernelUtils, List.of());
+        when(ctx.table.getId()).thenReturn(tableId);
+        when(ctx.tab.isTreeIncluded()).thenReturn(true);
+        when(ctx.tab.getTableTree()).thenReturn(mockTableTree);
+        when(ctx.tab.isReadOnlyTree()).thenReturn(false);
+        when(ctx.tab.isShowTreeNodeIcons()).thenReturn(true);
+        when(ctx.tab.getHQLWhereClauseForRootNodes()).thenReturn(hqlWhere);
+        when(mockTableTree.getId()).thenReturn(treeId);
+        when(mockTableTree.getTreeStructure()).thenReturn(treeStructure);
 
-    @SuppressWarnings("java:S107")
-    private void executeTabBuilderTest(OBContext mockContext, KernelUtils mockKernelUtils,
-            Tab mockTab, JSONObject tabFields,
-            boolean isWindowReadOnly, TabAccess tabAccess,
-            Consumer<MockedStatic<TabProcessor>> extraMocking,
-            Consumer<JSONObject> assertions) {
-        try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
-                MockedStatic<KernelUtils> mockedKernelUtils = mockStatic(KernelUtils.class);
-                MockedStatic<TabProcessor> mockedTabProcessor = mockStatic(TabProcessor.class);
-                MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class,
-                        (mock, context) -> {
-                            JSONObject tabJson = new JSONObject();
-                            tabJson.put("entityName", TEST_TABLE_NAME);
-                            when(mock.toJsonObject(any(), any())).thenReturn(tabJson);
-                        })) {
-
-            mockedOBContext.when(OBContext::getOBContext).thenReturn(mockContext);
-            mockedKernelUtils.when(KernelUtils::getInstance).thenReturn(mockKernelUtils);
-
-            // Mock both because getFields() might fall back to tab if access is empty
-            mockedTabProcessor.when(() -> TabProcessor.getTabFields(any(Tab.class))).thenReturn(tabFields);
-            mockedTabProcessor.when(() -> TabProcessor.getTabFields(any(TabAccess.class))).thenReturn(tabFields);
-
-            if (extraMocking != null) {
-                extraMocking.accept(mockedTabProcessor);
+        executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), result -> {
+            try {
+                assertTrue(result.getBoolean(HAS_TREE_KEY), HAS_TREE_SHOULD_BE_TRUE);
+                assertEquals(tableId, result.getString("tableId"), "tableId should be set");
+                assertEquals(treeId, result.getString(TABLE_TREE_ID_KEY), "tableTreeId should be set");
+                assertEquals(treeStructure, result.getString(TREE_STRUCTURE_KEY), "treeStructure should be set");
+                assertFalse(result.getBoolean("isReadOnlyTree"), "isReadOnlyTree should be false");
+                assertTrue(result.getBoolean("showTreeNodeIcons"), "showTreeNodeIcons should be true");
+                assertEquals(hqlWhere, result.getString(HQL_WHERE_KEY),
+                        "hqlWhereClauseForRootNodes should be set");
+            } catch (JSONException e) {
+                fail(JSON_EXCEPTION + ": " + e.getMessage());
             }
-
-            TabBuilder tabBuilder = new TabBuilder(mockTab, tabAccess, isWindowReadOnly);
-            JSONObject result = tabBuilder.toJSON();
-
-            assertions.accept(result);
-        } catch (Exception e) {
-            String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getName();
-            fail("Unexpected exception: " + msg);
-        }
-    }
-
-    private TestContext setupTestContext() {
-        OBContext mockContext = mock(OBContext.class);
-        return new TestContext(mockContext, mock(Language.class), mock(Tab.class), mock(Table.class),
-                mock(KernelUtils.class));
-    }
-
-    private Column createMockColumn(String id, String dbName, String name) {
-        Column column = mock(Column.class);
-        when(column.getId()).thenReturn(id);
-        when(column.getDBColumnName()).thenReturn(dbName);
-        when(column.getName()).thenReturn(name);
-        when(column.getDescription()).thenReturn(TEST_DESCRIPTION);
-        when(column.getHelpComment()).thenReturn(TEST_HELP);
-        when(column.isMandatory()).thenReturn(true);
-        when(column.getIdentifier()).thenReturn(name);
-        return column;
-    }
-
-    private Column createMockColumnLenient(String id, String dbName, String name) {
-        Column column = mock(Column.class);
-        lenient().when(column.getId()).thenReturn(id);
-        lenient().when(column.getDBColumnName()).thenReturn(dbName);
-        lenient().when(column.getName()).thenReturn(name);
-        lenient().when(column.getDescription()).thenReturn(TEST_DESCRIPTION);
-        lenient().when(column.getHelpComment()).thenReturn(TEST_HELP);
-        lenient().when(column.isMandatory()).thenReturn(true);
-        lenient().when(column.getIdentifier()).thenReturn(name);
-        return column;
-    }
-
-    private List<Column> createAllAuditColumns() {
-        return List.of(
-                createMockColumn(CREATED_ID, CREATED_ID, CREATION_DATE_NAME),
-                createMockColumn(CREATED_BY_ID, CREATED_BY_ID, CREATED_BY_NAME),
-                createMockColumn(UPDATED_ID, UPDATED_ID, UPDATED_NAME),
-                createMockColumn(UPDATED_BY_ID, UPDATED_BY_ID, UPDATED_BY_NAME));
-    }
-
-    private List<Column> createAllAuditColumnsLenient() {
-        return List.of(
-                createMockColumnLenient(CREATED_ID, CREATED_ID, CREATION_DATE_NAME),
-                createMockColumnLenient(CREATED_BY_ID, CREATED_BY_ID, CREATED_BY_NAME),
-                createMockColumnLenient(UPDATED_ID, UPDATED_ID, UPDATED_NAME),
-                createMockColumnLenient(UPDATED_BY_ID, UPDATED_BY_ID, UPDATED_BY_NAME));
-    }
-
-    private void setupBasicMocks(OBContext mockContext, Language mockLanguage, Tab mockTab,
-            Table mockTable, KernelUtils mockKernelUtils, List<Column> columns) {
-        Entity mockEntity = mock(Entity.class);
-        lenient().when(mockTab.getEntity()).thenReturn(mockEntity);
-        lenient().when(mockTab.getIdentifier()).thenReturn("MockTabIdentifier");
-        lenient().when(mockTab.getId()).thenReturn("MockTabId");
-        when(mockContext.getLanguage()).thenReturn(mockLanguage);
-        when(mockTab.getFilterClause()).thenReturn("");
-        when(mockTab.getDisplayLogic()).thenReturn("");
-        when(mockTab.getTable()).thenReturn(mockTable);
-        when(mockTable.getName()).thenReturn(TEST_TABLE_NAME);
-        when(mockTable.getADColumnList()).thenReturn(columns);
-        when(mockTab.getTabLevel()).thenReturn(0L);
-        when(mockKernelUtils.getParentTab(mockTab)).thenReturn(null);
-    }
-
-    private void setupBasicMocksLenient(OBContext mockContext, Language mockLanguage, Tab mockTab,
-            Table mockTable, KernelUtils mockKernelUtils, List<Column> columns) {
-        lenient().when(mockContext.getLanguage()).thenReturn(mockLanguage);
-        lenient().when(mockTab.getFilterClause()).thenReturn("");
-        lenient().when(mockTab.getDisplayLogic()).thenReturn("");
-        lenient().when(mockTab.getTable()).thenReturn(mockTable);
-        lenient().when(mockTable.getName()).thenReturn(TEST_TABLE_NAME);
-        lenient().when(mockTable.getADColumnList()).thenReturn(columns);
-        lenient().when(mockTab.getTabLevel()).thenReturn(0L);
-        lenient().when(mockKernelUtils.getParentTab(mockTab)).thenReturn(null);
+        });
     }
 
     /**
-     * Context holder for test mocks
+     * Tests that {@code obuiappCanAdd} is emitted as {@code true} when the underlying
+     * {@link Tab#isObuiappCanAdd()} returns {@code Boolean.TRUE}. Mirrors the classic
+     * UI rule in {@code OBViewTab#isAllowAdd()} — the property gates the inline
+     * "Add row" toolbar button in P&E grids rendered inside Process Definition modals.
+     *
+     * @throws Exception when mock setup fails
      */
-    private static class TestContext {
-        final OBContext context;
-        final Language language;
-        final Tab tab;
-        final Table table;
-        final KernelUtils kernelUtils;
+    @Test
+    void toJSONEmitsObuiappCanAddTrueWhenIsObuiappCanAddIsTrue() throws Exception {
+        TestContext ctx = setupTestContext();
+        setupBasicMocks(ctx.context, ctx.language, ctx.tab, ctx.table, ctx.kernelUtils, List.of());
+        when(ctx.tab.isObuiappCanAdd()).thenReturn(Boolean.TRUE);
 
-        TestContext(OBContext context, Language language, Tab tab, Table table, KernelUtils kernelUtils) {
-            this.context = context;
-            this.language = language;
-            this.tab = tab;
-            this.table = table;
-            this.kernelUtils = kernelUtils;
-        }
+        executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), result -> {
+            try {
+                assertTrue(result.has(OBUIAPP_CAN_ADD_KEY), OBUIAPP_CAN_ADD_MISSING);
+                assertTrue(result.getBoolean(OBUIAPP_CAN_ADD_KEY),
+                        "obuiappCanAdd should be true when Tab.isObuiappCanAdd() returns TRUE");
+            } catch (JSONException e) {
+                fail(JSON_EXCEPTION + ": " + e.getMessage());
+            }
+        });
+    }
+
+    /**
+     * Tests that tree properties are omitted when isTreeIncluded is false.
+     */
+    @Test
+    void toJSONOmitsTreePropertiesWhenHasTreeIsFalse() throws Exception {
+        TestContext ctx = setupTestContext();
+        setupBasicMocks(ctx.context, ctx.language, ctx.tab, ctx.table, ctx.kernelUtils, List.of());
+        when(ctx.tab.isTreeIncluded()).thenReturn(false);
+
+        executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), result -> {
+            assertFalse(result.has(HAS_TREE_KEY), "hasTree should be absent");
+            assertFalse(result.has(TABLE_TREE_ID_KEY), "tableTreeId should be absent");
+            assertFalse(result.has(TREE_STRUCTURE_KEY), "treeStructure should be absent");
+        });
+    }
+
+    /**
+     * Tests that hasTree is set but tree sub-fields are absent when tableTree is null.
+     */
+    @Test
+    void toJSONHandlesTreeWithNullTableTree() throws Exception {
+        TestContext ctx = setupTestContext();
+        String tableId = "table-002";
+
+        setupBasicMocks(ctx.context, ctx.language, ctx.tab, ctx.table, ctx.kernelUtils, List.of());
+        when(ctx.table.getId()).thenReturn(tableId);
+        when(ctx.tab.isTreeIncluded()).thenReturn(true);
+        when(ctx.tab.getTableTree()).thenReturn(null);
+        when(ctx.tab.isReadOnlyTree()).thenReturn(true);
+        when(ctx.tab.isShowTreeNodeIcons()).thenReturn(false);
+        when(ctx.tab.getHQLWhereClauseForRootNodes()).thenReturn(null);
+
+        executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), result -> {
+            try {
+                assertTrue(result.getBoolean(HAS_TREE_KEY), HAS_TREE_SHOULD_BE_TRUE);
+                assertEquals(tableId, result.getString("tableId"), "tableId should be set");
+                assertFalse(result.has(TABLE_TREE_ID_KEY), "tableTreeId should be absent when tableTree is null");
+                assertFalse(result.has(TREE_STRUCTURE_KEY), "treeStructure should be absent when tableTree is null");
+                assertFalse(result.has(HQL_WHERE_KEY),
+                        "hqlWhereClauseForRootNodes should be absent when null");
+            } catch (JSONException e) {
+                fail(JSON_EXCEPTION + ": " + e.getMessage());
+            }
+        });
+    }
+
+    /**
+     * Tests that {@code obuiappCanAdd} is emitted as {@code false} when
+     * {@link Tab#isObuiappCanAdd()} returns {@code Boolean.FALSE}.
+     *
+     * @throws Exception when mock setup fails
+     */
+    @Test
+    void toJSONEmitsObuiappCanAddFalseWhenIsObuiappCanAddIsFalse() throws Exception {
+        TestContext ctx = setupTestContext();
+        setupBasicMocks(ctx.context, ctx.language, ctx.tab, ctx.table, ctx.kernelUtils, List.of());
+        when(ctx.tab.isObuiappCanAdd()).thenReturn(Boolean.FALSE);
+
+        executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), result -> {
+            try {
+                assertTrue(result.has(OBUIAPP_CAN_ADD_KEY), OBUIAPP_CAN_ADD_MISSING);
+                assertFalse(result.getBoolean(OBUIAPP_CAN_ADD_KEY),
+                        "obuiappCanAdd should be false when Tab.isObuiappCanAdd() returns FALSE");
+            } catch (JSONException e) {
+                fail(JSON_EXCEPTION + ": " + e.getMessage());
+            }
+        });
+    }
+
+    /**
+     * Tests that treeStructure is omitted when tableTree exists but getTreeStructure() returns null.
+     */
+    @Test
+    void toJSONHandlesTreeWithNullTreeStructure() throws Exception {
+        TestContext ctx = setupTestContext();
+        TableTree mockTableTree = mock(TableTree.class);
+        String treeId = "tree-003";
+
+        setupBasicMocks(ctx.context, ctx.language, ctx.tab, ctx.table, ctx.kernelUtils, List.of());
+        lenient().when(ctx.table.getId()).thenReturn("table-003");
+        when(ctx.tab.isTreeIncluded()).thenReturn(true);
+        when(ctx.tab.getTableTree()).thenReturn(mockTableTree);
+        when(ctx.tab.isReadOnlyTree()).thenReturn(false);
+        when(ctx.tab.isShowTreeNodeIcons()).thenReturn(false);
+        when(ctx.tab.getHQLWhereClauseForRootNodes()).thenReturn("");
+        when(mockTableTree.getId()).thenReturn(treeId);
+        when(mockTableTree.getTreeStructure()).thenReturn(null);
+
+        executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), result -> {
+            try {
+                assertTrue(result.getBoolean(HAS_TREE_KEY), HAS_TREE_SHOULD_BE_TRUE);
+                assertEquals(treeId, result.getString(TABLE_TREE_ID_KEY), "tableTreeId should be set");
+                assertFalse(result.has(TREE_STRUCTURE_KEY), "treeStructure should be absent when null");
+                assertFalse(result.has(HQL_WHERE_KEY),
+                        "hqlWhereClauseForRootNodes should be absent when blank");
+            } catch (JSONException e) {
+                fail(JSON_EXCEPTION + ": " + e.getMessage());
+            }
+        });
+    }
+
+    /**
+     * Tests that {@code obuiappCanAdd} is emitted as {@code false} when
+     * {@link Tab#isObuiappCanAdd()} returns {@code null}. We always emit the
+     * property so the client can rely on a strict {@code === true} check.
+     *
+     * @throws Exception when mock setup fails
+     */
+    @Test
+    void toJSONEmitsObuiappCanAddFalseWhenIsObuiappCanAddIsNull() throws Exception {
+        TestContext ctx = setupTestContext();
+        setupBasicMocks(ctx.context, ctx.language, ctx.tab, ctx.table, ctx.kernelUtils, List.of());
+        when(ctx.tab.isObuiappCanAdd()).thenReturn(null);
+
+        executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), result -> {
+            try {
+                assertTrue(result.has(OBUIAPP_CAN_ADD_KEY), OBUIAPP_CAN_ADD_MISSING);
+                assertFalse(result.getBoolean(OBUIAPP_CAN_ADD_KEY),
+                        "obuiappCanAdd should be false when Tab.isObuiappCanAdd() returns null");
+            } catch (JSONException e) {
+                fail(JSON_EXCEPTION + ": " + e.getMessage());
+            }
+        });
     }
 }

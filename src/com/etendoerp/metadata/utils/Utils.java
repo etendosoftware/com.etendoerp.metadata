@@ -116,10 +116,10 @@ public class Utils {
     }
 
     /**
-     * Gets the referenced tab for a given property.
+     * Gets the referenced tab for a given property, filtering to active tabs only.
      *
      * @param referenced the property that references another entity
-     * @return the tab associated with the referenced entity, or null if not found
+     * @return the active tab associated with the referenced entity, or null if not found
      */
     public static Tab getReferencedTab(Property referenced) {
         OBDal dal = OBDal.getReadOnlyInstance();
@@ -128,6 +128,24 @@ public class Utils {
 
         return (Tab) dal.createCriteria(Tab.class).add(Restrictions.eq(Tab.PROPERTY_TABLE, table)).add(
                 Restrictions.eq(Tab.PROPERTY_ACTIVE, true)).setMaxResults(1).uniqueResult();
+    }
+
+    /**
+     * Gets the first Tab associated with the referenced entity's table, without filtering
+     * by active status. Mirrors the behavior of the original addReferencedProperty lookup.
+     *
+     * @param referenced the property that references another entity
+     * @return the first tab (active or inactive) for the referenced entity, or null if not found
+     */
+    public static Tab getAnyReferencedTab(Property referenced) {
+        OBDal dal = OBDal.getReadOnlyInstance();
+        String tableId = referenced.getEntity().getTableId();
+        Table table = dal.get(Table.class, tableId);
+        if (table == null) {
+            return null;
+        }
+        return (Tab) dal.createCriteria(Tab.class).add(Restrictions.eq(Tab.PROPERTY_TABLE, table))
+                .setMaxResults(1).uniqueResult();
     }
 
     /**

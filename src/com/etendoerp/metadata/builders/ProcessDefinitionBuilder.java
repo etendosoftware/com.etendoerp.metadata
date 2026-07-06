@@ -21,12 +21,32 @@ import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.client.application.Parameter;
 import org.openbravo.client.application.Process;
+import org.openbravo.client.application.ReportDefinition;
 import org.openbravo.service.json.DataResolvingMode;
+
+import java.util.List;
 
 /**
  * Builds a JSON representation of an OBUIAPP process definition and its parameters.
  */
 public class ProcessDefinitionBuilder extends Builder {
+    private static final String PARAMETERS = "parameters";
+    private static final String REPORT = "report";
+    /** Key auto-emitted by DataToJsonConverter from the ORM property name (legacy casing). */
+    private static final String ETMETA_ONLOAD_RAW = "eTMETAOnload";
+    /** Key the converter may emit for the custom-component flag with the legacy ETMETA casing. */
+    private static final String ETMETA_CUSTOM_COMPONENT_RAW = "eTMETACustomComponent";
+    /** Public, normalized key for the onLoad hook in the JSON response. */
+    private static final String ETMETA_ONLOAD = "etmetaOnload";
+    /** Public key for the onProcess hook in the JSON response. */
+    private static final String ETMETA_ONPROCESS = "etmetaOnprocess";
+    /** Public key for the onRefresh hook in the JSON response. */
+    private static final String ETMETA_ON_REFRESH = "etmetaOnRefresh";
+    /** Public key for the shared payscript module body in the JSON response. */
+    private static final String ETMETA_PAYSCRIPT_LOGIC = "etmetaPayscriptLogic";
+    /** Public, normalized key for the custom-component flag in the JSON response. */
+    private static final String ETMETA_CUSTOM_COMPONENT = "etmetaCustomComponent";
+
     private final Process process;
 
     /**
@@ -47,9 +67,25 @@ public class ProcessDefinitionBuilder extends Builder {
             parameters.put(param.getDBColumnName(), new ParameterBuilder(param).toJSON());
         }
 
-        processJSON.put("parameters", parameters);
-        processJSON.put("onLoad", process.getETMETAOnload());
-        processJSON.put("onProcess", process.getEtmetaOnprocess());
+        processJSON.put(PARAMETERS, parameters);
+        // Drop the converter's legacy-cased keys; the JS-hook columns are emitted
+        // explicitly below.
+        processJSON.remove(ETMETA_ONLOAD_RAW);
+        processJSON.remove(ETMETA_CUSTOM_COMPONENT_RAW);
+        // Emit the JS-hook columns directly from the entity so they are always present
+        // regardless of the role's derived-read access to OBUIAPP_Process: the converter
+        // skips non-derived-readable properties for business roles, which would otherwise
+        // strip these hooks from the payload.
+        putValueOrNull(processJSON, ETMETA_ONLOAD, process.getETMETAOnload());
+        putValueOrNull(processJSON, ETMETA_ONPROCESS, process.getEtmetaOnprocess());
+        putValueOrNull(processJSON, ETMETA_ON_REFRESH, process.getEtmetaOnRefresh());
+        putValueOrNull(processJSON, ETMETA_PAYSCRIPT_LOGIC, process.getEtmetaPayscriptLogic());
+        putValueOrNull(processJSON, ETMETA_CUSTOM_COMPONENT, process.isEtmetaCustomComponent());
+
+        List<ReportDefinition> reports = process.getOBUIAPPReportList();
+        if (!reports.isEmpty()) {
+            processJSON.put(REPORT, new ReportDefinitionBuilder(reports.get(0)).toJSON());
+        }
 
         return processJSON;
     }

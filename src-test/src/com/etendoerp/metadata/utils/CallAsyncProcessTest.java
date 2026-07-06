@@ -34,6 +34,7 @@ import java.lang.reflect.Field;
 import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -265,6 +266,8 @@ public class CallAsyncProcessTest extends OBBaseTest {
             doNothing().when(obDal).commitAndClose();
 
             when(process.getProcedure()).thenReturn("MY_PROC");
+            // No Java class → executeByType takes the PL/SQL branch.
+            when(process.getADModelImplementationList()).thenReturn(Collections.emptyList());
             when(pInstance.getId()).thenReturn(PINSTANCE_ID);
 
             obPropStatic.when(OBPropertiesProvider::getInstance).thenReturn(propsProvider);

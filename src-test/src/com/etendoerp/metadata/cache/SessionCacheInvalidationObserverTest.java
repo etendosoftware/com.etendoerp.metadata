@@ -1,0 +1,174 @@
+/*
+ *************************************************************************
+ * The contents of this file are subject to the Etendo License
+ * (the "License"), you may not use this file except in compliance with
+ * the License.
+ * You may obtain a copy of the License at
+ * https://github.com/etendosoftware/etendo_core/blob/main/legal/Etendo_license.txt
+ * Software distributed under the License is distributed on an
+ * "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
+ * implied. See the License for the specific language governing rights
+ * and limitations under the License.
+ * All portions are Copyright © 2021-2026 FUTIT SERVICES, S.L
+ * All Rights Reserved.
+ * Contributor(s): Futit Services S.L.
+ *************************************************************************
+ */
+package com.etendoerp.metadata.cache;
+
+import static com.etendoerp.metadata.cache.EntityPersistenceEventTestSupport.createDeleteEvent;
+import static com.etendoerp.metadata.cache.EntityPersistenceEventTestSupport.createNewEvent;
+import static com.etendoerp.metadata.cache.EntityPersistenceEventTestSupport.createUpdateEvent;
+import static com.etendoerp.metadata.cache.EntityPersistenceEventTestSupport.setupMocks;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.when;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.MockedStatic;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
+import org.openbravo.base.model.Entity;
+import org.openbravo.base.model.ModelProvider;
+import org.openbravo.client.kernel.event.EntityDeleteEvent;
+import org.openbravo.client.kernel.event.EntityNewEvent;
+import org.openbravo.client.kernel.event.EntityUpdateEvent;
+import org.openbravo.dal.core.TriggerHandler;
+
+import com.etendoerp.metadata.builders.SessionBuilder;
+
+/**
+ * Unit tests for {@link SessionCacheInvalidationObserver}.
+ * Verifies that entity persistence events on the role/organization/warehouse tree
+ * trigger the session roles cache invalidation.
+ */
+@MockitoSettings(strictness = Strictness.LENIENT)
+@ExtendWith(MockitoExtension.class)
+class SessionCacheInvalidationObserverTest {
+
+  private static final String[] OBSERVED_ENTITY_NAMES = {
+      "ADUserRoles", "ADRoleOrganization", "OrganizationWarehouse",
+      "ADRole", "Organization", "Warehouse", "ADClient"
+  };
+
+  @Test
+  void onNewInvalidatesRolesCacheForValidEvent() {
+    try (
+        MockedStatic<ModelProvider> modelProviderMock = mockStatic(ModelProvider.class);
+        MockedStatic<TriggerHandler> triggerMock = mockStatic(TriggerHandler.class);
+        MockedStatic<SessionBuilder> sessionBuilderMock = mockStatic(SessionBuilder.class)
+    ) {
+      setupMocks(modelProviderMock, triggerMock, OBSERVED_ENTITY_NAMES);
+
+      SessionCacheInvalidationObserver observer = new SessionCacheInvalidationObserver();
+      Entity observedEntity = observer.getObservedEntities()[0];
+
+      EntityNewEvent event = createNewEvent(observedEntity);
+      observer.onNew(event);
+
+      sessionBuilderMock.verify(SessionBuilder::clearRolesCache, times(1));
+    }
+  }
+
+  @Test
+  void onUpdateInvalidatesRolesCacheForValidEvent() {
+    try (
+        MockedStatic<ModelProvider> modelProviderMock = mockStatic(ModelProvider.class);
+        MockedStatic<TriggerHandler> triggerMock = mockStatic(TriggerHandler.class);
+        MockedStatic<SessionBuilder> sessionBuilderMock = mockStatic(SessionBuilder.class)
+    ) {
+      setupMocks(modelProviderMock, triggerMock, OBSERVED_ENTITY_NAMES);
+
+      SessionCacheInvalidationObserver observer = new SessionCacheInvalidationObserver();
+      Entity observedEntity = observer.getObservedEntities()[0];
+
+      EntityUpdateEvent event = createUpdateEvent(observedEntity);
+      observer.onUpdate(event);
+
+      sessionBuilderMock.verify(SessionBuilder::clearRolesCache, times(1));
+    }
+  }
+
+  @Test
+  void onDeleteInvalidatesRolesCacheForValidEvent() {
+    try (
+        MockedStatic<ModelProvider> modelProviderMock = mockStatic(ModelProvider.class);
+        MockedStatic<TriggerHandler> triggerMock = mockStatic(TriggerHandler.class);
+        MockedStatic<SessionBuilder> sessionBuilderMock = mockStatic(SessionBuilder.class)
+    ) {
+      setupMocks(modelProviderMock, triggerMock, OBSERVED_ENTITY_NAMES);
+
+      SessionCacheInvalidationObserver observer = new SessionCacheInvalidationObserver();
+      Entity observedEntity = observer.getObservedEntities()[0];
+
+      EntityDeleteEvent event = createDeleteEvent(observedEntity);
+      observer.onDelete(event);
+
+      sessionBuilderMock.verify(SessionBuilder::clearRolesCache, times(1));
+    }
+  }
+
+  @Test
+  void onNewDoesNotInvalidateWhenTriggersDisabled() {
+    try (
+        MockedStatic<ModelProvider> modelProviderMock = mockStatic(ModelProvider.class);
+        MockedStatic<TriggerHandler> triggerMock = mockStatic(TriggerHandler.class);
+        MockedStatic<SessionBuilder> sessionBuilderMock = mockStatic(SessionBuilder.class)
+    ) {
+      setupMocks(modelProviderMock, triggerMock, OBSERVED_ENTITY_NAMES);
+
+      TriggerHandler mockTriggerHandler = TriggerHandler.getInstance();
+      when(mockTriggerHandler.isDisabled()).thenReturn(true);
+
+      SessionCacheInvalidationObserver observer = new SessionCacheInvalidationObserver();
+      Entity observedEntity = observer.getObservedEntities()[0];
+
+      EntityNewEvent event = createNewEvent(observedEntity);
+      observer.onNew(event);
+
+      sessionBuilderMock.verify(SessionBuilder::clearRolesCache, never());
+    }
+  }
+
+  @Test
+  void onNewDoesNotInvalidateForUnobservedEntity() {
+    try (
+        MockedStatic<ModelProvider> modelProviderMock = mockStatic(ModelProvider.class);
+        MockedStatic<TriggerHandler> triggerMock = mockStatic(TriggerHandler.class);
+        MockedStatic<SessionBuilder> sessionBuilderMock = mockStatic(SessionBuilder.class)
+    ) {
+      setupMocks(modelProviderMock, triggerMock, OBSERVED_ENTITY_NAMES);
+
+      Entity unrelatedEntity = mock(Entity.class);
+
+      SessionCacheInvalidationObserver observer = new SessionCacheInvalidationObserver();
+
+      EntityNewEvent event = createNewEvent(unrelatedEntity);
+      observer.onNew(event);
+
+      sessionBuilderMock.verify(SessionBuilder::clearRolesCache, never());
+    }
+  }
+
+  @Test
+  void getObservedEntitiesReturnsSevenEntities() {
+    try (
+        MockedStatic<ModelProvider> modelProviderMock = mockStatic(ModelProvider.class);
+        MockedStatic<TriggerHandler> triggerMock = mockStatic(TriggerHandler.class)
+    ) {
+      setupMocks(modelProviderMock, triggerMock, OBSERVED_ENTITY_NAMES);
+
+      SessionCacheInvalidationObserver observer = new SessionCacheInvalidationObserver();
+      Entity[] entities = observer.getObservedEntities();
+
+      assertNotNull(entities);
+      assertEquals(OBSERVED_ENTITY_NAMES.length, entities.length);
+    }
+  }
+}

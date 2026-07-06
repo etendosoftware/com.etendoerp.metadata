@@ -26,6 +26,9 @@ import com.smf.securewebservices.utils.SecureWebServicesUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.codehaus.jettison.json.JSONArray;
+import org.codehaus.jettison.json.JSONException;
+import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.base.HttpBaseUtils;
 import org.openbravo.base.exception.OBException;
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
@@ -36,6 +39,7 @@ import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.erpCommon.security.SessionLogin;
 import org.openbravo.model.ad.access.User;
+import org.openbravo.model.financialmgmt.accounting.coa.AcctSchema;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.Cookie;
@@ -44,9 +48,15 @@ import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -54,8 +64,6 @@ import static com.etendoerp.metadata.utils.Constants.FORM_CLOSE_TAG;
 import static com.etendoerp.metadata.utils.Constants.FRAMESET_CLOSE_TAG;
 import static com.etendoerp.metadata.utils.Constants.HEAD_CLOSE_TAG;
 import static com.etendoerp.metadata.utils.Constants.PUBLIC_JS_PATH;
-import static com.etendoerp.metadata.utils.LegacyPaths.ABOUT_MODAL;
-import static com.etendoerp.metadata.utils.LegacyPaths.MANUAL_PROCESS;
 
 /**
  * Legacy servlet that uses existing HttpServletRequestWrapper infrastructure
@@ -69,23 +77,404 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
     private static final String JWT_TOKEN = "#JWT_TOKEN";
     private static final String HTML_EXTENSION = ".html";
     private static final String JS_EXTENSION = ".js";
+    private static final String ACTION_JSON_SEPARATOR = "',action:";
+    private static final String HTML_UTF8_CONTENT_TYPE = "text/html; charset=UTF-8";
+    private static final String UTF8_CHARSET = "UTF-8";
+    private static final String JSON_CONTENT_TYPE_PREFIX = "application/json";
     private static final String TOKEN_PARAM = "token";
     private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String BEARER_PREFIX = "Bearer ";
     private static final String META_LEGACY_PATH = "/meta/legacy";
     private static final String WEB_PATH = "/web/";
     private static final String SRC_REPLACE_STRING = "src=\"";
+    /** Path segment identifying a Classic info-window (search/selector) page. */
+    private static final String INFO_PATH_SEGMENT = "info/";
+    /** Function present only in Classic search/selector popups; gates the selector shim. */
+    private static final String VALIDATE_SELECTOR_MARKER = "validateSelector";
 
     private static final String RECEIVE_AND_POST_MESSAGE_SCRIPT = "<script>window.addEventListener(\"message\", (event) => {"
             +
-            "if (event.data?.type === \"fromForm\" && window.parent) {" +
+            "if (event.data?.type === \"" + LegacyMessageProtocol.MESSAGE_TYPE + "\" && window.parent) {" +
             "window.parent.postMessage({ type: \"fromIframe\", action: event.data.action }, \"*\");" +
             "}});</script>";
 
-    private static final String POST_MESSAGE_SCRIPT = "<script>const sendMessage = (action) => {" +
-            "if (window.parent) {" +
-            "window.parent.postMessage({ type: \"fromForm\", action: action, }, \"*\");" +
-            "}}</script>";
+    /**
+     * Script injected into Classic search/selector popups (e.g. {@code /info/Product.html})
+     * opened by the new UI (via {@code window.open}). The Classic popup delivers the picked
+     * row by calling {@code theOpener.closeSearch(action, key, text, params)}, where
+     * {@code theOpener = parent.opener || getFrame('LayoutMDI')}.
+     *
+     * <p>In a {@code window.open} popup, {@code parent.opener} is the cross-origin new-UI
+     * window, so {@code theOpener.closeSearch} would throw a security error. This shim
+     * (installed on {@code load}, after {@code searchs.js} has declared its own functions)
+     * therefore: (1) captures the opener, (2) nulls {@code window.opener} so
+     * {@code parent.opener} becomes falsy and {@code validateSelector} falls through to
+     * {@code getFrame}, (3) makes {@code getFrame} return a stub whose {@code closeSearch}
+     * {@code postMessage}s {@code {action,id,identifier}} back to the captured opener (or the
+     * parent, when embedded in an iframe). Real frame lookups (e.g. {@code frameMenu}, used
+     * for number formatting) are preserved.
+     *
+     * <p>OK ({@code validateSelector('SAVE')}), Cancel ({@code validateSelector('CLEAR')}) and
+     * double-click all route through the page's {@code validateSelector}, which resolves
+     * {@code theOpener = parent.opener || getFrame('LayoutMDI')} and calls
+     * {@code theOpener.closeSearch}. To guarantee delivery without depending on a stale
+     * {@code window.opener}, the shim WRAPS {@code validateSelector} to null {@code window.opener}
+     * immediately before delegating (so {@code parent.opener} is falsy and {@code theOpener}
+     * falls to our {@code getFrame} stub), while preserving each selector's own key/text
+     * extraction. After posting, {@code stub.closeSearch} calls {@code window.close()} so the
+     * script-opened popup closes itself (covers OK/Cancel/double-click deterministically).
+     */
+    private static final String SELECTOR_POPUP_SHIM_SCRIPT = "<script>(function(){" +
+            "var opener=window.opener;" +
+            "function pick(action,key,text){try{(opener||window.parent).postMessage({type:'"
+            + LegacyMessageProtocol.MESSAGE_TYPE + "',action:'"
+            + LegacyMessageProtocol.ACTION_SELECTOR_VALUE_PICKED
+            + "',payload:{action:action,id:key,identifier:text}},'*');}catch(e){}}" +
+            "var stub={closeSearch:function(action,key,text){pick(action,key,text);try{window.close();}catch(e){}}};" +
+            "function install(){" +
+            "window.closeSearch=stub.closeSearch;" +
+            "var real=window.getFrame;" +
+            "window.getFrame=function(name){try{var f=real?real(name):null;if(f)return f;}catch(e){}return stub;};" +
+            "var origValidate=window.validateSelector;" +
+            "if(typeof origValidate==='function'){window.validateSelector=function(){"
+            + "try{window.opener=null;}catch(e){}return origValidate.apply(this,arguments);};}" +
+            "}" +
+            "if(document.readyState==='complete'){install();}else{window.addEventListener('load',install);}" +
+            "})();</script>";
+
+    /**
+     * JS-array literal listing the {@code Command} prefixes the legacy framework uses
+     * for form refreshes (combo onChange, response page reload, comparative-mode
+     * checkbox) — i.e. submissions that unload the iframe but do <strong>not</strong>
+     * represent a process execution. When {@code document.forms[0].Command.value}
+     * matches any of these prefixes at unload time, the iframe suppresses
+     * {@link LegacyMessageProtocol#ACTION_IFRAME_UNLOADED} so the new UI does not
+     * arm its fallback-warning countdown for a non-process navigation. Counterpart
+     * of {@link #PROCESS_COMMAND_PREFIX}; values audited against
+     * {@code erp/src/org/openbravo/erpCommon/ad_actionButton/} (27 templates) and
+     * {@code vars.commandIn(...)} call sites in the related Java servlets.
+     */
+    private static final String REFRESH_COMMAND_PREFIXES_JS = "['FIND','REFRESH','DEFAULT']";
+
+    /**
+     * Script injected into the {@code <head>} of legacy action-button form pages.
+     * Patches {@code window.open} so that selector popup URLs (e.g.
+     * {@code ../info/Locator.html}) are resolved and have the {@code /meta/legacy/}
+     * prefix stripped before the browser navigates to them. Without this fix,
+     * {@code window.open()} resolves relative URLs against {@code window.location.href}
+     * (not the {@code <base>} tag), so the popup opens under {@code /meta/legacy/info/}
+     * — its Dojo DataGrid then issues {@code Command=STRUCTURE} and {@code Command=DATA}
+     * requests through {@code LegacyProcessServlet}, which was not designed to handle
+     * info-selector XML responses and returns them with {@code Content-Type: text/html},
+     * causing the browser to set {@code xhr.responseXML = null} and Dojo's
+     * {@code parseStructure} to throw "Cannot read properties of null".
+     *
+     * <p>This script also applies the popup-centering fix that the new UI previously
+     * attempted client-side via {@code injectPopupPositionFix} in {@code Iframe.tsx}:
+     * that approach is blocked by the cross-origin boundary between the Next.js dev
+     * server (port 3000) and Tomcat (port 8080), so it is applied here server-side.
+     */
+    private static final String POPUP_URL_FIX_SCRIPT = "<script>(function(){" +
+            "if(window.__etendoPopupUrlFixApplied)return;" +
+            "window.__etendoPopupUrlFixApplied=true;" +
+            "var _origOpen=window.open;" +
+            "window.open=function(url,name,features,replace){" +
+            "if(features&&typeof features==='string'){" +
+            "var w=800,h=600;" +
+            "var mw=features.match(/width=(\\d+)/);" +
+            "var mh=features.match(/height=(\\d+)/);" +
+            "if(mw)w=parseInt(mw[1],10);" +
+            "if(mh)h=parseInt(mh[1],10);" +
+            "features=features" +
+            ".replace(/left=-?\\d+/,'left='+Math.max(0,Math.round((screen.width-w)/2)))" +
+            ".replace(/top=-?\\d+/,'top='+Math.max(0,Math.round((screen.height-h)/2)));" +
+            "}" +
+            "if(typeof url==='string'&&url){" +
+            "try{" +
+            "var resolved=new URL(url,window.location.href);" +
+            "resolved.pathname=resolved.pathname.replace('/meta/legacy/','/');" +
+            "url=resolved.href;" +
+            "}catch(e){}" +
+            "}" +
+            "return _origOpen.call(this,url,name,features,replace);" +
+            "};" +
+            "})();</script>";
+
+    /**
+     * Script injected into legacy form pages to expose {@code window.sendMessage}
+     * and to guarantee that the parent always receives a final notification even
+     * when the page is unloaded mid-flight (redirect, navigation, browser-tab
+     * change). Tracks whether a "final" message ({@code showProcessMessage} or
+     * {@code closeModal}) was emitted; if not, on {@code pagehide}/{@code beforeunload}
+     * it sends an {@code iframeUnloaded} action so the new UI can show the
+     * fallback warning instead of leaving the user without feedback.
+     *
+     * <p>The {@code notifyUnload} guard reads the form's {@code Command} value
+     * before posting and short-circuits when it matches a refresh prefix from
+     * {@link #REFRESH_COMMAND_PREFIXES_JS} — this prevents the false warning that
+     * would otherwise appear when the user refreshes the popup contents (combo
+     * onChange firing {@code submitCommandForm('FIND_PO',...)} and similar).
+     *
+     * <p>The script also installs a one-shot hook on
+     * {@code HTMLFormElement.prototype.submit} that dispatches
+     * {@link LegacyMessageProtocol#ACTION_PROCESS_ORDER} only when a form is
+     * really submitted to the server (filtering refresh-prefix Commands via the
+     * same {@code isRefreshCommand} helper). This replaces the previous
+     * call-site injection that prepended {@code sendMessage('processOrder')} to
+     * every {@code submitThisPage(...)}, which fired even when the classic
+     * client-side validation (e.g. {@code showJSMessage('NoDataSelected')})
+     * aborted the submit and left the React shell polling
+     * {@code GetTabMessageActionHandler} until the fallback warning tripped.
+     */
+    private static final String POST_MESSAGE_SCRIPT = "<script>(function(){" +
+            "var sent=false;" +
+            "var REFRESH_COMMAND_PREFIXES=" + REFRESH_COMMAND_PREFIXES_JS + ";" +
+            "function getSubmittedCommand(){" +
+            "var f=document.forms&&document.forms[0];" +
+            "if(!f||!f.Command)return null;" +
+            "return f.Command.value||null;" +
+            "}" +
+            "function isRefreshCommand(cmd){" +
+            "if(!cmd)return false;" +
+            "var upper=String(cmd).toUpperCase();" +
+            "for(var i=0;i<REFRESH_COMMAND_PREFIXES.length;i++){" +
+            "if(upper.indexOf(REFRESH_COMMAND_PREFIXES[i])===0)return true;" +
+            "}" +
+            "return false;" +
+            "}" +
+            "window.sendMessage=function(action){" +
+            "if(!window.parent)return;" +
+            "window.parent.postMessage({type:'" + LegacyMessageProtocol.MESSAGE_TYPE + ACTION_JSON_SEPARATOR
+            + "action},'*');" +
+            "if(action==='" + LegacyMessageProtocol.ACTION_SHOW_PROCESS_MESSAGE + "'||action==='"
+            + LegacyMessageProtocol.ACTION_CLOSE_MODAL + "'){sent=true;window.__etendoMessageSent=true;}" +
+            "};" +
+            "if(typeof HTMLFormElement!=='undefined'&&HTMLFormElement.prototype&&!HTMLFormElement.prototype.__etendoSubmitHooked){" +
+            "var origSubmit=HTMLFormElement.prototype.submit;" +
+            "HTMLFormElement.prototype.submit=function(){" +
+            "try{" +
+            "var cmd=(this&&this.Command&&this.Command.value)||null;" +
+            "if(cmd&&!isRefreshCommand(cmd))window.sendMessage('"
+            + LegacyMessageProtocol.ACTION_PROCESS_ORDER + "');" +
+            "}catch(e){}" +
+            "return origSubmit.apply(this,arguments);" +
+            "};" +
+            "HTMLFormElement.prototype.__etendoSubmitHooked=true;" +
+            "}" +
+            "function notifyUnload(){" +
+            "if(sent||window.__etendoMessageSent)return;" +
+            "if(isRefreshCommand(getSubmittedCommand()))return;" +
+            "if(!window.parent)return;" +
+            "window.parent.postMessage({type:'" + LegacyMessageProtocol.MESSAGE_TYPE + ACTION_JSON_SEPARATOR
+            + "'" + LegacyMessageProtocol.ACTION_IFRAME_UNLOADED + "'},'*');" +
+            "sent=true;window.__etendoMessageSent=true;" +
+            "}" +
+            "window.addEventListener('pagehide',notifyUnload);" +
+            "window.addEventListener('beforeunload',notifyUnload);" +
+            "})();</script>";
+
+    /**
+     * Marker used to detect Openbravo classic "popup message" response pages
+     * (error/success/info/warning dialogs emitted by action button servlets).
+     * These pages share the template: id="messageBoxIDTitle" + id="messageBoxIDMessage"
+     * + id="paramTipo" class="MessageBox{TYPE}".
+     */
+    private static final String POPUP_MESSAGE_MARKER = "id=\"messageBoxIDMessage\"";
+
+    /**
+     * Marker matching the CSS class the Openbravo error popup template writes.
+     * When present in the captured body the DAL session is almost certainly
+     * dirty (the WAD servlet caught its own OBException without rolling back),
+     * so we must rollback before the filter chain tries to commit.
+     */
+    private static final String ERROR_POPUP_CLASS_MARKER = "MessageBoxERROR";
+
+    /**
+     * Script injected into popup-message pages. Extracts the title/text/type from
+     * the DOM and forwards them to the parent window so the new UI can render the
+     * dialog with its own styles.
+     *
+     * <p>The modal close is intentionally NOT triggered from here: the React shell
+     * governs the lifecycle ({@code success} auto-closes after its 3 s progress
+     * timer; {@code error}/{@code warning}/{@code info} stay open until the user
+     * dismisses them). This mirrors {@link #MINIMAL_FORWARDER_HTML}, which also
+     * relies on the parent for the close decision.
+     */
+    private static final String SHOW_PROCESS_MESSAGE_SCRIPT = "<script>(function(){" +
+            "function forward(){" +
+            "var t=document.getElementById('messageBoxIDTitle');" +
+            "var m=document.getElementById('messageBoxIDMessage');" +
+            "if(!t||!m||!window.parent)return;" +
+            "var typeEl=document.querySelector('.MessageBoxERROR,.MessageBoxSUCCESS,.MessageBoxWARNING,.MessageBoxINFO');" +
+            "var cls=(typeEl&&typeEl.className)||'';" +
+            "var type='info';" +
+            "if(cls.indexOf('ERROR')>=0)type='error';" +
+            "else if(cls.indexOf('SUCCESS')>=0)type='success';" +
+            "else if(cls.indexOf('WARNING')>=0)type='warning';" +
+            "var payload={type:type,title:(t.textContent||'').trim(),text:(m.textContent||'').trim()};" +
+            "window.parent.postMessage({type:'" + LegacyMessageProtocol.MESSAGE_TYPE + ACTION_JSON_SEPARATOR
+            + "'" + LegacyMessageProtocol.ACTION_SHOW_PROCESS_MESSAGE + "',payload:payload},'*');" +
+            "window.__etendoMessageSent=true;" +
+            "}" +
+            "if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',forward);" +
+            "else forward();" +
+            "})();</script>";
+
+    /**
+     * Request parameter name and canonical value prefix used by Openbravo
+     * action-button servlets to signal "execute the action". Matching variants
+     * like {@code PROCESSDEFAULT} requires a {@code startsWith} check rather than
+     * equality.
+     */
+    private static final String COMMAND_PARAM = "Command";
+    private static final String PROCESS_COMMAND_PREFIX = "PROCESS";
+    /** Dojo DataGrid info-selector data commands; their responses are XML, not HTML. */
+    private static final String COMMAND_STRUCTURE = "STRUCTURE";
+    private static final String COMMAND_DATA = "DATA";
+    private static final String XML_UTF8_CONTENT_TYPE = "text/xml; charset=UTF-8";
+
+    /**
+     * Patterns used to extract the popup title, message and message-type class
+     * from the captured legacy HTML. The {@code messageBoxIDTitle} and
+     * {@code messageBoxIDMessage} ids are stable across all Openbravo classic
+     * templates; the message-type signal is matched on the CSS class
+     * ({@code MessageBoxERROR|SUCCESS|WARNING|INFO}) because the id of the
+     * carrier table is inconsistent — most templates use {@code paramTipo}
+     * (Spanish) but {@code AdvisePopUpRefresh.html} uses {@code paramType}
+     * (English). The class is the canonical signal in every template.
+     */
+    private static final Pattern POPUP_TITLE_PATTERN = Pattern.compile(
+            "id=\"messageBoxIDTitle\"[^>]*>([^<]*)<", Pattern.CASE_INSENSITIVE);
+    private static final Pattern POPUP_MESSAGE_PATTERN = Pattern.compile(
+            "id=\"messageBoxIDMessage\"[^>]*>([^<]*)<", Pattern.CASE_INSENSITIVE);
+    private static final Pattern POPUP_TYPE_PATTERN = Pattern.compile(
+            "class=\"MessageBox(ERROR|SUCCESS|WARNING|INFO)\"", Pattern.CASE_INSENSITIVE);
+
+    /** Shared HTML preamble for all postMessage forwarder pages. */
+    private static final String HTML_DOCTYPE_HEAD =
+            "<!DOCTYPE html>\n<html><head><meta charset=\"" + UTF8_CHARSET + "\"><script>";
+
+    /**
+     * Minimal self-contained HTML served for {@code Command=PROCESS} popups.
+     * Bypasses the legacy HTML pipeline entirely: a tiny (~500 B) response
+     * cannot trigger the chunked-encoding race that breaks the full popup path.
+     * The payload placeholder is a JSON object with {@code type}/{@code title}/{@code text}.
+     */
+    private static final String MINIMAL_FORWARDER_HTML =
+            HTML_DOCTYPE_HEAD +
+                    "(function(){if(!window.parent)return;" +
+                    "window.parent.postMessage({type:'" + LegacyMessageProtocol.MESSAGE_TYPE + ACTION_JSON_SEPARATOR
+                    + "'" + LegacyMessageProtocol.ACTION_SHOW_PROCESS_MESSAGE + "',payload:%s},'*');" +
+                    "window.__etendoMessageSent=true;" +
+                    "})();</script></head><body></body></html>";
+
+    /**
+     * Self-contained HTML served when the legacy iframe pipeline cannot complete the
+     * request (e.g. unhandled exception, missing follow-up token, unresolvable target
+     * path). Posts a {@code requestFailed} action to the parent window so the new UI
+     * renders its own user-facing copy ({@code process.requestFailed.*}) instead of
+     * leaving the iframe on Tomcat's error page. The HTTP status is 200 so the body
+     * is loaded and the script runs.
+     */
+    private static final String REQUEST_FAILED_FORWARDER_HTML =
+            HTML_DOCTYPE_HEAD +
+                    "(function(){if(!window.parent)return;" +
+                    "window.parent.postMessage({type:'" + LegacyMessageProtocol.MESSAGE_TYPE + ACTION_JSON_SEPARATOR
+                    + "'" + LegacyMessageProtocol.ACTION_REQUEST_FAILED + "'},'*');" +
+                    "window.__etendoMessageSent=true;" +
+                    "})();</script></head><body></body></html>";
+
+    /**
+     * Matches the {@code submitThisPage('<url>');} call emitted by the
+     * {@code PopUp_Response.html} template (rendered by
+     * {@code HttpSecureAppServlet.printPageClosePopUp(response, vars, path, ...)}).
+     * The captured group is any URL-shaped argument — relative path
+     * ({@code /...}) or absolute http(s) URL. This deliberately excludes:
+     * <ul>
+     *   <li>the no-URL branch ({@code submitThisPage(null);}) — no quotes;</li>
+     *   <li>action codes used by the form-render HTML
+     *       ({@code 'SAVE'}, {@code 'OK'}, {@code 'EDIT'}, {@code 'REFRESH'}, ...)
+     *       which are passed to the same JS helper but identify a button command,
+     *       not a URL.</li>
+     * </ul>
+     * Without this URL-shape check, the very first GET on an action button
+     * (which renders the confirmation form) would short-circuit before the user
+     * even submits.
+     * <p>
+     * Whether the matched URL must trigger an {@code openLegacyReport} forwarder
+     * is decided separately by {@link #REPORT_PATH_MARKER}: the regex on its own
+     * does NOT imply "is a report" — many callers of {@code printPageClosePopUp}
+     * pass parent-tab URLs built from {@code Utility.getTabURL(...)} that just
+     * refresh the source tab in the classic UI.
+     */
+    private static final Pattern SUBMIT_THIS_PAGE_HREF =
+            Pattern.compile("submitThisPage\\(\\s*'(/[^']+|https?://[^']+)'\\s*\\);");
+
+    /**
+     * Path marker that identifies a classic Openbravo AD report URL. Posted
+     * ({@code org.openbravo.erpCommon.ad_actionButton.Posted}) is the only
+     * confirmed action button that returns a report — its URL is built from
+     * {@code AcctServer.getDocumentPaths()} and always contains
+     * {@code /ad_reports/}. All other callers of
+     * {@code printPageClosePopUp(response, vars, path, ...)} (Reactivate via
+     * {@code ProcessInvoice}, the {@code CopyFrom*} family, {@code ProjectClose},
+     * etc.) pass window URLs from {@code Utility.getTabURL(strTabId, "R", true)}
+     * — those must NOT short-circuit the pipeline; the existing
+     * {@code processOrder}/{@code showProcessMessage} flow already handles them
+     * (success/error message + parent table refresh).
+     */
+    private static final String REPORT_PATH_MARKER = "/ad_reports/";
+
+    /**
+     * Path of the General Ledger Journal report — the only confirmed AD report
+     * that the classic UI explodes into N popups when the posted invoice has
+     * multiple accounting schemas. The expansion logic lives in the report's
+     * own JS ({@code openTabWhenPost} in
+     * {@code ReportGeneralLedgerJournal.html}) and depends on the SmartClient
+     * shell ({@code LayoutMDI}, {@code OB.Layout.ViewManager}) which the new
+     * UI does not provide. We replicate it server-side so each schema gets
+     * its own browser popup driven by the {@code openLegacyReport} forwarder.
+     */
+    private static final String JOURNAL_ENTRIES_REPORT_PATH = "/ad_reports/ReportGeneralLedgerJournal.html";
+
+    private static final String INP_ACCSCHEMAS_KEY = "inpAccSchemas";
+    private static final String INP_PARAMSCHEMAS_KEY = "inpParamschemas";
+    private static final String POSTED_FLAG_KEY = "posted";
+    private static final String POSTED_FLAG_YES = "Y";
+    private static final String COMMAND_KEY = "Command";
+    private static final String COMMAND_DIRECT = "DIRECT";
+    private static final String INP_TABLE_KEY = "inpTable";
+    private static final String INP_RECORD_KEY = "inpRecord";
+    private static final String INP_ORG_KEY = "inpOrg";
+    private static final String TAB_TITLE_SEPARATOR = " - ";
+
+    /**
+     * Captures the {@code tabTitle} value embedded in the {@code newTabParams}
+     * JSON literal that {@code printPageClosePopUp(response, vars, path, title)}
+     * writes to the popup body. The classic UI uses this title for the new
+     * SmartClient tab; the new UI forwards it as {@code obManualURL} bookmark
+     * metadata. Tolerates JSON-style escaped quotes ({@code \"}).
+     */
+    private static final Pattern TAB_TITLE_PATTERN =
+            Pattern.compile("\"tabTitle\"\\s*+:\\s*+\"((?:[^\"\\\\]|\\\\.)*+)\"");
+
+    /**
+     * Self-contained HTML served when the captured legacy response is a
+     * {@code PopUp_Response} with one or more report URLs. Posts an
+     * {@code openLegacyReport} action with a payload of the shape
+     * {@code {reports: [{processUrl, tabTitle, params}, ...]}} to the parent
+     * window so the new UI can rebuild each Etendo Classic bookmark URL (via
+     * {@code buildEtendoClassicBookmarkUrl}) and open it in a browser popup,
+     * then close the iframe modal. The placeholder is the JSON payload.
+     */
+    private static final String OPEN_LEGACY_REPORT_FORWARDER_HTML =
+            HTML_DOCTYPE_HEAD +
+                    "(function(){if(!window.parent)return;" +
+                    "window.parent.postMessage({type:'" + LegacyMessageProtocol.MESSAGE_TYPE + ACTION_JSON_SEPARATOR
+                    + "'" + LegacyMessageProtocol.ACTION_OPEN_LEGACY_REPORT + "',payload:%s},'*');" +
+                    "window.__etendoMessageSent=true;" +
+                    "})();</script></head><body></body></html>";
+
     public static final String SET_COOKIE = "Set-Cookie";
     public static final String ERROR_SENDING_ERROR_RESPONSE = "Error sending error response: {}";
 
@@ -294,6 +683,28 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
     }
 
     /**
+     * Writes a minimal HTML response that postMessages a {@code requestFailed} action
+     * to the parent window. Used when the legacy iframe pipeline aborts and we need
+     * the new UI to surface a friendly error overlay instead of letting the iframe
+     * load Tomcat's default error page.
+     *
+     * @param res   the HttpServletResponse to write the forwarder HTML into
+     * @param cause the original exception (logged for diagnostics; not exposed to the client)
+     */
+    private void writeRequestFailedForwarder(HttpServletResponse res, Exception cause) {
+        log.error("Forwarding request failure to iframe parent", cause);
+        try {
+            res.setContentType(HTML_UTF8_CONTENT_TYPE);
+            res.setCharacterEncoding(UTF8_CHARSET);
+            res.setStatus(HttpServletResponse.SC_OK);
+            res.getWriter().write(REQUEST_FAILED_FORWARDER_HTML);
+            res.getWriter().flush();
+        } catch (IOException e) {
+            log.error("Failed to write requestFailed forwarder: {}", e.getMessage(), e);
+        }
+    }
+
+    /**
      * Sends a successful HTML response to the client.
      *
      * @param res  the HttpServletResponse
@@ -301,7 +712,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
      * @throws IOException if an error occurs while writing the response
      */
     private void sendHtmlResponse(HttpServletResponse res, String html) throws IOException {
-        res.setContentType("text/html; charset=UTF-8");
+        res.setContentType(HTML_UTF8_CONTENT_TYPE);
         res.setStatus(HttpServletResponse.SC_OK);
         res.getWriter().write(html);
         res.getWriter().flush();
@@ -351,12 +762,13 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
 
             wrappedRequest.getRequestDispatcher(path).include(wrappedRequest, responseWrapper);
 
+            rollbackDalSessionIfErrorPopup(responseWrapper);
+
             handleResponse(res, responseWrapper, path, contextPath);
 
         } catch (Exception e) {
             log.error("Error processing legacy request {}: {}", path, e.getMessage(), e);
-            res.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
-                    "Error processing legacy request: " + e.getMessage());
+            writeRequestFailedForwarder(res, e);
         }
     }
 
@@ -388,8 +800,8 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             String jsContent = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
             String processedContent = transformJavaScriptContent(jsContent);
 
-            res.setContentType("application/javascript; charset=UTF-8");
-            res.setCharacterEncoding("UTF-8");
+            res.setContentType("application/javascript; charset=" + UTF8_CHARSET);
+            res.setCharacterEncoding(UTF8_CHARSET);
             res.setStatus(HttpServletResponse.SC_OK);
             res.getWriter().write(processedContent);
             res.getWriter().flush();
@@ -501,6 +913,12 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
 
         String output = wrapper.getCapturedOutputAsString();
 
+        List<ReportInfo> reports = extractReportsFromBody(output, contextPath);
+        if (!reports.isEmpty()) {
+            writeOpenLegacyReportForwarder(res, reports);
+            return;
+        }
+
         if (wrapper.isRedirected()) {
             writeRedirect(res, wrapper, contextPath);
             return;
@@ -508,7 +926,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
 
         output = getInjectedContent(path, output);
 
-        writeFinalResponse(res, wrapper, path, output);
+        writeFinalResponse(res, wrapper, output);
     }
 
     private void writeRedirect(HttpServletResponse res,
@@ -525,19 +943,540 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
 
     private void writeFinalResponse(HttpServletResponse res,
             HttpServletResponseLegacyWrapper wrapper,
-            String path,
             String output) throws IOException {
 
-        if (ABOUT_MODAL.equals(path) || MANUAL_PROCESS.equals(path)) {
-            res.setContentType("text/html; charset=UTF-8");
-            res.setCharacterEncoding("UTF-8");
-        } else {
-            res.setContentType(wrapper.getContentType());
+        HttpServletRequest req = RequestContext.get().getRequest();
+        if (isProcessCommandPopup(req, output)) {
+            writeProcessCommandForwarder(res, output);
+            return;
         }
 
+        applyFinalContentType(res, wrapper);
         res.setStatus(wrapper.getStatus());
         res.getWriter().write(output);
         res.getWriter().flush();
+    }
+
+    /**
+     * Preserves the Content-Type declared by the wrapped legacy servlet when it
+     * is a JSON or XML response. JSON: e.g. {@code UsedByLink} answering
+     * {@code JSONCategory} or {@code JSONLinkedItem}. XML: e.g. selector info
+     * pages returning {@code Command=STRUCTURE} or {@code Command=DATA} responses
+     * — Dojo's DataGrid reads these via {@code xhr.responseXML}, which browsers
+     * set to {@code null} when the declared MIME type is not an XML variant,
+     * causing the "Error while parsing datagrid structure" alert. For every other
+     * case the legacy WAD pipeline produces HTML, so the historical default is kept.
+     */
+    private void applyFinalContentType(HttpServletResponse res,
+            HttpServletResponseLegacyWrapper wrapper) {
+        String wrappedContentType = wrapper.getContentType();
+        if (wrappedContentType != null) {
+            String lower = wrappedContentType.toLowerCase();
+            if (lower.contains(JSON_CONTENT_TYPE_PREFIX) || lower.contains("xml")) {
+                res.setContentType(wrappedContentType);
+                return;
+            }
+        }
+        // Dojo DataGrid info-selector data requests (Command=STRUCTURE|DATA) return XML
+        // but the legacy servlet leaves the Content-Type unset; serve them as XML so the
+        // browser exposes responseXML (otherwise the grid stays empty).
+        if (isXmlDataCommand()) {
+            res.setContentType(XML_UTF8_CONTENT_TYPE);
+            res.setCharacterEncoding(UTF8_CHARSET);
+            return;
+        }
+        res.setContentType(HTML_UTF8_CONTENT_TYPE);
+        res.setCharacterEncoding(UTF8_CHARSET);
+    }
+
+    /**
+     * Tells whether the current request is a Dojo DataGrid data request
+     * ({@code Command=STRUCTURE} or {@code Command=DATA}) whose response is XML.
+     *
+     * @return {@code true} when the {@code Command} parameter is STRUCTURE or DATA
+     */
+    private static boolean isXmlDataCommand() {
+        HttpServletRequest req = RequestContext.get().getRequest();
+        if (req == null) {
+            return false;
+        }
+        String command = req.getParameter(COMMAND_PARAM);
+        return COMMAND_STRUCTURE.equals(command) || COMMAND_DATA.equals(command);
+    }
+
+    /**
+     * Detects whether the captured response is the popup emitted by an action
+     * button servlet in response to {@code Command=PROCESS}. Combines two
+     * independent signals — the request parameter and a marker in the body —
+     * so GRID/SAVE/DEFAULT requests that happen to contain the marker (highly
+     * unlikely) are not accidentally rerouted.
+     *
+     * @param req  the original request
+     * @param body the captured legacy HTML
+     * @return {@code true} when the short-circuit path should serve the response
+     */
+    private boolean isProcessCommandPopup(HttpServletRequest req, String body) {
+        if (body == null || !body.contains(POPUP_MESSAGE_MARKER)) {
+            return false;
+        }
+        String command = req.getParameter(COMMAND_PARAM);
+        if (command == null) {
+            return false;
+        }
+        return command.toUpperCase().startsWith(PROCESS_COMMAND_PREFIX);
+    }
+
+    /**
+     * Returns the first captured group for {@code pattern} in {@code source},
+     * or {@code fallback} when no match is found. Trims the match to drop the
+     * whitespace Openbravo templates leave around the title/message text.
+     */
+    private String extractFirstGroup(Pattern pattern, String source, String fallback) {
+        Matcher matcher = pattern.matcher(source);
+        if (matcher.find()) {
+            return matcher.group(1).trim();
+        }
+        return fallback;
+    }
+
+    /**
+     * Maps the Openbravo {@code MessageBoxXXX} CSS class suffix to the type
+     * string the new UI overlay expects.
+     */
+    private String mapMessageType(String classSuffix) {
+        String upper = classSuffix.toUpperCase();
+        if (upper.contains("ERROR")) return "error";
+        if (upper.contains("SUCCESS")) return "success";
+        if (upper.contains("WARNING")) return "warning";
+        return "info";
+    }
+
+    /**
+     * Writes the short-circuit response for {@code Command=PROCESS} popups: a
+     * tiny, self-contained HTML that dispatches {@code showProcessMessage} and
+     * {@code closeModal} to the parent window. Because the body is small and
+     * written in one go, Tomcat does not trigger chunked encoding, avoiding
+     * the {@code ERR_INCOMPLETE_CHUNKED_ENCODING} race that affected the full
+     * popup path.
+     *
+     * @param res           the real response
+     * @param capturedHtml  the original popup HTML captured by the wrapper
+     * @throws IOException if the response writer fails
+     */
+    private void writeProcessCommandForwarder(HttpServletResponse res, String capturedHtml) throws IOException {
+        String title = extractFirstGroup(POPUP_TITLE_PATTERN, capturedHtml, "");
+        String text = extractFirstGroup(POPUP_MESSAGE_PATTERN, capturedHtml, "");
+        String typeClass = extractFirstGroup(POPUP_TYPE_PATTERN, capturedHtml, "INFO");
+
+        String payload = buildForwarderPayload(mapMessageType(typeClass), title, text);
+        String html = String.format(MINIMAL_FORWARDER_HTML, payload);
+
+        res.setContentType(HTML_UTF8_CONTENT_TYPE);
+        res.setCharacterEncoding(UTF8_CHARSET);
+        res.setStatus(HttpServletResponse.SC_OK);
+        res.getWriter().write(html);
+        res.getWriter().flush();
+    }
+
+    private String buildForwarderPayload(String type, String title, String text) {
+        try {
+            JSONObject payload = new JSONObject();
+            payload.put("type", type);
+            payload.put("title", title);
+            payload.put("text", text);
+            return payload.toString();
+        } catch (JSONException e) {
+            log.warn("Could not build forwarder payload, using fallback: {}", e.getMessage());
+            return "{\"type\":\"info\",\"title\":\"\",\"text\":\"\"}";
+        }
+    }
+
+    /**
+     * Immutable triple describing a report ready to be opened by the new UI as
+     * an Etendo Classic bookmark popup. The {@link #processUrl} is the
+     * context-relative path of the report (e.g. {@code /ad_reports/Report.html})
+     * that lands in {@code obManualURL}; {@link #params} is the query string
+     * from the original URL ({@code Command=DIRECT&inpRecord=...}, without the
+     * leading {@code ?}); {@link #tabTitle} is the title the popup tab will
+     * display, extracted from the {@code newTabParams} literal in the popup
+     * body.
+     */
+    static final class ReportInfo {
+        final String processUrl;
+        final String tabTitle;
+        final String params;
+
+        ReportInfo(String processUrl, String tabTitle, String params) {
+            this.processUrl = processUrl;
+            this.tabTitle = tabTitle;
+            this.params = params;
+        }
+    }
+
+    /**
+     * Scans the captured legacy HTML for every {@code submitThisPage('<url>');}
+     * call emitted by {@code PopUp_Response.html} and returns one
+     * {@link ReportInfo} per URL that points at a real report (filtered by
+     * {@link #REPORT_PATH_MARKER}). An empty list means the response is not a
+     * popup that should open browser-level reports — the regular injection
+     * pipeline handles everything else.
+     *
+     * <p>For each match the URL is split into its context-relative path and
+     * its query string; the host (when present) and {@code contextPath} (when
+     * matching) are stripped. The {@code tabTitle} is read once from the
+     * shared {@code newTabParams} literal and applied to every report in the
+     * body — {@code printPageClosePopUp(response, vars, path, title)} only
+     * emits a single title per response.
+     *
+     * @param body        the captured legacy response body, may be {@code null}
+     * @param contextPath the servlet context path (e.g. {@code /etendo}); {@code null} or empty disables the strip
+     * @return the list of {@link ReportInfo}, never {@code null}
+     */
+    private List<ReportInfo> extractReportsFromBody(String body, String contextPath) {
+        if (body == null) {
+            return Collections.emptyList();
+        }
+        Matcher matcher = SUBMIT_THIS_PAGE_HREF.matcher(body);
+        List<String> rawUrls = new ArrayList<>();
+        while (matcher.find()) {
+            String url = matcher.group(1);
+            if (url.contains(REPORT_PATH_MARKER)) {
+                rawUrls.add(url);
+            }
+        }
+        if (rawUrls.isEmpty()) {
+            return Collections.emptyList();
+        }
+        String tabTitle = extractTabTitle(body);
+        List<ReportInfo> reports = new ArrayList<>(rawUrls.size());
+        for (String rawUrl : rawUrls) {
+            String[] split = splitReportUrl(rawUrl, contextPath);
+            reports.add(new ReportInfo(split[0], tabTitle, split[1]));
+        }
+        return expandMultiSchemaReports(reports, this::resolveAcctSchemaName);
+    }
+
+    /**
+     * Returns the {@code tabTitle} value from the {@code newTabParams} JSON
+     * literal that {@code printPageClosePopUp} writes to the popup body, or
+     * an empty string when the literal is absent (defensive — {@code
+     * printPageClosePopUp(response, vars, url, title)} always emits it).
+     */
+    private String extractTabTitle(String body) {
+        Matcher m = TAB_TITLE_PATTERN.matcher(body);
+        if (m.find()) {
+            return m.group(1);
+        }
+        return "";
+    }
+
+    /**
+     * Strips the host (when the URL is absolute) and the context path (when it
+     * matches), then splits the remainder on the first {@code ?}. Returns a
+     * two-element array: {@code [processUrl, params]}. {@code params} is empty
+     * when the URL has no query string.
+     */
+    private String[] splitReportUrl(String rawUrl, String contextPath) {
+        String pathAndQuery = stripHost(rawUrl);
+        String pathAndQueryNoContext = stripContextPath(pathAndQuery, contextPath);
+        int q = pathAndQueryNoContext.indexOf('?');
+        if (q < 0) {
+            return new String[] { pathAndQueryNoContext, "" };
+        }
+        return new String[] {
+                pathAndQueryNoContext.substring(0, q),
+                pathAndQueryNoContext.substring(q + 1)
+        };
+    }
+
+    private String stripHost(String url) {
+        int scheme = url.indexOf("://");
+        if (scheme < 0) {
+            return url;
+        }
+        int firstSlash = url.indexOf('/', scheme + 3);
+        if (firstSlash < 0) {
+            return "/";
+        }
+        return url.substring(firstSlash);
+    }
+
+    private String stripContextPath(String path, String contextPath) {
+        if (contextPath == null || contextPath.isEmpty() || "/".equals(contextPath)) {
+            return path;
+        }
+        if (path.startsWith(contextPath)) {
+            return path.substring(contextPath.length());
+        }
+        return path;
+    }
+
+    /**
+     * Replicates the behaviour of {@code openTabWhenPost} in
+     * {@code ReportGeneralLedgerJournal.html} server-side: when a report URL
+     * targets the General Ledger Journal report, carries {@code posted=Y} and
+     * a CSV {@code inpAccSchemas} with multiple values, the original
+     * {@link ReportInfo} is followed by one extra entry per additional schema.
+     * Each extra entry uses {@code inpParamschemas=<single_id>} (the same
+     * shape the classic JS feeds {@code OB.Layout.ViewManager.openView}) and
+     * keeps the invoice filters explicit so the popups don't rely on session
+     * state shared with the first popup (they open in parallel from the new UI).
+     *
+     * @param reports         the reports as extracted from the popup body
+     * @param schemaNameResolver function that maps an accounting-schema id to its
+     *                        display name; tests inject a stub to avoid hitting DAL
+     * @return the (possibly expanded) report list, in the order they will be opened
+     */
+    List<ReportInfo> expandMultiSchemaReports(List<ReportInfo> reports,
+            Function<String, String> schemaNameResolver) {
+        List<ReportInfo> out = new ArrayList<>(reports.size());
+        for (ReportInfo r : reports) {
+            if (!shouldExpandMultiSchema(r)) {
+                out.add(r);
+                continue;
+            }
+            out.addAll(expandJournalEntriesReport(r, schemaNameResolver));
+        }
+        return out;
+    }
+
+    private boolean shouldExpandMultiSchema(ReportInfo r) {
+        if (!JOURNAL_ENTRIES_REPORT_PATH.equals(r.processUrl)) {
+            return false;
+        }
+        Map<String, String> kv = parseQueryParams(r.params);
+        if (!POSTED_FLAG_YES.equals(kv.get(POSTED_FLAG_KEY))) {
+            return false;
+        }
+        String csv = kv.get(INP_ACCSCHEMAS_KEY);
+        return csv != null && csv.contains(",");
+    }
+
+    private List<ReportInfo> expandJournalEntriesReport(ReportInfo original,
+            Function<String, String> schemaNameResolver) {
+        Map<String, String> kv = parseQueryParams(original.params);
+        String[] schemas = kv.get(INP_ACCSCHEMAS_KEY).split(",");
+        String table = kv.getOrDefault(INP_TABLE_KEY, "");
+        String currentRecord = kv.getOrDefault(INP_RECORD_KEY, "");
+        String org = kv.getOrDefault(INP_ORG_KEY, "");
+        String titlePrefix = extractTitlePrefix(original.tabTitle);
+
+        List<ReportInfo> result = new ArrayList<>();
+        // Entry 0: clone of the original with `posted=Y` stripped. The popup's
+        // openTabWhenPost JS only spawns extra in-popup Smartclient tabs when
+        // the flag is present; with N additional popups already opened from
+        // the parent UI, that in-popup spawn would override the first popup's
+        // own content and make every popup display the same schema.
+        String firstParams = removePostedFlag(original.params);
+        result.add(new ReportInfo(original.processUrl, original.tabTitle, firstParams));
+        for (int i = 1; i < schemas.length; i++) {
+            String schemaId = schemas[i].trim();
+            if (schemaId.isEmpty()) {
+                continue;
+            }
+            String params = buildSingleSchemaParams(table, currentRecord, org, schemaId);
+            String title = buildSchemaTabTitle(titlePrefix, schemaId, schemaNameResolver);
+            result.add(new ReportInfo(original.processUrl, title, params));
+        }
+        return result;
+    }
+
+    /**
+     * Decodes a query string ({@code k1=v1&k2=v2}) into a Map preserving the
+     * insertion order. Each pair is URL-decoded so we recover the original
+     * value (the source string was extracted from a quoted URL inside the
+     * popup body and may have been percent-encoded). Malformed pairs (no
+     * {@code =} or empty key) are skipped.
+     */
+    Map<String, String> parseQueryParams(String params) {
+        Map<String, String> map = new LinkedHashMap<>();
+        if (params == null || params.isEmpty()) {
+            return map;
+        }
+        for (String pair : params.split("&")) {
+            int eq = pair.indexOf('=');
+            if (eq <= 0) {
+                continue;
+            }
+            String key = pair.substring(0, eq);
+            String val = pair.substring(eq + 1);
+            try {
+                key = URLDecoder.decode(key, UTF8_CHARSET);
+                val = URLDecoder.decode(val, UTF8_CHARSET);
+            } catch (Exception ignore) {
+                // Keep raw values when decoding fails — defensive, should not
+                // happen with well-formed legacy URLs.
+            }
+            map.put(key, val);
+        }
+        return map;
+    }
+
+    /**
+     * Strips the {@code posted=<value>} pair from a query string, preserving
+     * the order and decoding of the remaining pairs. Applied to the first
+     * {@link ReportInfo} of a multi-schema expansion so the popup's
+     * {@code openTabWhenPost} JS (in {@code ReportGeneralLedgerJournal.html})
+     * does NOT detect the flag and call {@code OB.Layout.ViewManager.openView}
+     * inside the popup's own SmartClient — the parent UI already opens
+     * separate popups for the additional schemas, so the in-popup tab spawn
+     * would override the first popup's own content.
+     */
+    private String removePostedFlag(String params) {
+        if (params == null || params.isEmpty()) {
+            return params;
+        }
+        StringBuilder sb = new StringBuilder();
+        for (String pair : params.split("&")) {
+            if (pair.startsWith(POSTED_FLAG_KEY + "=")) {
+                continue;
+            }
+            if (sb.length() > 0) {
+                sb.append('&');
+            }
+            sb.append(pair);
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Builds the query string for a multi-schema follow-up popup. Order matters:
+     * {@code Command=DIRECT} comes first so it wins over the {@code Command=DEFAULT}
+     * that {@code OBClassicWindow} appends at the end of the iframe URL —
+     * {@code vars.getCommand()} reads the first occurrence.
+     */
+    private String buildSingleSchemaParams(String table, String currentRecord, String org, String schemaId) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(COMMAND_KEY).append('=').append(COMMAND_DIRECT);
+        if (!table.isEmpty()) {
+            sb.append('&').append(INP_TABLE_KEY).append('=').append(table);
+        }
+        if (!currentRecord.isEmpty()) {
+            sb.append('&').append(INP_RECORD_KEY).append('=').append(currentRecord);
+        }
+        if (!org.isEmpty()) {
+            sb.append('&').append(INP_ORG_KEY).append('=').append(org);
+        }
+        sb.append('&').append(INP_PARAMSCHEMAS_KEY).append('=').append(schemaId);
+        return sb.toString();
+    }
+
+    /**
+     * Returns the prefix portion of a tab title (everything before the last
+     * {@value #TAB_TITLE_SEPARATOR}). The classic flow renders
+     * {@code "Journal Entries Report - <firstSchemaName>"} as the popup title;
+     * we strip the schema-name suffix so the additional popups can build their
+     * own title with the same prefix and their own schema name.
+     */
+    String extractTitlePrefix(String tabTitle) {
+        if (tabTitle == null || tabTitle.isEmpty()) {
+            return "";
+        }
+        int sep = tabTitle.lastIndexOf(TAB_TITLE_SEPARATOR);
+        if (sep < 0) {
+            return tabTitle;
+        }
+        return tabTitle.substring(0, sep);
+    }
+
+    private String buildSchemaTabTitle(String prefix, String schemaId,
+            Function<String, String> schemaNameResolver) {
+        String name = schemaNameResolver.apply(schemaId);
+        if (prefix.isEmpty()) {
+            return name;
+        }
+        return prefix + TAB_TITLE_SEPARATOR + name;
+    }
+
+    /**
+     * Resolves the display name of an accounting schema via the DAL. Falls
+     * back to the raw {@code schemaId} when the entity is missing or the
+     * lookup throws — defensive, the report popup is still openable with the
+     * UUID in the title (better than a 500 swallowed by the forwarder).
+     * Uses {@code setAdminMode} because additional schemas may belong to
+     * organisations the current user cannot see directly.
+     */
+    private String resolveAcctSchemaName(String schemaId) {
+        try {
+            OBContext.setAdminMode(true);
+            try {
+                AcctSchema schema = OBDal.getInstance().get(AcctSchema.class, schemaId);
+                if (schema != null && schema.getName() != null) {
+                    return schema.getName();
+                }
+            } finally {
+                OBContext.restorePreviousMode();
+            }
+        } catch (Exception e) {
+            log.warn("Could not resolve AcctSchema name for id {}: {}", schemaId, e.getMessage());
+        }
+        return schemaId;
+    }
+
+    /**
+     * Writes the short-circuit response for legacy popups that carry one or more
+     * report URLs (e.g. the page rendered by {@code printPageClosePopUp(res, vars,
+     * url, title)} after a {@code Posted} action succeeds). Like
+     * {@link #writeProcessCommandForwarder(HttpServletResponse, String)}, the
+     * body is a tiny self-contained HTML that posts the {@code openLegacyReport}
+     * action to the parent window with the {@link ReportInfo} list as payload.
+     *
+     * @param res     the real response
+     * @param reports the reports extracted by {@link #extractReportsFromBody(String, String)}
+     * @throws IOException if the response writer fails
+     */
+    private void writeOpenLegacyReportForwarder(HttpServletResponse res, List<ReportInfo> reports) throws IOException {
+        String payload = buildOpenLegacyReportPayload(reports);
+        String html = String.format(OPEN_LEGACY_REPORT_FORWARDER_HTML, payload);
+
+        res.setContentType(HTML_UTF8_CONTENT_TYPE);
+        res.setCharacterEncoding(UTF8_CHARSET);
+        res.setStatus(HttpServletResponse.SC_OK);
+        res.getWriter().write(html);
+        res.getWriter().flush();
+    }
+
+    private String buildOpenLegacyReportPayload(List<ReportInfo> reports) {
+        try {
+            JSONArray reportsJson = new JSONArray();
+            for (ReportInfo r : reports) {
+                JSONObject obj = new JSONObject();
+                obj.put("processUrl", r.processUrl);
+                obj.put("tabTitle", r.tabTitle);
+                obj.put("params", r.params);
+                reportsJson.put(obj);
+            }
+            JSONObject payload = new JSONObject();
+            payload.put("reports", reportsJson);
+            return payload.toString();
+        } catch (JSONException e) {
+            log.warn("Could not build open-legacy-report payload, using fallback: {}", e.getMessage());
+            return "{\"reports\":[]}";
+        }
+    }
+
+    /**
+     * Rolls back the DAL session when the captured response is an Openbravo
+     * error popup. WAD action-button servlets (e.g. Reconciliation) catch their
+     * own {@code OBException} to render the popup, but they leave the Hibernate
+     * session with stale entities. Without this rollback, the post-request
+     * commit in the filter chain throws {@code StaleStateException}, which
+     * aborts the HTTP connection mid-stream and produces
+     * {@code ERR_INCOMPLETE_CHUNKED_ENCODING} in the browser.
+     *
+     * @param wrapper the capturing wrapper holding the legacy response body
+     */
+    private void rollbackDalSessionIfErrorPopup(HttpServletResponseLegacyWrapper wrapper) {
+        try {
+            String body = wrapper.getCapturedOutputAsString();
+            if (body == null || !body.contains(ERROR_POPUP_CLASS_MARKER)) {
+                return;
+            }
+            OBDal.getInstance().rollbackAndClose();
+            log.debug("Rolled back DAL session after detecting error popup in legacy response");
+        } catch (Exception e) {
+            log.warn("Could not rollback DAL session after error popup: {}", e.getMessage());
+        }
     }
 
     /**
@@ -622,8 +1561,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         String servletDir = (String) req.getSession(false).getAttribute("LEGACY_SERVLET_DIR");
 
         if (token == null) {
-            log.error("No token found in session for legacy follow-up request");
-            res.sendError(HttpServletResponse.SC_UNAUTHORIZED, "No authentication token for follow-up request");
+            writeRequestFailedForwarder(res, new OBException("No authentication token for follow-up request"));
             return;
         }
 
@@ -658,14 +1596,13 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
                 log.debug("Forwarding follow-up request to: {}", targetPath);
                 wrappedRequest.getRequestDispatcher(targetPath).forward(wrappedRequest, res);
             } else {
-                log.error("Could not determine target path for follow-up request. PathInfo: {}, ServletDir: {}",
-                        req.getPathInfo(), servletDir);
-                res.sendError(HttpServletResponse.SC_BAD_REQUEST, "Could not determine target servlet");
+                writeRequestFailedForwarder(res, new OBException(String.format(
+                        "Could not determine target path for follow-up request. PathInfo: %s, ServletDir: %s",
+                        req.getPathInfo(), servletDir)));
             }
 
         } catch (Exception e) {
-            log.error("Error processing legacy follow-up request: {}", e.getMessage(), e);
-            res.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Error processing follow-up request");
+            writeRequestFailedForwarder(res, e);
         }
     }
 
@@ -682,6 +1619,16 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         return extractTargetPathFromReferer(req.getHeader("Referer"));
     }
 
+    /**
+     * Best-effort extraction of the legacy target servlet path from the {@code Referer}
+     * header. Used as fallback when {@code LEGACY_SERVLET_DIR} is not yet present in
+     * the session (e.g. a follow-up request that races with the first servlet hit).
+     *
+     * <p>Returns {@code null} when the path cannot be inferred — the caller
+     * ({@link #processLegacyFollowupRequest}) treats {@code null} as "give up" and
+     * surfaces a {@code requestFailed} forwarder so the iframe shows the proper
+     * error overlay instead of Tomcat's default page.
+     */
     private String extractTargetPathFromReferer(String referer) {
         if (referer == null)
             return null;
@@ -701,9 +1648,6 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
                 int queryIndex = afterMeta.indexOf('?');
                 if (queryIndex != -1) {
                     afterMeta = afterMeta.substring(0, queryIndex);
-                }
-                if (afterMeta.endsWith(HTML_EXTENSION) && !afterMeta.contains("/")) {
-                    return "/SalesOrder" + afterMeta;
                 }
                 return afterMeta;
             }
@@ -815,11 +1759,94 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
                 "<!DOCTYPE html>\n" +
                         "<html>\n" +
                         "    <head>\n" +
-                        "        <meta charset='UTF-8'/>\n" +
+                        "        <meta charset='" + UTF8_CHARSET + "'/>\n" +
                         "        <meta http-equiv=\"refresh\" content=\"0; url='%s'\"/>\n" +
                         "    </head>\n" +
                         "</html>",
                 forwardedUrl);
+    }
+
+    private String buildFrameMenuShim() {
+        String decSep = ".";
+        String groupSep = ",";
+        String maskNum = "#,##0.00";
+        String contextPath = "";
+        try {
+            HttpServletRequest req = RequestContext.get().getRequest();
+            VariablesSecureApp vars = new VariablesSecureApp(req);
+            decSep = StringUtils.defaultIfBlank(vars.getSessionValue("#DECIMALSEPARATOR|QTYEDITION"), decSep);
+            groupSep = StringUtils.defaultIfBlank(vars.getSessionValue("#GROUPSEPARATOR|QTYEDITION"), groupSep);
+            maskNum = StringUtils.defaultIfBlank(vars.getSessionValue("#FORMATOUTPUT|QTYEDITION"), maskNum);
+            contextPath = StringUtils.defaultIfBlank(req.getContextPath(), "");
+        } catch (Exception e) {
+            log.warn("Could not read locale session values for frameMenu shim, using defaults: {}", e.getMessage());
+        }
+        return buildShimScript(escapeJs(decSep), escapeJs(groupSep), escapeJs(maskNum), escapeJs(contextPath));
+    }
+
+    private static String buildShimScript(String decSep, String groupSep, String maskNum, String contextPath) {
+        return "<script>(function(){" +
+                "var m={" +
+                "decSeparator_global:'" + decSep + "'," +
+                "groupSeparator_global:'" + groupSep + "'," +
+                "groupInterval_global:'3'," +
+                "maskNumeric_default:'" + maskNum + "'," +
+                "autosave:false," +
+                "arrMessages:[]," +
+                "arrTypes:[]," +
+                "F:{formats:[],getFormat:function(n){return '" + maskNum + "';}}," +
+                "getAppUrlFromMenu:function(){return '" + contextPath + "';}," +
+                "focus:function(){}," +
+                "document:window.document" +
+                "};" +
+                "window.frameMenu=m;" +
+                "var _shimGetFrame=function(name){" +
+                "if(name==='frameMenu')return window.frameMenu;" +
+                "try{" +
+                "if(window.parent&&window.parent.frames&&window.parent.frames[name])return window.parent.frames[name];" +
+                "return null;" +
+                "}catch(e){return null;}" +
+                "};" +
+                "window.getFrame=_shimGetFrame;" +
+                "window._shimGetFrame=_shimGetFrame;" +
+                "})();</script>";
+    }
+
+    private static String buildFrameMenuPatchScript() {
+        return "<script>(function(){" +
+                "if(typeof getFrame==='function'&&typeof window.frameMenu!=='undefined'&&window.getFrame!==window._shimGetFrame){" +
+                "var _messagesGetFrame=getFrame;" +
+                "window.getFrame=function(name){" +
+                "if(name==='frameMenu')return window.frameMenu;" +
+                "try{return _messagesGetFrame(name);}catch(e){return null;}" +
+                "};" +
+                "}" +
+                "})();</script>";
+    }
+
+    private static String escapeJs(String value) {
+        return value.replace("\\", "\\\\").replace("'", "\\'");
+    }
+
+    private String injectFrameMenuShim(String responseString) {
+        // Inject shim immediately after <head> (or <HEAD>) opening tag
+        // This ensures it runs BEFORE other scripts in <head>
+        Pattern headOpenPattern = Pattern.compile("<head[^>]*>", Pattern.CASE_INSENSITIVE);
+        Matcher matcher = headOpenPattern.matcher(responseString);
+        if (matcher.find()) {
+            String headTag = matcher.group(0);
+            String shimScript = buildFrameMenuShim();
+            responseString = responseString.replace(headTag, headTag + shimScript);
+        }
+
+        // Inject patch script before </HEAD> to wrap messages.js's getFrame
+        // This is necessary because function declarations bypass Object.defineProperty setters
+        if (responseString.contains(HEAD_CLOSE_TAG)) {
+            String patchScript = buildFrameMenuPatchScript();
+            return responseString.replace(HEAD_CLOSE_TAG, patchScript.concat(HEAD_CLOSE_TAG));
+        }
+
+        return responseString;
     }
 
     /**
@@ -847,11 +1874,17 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
                 .replace(SRC_REPLACE_STRING + "../web/", SRC_REPLACE_STRING + contextPath + WEB_PATH)
                 .replace("href=\"../web/", "href=\"" + contextPath + WEB_PATH);
 
+        responseString = injectFrameMenuShim(responseString);
+        responseString = injectSelectorPopupShim(path, responseString);
+
         if (responseString.contains(FRAMESET_CLOSE_TAG)) {
             return responseString.replace(HEAD_CLOSE_TAG, RECEIVE_AND_POST_MESSAGE_SCRIPT.concat(HEAD_CLOSE_TAG));
         }
 
         if (responseString.contains(FORM_CLOSE_TAG)) {
+            if (responseString.contains(HEAD_CLOSE_TAG)) {
+                responseString = responseString.replace(HEAD_CLOSE_TAG, POPUP_URL_FIX_SCRIPT.concat(HEAD_CLOSE_TAG));
+            }
             String resWithNewScript = responseString.replace(FORM_CLOSE_TAG,
                     FORM_CLOSE_TAG.concat(POST_MESSAGE_SCRIPT));
             resWithNewScript = resWithNewScript.replace(SRC_REPLACE_STRING + "../web/",
@@ -859,17 +1892,62 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             resWithNewScript = resWithNewScript.replace("href=\"../web/", "href=\"" + contextPath + WEB_PATH);
 
             return injectCodeAfterFunctionCall(
-                    injectCodeAfterFunctionCall(
-                            resWithNewScript,
-                            "submitThisPage\\(([^)]+)\\);",
-                            "sendMessage('processOrder');",
-                            true),
+                    resWithNewScript,
                     "close(This)?Page\\(\\);",
-                    "sendMessage('closeModal');",
+                    "sendMessage('" + LegacyMessageProtocol.ACTION_CLOSE_MODAL + "');",
                     true);
         }
 
-        return responseString;
+        return injectPopupMessageForwarder(responseString);
+    }
+
+    /**
+     * Injects the {@link #SHOW_PROCESS_MESSAGE_SCRIPT} into Openbravo classic
+     * popup-message pages (identified by {@link #POPUP_MESSAGE_MARKER}) so the
+     * title/text/type of the dialog is forwarded to the parent window via
+     * {@code postMessage} and the iframe is closed afterwards. Pages that don't
+     * match the popup template are returned unchanged.
+     *
+     * @param responseString the HTML response after all previous injections
+     * @return the HTML with the forwarder script injected before {@code </HEAD>},
+     *         or the original HTML when the popup marker or close-tag is absent
+     */
+    private String injectPopupMessageForwarder(String responseString) {
+        if (!responseString.contains(POPUP_MESSAGE_MARKER) || !responseString.contains(HEAD_CLOSE_TAG)) {
+            return responseString;
+        }
+        return responseString.replace(HEAD_CLOSE_TAG, SHOW_PROCESS_MESSAGE_SCRIPT.concat(HEAD_CLOSE_TAG));
+    }
+
+    /**
+     * Injects {@link #SELECTOR_POPUP_SHIM_SCRIPT} into Classic search/selector popups so the
+     * picked record is forwarded to the parent window via {@code postMessage} instead of the
+     * Classic {@code opener.closeSearch} call. Only standalone info-window pages are targeted
+     * (gated by {@link #isSelectorPopupPage(String, String)}); regular process/report forms
+     * are left untouched.
+     *
+     * @param path           the requested resource path
+     * @param responseString the HTML response after previous injections
+     * @return the HTML with the shim injected before {@code </HEAD>}, or the original HTML
+     *         when the page is not a selector popup
+     */
+    private String injectSelectorPopupShim(String path, String responseString) {
+        if (!isSelectorPopupPage(path, responseString) || !responseString.contains(HEAD_CLOSE_TAG)) {
+            return responseString;
+        }
+        return responseString.replace(HEAD_CLOSE_TAG, SELECTOR_POPUP_SHIM_SCRIPT.concat(HEAD_CLOSE_TAG));
+    }
+
+    /**
+     * Tells whether the response is a Classic search/selector popup page: it lives under the
+     * {@code info/} path and defines the {@code validateSelector} delivery function.
+     *
+     * @param path           the requested resource path
+     * @param responseString the captured HTML response
+     * @return {@code true} when both the path segment and the marker function are present
+     */
+    private static boolean isSelectorPopupPage(String path, String responseString) {
+        return path != null && path.contains(INFO_PATH_SEGMENT) && responseString.contains(VALIDATE_SELECTOR_MARKER);
     }
 
     private String injectCodeAfterFunctionCall(String originalRes, String originalFunctionCall, String newFunctionCall,
@@ -887,6 +1965,28 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         return result.toString();
     }
 
+    /**
+     * Same as {@link #injectCodeAfterFunctionCall} but inserts {@code newFunctionCall}
+     * BEFORE the matched call. Used when the call itself triggers navigation
+     * (e.g. {@code submitThisPage}) and we need the side-effect (e.g. postMessage)
+     * to fire before the page can unload.
+     */
+    @SuppressWarnings("unused")
+    private String injectCodeBeforeFunctionCall(String originalRes, String originalFunctionCall,
+            String newFunctionCall, boolean isRegex) {
+        Pattern pattern = isRegex ? Pattern.compile(originalFunctionCall)
+                : Pattern.compile(Pattern.quote(originalFunctionCall));
+        Matcher matcher = pattern.matcher(originalRes);
+        StringBuilder result = new StringBuilder();
+        while (matcher.find()) {
+            String original = matcher.group(0);
+            String modified = newFunctionCall + original;
+            matcher.appendReplacement(result, Matcher.quoteReplacement(modified));
+        }
+        matcher.appendTail(result);
+        return result.toString();
+    }
+    
     private static void handleCreateFromSession(HttpServletRequest req, String path, HttpSession session) {
         if (LegacyPaths.CREATE_FROM_HTML.equals(path) && "SAVE".equals(req.getParameter("Command"))) {
             String windowId = req.getParameter("inpWindowId");

@@ -17,6 +17,8 @@
 package com.etendoerp.metadata.builders;
 
 import static com.etendoerp.metadata.MetadataTestConstants.DATASOURCE_NAME;
+import static com.etendoerp.metadata.MetadataTestConstants.ETMETA_ON_GRID_LOAD;
+import static com.etendoerp.metadata.MetadataTestConstants.ETMETA_ON_PARAMETER_CHANGE;
 import static com.etendoerp.metadata.MetadataTestConstants.JS_EXPRESSION;
 import static com.etendoerp.metadata.MetadataTestConstants.PARAMETER_ID;
 import static com.etendoerp.metadata.MetadataTestConstants.READONLY_LOGIC;
@@ -43,6 +45,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.codehaus.jettison.json.JSONArray;
+import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -56,6 +59,7 @@ import org.openbravo.client.application.RefWindow;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.model.ad.domain.Reference;
 import org.openbravo.model.ad.system.Language;
+import org.openbravo.model.ad.ui.FieldGroup;
 import org.openbravo.model.ad.ui.Window;
 import org.openbravo.service.json.DataResolvingMode;
 import org.openbravo.service.json.DataToJsonConverter;
@@ -77,6 +81,17 @@ class ParameterBuilderTest {
   private Reference mockReferenceSearchKey;
 
   private static final String DISPLAY_LOGIC_EXPRESSION = "displayLogicExpression";
+  private static final String FIELD_GROUP_COLLAPSED_PROPERTY = "fieldGroupCollapsed";
+
+  /**
+   * Customizes the JSON the mocked {@link DataToJsonConverter} returns. Unlike
+   * {@link java.util.function.Consumer}, its single method may throw
+   * {@link JSONException}, mirroring {@link JSONObject#put(String, Object)}.
+   */
+  @FunctionalInterface
+  private interface ConverterJsonCustomizer {
+    void accept(JSONObject json) throws JSONException;
+  }
 
 
   /**
@@ -158,6 +173,25 @@ class ParameterBuilderTest {
    * @throws Exception if processing fails
    */
   private JSONObject executeToJSON(Runnable extraMocks, String baseName) throws Exception {
+    return executeToJSON(extraMocks, baseName, null);
+  }
+
+  /**
+   * Helper method to execute toJSON with proper static mocks and construction mocks,
+   * allowing the caller to enrich the JSON the mocked converter returns. This models
+   * the {@link DataToJsonConverter} auto-emitting additional entity properties (such
+   * as the parameter-level {@code etmeta*} hooks) so the builder's pass-through
+   * contract can be asserted.
+   *
+   * @param extraMocks additional mocking configuration to run within the mock context
+   * @param baseName optional name to include in the base JSONObject
+   * @param converterJsonCustomizer optional customizer applied to the base JSON the
+   *                                converter returns (e.g. to add etmeta keys); may be {@code null}
+   * @return the resulting JSONObject from parameterBuilder.toJSON()
+   * @throws Exception if processing fails
+   */
+  private JSONObject executeToJSON(Runnable extraMocks, String baseName,
+      ConverterJsonCustomizer converterJsonCustomizer) throws Exception {
     try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
          MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class,
              (mock, context) -> {
@@ -165,6 +199,9 @@ class ParameterBuilderTest {
                parameterJson.put("id", PARAMETER_ID);
                if (baseName != null) {
                  parameterJson.put("name", baseName);
+               }
+               if (converterJsonCustomizer != null) {
+                 converterJsonCustomizer.accept(parameterJson);
                }
                when(mock.toJsonObject(any(), eq(DataResolvingMode.FULL_TRANSLATABLE))).thenReturn(parameterJson);
              })) {
@@ -257,7 +294,7 @@ class ParameterBuilderTest {
    * Tests the toJSON method includes selector information for selector references.
    * Verifies that when a parameter has a selector reference type (table reference),
    * the method includes selector information obtained from FieldBuilder.
-   * 
+   *
    * @throws Exception if JSON processing or selector info retrieval fails
    */
   @Test
@@ -268,6 +305,25 @@ class ParameterBuilderTest {
     assertTrue(result.has(SELECTOR));
     JSONObject selector = result.getJSONObject(SELECTOR);
     assertEquals("TestDataSource", selector.getString(DATASOURCE_NAME));
+  }
+
+  /**
+   * Tests the toJSON method includes selector information for the multi-record
+   * selector reference (OBUISEL_Multi Selector). Without this, Process Definition
+   * parameters such as NotPostedDocuments.accounting_status reach the client with
+   * no `selector` block, which prevents the multi-record picker modal from
+   * resolving its datasource or grid columns.
+   *
+   * @throws Exception if JSON processing or selector info retrieval fails
+   */
+  @Test
+  void toJSONWithMultiSelectorReferenceIncludesSelectorInfo() throws Exception {
+    JSONObject result = executeSelectorTest(Constants.MULTI_SELECTOR_REFERENCE_ID, "List");
+
+    assertNotNull(result);
+    assertTrue(result.has(SELECTOR));
+    JSONObject selector = result.getJSONObject(SELECTOR);
+    assertEquals("List", selector.getString(DATASOURCE_NAME));
   }
 
   /**
@@ -481,7 +537,7 @@ class ParameterBuilderTest {
 
   /**
    * Tests the toJSON method includes reference list information for button list references.
-   * 
+   *
    * @throws Exception if JSON processing or list info retrieval fails
    */
   @Test
@@ -490,5 +546,126 @@ class ParameterBuilderTest {
 
     assertNotNull(result);
     assertTrue(result.has(REF_LIST));
+  }
+
+  /**
+   * Tests that the toJSON method emits {@code fieldGroupCollapsed = true} when the
+   * parameter's AD_FieldGroup has IsCollapsed flagged true. This mirrors the
+   * classic UI rule implemented in OBViewParamGroup#isExpanded so that the
+   * section opens collapsed by default in the new UI.
+   *
+   * @throws Exception if JSON processing fails
+   */
+  @Test
+  void toJSONEmitsFieldGroupCollapsedTrueWhenIsCollapsedIsTrue() throws Exception {
+    FieldGroup mockFieldGroup = mock(FieldGroup.class);
+    when(mockFieldGroup.isCollapsed()).thenReturn(Boolean.TRUE);
+    when(mockParameter.getFieldGroup()).thenReturn(mockFieldGroup);
+    when(mockParameter.getReadOnlyLogic()).thenReturn(null);
+    when(mockParameter.getReference()).thenReturn(null);
+
+    JSONObject result = executeToJSON(null, null);
+
+    assertNotNull(result);
+    assertTrue(result.has(FIELD_GROUP_COLLAPSED_PROPERTY));
+    assertTrue(result.getBoolean(FIELD_GROUP_COLLAPSED_PROPERTY));
+  }
+
+  /**
+   * Tests that the toJSON method emits {@code fieldGroupCollapsed = false} when the
+   * parameter's AD_FieldGroup has IsCollapsed flagged false. In the classic UI
+   * such a section opens expanded by default.
+   *
+   * @throws Exception if JSON processing fails
+   */
+  @Test
+  void toJSONEmitsFieldGroupCollapsedFalseWhenIsCollapsedIsFalse() throws Exception {
+    FieldGroup mockFieldGroup = mock(FieldGroup.class);
+    when(mockFieldGroup.isCollapsed()).thenReturn(Boolean.FALSE);
+    when(mockParameter.getFieldGroup()).thenReturn(mockFieldGroup);
+    when(mockParameter.getReadOnlyLogic()).thenReturn(null);
+    when(mockParameter.getReference()).thenReturn(null);
+
+    JSONObject result = executeToJSON(null, null);
+
+    assertNotNull(result);
+    assertTrue(result.has(FIELD_GROUP_COLLAPSED_PROPERTY));
+    assertFalse(result.getBoolean(FIELD_GROUP_COLLAPSED_PROPERTY));
+  }
+
+  /**
+   * Tests that the toJSON method omits the {@code fieldGroupCollapsed} property
+   * entirely when the parameter does not belong to a FieldGroup. The classic UI
+   * has no concept of collapsing for ungrouped parameters, so the client should
+   * not receive a flag in that case.
+   *
+   * @throws Exception if JSON processing fails
+   */
+  @Test
+  void toJSONOmitsFieldGroupCollapsedWhenParameterHasNoFieldGroup() throws Exception {
+    when(mockParameter.getFieldGroup()).thenReturn(null);
+    when(mockParameter.getReadOnlyLogic()).thenReturn(null);
+    when(mockParameter.getReference()).thenReturn(null);
+
+    JSONObject result = executeToJSON(null, null);
+
+    assertNotNull(result);
+    assertFalse(result.has(FIELD_GROUP_COLLAPSED_PROPERTY));
+  }
+
+  /**
+   * Asserts that {@code key} is present in {@code json} and holds {@link JSONObject#NULL}.
+   * Encapsulates the always-present / JSON-null contract assertion so it (and its
+   * message strings) is not repeated once per metadata key.
+   *
+   * @param json the JSON object under test
+   * @param key  the metadata key that must always be present with a JSON-null value
+   */
+  private static void assertPresentAndNull(JSONObject json, String key) {
+    assertTrue(json.has(key), key + " must always be present in the payload");
+    assertEquals(JSONObject.NULL, json.opt(key), key + " must hold JSON null when the column is empty");
+  }
+
+  /**
+   * Tests that {@code toJSON()} publishes the parameter-level
+   * {@code etmetaOnParameterChange} and {@code etmetaOnGridLoad} hooks from the
+   * entity getters when populated. They are emitted explicitly (not relied upon
+   * from the converter), so they are present regardless of the role's derived-read
+   * access to {@code OBUIAPP_Parameter}.
+   *
+   * @throws Exception if JSON processing fails
+   */
+  @Test
+  void toJSONKeepsParameterLevelEtmetaHooksWhenPopulated() throws Exception {
+    final String onParameterChangeScript = "onParameterChangeScript";
+    final String onGridLoadScript = "onGridLoadScript";
+
+    JSONObject result = executeToJSON(() -> {
+      when(mockParameter.getEtmetaOnParameterChange()).thenReturn(onParameterChangeScript);
+      when(mockParameter.getEtmetaOnGridLoad()).thenReturn(onGridLoadScript);
+    }, null, null);
+
+    assertNotNull(result);
+    assertEquals(onParameterChangeScript, result.getString(ETMETA_ON_PARAMETER_CHANGE));
+    assertEquals(onGridLoadScript, result.getString(ETMETA_ON_GRID_LOAD));
+  }
+
+  /**
+   * Locks the stable null-vs-absent contract at the parameter level: when the
+   * {@code EM_Etmeta_On_Parameter_Change} / {@code EM_Etmeta_On_Grid_Load} columns
+   * are empty (the getters return null and the converter omits them), the builder
+   * keeps both keys present (never absent) with {@link JSONObject#NULL}. A FE
+   * consumer can therefore rely on the keys always existing and only test for
+   * {@code null}.
+   *
+   * @throws Exception if JSON processing fails
+   */
+  @Test
+  void toJSONKeepsParameterLevelEtmetaHooksPresentWhenColumnsEmpty() throws Exception {
+    JSONObject result = executeToJSON(null, null, null);
+
+    assertNotNull(result);
+    assertPresentAndNull(result, ETMETA_ON_PARAMETER_CHANGE);
+    assertPresentAndNull(result, ETMETA_ON_GRID_LOAD);
   }
 }

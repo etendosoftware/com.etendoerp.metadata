@@ -63,8 +63,24 @@ public final class MetadataTestConstants {
   public static final String PARAM2_COLUMN = "param2Column";
   public static final String CONVERTER = "converter";
   public static final String COULD_NOT_SET_CONVERTER_FIELD = "Could not set converter field: ";
+  /** Legacy custom key (removed by builder); kept as constant for negative assertions. */
   public static final String ON_LOAD = "onLoad";
+  /** Legacy custom key (removed by builder); kept as constant for negative assertions. */
   public static final String ON_PROCESS = "onProcess";
+  /** Raw key produced by the ORM converter from the legacy-cased Hibernate property name. */
+  public static final String ETMETA_ONLOAD_TYPO = "eTMETAOnload";
+  /** Normalized JSON key the builder publishes for the onLoad hook. */
+  public static final String ETMETA_ONLOAD = "etmetaOnload";
+  /** Auto-emitted JSON key for the onProcess hook (already correctly cased by converter). */
+  public static final String ETMETA_ONPROCESS = "etmetaOnprocess";
+  /** Auto-emitted JSON key for the onRefresh hook (already correctly cased by converter). */
+  public static final String ETMETA_ON_REFRESH = "etmetaOnRefresh";
+  /** Auto-emitted JSON key for the shared payscript module body. */
+  public static final String ETMETA_PAYSCRIPT_LOGIC = "etmetaPayscriptLogic";
+  /** Auto-emitted JSON key for the parameter-level onParameterChange hook (clean camelCase, no rename). */
+  public static final String ETMETA_ON_PARAMETER_CHANGE = "etmetaOnParameterChange";
+  /** Auto-emitted JSON key for the parameter-level onGridLoad hook (clean camelCase, no rename). */
+  public static final String ETMETA_ON_GRID_LOAD = "etmetaOnGridLoad";
   public static final String FIELD1 = "field1";
   public static final String FILTER = "filter";
   public static final String DISPLAY_LOGIC = "displayLogic";
@@ -221,6 +237,11 @@ public final class MetadataTestConstants {
   public static final String LEGACY_REQUEST_FAILED = "Failed to process legacy request";
   public static final String ENTITY_NAME_PROPERTY = "entityName";
   public static final String IDENTIFIER_PROPERTY = "identifier";
+
+  public static final String ETAG_HEADER = "ETag";
+  public static final String CACHE_CONTROL_HEADER = "Cache-Control";
+  public static final String IF_NONE_MATCH_HEADER = "If-None-Match";
+  public static final String CACHE_CONTROL_PRIVATE_MUST_REVALIDATE = "private, must-revalidate";
 
   /**
    * Private constructor to prevent instantiation of this utility class.
