@@ -36,6 +36,8 @@ import org.apache.logging.log4j.Logger;
 import org.openbravo.client.kernel.RequestContext;
 
 import com.etendoerp.metadata.service.MetadataService;
+import com.etendoerp.metadata.service.SSOService;
+import com.etendoerp.metadata.utils.Constants;
 import com.etendoerp.metadata.utils.Utils;
 
 /**
@@ -103,6 +105,9 @@ public class MetadataFilter implements Filter {
                         return;
                     } else if (pathInfo.startsWith(forwardPath)) {
                         new ForwarderServlet().process(httpReq, httpRes);
+                        return;
+                    } else if (pathInfo.startsWith(Constants.SSO_PATH)) {
+                        new SSOService().handle(httpReq, httpRes);
                         return;
                     }
                 }
