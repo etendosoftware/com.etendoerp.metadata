@@ -42,6 +42,7 @@ public class Constants {
     public static final String MESSAGE_PATH = "/message";
     public static final String LABELS_PATH = "/labels";
     public static final String PREFERENCES_PATH = "/preferences";
+    public static final String SSO_PATH = "/sso/";
     public static final boolean DEFAULT_CHECKON_SAVE = true;
     public static final boolean DEFAULT_EDITABLE_FIELD = true;
     public static final String LIST_REFERENCE_ID = "17";
