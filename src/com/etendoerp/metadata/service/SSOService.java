@@ -74,10 +74,15 @@ public class SSOService {
     private static final String SSO_AUTH_TYPE = "sso.auth.type";
     private static final String SSO_DOMAIN_URL = "sso.domain.url";
     private static final String AUTH0 = "Auth0";
-    // ponytail: hardcoded provider list matches SSOLogin.java in etendorx — dynamic provider
-    // discovery when middleware adds/removes providers
-    private static final String[] MIDDLEWARE_PROVIDERS = {
-        "google", "microsoft", "linkedin", "github", "facebook"
+    // ponytail: provider IDs must match Auth0 connection names used by the middleware,
+    // as seen in SSOLogin.java in etendorx — dynamic discovery when middleware changes providers
+    private static final String[][] MIDDLEWARE_PROVIDERS = {
+        // { auth0ConnectionName, displayName }
+        { "google-oauth2", "google" },
+        { "windowslive", "microsoft" },
+        { "linkedin", "linkedin" },
+        { "github", "github" },
+        { "facebook", "facebook" }
     };
     private static final String MIDDLEWARE_ISSUER = "https://etendo-sso.us.auth0.com/";
 
@@ -143,7 +148,14 @@ public class SSOService {
             } finally {
                 OBContext.restorePreviousMode();
             }
-            config.put("providers", new JSONArray(java.util.Arrays.asList(MIDDLEWARE_PROVIDERS)));
+            JSONArray providers = new JSONArray();
+            for (String[] p : MIDDLEWARE_PROVIDERS) {
+                JSONObject provider = new JSONObject();
+                provider.put("id", p[0]);
+                provider.put("name", p[1]);
+                providers.put(provider);
+            }
+            config.put("providers", providers);
         }
 
         writeJson(response, HttpServletResponse.SC_OK, config);
