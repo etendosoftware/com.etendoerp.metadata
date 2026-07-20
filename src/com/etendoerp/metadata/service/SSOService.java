@@ -101,6 +101,9 @@ public class SSOService {
                 case "/callback":
                     handleCallback(request, response);
                     break;
+                case "/link":
+                    handleLink(request, response);
+                    break;
                 default:
                     writeJson(response, HttpServletResponse.SC_NOT_FOUND,
                         errorJson("not_found", "Unknown SSO endpoint: " + ssoPath));
@@ -278,6 +281,163 @@ public class SSOService {
                 errorJson("internal_error", "Authentication failed: " + e.getMessage()));
         } finally {
             OBContext.restorePreviousMode();
+        }
+    }
+
+    /**
+     * POST /meta/sso/link — links an SSO identity to the currently authenticated user.
+     * Requires a valid Etendo JWT in the Authorization header.
+     * Body: { "accessToken": "..." } (middleware) or { "code": "...", ... } (Auth0)
+     */
+    private void handleLink(HttpServletRequest request, HttpServletResponse response)
+            throws IOException, JSONException {
+        if (!"POST".equalsIgnoreCase(request.getMethod())) {
+            writeJson(response, HttpServletResponse.SC_METHOD_NOT_ALLOWED,
+                errorJson("method_not_allowed", "Use POST"));
+            return;
+        }
+
+        // Authenticate: extract user from Bearer token
+        String userId = extractUserIdFromBearer(request);
+        if (userId == null) {
+            writeJson(response, HttpServletResponse.SC_UNAUTHORIZED,
+                errorJson("unauthorized", "Valid Authorization: Bearer <token> header required"));
+            return;
+        }
+
+        Properties props = OBPropertiesProvider.getInstance().getOpenbravoProperties();
+        String authType = StringUtils.trimToEmpty(props.getProperty(SSO_AUTH_TYPE));
+
+        if (StringUtils.isBlank(authType)) {
+            writeJson(response, HttpServletResponse.SC_SERVICE_UNAVAILABLE,
+                errorJson("sso_not_configured", "SSO authentication is not configured on this server"));
+            return;
+        }
+
+        // Parse body
+        StringBuilder sb = new StringBuilder();
+        String line;
+        try (var reader = request.getReader()) {
+            while ((line = reader.readLine()) != null) {
+                sb.append(line);
+            }
+        }
+
+        JSONObject body;
+        try {
+            body = new JSONObject(sb.toString());
+        } catch (JSONException e) {
+            writeJson(response, HttpServletResponse.SC_BAD_REQUEST,
+                errorJson("invalid_request", "Request body must be valid JSON"));
+            return;
+        }
+
+        // Get the SSO token (same logic as callback)
+        String ssoToken;
+        if (AUTH0.equalsIgnoreCase(authType)) {
+            String code = body.optString("code", "");
+            if (StringUtils.isBlank(code)) {
+                writeJson(response, HttpServletResponse.SC_BAD_REQUEST,
+                    errorJson("invalid_request", "Missing required field: code"));
+                return;
+            }
+            ssoToken = exchangeCodeForToken(props, code,
+                body.optString("codeVerifier", null), body.optString("redirectUri", ""));
+            if (ssoToken == null) {
+                writeJson(response, HttpServletResponse.SC_BAD_GATEWAY,
+                    errorJson("token_exchange_failed", "Failed to exchange authorization code for token"));
+                return;
+            }
+        } else {
+            ssoToken = body.optString("accessToken", "");
+            if (StringUtils.isBlank(ssoToken)) {
+                writeJson(response, HttpServletResponse.SC_BAD_REQUEST,
+                    errorJson("invalid_request", "Missing required field: accessToken"));
+                return;
+            }
+        }
+
+        // Validate SSO token
+        if (!validateJwksToken(ssoToken, props, authType)) {
+            writeJson(response, HttpServletResponse.SC_UNAUTHORIZED,
+                errorJson("invalid_token", "SSO token signature verification failed"));
+            return;
+        }
+
+        // Decode SSO token and extract sub
+        DecodedJWT decoded = JWT.decode(ssoToken);
+        String sub = decoded.getClaim("sub").asString();
+        // Extract provider from sub (format: "provider|userId")
+        String tokenProvider = sub.contains("|") ? sub.substring(0, sub.indexOf('|')) : sub;
+
+        try {
+            OBContext.setAdminMode(true);
+
+            User user = OBDal.getInstance().get(User.class, userId);
+            if (user == null) {
+                writeJson(response, HttpServletResponse.SC_NOT_FOUND,
+                    errorJson("user_not_found", "Authenticated user not found"));
+                return;
+            }
+
+            // Delete existing link for this sub (replace, same as LinkAuth0Account)
+            ETRXTokenUser existing = (ETRXTokenUser) OBDal.getInstance()
+                .createCriteria(ETRXTokenUser.class)
+                .add(Restrictions.eq(ETRXTokenUser.PROPERTY_SUB, sub))
+                .setFilterOnReadableClients(false)
+                .setFilterOnReadableOrganization(false)
+                .setMaxResults(1)
+                .uniqueResult();
+            if (existing != null) {
+                OBDal.getInstance().remove(existing);
+                OBDal.getInstance().flush();
+            }
+
+            // Create new link
+            ETRXTokenUser tokenUser = new ETRXTokenUser();
+            tokenUser.setClient(user.getClient());
+            tokenUser.setOrganization(user.getOrganization());
+            tokenUser.setSub(sub);
+            tokenUser.setOAuthToken(ssoToken);
+            tokenUser.setTokenProvider(tokenProvider);
+            tokenUser.setUserForToken(user);
+            OBDal.getInstance().save(tokenUser);
+            OBDal.getInstance().flush();
+
+            JSONObject result = new JSONObject();
+            result.put("status", "linked");
+            result.put("provider", tokenProvider);
+            result.put("sub", sub);
+            writeJson(response, HttpServletResponse.SC_OK, result);
+
+        } catch (Exception e) {
+            log.error("SSO link error", e);
+            writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                errorJson("internal_error", "Failed to link account: " + e.getMessage()));
+        } finally {
+            OBContext.restorePreviousMode();
+        }
+    }
+
+    /**
+     * Extracts the user ID from the Authorization: Bearer header.
+     * Returns null if the header is missing or the token is invalid.
+     */
+    private String extractUserIdFromBearer(HttpServletRequest request) {
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return null;
+        }
+        String token = authHeader.substring(7).trim();
+        if (StringUtils.isBlank(token)) {
+            return null;
+        }
+        try {
+            DecodedJWT decoded = Utils.decodeToken(token);
+            return decoded.getClaim("user").asString();
+        } catch (Exception e) {
+            log.debug("Failed to decode bearer token for SSO link", e);
+            return null;
         }
     }
 
