@@ -74,10 +74,10 @@ public class SSOService {
     private static final String SSO_AUTH_TYPE = "sso.auth.type";
     private static final String SSO_DOMAIN_URL = "sso.domain.url";
     private static final String AUTH0 = "Auth0";
-    // ponytail: provider IDs must match Auth0 connection names used by the middleware,
-    // as seen in SSOLogin.java in etendorx — dynamic discovery when middleware changes providers
+    private static final String INTERNAL_ERROR = "internal_error";
+    private static final String INVALID_REQUEST = "invalid_request";
+    private static final String REDIRECT_URI_KEY = "redirectUri";
     private static final String[][] MIDDLEWARE_PROVIDERS = {
-        // { auth0ConnectionName, displayName }
         { "google-oauth2", "google" },
         { "windowslive", "microsoft" },
         { "linkedin", "linkedin" },
@@ -88,6 +88,10 @@ public class SSOService {
 
     /**
      * Routes the request to the appropriate handler based on the path.
+     *
+     * @param request  the HTTP request containing the SSO path and parameters
+     * @param response the HTTP response to write the result to
+     * @throws IOException if an I/O error occurs while handling the request
      */
     public void handle(HttpServletRequest request, HttpServletResponse response) throws IOException {
         String pathInfo = request.getPathInfo();
@@ -96,7 +100,7 @@ public class SSOService {
         try {
             switch (ssoPath) {
                 case "/config":
-                    handleConfig(request, response);
+                    handleConfig(response);
                     break;
                 case "/callback":
                     handleCallback(request, response);
@@ -112,14 +116,14 @@ public class SSOService {
         } catch (JSONException e) {
             log.error("SSO JSON error", e);
             writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
-                errorJson("internal_error", e.getMessage()));
+                errorJson(INTERNAL_ERROR, e.getMessage()));
         }
     }
 
     /**
      * GET /meta/sso/config — returns SSO configuration for the login screen.
      */
-    private void handleConfig(HttpServletRequest request, HttpServletResponse response)
+    private void handleConfig(HttpServletResponse response)
             throws IOException, JSONException {
         Properties props = OBPropertiesProvider.getInstance().getOpenbravoProperties();
         String authType = StringUtils.trimToEmpty(props.getProperty(SSO_AUTH_TYPE));
@@ -141,7 +145,7 @@ public class SSOService {
             config.put("callbackUrl", StringUtils.trimToEmpty(props.getProperty("sso.callback.url")));
         } else {
             config.put("middlewareUrl", StringUtils.trimToEmpty(props.getProperty("sso.middleware.url")));
-            config.put("redirectUri", StringUtils.trimToEmpty(props.getProperty("sso.middleware.redirectUri")));
+            config.put(REDIRECT_URI_KEY, StringUtils.trimToEmpty(props.getProperty("sso.middleware.redirectUri")));
             try {
                 OBContext.setAdminMode(true);
                 config.put("accountId", SystemInfo.getSystemIdentifier());
@@ -184,58 +188,22 @@ public class SSOService {
             return;
         }
 
-        // Read and parse POST body
-        StringBuilder sb = new StringBuilder();
-        String line;
-        try (var reader = request.getReader()) {
-            while ((line = reader.readLine()) != null) {
-                sb.append(line);
-            }
-        }
-
-        JSONObject body;
-        try {
-            body = new JSONObject(sb.toString());
-        } catch (JSONException e) {
-            writeJson(response, HttpServletResponse.SC_BAD_REQUEST,
-                errorJson("invalid_request", "Request body must be valid JSON"));
+        JSONObject body = parseJsonBody(request, response);
+        if (body == null) {
             return;
         }
-        String idToken;
 
-        if (AUTH0.equalsIgnoreCase(authType)) {
-            String code = body.optString("code", "");
-            if (StringUtils.isBlank(code)) {
-                writeJson(response, HttpServletResponse.SC_BAD_REQUEST,
-                    errorJson("invalid_request", "Missing required field: code"));
-                return;
-            }
-            String codeVerifier = body.optString("codeVerifier", null);
-            String redirectUri = body.optString("redirectUri", "");
-            idToken = exchangeCodeForToken(props, code, codeVerifier, redirectUri);
-            if (idToken == null) {
-                writeJson(response, HttpServletResponse.SC_BAD_GATEWAY,
-                    errorJson("token_exchange_failed", "Failed to exchange authorization code for token"));
-                return;
-            }
-        } else {
-            // Middleware: token comes directly
-            idToken = body.optString("accessToken", "");
-            if (StringUtils.isBlank(idToken)) {
-                writeJson(response, HttpServletResponse.SC_BAD_REQUEST,
-                    errorJson("invalid_request", "Missing required field: accessToken"));
-                return;
-            }
+        String idToken = resolveSsoToken(body, props, authType, response);
+        if (idToken == null) {
+            return;
         }
 
-        // Validate token via JWKS
         if (!validateJwksToken(idToken, props, authType)) {
             writeJson(response, HttpServletResponse.SC_UNAUTHORIZED,
                 errorJson("invalid_token", "JWT signature verification failed"));
             return;
         }
 
-        // Decode and match user
         DecodedJWT decoded = JWT.decode(idToken);
         String sub = decoded.getClaim("sub").asString();
 
@@ -257,7 +225,6 @@ public class SSOService {
                 return;
             }
 
-            // Update stored OAuth token
             tokenUser.setOAuthToken(idToken);
             OBDal.getInstance().save(tokenUser);
             OBDal.getInstance().flush();
@@ -278,7 +245,7 @@ public class SSOService {
         } catch (Exception e) {
             log.error("SSO callback error", e);
             writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
-                errorJson("internal_error", "Authentication failed: " + e.getMessage()));
+                errorJson(INTERNAL_ERROR, "Authentication failed: " + e.getMessage()));
         } finally {
             OBContext.restorePreviousMode();
         }
@@ -297,7 +264,6 @@ public class SSOService {
             return;
         }
 
-        // Authenticate: extract user from Bearer token
         String userId = extractUserIdFromBearer(request);
         if (userId == null) {
             writeJson(response, HttpServletResponse.SC_UNAUTHORIZED,
@@ -314,60 +280,24 @@ public class SSOService {
             return;
         }
 
-        // Parse body
-        StringBuilder sb = new StringBuilder();
-        String line;
-        try (var reader = request.getReader()) {
-            while ((line = reader.readLine()) != null) {
-                sb.append(line);
-            }
-        }
-
-        JSONObject body;
-        try {
-            body = new JSONObject(sb.toString());
-        } catch (JSONException e) {
-            writeJson(response, HttpServletResponse.SC_BAD_REQUEST,
-                errorJson("invalid_request", "Request body must be valid JSON"));
+        JSONObject body = parseJsonBody(request, response);
+        if (body == null) {
             return;
         }
 
-        // Get the SSO token (same logic as callback)
-        String ssoToken;
-        if (AUTH0.equalsIgnoreCase(authType)) {
-            String code = body.optString("code", "");
-            if (StringUtils.isBlank(code)) {
-                writeJson(response, HttpServletResponse.SC_BAD_REQUEST,
-                    errorJson("invalid_request", "Missing required field: code"));
-                return;
-            }
-            ssoToken = exchangeCodeForToken(props, code,
-                body.optString("codeVerifier", null), body.optString("redirectUri", ""));
-            if (ssoToken == null) {
-                writeJson(response, HttpServletResponse.SC_BAD_GATEWAY,
-                    errorJson("token_exchange_failed", "Failed to exchange authorization code for token"));
-                return;
-            }
-        } else {
-            ssoToken = body.optString("accessToken", "");
-            if (StringUtils.isBlank(ssoToken)) {
-                writeJson(response, HttpServletResponse.SC_BAD_REQUEST,
-                    errorJson("invalid_request", "Missing required field: accessToken"));
-                return;
-            }
+        String ssoToken = resolveSsoToken(body, props, authType, response);
+        if (ssoToken == null) {
+            return;
         }
 
-        // Validate SSO token
         if (!validateJwksToken(ssoToken, props, authType)) {
             writeJson(response, HttpServletResponse.SC_UNAUTHORIZED,
                 errorJson("invalid_token", "SSO token signature verification failed"));
             return;
         }
 
-        // Decode SSO token and extract sub
         DecodedJWT decoded = JWT.decode(ssoToken);
         String sub = decoded.getClaim("sub").asString();
-        // Extract provider from sub (format: "provider|userId")
         String tokenProvider = sub.contains("|") ? sub.substring(0, sub.indexOf('|')) : sub;
 
         try {
@@ -380,7 +310,6 @@ public class SSOService {
                 return;
             }
 
-            // Delete existing link for this sub (replace, same as LinkAuth0Account)
             ETRXTokenUser existing = (ETRXTokenUser) OBDal.getInstance()
                 .createCriteria(ETRXTokenUser.class)
                 .add(Restrictions.eq(ETRXTokenUser.PROPERTY_SUB, sub))
@@ -393,7 +322,6 @@ public class SSOService {
                 OBDal.getInstance().flush();
             }
 
-            // Create new link
             ETRXTokenUser tokenUser = new ETRXTokenUser();
             tokenUser.setClient(user.getClient());
             tokenUser.setOrganization(user.getOrganization());
@@ -413,7 +341,7 @@ public class SSOService {
         } catch (Exception e) {
             log.error("SSO link error", e);
             writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
-                errorJson("internal_error", "Failed to link account: " + e.getMessage()));
+                errorJson(INTERNAL_ERROR, "Failed to link account: " + e.getMessage()));
         } finally {
             OBContext.restorePreviousMode();
         }
@@ -439,6 +367,60 @@ public class SSOService {
             log.debug("Failed to decode bearer token for SSO link", e);
             return null;
         }
+    }
+
+    /**
+     * Reads and parses the JSON body from the request.
+     * Returns null and writes a 400 error response if the body is not valid JSON.
+     */
+    private JSONObject parseJsonBody(HttpServletRequest request, HttpServletResponse response)
+            throws IOException {
+        StringBuilder sb = new StringBuilder();
+        String line;
+        try (var reader = request.getReader()) {
+            while ((line = reader.readLine()) != null) {
+                sb.append(line);
+            }
+        }
+        try {
+            return new JSONObject(sb.toString());
+        } catch (JSONException e) {
+            writeJson(response, HttpServletResponse.SC_BAD_REQUEST,
+                errorJson(INVALID_REQUEST, "Request body must be valid JSON"));
+            return null;
+        }
+    }
+
+    /**
+     * Resolves the SSO token from the request body based on auth type.
+     * For Auth0, exchanges the authorization code. For middleware, extracts the access token directly.
+     * Returns null and writes an error response if resolution fails.
+     */
+    private String resolveSsoToken(JSONObject body, Properties props, String authType,
+            HttpServletResponse response) throws IOException, JSONException {
+        if (AUTH0.equalsIgnoreCase(authType)) {
+            String code = body.optString("code", "");
+            if (StringUtils.isBlank(code)) {
+                writeJson(response, HttpServletResponse.SC_BAD_REQUEST,
+                    errorJson(INVALID_REQUEST, "Missing required field: code"));
+                return null;
+            }
+            String codeVerifier = body.optString("codeVerifier", null);
+            String redirectUri = body.optString(REDIRECT_URI_KEY, "");
+            String token = exchangeCodeForToken(props, code, codeVerifier, redirectUri);
+            if (token == null) {
+                writeJson(response, HttpServletResponse.SC_BAD_GATEWAY,
+                    errorJson("token_exchange_failed", "Failed to exchange authorization code for token"));
+            }
+            return token;
+        }
+        String token = body.optString("accessToken", "");
+        if (StringUtils.isBlank(token)) {
+            writeJson(response, HttpServletResponse.SC_BAD_REQUEST,
+                errorJson(INVALID_REQUEST, "Missing required field: accessToken"));
+            return null;
+        }
+        return token;
     }
 
     /**
@@ -551,7 +533,7 @@ public class SSOService {
             json.put("message", message);
             return json;
         } catch (JSONException e) {
-            throw new RuntimeException(e);
+            throw new IllegalStateException("Failed to build error JSON", e);
         }
     }
 }

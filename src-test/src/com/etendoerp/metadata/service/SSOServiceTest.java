@@ -46,6 +46,12 @@ import org.openbravo.erpCommon.utility.SystemInfo;
 @MockitoSettings(strictness = Strictness.LENIENT)
 class SSOServiceTest {
 
+    private static final String SSO_CONFIG_PATH = "/sso/config";
+    private static final String SSO_CALLBACK_PATH = "/sso/callback";
+    private static final String ENABLED_KEY = "enabled";
+    private static final String SSO_AUTH_TYPE_PROP = "sso.auth.type";
+    private static final String AUTH0_TYPE = "Auth0";
+
     @Mock
     private HttpServletRequest request;
 
@@ -63,21 +69,29 @@ class SSOServiceTest {
         when(response.getWriter()).thenReturn(new PrintWriter(responseWriter));
     }
 
+    private void mockProperties(MockedStatic<OBPropertiesProvider> providerStatic, Properties props) {
+        providerStatic.when(OBPropertiesProvider::getInstance).thenReturn(propertiesProvider);
+        when(propertiesProvider.getOpenbravoProperties()).thenReturn(props);
+    }
+
+    private void setupRequest(String path, String method) {
+        when(request.getPathInfo()).thenReturn(path);
+        when(request.getMethod()).thenReturn(method);
+    }
+
+    private JSONObject executeAndParse() throws Exception {
+        new SSOService().handle(request, response);
+        return new JSONObject(responseWriter.toString());
+    }
+
     @Test
     void configReturnsDisabledWhenNoSSOConfigured() throws Exception {
         try (MockedStatic<OBPropertiesProvider> providerStatic = mockStatic(OBPropertiesProvider.class)) {
-            Properties props = new Properties();
-            providerStatic.when(OBPropertiesProvider::getInstance).thenReturn(propertiesProvider);
-            when(propertiesProvider.getOpenbravoProperties()).thenReturn(props);
+            mockProperties(providerStatic, new Properties());
+            setupRequest(SSO_CONFIG_PATH, "GET");
 
-            when(request.getPathInfo()).thenReturn("/sso/config");
-            when(request.getMethod()).thenReturn("GET");
-
-            SSOService service = new SSOService();
-            service.handle(request, response);
-
-            JSONObject result = new JSONObject(responseWriter.toString());
-            assertFalse(result.getBoolean("enabled"));
+            JSONObject result = executeAndParse();
+            assertFalse(result.getBoolean(ENABLED_KEY));
         }
     }
 
@@ -85,23 +99,17 @@ class SSOServiceTest {
     void configReturnsAuth0Config() throws Exception {
         try (MockedStatic<OBPropertiesProvider> providerStatic = mockStatic(OBPropertiesProvider.class)) {
             Properties props = new Properties();
-            props.setProperty("sso.auth.type", "Auth0");
+            props.setProperty(SSO_AUTH_TYPE_PROP, AUTH0_TYPE);
             props.setProperty("sso.domain.url", "etendo.auth0.com");
             props.setProperty("sso.client.id", "test-client-id");
             props.setProperty("sso.callback.url", "http://localhost:8080/etendo/callback");
 
-            providerStatic.when(OBPropertiesProvider::getInstance).thenReturn(propertiesProvider);
-            when(propertiesProvider.getOpenbravoProperties()).thenReturn(props);
+            mockProperties(providerStatic, props);
+            setupRequest(SSO_CONFIG_PATH, "GET");
 
-            when(request.getPathInfo()).thenReturn("/sso/config");
-            when(request.getMethod()).thenReturn("GET");
-
-            SSOService service = new SSOService();
-            service.handle(request, response);
-
-            JSONObject result = new JSONObject(responseWriter.toString());
-            assertTrue(result.getBoolean("enabled"));
-            assertEquals("Auth0", result.getString("authType"));
+            JSONObject result = executeAndParse();
+            assertTrue(result.getBoolean(ENABLED_KEY));
+            assertEquals(AUTH0_TYPE, result.getString("authType"));
             assertEquals("etendo.auth0.com", result.getString("domain"));
             assertEquals("test-client-id", result.getString("clientId"));
         }
@@ -113,22 +121,16 @@ class SSOServiceTest {
              MockedStatic<SystemInfo> systemInfoStatic = mockStatic(SystemInfo.class);
              MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class)) {
             Properties props = new Properties();
-            props.setProperty("sso.auth.type", "Middleware");
+            props.setProperty(SSO_AUTH_TYPE_PROP, "Middleware");
             props.setProperty("sso.middleware.url", "http://middleware:3000");
             props.setProperty("sso.middleware.redirectUri", "http://localhost:8080/etendo/saveToken");
 
-            providerStatic.when(OBPropertiesProvider::getInstance).thenReturn(propertiesProvider);
-            when(propertiesProvider.getOpenbravoProperties()).thenReturn(props);
+            mockProperties(providerStatic, props);
             systemInfoStatic.when(SystemInfo::getSystemIdentifier).thenReturn("test-account-id");
+            setupRequest(SSO_CONFIG_PATH, "GET");
 
-            when(request.getPathInfo()).thenReturn("/sso/config");
-            when(request.getMethod()).thenReturn("GET");
-
-            SSOService service = new SSOService();
-            service.handle(request, response);
-
-            JSONObject result = new JSONObject(responseWriter.toString());
-            assertTrue(result.getBoolean("enabled"));
+            JSONObject result = executeAndParse();
+            assertTrue(result.getBoolean(ENABLED_KEY));
             assertEquals("Middleware", result.getString("authType"));
             assertEquals("http://middleware:3000", result.getString("middlewareUrl"));
             assertEquals("test-account-id", result.getString("accountId"));
@@ -137,28 +139,22 @@ class SSOServiceTest {
 
     @Test
     void callbackRejectsGetMethod() throws Exception {
-        when(request.getPathInfo()).thenReturn("/sso/callback");
-        when(request.getMethod()).thenReturn("GET");
+        setupRequest(SSO_CALLBACK_PATH, "GET");
 
-        SSOService service = new SSOService();
-        service.handle(request, response);
+        new SSOService().handle(request, response);
 
         verify(response).setStatus(HttpServletResponse.SC_METHOD_NOT_ALLOWED);
     }
 
     @Test
     void callbackRejectsMissingAuthType() throws Exception {
-        when(request.getPathInfo()).thenReturn("/sso/callback");
-        when(request.getMethod()).thenReturn("POST");
+        setupRequest(SSO_CALLBACK_PATH, "POST");
         when(request.getReader()).thenReturn(new BufferedReader(new StringReader("{}")));
 
         try (MockedStatic<OBPropertiesProvider> providerStatic = mockStatic(OBPropertiesProvider.class)) {
-            Properties props = new Properties();
-            providerStatic.when(OBPropertiesProvider::getInstance).thenReturn(propertiesProvider);
-            when(propertiesProvider.getOpenbravoProperties()).thenReturn(props);
+            mockProperties(providerStatic, new Properties());
 
-            SSOService service = new SSOService();
-            service.handle(request, response);
+            new SSOService().handle(request, response);
 
             verify(response).setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
         }
@@ -166,41 +162,31 @@ class SSOServiceTest {
 
     @Test
     void callbackRejectsMalformedJson() throws Exception {
-        when(request.getPathInfo()).thenReturn("/sso/callback");
-        when(request.getMethod()).thenReturn("POST");
+        setupRequest(SSO_CALLBACK_PATH, "POST");
         when(request.getReader()).thenReturn(new BufferedReader(new StringReader("not json")));
 
         try (MockedStatic<OBPropertiesProvider> providerStatic = mockStatic(OBPropertiesProvider.class)) {
             Properties props = new Properties();
-            props.setProperty("sso.auth.type", "Auth0");
-            providerStatic.when(OBPropertiesProvider::getInstance).thenReturn(propertiesProvider);
-            when(propertiesProvider.getOpenbravoProperties()).thenReturn(props);
+            props.setProperty(SSO_AUTH_TYPE_PROP, AUTH0_TYPE);
+            mockProperties(providerStatic, props);
 
-            SSOService service = new SSOService();
-            service.handle(request, response);
-
-            JSONObject result = new JSONObject(responseWriter.toString());
+            JSONObject result = executeAndParse();
             assertEquals("invalid_request", result.getString("error"));
         }
     }
 
     @Test
     void callbackRejectsMissingCodeForAuth0() throws Exception {
-        when(request.getPathInfo()).thenReturn("/sso/callback");
-        when(request.getMethod()).thenReturn("POST");
+        setupRequest(SSO_CALLBACK_PATH, "POST");
         when(request.getReader()).thenReturn(
             new BufferedReader(new StringReader("{\"authType\":\"Auth0\"}")));
 
         try (MockedStatic<OBPropertiesProvider> providerStatic = mockStatic(OBPropertiesProvider.class)) {
             Properties props = new Properties();
-            props.setProperty("sso.auth.type", "Auth0");
-            providerStatic.when(OBPropertiesProvider::getInstance).thenReturn(propertiesProvider);
-            when(propertiesProvider.getOpenbravoProperties()).thenReturn(props);
+            props.setProperty(SSO_AUTH_TYPE_PROP, AUTH0_TYPE);
+            mockProperties(providerStatic, props);
 
-            SSOService service = new SSOService();
-            service.handle(request, response);
-
-            JSONObject result = new JSONObject(responseWriter.toString());
+            JSONObject result = executeAndParse();
             assertEquals("invalid_request", result.getString("error"));
         }
     }
@@ -209,8 +195,7 @@ class SSOServiceTest {
     void unknownPathReturns404() throws Exception {
         when(request.getPathInfo()).thenReturn("/sso/unknown");
 
-        SSOService service = new SSOService();
-        service.handle(request, response);
+        new SSOService().handle(request, response);
 
         verify(response).setStatus(HttpServletResponse.SC_NOT_FOUND);
     }
