@@ -42,15 +42,23 @@ import org.openbravo.base.session.OBPropertiesProvider;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.erpCommon.utility.SystemInfo;
 
+import com.etendoerp.metadata.auth.Utils;
+
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class SSOServiceTest {
 
     private static final String SSO_CONFIG_PATH = "/sso/config";
     private static final String SSO_CALLBACK_PATH = "/sso/callback";
+    private static final String SSO_LINK_PATH = "/sso/link";
     private static final String ENABLED_KEY = "enabled";
     private static final String SSO_AUTH_TYPE_PROP = "sso.auth.type";
     private static final String AUTH0_TYPE = "Auth0";
+    private static final String MIDDLEWARE_TYPE = "Middleware";
+    private static final String ERROR_KEY = "error";
+    private static final String INVALID_REQUEST_ERROR = "invalid_request";
+    private static final String UNAUTHORIZED_ERROR = "unauthorized";
+    private static final String AUTHORIZATION_HEADER = "Authorization";
 
     @Mock
     private HttpServletRequest request;
@@ -121,7 +129,7 @@ class SSOServiceTest {
              MockedStatic<SystemInfo> systemInfoStatic = mockStatic(SystemInfo.class);
              MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class)) {
             Properties props = new Properties();
-            props.setProperty(SSO_AUTH_TYPE_PROP, "Middleware");
+            props.setProperty(SSO_AUTH_TYPE_PROP, MIDDLEWARE_TYPE);
             props.setProperty("sso.middleware.url", "http://middleware:3000");
             props.setProperty("sso.middleware.redirectUri", "http://localhost:8080/etendo/saveToken");
 
@@ -131,7 +139,7 @@ class SSOServiceTest {
 
             JSONObject result = executeAndParse();
             assertTrue(result.getBoolean(ENABLED_KEY));
-            assertEquals("Middleware", result.getString("authType"));
+            assertEquals(MIDDLEWARE_TYPE, result.getString("authType"));
             assertEquals("http://middleware:3000", result.getString("middlewareUrl"));
             assertEquals("test-account-id", result.getString("accountId"));
         }
@@ -171,7 +179,7 @@ class SSOServiceTest {
             mockProperties(providerStatic, props);
 
             JSONObject result = executeAndParse();
-            assertEquals("invalid_request", result.getString("error"));
+            assertEquals(INVALID_REQUEST_ERROR, result.getString(ERROR_KEY));
         }
     }
 
@@ -187,7 +195,7 @@ class SSOServiceTest {
             mockProperties(providerStatic, props);
 
             JSONObject result = executeAndParse();
-            assertEquals("invalid_request", result.getString("error"));
+            assertEquals(INVALID_REQUEST_ERROR, result.getString(ERROR_KEY));
         }
     }
 
@@ -198,5 +206,158 @@ class SSOServiceTest {
         new SSOService().handle(request, response);
 
         verify(response).setStatus(HttpServletResponse.SC_NOT_FOUND);
+    }
+
+    // --- /sso/link tests ---
+
+    @Test
+    void linkRejectsGetMethod() throws Exception {
+        setupRequest(SSO_LINK_PATH, "GET");
+
+        new SSOService().handle(request, response);
+
+        verify(response).setStatus(HttpServletResponse.SC_METHOD_NOT_ALLOWED);
+    }
+
+    @Test
+    void linkRejectsNoAuthorizationHeader() throws Exception {
+        setupRequest(SSO_LINK_PATH, "POST");
+        when(request.getHeader(AUTHORIZATION_HEADER)).thenReturn(null);
+
+        JSONObject result = executeAndParse();
+        assertEquals(UNAUTHORIZED_ERROR, result.getString(ERROR_KEY));
+    }
+
+    @Test
+    void linkRejectsEmptyBearerToken() throws Exception {
+        setupRequest(SSO_LINK_PATH, "POST");
+        when(request.getHeader(AUTHORIZATION_HEADER)).thenReturn("Bearer   ");
+
+        JSONObject result = executeAndParse();
+        assertEquals(UNAUTHORIZED_ERROR, result.getString(ERROR_KEY));
+    }
+
+    @Test
+    void linkRejectsInvalidBearerToken() throws Exception {
+        setupRequest(SSO_LINK_PATH, "POST");
+        when(request.getHeader(AUTHORIZATION_HEADER)).thenReturn("Bearer invalid-token");
+
+        try (MockedStatic<Utils> utilsStatic = mockStatic(Utils.class)) {
+            utilsStatic.when(() -> Utils.decodeToken("invalid-token"))
+                .thenThrow(new RuntimeException("bad token"));
+
+            JSONObject result = executeAndParse();
+            assertEquals(UNAUTHORIZED_ERROR, result.getString(ERROR_KEY));
+        }
+    }
+
+    @Test
+    void linkRejectsMissingAuthType() throws Exception {
+        setupRequest(SSO_LINK_PATH, "POST");
+        setupValidBearerToken();
+
+        try (MockedStatic<OBPropertiesProvider> providerStatic = mockStatic(OBPropertiesProvider.class);
+             MockedStatic<Utils> utilsStatic = mockStatic(Utils.class)) {
+            mockValidBearer(utilsStatic);
+            mockProperties(providerStatic, new Properties());
+
+            new SSOService().handle(request, response);
+
+            verify(response).setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
+        }
+    }
+
+    @Test
+    void linkRejectsMalformedJson() throws Exception {
+        setupRequest(SSO_LINK_PATH, "POST");
+        setupValidBearerToken();
+        when(request.getReader()).thenReturn(new BufferedReader(new StringReader("not json")));
+
+        try (MockedStatic<OBPropertiesProvider> providerStatic = mockStatic(OBPropertiesProvider.class);
+             MockedStatic<Utils> utilsStatic = mockStatic(Utils.class)) {
+            mockValidBearer(utilsStatic);
+            Properties props = new Properties();
+            props.setProperty(SSO_AUTH_TYPE_PROP, AUTH0_TYPE);
+            mockProperties(providerStatic, props);
+
+            JSONObject result = executeAndParse();
+            assertEquals(INVALID_REQUEST_ERROR, result.getString(ERROR_KEY));
+        }
+    }
+
+    @Test
+    void linkRejectsMissingCodeForAuth0() throws Exception {
+        setupRequest(SSO_LINK_PATH, "POST");
+        setupValidBearerToken();
+        when(request.getReader()).thenReturn(new BufferedReader(new StringReader("{}")));
+
+        try (MockedStatic<OBPropertiesProvider> providerStatic = mockStatic(OBPropertiesProvider.class);
+             MockedStatic<Utils> utilsStatic = mockStatic(Utils.class)) {
+            mockValidBearer(utilsStatic);
+            Properties props = new Properties();
+            props.setProperty(SSO_AUTH_TYPE_PROP, AUTH0_TYPE);
+            mockProperties(providerStatic, props);
+
+            JSONObject result = executeAndParse();
+            assertEquals(INVALID_REQUEST_ERROR, result.getString(ERROR_KEY));
+        }
+    }
+
+    @Test
+    void linkRejectsMissingAccessTokenForMiddleware() throws Exception {
+        setupRequest(SSO_LINK_PATH, "POST");
+        setupValidBearerToken();
+        when(request.getReader()).thenReturn(new BufferedReader(new StringReader("{}")));
+
+        try (MockedStatic<OBPropertiesProvider> providerStatic = mockStatic(OBPropertiesProvider.class);
+             MockedStatic<Utils> utilsStatic = mockStatic(Utils.class)) {
+            mockValidBearer(utilsStatic);
+            Properties props = new Properties();
+            props.setProperty(SSO_AUTH_TYPE_PROP, MIDDLEWARE_TYPE);
+            mockProperties(providerStatic, props);
+
+            JSONObject result = executeAndParse();
+            assertEquals(INVALID_REQUEST_ERROR, result.getString(ERROR_KEY));
+        }
+    }
+
+    // --- middleware callback tests ---
+
+    @Test
+    void callbackRejectsMissingAccessTokenForMiddleware() throws Exception {
+        setupRequest(SSO_CALLBACK_PATH, "POST");
+        when(request.getReader()).thenReturn(new BufferedReader(new StringReader("{}")));
+
+        try (MockedStatic<OBPropertiesProvider> providerStatic = mockStatic(OBPropertiesProvider.class)) {
+            Properties props = new Properties();
+            props.setProperty(SSO_AUTH_TYPE_PROP, MIDDLEWARE_TYPE);
+            mockProperties(providerStatic, props);
+
+            JSONObject result = executeAndParse();
+            assertEquals(INVALID_REQUEST_ERROR, result.getString(ERROR_KEY));
+        }
+    }
+
+    @Test
+    void linkRejectsNonBearerAuthorizationHeader() throws Exception {
+        setupRequest(SSO_LINK_PATH, "POST");
+        when(request.getHeader(AUTHORIZATION_HEADER)).thenReturn("Basic dXNlcjpwYXNz");
+
+        JSONObject result = executeAndParse();
+        assertEquals(UNAUTHORIZED_ERROR, result.getString(ERROR_KEY));
+    }
+
+    // --- helpers for bearer token mocking ---
+
+    private void setupValidBearerToken() {
+        when(request.getHeader(AUTHORIZATION_HEADER)).thenReturn("Bearer valid-test-token");
+    }
+
+    private void mockValidBearer(MockedStatic<Utils> utilsStatic) {
+        com.auth0.jwt.interfaces.DecodedJWT mockJwt = mock(com.auth0.jwt.interfaces.DecodedJWT.class);
+        com.auth0.jwt.interfaces.Claim mockClaim = mock(com.auth0.jwt.interfaces.Claim.class);
+        when(mockClaim.asString()).thenReturn("test-user-id");
+        when(mockJwt.getClaim("user")).thenReturn(mockClaim);
+        utilsStatic.when(() -> Utils.decodeToken("valid-test-token")).thenReturn(mockJwt);
     }
 }
