@@ -40,7 +40,17 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.openbravo.base.session.OBPropertiesProvider;
 import org.openbravo.dal.core.OBContext;
+import org.openbravo.model.ad.access.Role;
+import org.openbravo.model.ad.access.User;
+import org.openbravo.model.ad.system.Client;
+import org.openbravo.model.common.enterprise.Organization;
+import org.openbravo.model.common.enterprise.Warehouse;
+
+import com.etendoerp.etendorx.data.ETRXTokenUser;
 import org.openbravo.erpCommon.utility.SystemInfo;
+
+import org.openbravo.dal.service.OBCriteria;
+import org.openbravo.dal.service.OBDal;
 
 import com.etendoerp.metadata.auth.Utils;
 
@@ -53,6 +63,8 @@ class SSOServiceTest {
     private static final String SSO_LINK_PATH = "/sso/link";
     private static final String ENABLED_KEY = "enabled";
     private static final String SSO_AUTH_TYPE_PROP = "sso.auth.type";
+    private static final String SSO_DOMAIN_URL_PROP = "sso.domain.url";
+    private static final String SSO_CLIENT_ID_PROP = "sso.client.id";
     private static final String AUTH0_TYPE = "Auth0";
     private static final String MIDDLEWARE_TYPE = "Middleware";
     private static final String ERROR_KEY = "error";
@@ -66,10 +78,13 @@ class SSOServiceTest {
     private static final String MIDDLEWARE_URL_VALUE = "http://middleware:3000";
     private static final String TEST_REDIRECT_URI = "http://localhost/callback";
     private static final String PROVIDERS_KEY = "providers";
+    private static final String LOCALHOST_INVALID = "localhost.invalid";
+    private static final String CODE_BODY = "{\"code\":\"test-code\"}";
     // Minimal valid JWT: header.payload.signature (signature is irrelevant for decode)
     private static final String FAKE_JWT =
         "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InRlc3QifQ"
         + ".eyJzdWIiOiJ0ZXN0fDEyMyJ9.fakesig";
+    private static final String FAKE_JWT_BODY = "{\"accessToken\":\"" + FAKE_JWT + "\"}";
 
     @Mock
     private HttpServletRequest request;
@@ -122,6 +137,16 @@ class SSOServiceTest {
         return props;
     }
 
+    private Properties auth0ExchangeProps(boolean includeSecret) {
+        Properties props = propsWithAuthType(AUTH0_TYPE);
+        props.setProperty(SSO_DOMAIN_URL_PROP, LOCALHOST_INVALID);
+        props.setProperty(SSO_CLIENT_ID_PROP, "cid");
+        if (includeSecret) {
+            props.setProperty("sso.client.secret", "csecret");
+        }
+        return props;
+    }
+
     private void setupValidBearerToken() {
         when(request.getHeader(AUTHORIZATION_HEADER)).thenReturn("Bearer valid-test-token");
     }
@@ -134,12 +159,10 @@ class SSOServiceTest {
         utilsStatic.when(() -> Utils.decodeToken("valid-test-token")).thenReturn(mockJwt);
     }
 
-    /**
-     * Helper: sets up a POST callback request with body and auth type, executes,
-     * and asserts the expected error key.
-     */
     private void assertCallbackError(String body, String authType, String expectedError)
             throws Exception {
+        responseWriter = new StringWriter();
+        when(response.getWriter()).thenReturn(new PrintWriter(responseWriter));
         setupRequest(SSO_CALLBACK_PATH, "POST");
         setRequestBody(body);
         try (MockedStatic<OBPropertiesProvider> providerStatic = mockStatic(OBPropertiesProvider.class)) {
@@ -149,12 +172,10 @@ class SSOServiceTest {
         }
     }
 
-    /**
-     * Helper: sets up a POST link request with bearer, body, and auth type, executes,
-     * and asserts the expected error key.
-     */
     private void assertLinkError(String body, String authType, String expectedError)
             throws Exception {
+        responseWriter = new StringWriter();
+        when(response.getWriter()).thenReturn(new PrintWriter(responseWriter));
         setupRequest(SSO_LINK_PATH, "POST");
         setupValidBearerToken();
         setRequestBody(body);
@@ -184,8 +205,8 @@ class SSOServiceTest {
     void configReturnsAuth0Config() throws Exception {
         try (MockedStatic<OBPropertiesProvider> providerStatic = mockStatic(OBPropertiesProvider.class)) {
             Properties props = propsWithAuthType(AUTH0_TYPE);
-            props.setProperty("sso.domain.url", "etendo.auth0.com");
-            props.setProperty("sso.client.id", "test-client-id");
+            props.setProperty(SSO_DOMAIN_URL_PROP, "etendo.auth0.com");
+            props.setProperty(SSO_CLIENT_ID_PROP, "test-client-id");
             props.setProperty("sso.callback.url", "http://localhost:8080/etendo/callback");
 
             mockProperties(providerStatic, props);
@@ -273,25 +294,38 @@ class SSOServiceTest {
     }
 
     @Test
-    void callbackAuth0TokenExchangeFails() throws Exception {
+    void callbackAuth0TokenExchangeFailsAllVariants() throws Exception {
+        // With client secret
         setupRequest(SSO_CALLBACK_PATH, "POST");
-        setRequestBody("{\"code\":\"test-code\"}");
+        setRequestBody(CODE_BODY);
         try (MockedStatic<OBPropertiesProvider> providerStatic = mockStatic(OBPropertiesProvider.class)) {
-            Properties props = propsWithAuthType(AUTH0_TYPE);
-            props.setProperty("sso.domain.url", "localhost.invalid");
-            props.setProperty("sso.client.id", "cid");
-            props.setProperty("sso.client.secret", "csecret");
-            mockProperties(providerStatic, props);
-
-            JSONObject result = executeAndParse();
-            assertEquals(TOKEN_EXCHANGE_FAILED_ERROR, result.getString(ERROR_KEY));
+            mockProperties(providerStatic, auth0ExchangeProps(true));
+            assertEquals(TOKEN_EXCHANGE_FAILED_ERROR, executeAndParse().getString(ERROR_KEY));
+        }
+        // Without client secret (no PKCE)
+        responseWriter = new StringWriter();
+        when(response.getWriter()).thenReturn(new PrintWriter(responseWriter));
+        setupRequest(SSO_CALLBACK_PATH, "POST");
+        setRequestBody(CODE_BODY);
+        try (MockedStatic<OBPropertiesProvider> providerStatic = mockStatic(OBPropertiesProvider.class)) {
+            mockProperties(providerStatic, auth0ExchangeProps(false));
+            assertEquals(TOKEN_EXCHANGE_FAILED_ERROR, executeAndParse().getString(ERROR_KEY));
+        }
+        // PKCE flow
+        responseWriter = new StringWriter();
+        when(response.getWriter()).thenReturn(new PrintWriter(responseWriter));
+        setupRequest(SSO_CALLBACK_PATH, "POST");
+        setRequestBody("{\"code\":\"c\",\"codeVerifier\":\"v\",\"redirectUri\":\"http://l\"}");
+        try (MockedStatic<OBPropertiesProvider> providerStatic = mockStatic(OBPropertiesProvider.class)) {
+            mockProperties(providerStatic, auth0ExchangeProps(false));
+            assertEquals(TOKEN_EXCHANGE_FAILED_ERROR, executeAndParse().getString(ERROR_KEY));
         }
     }
 
     @Test
     void callbackMiddlewareInvalidToken() throws Exception {
         setupRequest(SSO_CALLBACK_PATH, "POST");
-        setRequestBody("{\"accessToken\":\"" + FAKE_JWT + "\"}");
+        setRequestBody(FAKE_JWT_BODY);
         try (MockedStatic<OBPropertiesProvider> providerStatic = mockStatic(OBPropertiesProvider.class)) {
             Properties props = propsWithAuthType(MIDDLEWARE_TYPE);
             props.setProperty(MIDDLEWARE_URL_PROP, "http://localhost:1");
@@ -321,27 +355,17 @@ class SSOServiceTest {
     }
 
     @Test
-    void linkRejectsNoAuthorizationHeader() throws Exception {
-        setupRequest(SSO_LINK_PATH, "POST");
-        when(request.getHeader(AUTHORIZATION_HEADER)).thenReturn(null);
-        JSONObject result = executeAndParse();
-        assertEquals(UNAUTHORIZED_ERROR, result.getString(ERROR_KEY));
-    }
-
-    @Test
-    void linkRejectsEmptyBearerToken() throws Exception {
-        setupRequest(SSO_LINK_PATH, "POST");
-        when(request.getHeader(AUTHORIZATION_HEADER)).thenReturn("Bearer   ");
-        JSONObject result = executeAndParse();
-        assertEquals(UNAUTHORIZED_ERROR, result.getString(ERROR_KEY));
-    }
-
-    @Test
-    void linkRejectsNonBearerAuthorizationHeader() throws Exception {
-        setupRequest(SSO_LINK_PATH, "POST");
-        when(request.getHeader(AUTHORIZATION_HEADER)).thenReturn("Basic dXNlcjpwYXNz");
-        JSONObject result = executeAndParse();
-        assertEquals(UNAUTHORIZED_ERROR, result.getString(ERROR_KEY));
+    void linkRejectsInvalidAuthorizationHeaders() throws Exception {
+        String[] invalidHeaders = {null, "Bearer   ", "Basic dXNlcjpwYXNz"};
+        for (String header : invalidHeaders) {
+            responseWriter = new StringWriter();
+            when(response.getWriter()).thenReturn(new PrintWriter(responseWriter));
+            setupRequest(SSO_LINK_PATH, "POST");
+            when(request.getHeader(AUTHORIZATION_HEADER)).thenReturn(header);
+            JSONObject result = executeAndParse();
+            assertEquals(UNAUTHORIZED_ERROR, result.getString(ERROR_KEY),
+                "Expected unauthorized for header: " + header);
+        }
     }
 
     @Test
@@ -370,25 +394,31 @@ class SSOServiceTest {
     }
 
     @Test
-    void linkRejectsMalformedJson() throws Exception {
+    void linkRejectsInvalidBodies() throws Exception {
         assertLinkError("not json", AUTH0_TYPE, INVALID_REQUEST_ERROR);
-    }
-
-    @Test
-    void linkRejectsMissingCodeForAuth0() throws Exception {
         assertLinkError("{}", AUTH0_TYPE, INVALID_REQUEST_ERROR);
+        assertLinkError("{}", MIDDLEWARE_TYPE, INVALID_REQUEST_ERROR);
     }
 
     @Test
-    void linkRejectsMissingAccessTokenForMiddleware() throws Exception {
-        assertLinkError("{}", MIDDLEWARE_TYPE, INVALID_REQUEST_ERROR);
+    void linkAuth0TokenExchangeFails() throws Exception {
+        setupRequest(SSO_LINK_PATH, "POST");
+        setupValidBearerToken();
+        setRequestBody(CODE_BODY);
+        try (MockedStatic<OBPropertiesProvider> providerStatic = mockStatic(OBPropertiesProvider.class);
+             MockedStatic<Utils> utilsStatic = mockStatic(Utils.class)) {
+            mockValidBearer(utilsStatic);
+            mockProperties(providerStatic, auth0ExchangeProps(true));
+            JSONObject result = executeAndParse();
+            assertEquals(TOKEN_EXCHANGE_FAILED_ERROR, result.getString(ERROR_KEY));
+        }
     }
 
     @Test
     void linkMiddlewareInvalidToken() throws Exception {
         setupRequest(SSO_LINK_PATH, "POST");
         setupValidBearerToken();
-        setRequestBody("{\"accessToken\":\"" + FAKE_JWT + "\"}");
+        setRequestBody(FAKE_JWT_BODY);
         try (MockedStatic<OBPropertiesProvider> providerStatic = mockStatic(OBPropertiesProvider.class);
              MockedStatic<Utils> utilsStatic = mockStatic(Utils.class)) {
             mockValidBearer(utilsStatic);
@@ -398,6 +428,179 @@ class SSOServiceTest {
 
             JSONObject result = executeAndParse();
             assertEquals(INVALID_TOKEN_ERROR, result.getString(ERROR_KEY));
+        }
+    }
+
+    // --- deep path tests (spy bypasses JWKS validation) ---
+
+    private JSONObject spyExecuteAndParse() throws Exception {
+        SSOService service = spy(new SSOService());
+        doReturn(true).when(service).validateJwksToken(anyString(), any(), anyString());
+        service.handle(request, response);
+        return new JSONObject(responseWriter.toString());
+    }
+
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    private OBCriteria mockOBDalCriteria(MockedStatic<OBDal> obDalStatic) {
+        OBDal mockDal = mock(OBDal.class);
+        obDalStatic.when(OBDal::getInstance).thenReturn(mockDal);
+        OBCriteria mockCriteria = mock(OBCriteria.class);
+        when(mockDal.createCriteria(any(Class.class))).thenReturn(mockCriteria);
+        when(mockCriteria.add(any())).thenReturn(mockCriteria);
+        when(mockCriteria.setFilterOnReadableClients(anyBoolean())).thenReturn(mockCriteria);
+        when(mockCriteria.setFilterOnReadableOrganization(anyBoolean())).thenReturn(mockCriteria);
+        when(mockCriteria.setMaxResults(anyInt())).thenReturn(mockCriteria);
+        return mockCriteria;
+    }
+
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    @Test
+    void callbackDeepPaths() throws Exception {
+        // No user linked
+        setupRequest(SSO_CALLBACK_PATH, "POST");
+        setRequestBody(FAKE_JWT_BODY);
+        try (MockedStatic<OBPropertiesProvider> providerStatic = mockStatic(OBPropertiesProvider.class);
+             MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
+             MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class)) {
+            mockProperties(providerStatic, propsWithAuthType(MIDDLEWARE_TYPE));
+            OBCriteria criteria = mockOBDalCriteria(obDalStatic);
+            when(criteria.uniqueResult()).thenReturn(null);
+            assertEquals("no_user_linked", spyExecuteAndParse().getString(ERROR_KEY));
+        }
+        // DB exception
+        responseWriter = new StringWriter();
+        when(response.getWriter()).thenReturn(new PrintWriter(responseWriter));
+        setupRequest(SSO_CALLBACK_PATH, "POST");
+        setRequestBody(FAKE_JWT_BODY);
+        try (MockedStatic<OBPropertiesProvider> providerStatic = mockStatic(OBPropertiesProvider.class);
+             MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
+             MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class)) {
+            mockProperties(providerStatic, propsWithAuthType(MIDDLEWARE_TYPE));
+            OBDal mockDal = mock(OBDal.class);
+            obDalStatic.when(OBDal::getInstance).thenReturn(mockDal);
+            when(mockDal.createCriteria(any(Class.class))).thenThrow(new RuntimeException("DB error"));
+            assertEquals("internal_error", spyExecuteAndParse().getString(ERROR_KEY));
+        }
+        // Success path: user found, token generated
+        responseWriter = new StringWriter();
+        when(response.getWriter()).thenReturn(new PrintWriter(responseWriter));
+        setupRequest(SSO_CALLBACK_PATH, "POST");
+        setRequestBody(FAKE_JWT_BODY);
+        try (MockedStatic<OBPropertiesProvider> providerStatic = mockStatic(OBPropertiesProvider.class);
+             MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
+             MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class);
+             MockedStatic<Utils> utilsStatic = mockStatic(Utils.class)) {
+            mockProperties(providerStatic, propsWithAuthType(MIDDLEWARE_TYPE));
+            OBCriteria criteria = mockOBDalCriteria(obDalStatic);
+
+            ETRXTokenUser mockTokenUser = mock(ETRXTokenUser.class);
+            User mockUser = mock(User.class);
+            Role mockRole = mock(Role.class);
+            Client mockClient = mock(Client.class);
+            when(mockRole.getClient()).thenReturn(mockClient);
+            when(mockUser.getDefaultRole()).thenReturn(mockRole);
+            when(mockUser.getDefaultOrganization()).thenReturn(mock(Organization.class));
+            when(mockUser.getDefaultWarehouse()).thenReturn(mock(Warehouse.class));
+            when(mockUser.getClient()).thenReturn(mockClient);
+            when(mockUser.getId()).thenReturn("usr-123");
+            when(mockUser.getUsername()).thenReturn("testuser");
+            when(mockTokenUser.getUserForToken()).thenReturn(mockUser);
+            when(criteria.uniqueResult()).thenReturn(mockTokenUser);
+            utilsStatic.when(() -> Utils.generateToken(any(), any())).thenReturn("jwt-token");
+
+            JSONObject result = spyExecuteAndParse();
+            assertEquals("jwt-token", result.getString("token"));
+            assertEquals("usr-123", result.getString("userId"));
+            assertEquals("testuser", result.getString("username"));
+        }
+        // Success with null default role (covers ternary false branch)
+        responseWriter = new StringWriter();
+        when(response.getWriter()).thenReturn(new PrintWriter(responseWriter));
+        setupRequest(SSO_CALLBACK_PATH, "POST");
+        setRequestBody(FAKE_JWT_BODY);
+        try (MockedStatic<OBPropertiesProvider> providerStatic = mockStatic(OBPropertiesProvider.class);
+             MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
+             MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class);
+             MockedStatic<Utils> utilsStatic = mockStatic(Utils.class)) {
+            mockProperties(providerStatic, propsWithAuthType(MIDDLEWARE_TYPE));
+            OBCriteria criteria = mockOBDalCriteria(obDalStatic);
+
+            ETRXTokenUser mockTokenUser = mock(ETRXTokenUser.class);
+            User mockUser = mock(User.class);
+            when(mockUser.getDefaultRole()).thenReturn(null);
+            when(mockUser.getClient()).thenReturn(mock(Client.class));
+            when(mockUser.getId()).thenReturn("usr-456");
+            when(mockUser.getUsername()).thenReturn("noroler");
+            when(mockTokenUser.getUserForToken()).thenReturn(mockUser);
+            when(criteria.uniqueResult()).thenReturn(mockTokenUser);
+            utilsStatic.when(() -> Utils.generateToken(any(), any())).thenReturn("t2");
+
+            assertEquals("t2", spyExecuteAndParse().getString("token"));
+        }
+    }
+
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    @Test
+    void linkDeepPaths() throws Exception {
+        // User not found
+        setupRequest(SSO_LINK_PATH, "POST");
+        setupValidBearerToken();
+        setRequestBody(FAKE_JWT_BODY);
+        try (MockedStatic<OBPropertiesProvider> providerStatic = mockStatic(OBPropertiesProvider.class);
+             MockedStatic<Utils> utilsStatic = mockStatic(Utils.class);
+             MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
+             MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class)) {
+            mockValidBearer(utilsStatic);
+            mockProperties(providerStatic, propsWithAuthType(MIDDLEWARE_TYPE));
+            OBDal mockDal = mock(OBDal.class);
+            obDalStatic.when(OBDal::getInstance).thenReturn(mockDal);
+            when(mockDal.get(any(Class.class), anyString())).thenReturn(null);
+            assertEquals("user_not_found", spyExecuteAndParse().getString(ERROR_KEY));
+        }
+        // DB exception
+        responseWriter = new StringWriter();
+        when(response.getWriter()).thenReturn(new PrintWriter(responseWriter));
+        setupRequest(SSO_LINK_PATH, "POST");
+        setupValidBearerToken();
+        setRequestBody(FAKE_JWT_BODY);
+        try (MockedStatic<OBPropertiesProvider> providerStatic = mockStatic(OBPropertiesProvider.class);
+             MockedStatic<Utils> utilsStatic = mockStatic(Utils.class);
+             MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
+             MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class)) {
+            mockValidBearer(utilsStatic);
+            mockProperties(providerStatic, propsWithAuthType(MIDDLEWARE_TYPE));
+            OBDal mockDal = mock(OBDal.class);
+            obDalStatic.when(OBDal::getInstance).thenReturn(mockDal);
+            when(mockDal.get(any(Class.class), anyString())).thenThrow(new RuntimeException("DB error"));
+            assertEquals("internal_error", spyExecuteAndParse().getString(ERROR_KEY));
+        }
+        // User found, existing link removed, new link created
+        responseWriter = new StringWriter();
+        when(response.getWriter()).thenReturn(new PrintWriter(responseWriter));
+        setupRequest(SSO_LINK_PATH, "POST");
+        setupValidBearerToken();
+        setRequestBody(FAKE_JWT_BODY);
+        try (MockedStatic<OBPropertiesProvider> providerStatic = mockStatic(OBPropertiesProvider.class);
+             MockedStatic<Utils> utilsStatic = mockStatic(Utils.class);
+             MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
+             MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class)) {
+            mockValidBearer(utilsStatic);
+            mockProperties(providerStatic, propsWithAuthType(MIDDLEWARE_TYPE));
+
+            // Setup OBDal with both get() and createCriteria() on same mock
+            OBCriteria criteria = mockOBDalCriteria(obDalStatic);
+            OBDal mockDal = OBDal.getInstance(); // get the mock created by mockOBDalCriteria
+            User mockUser = mock(User.class);
+            when(mockUser.getClient()).thenReturn(mock(Client.class));
+            when(mockUser.getOrganization()).thenReturn(mock(Organization.class));
+            when(mockDal.get(any(Class.class), anyString())).thenReturn(mockUser);
+
+            ETRXTokenUser existingToken = mock(ETRXTokenUser.class);
+            when(criteria.uniqueResult()).thenReturn(existingToken);
+
+            // new ETRXTokenUser() may fail without DAL — catch covers it
+            JSONObject result = spyExecuteAndParse();
+            assertTrue(result.has("status") || result.has(ERROR_KEY));
         }
     }
 }

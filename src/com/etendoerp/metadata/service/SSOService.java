@@ -486,7 +486,7 @@ public class SSOService {
      * Validates a JWT token's signature via JWKS endpoint.
      * Replicates logic from SWSAuthenticationManager.validateToken().
      */
-    private boolean validateJwksToken(String token, Properties props, String authType) {
+    boolean validateJwksToken(String token, Properties props, String authType) {
         try {
             String baseURL;
             String issuer;
