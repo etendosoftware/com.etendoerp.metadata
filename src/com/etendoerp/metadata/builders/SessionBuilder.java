@@ -96,6 +96,8 @@ public class SessionBuilder extends Builder {
             Organization organization = context.getCurrentOrganization();
             Client client = context.getCurrentClient();
             Warehouse warehouse = context.getWarehouse();
+            // ponytail: if warehouse doesn't belong to the resolved org, pick one that does
+            warehouse = validateWarehouseForOrg(warehouse, organization, role);
 
             json.put("user", getJsonObject(user));
             json.put("currentRole", getJsonObject(role));
@@ -264,5 +266,28 @@ public class SessionBuilder extends Builder {
         }
 
         return warehouses;
+    }
+
+    /**
+     * Returns the given warehouse if it belongs to an organization accessible by the role.
+     * Otherwise returns the first valid warehouse for the current organization.
+     * ponytail: guard against cross-org warehouse from stale token, pick org-scoped fallback
+     */
+    private Warehouse validateWarehouseForOrg(Warehouse warehouse, Organization organization, Role role) {
+        if (warehouse == null) {
+            return null;
+        }
+        String whOrgId = warehouse.getOrganization().getId();
+        boolean belongsToRole = role.getADRoleOrganizationList().stream()
+            .anyMatch(ro -> ro.getOrganization().getId().equals(whOrgId));
+        if (belongsToRole) {
+            return warehouse;
+        }
+        // Fallback: first warehouse linked to the current organization
+        List<OrgWarehouse> orgWarehouses = organization.getOrganizationWarehouseList();
+        if (!orgWarehouses.isEmpty()) {
+            return orgWarehouses.get(0).getWarehouse();
+        }
+        return warehouse;
     }
 }
