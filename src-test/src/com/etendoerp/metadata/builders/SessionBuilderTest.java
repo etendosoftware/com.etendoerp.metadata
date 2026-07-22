@@ -191,7 +191,11 @@ class SessionBuilderTest {
     when(organization.getId()).thenReturn(ORG_ID);
     when(client.getId()).thenReturn(CLIENT_ID);
     when(warehouse.getId()).thenReturn(WAREHOUSE_ID);
+    when(warehouse.getOrganization()).thenReturn(org1);
     when(language.getLanguage()).thenReturn(LANGUAGE_CODE);
+
+    // validateWarehouseForOrg needs the context role's org list
+    when(role.getADRoleOrganizationList()).thenReturn(Arrays.asList(roleOrg1));
 
     // Mock the HQL join-fetch query that replaces user.getADUserRolesList()
     obDalStatic = mockStatic(OBDal.class);
