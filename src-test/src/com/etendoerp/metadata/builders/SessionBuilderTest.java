@@ -47,6 +47,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
@@ -64,6 +65,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 import org.openbravo.dal.core.OBContext;
+import org.openbravo.dal.security.OrganizationStructureProvider;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.erpCommon.utility.DimensionDisplayUtility;
 import org.openbravo.model.ad.access.Role;
@@ -72,7 +74,7 @@ import org.openbravo.model.ad.access.User;
 import org.openbravo.model.ad.access.UserRoles;
 import org.openbravo.model.ad.system.Client;
 import org.openbravo.model.ad.system.Language;
-import org.openbravo.model.common.enterprise.OrgWarehouse;
+
 import org.openbravo.model.common.enterprise.Organization;
 import org.openbravo.model.common.enterprise.Warehouse;
 
@@ -145,16 +147,19 @@ class SessionBuilderTest {
   private Organization org2;
 
   @Mock
-  private OrgWarehouse orgWarehouse1;
-
-  @Mock
-  private OrgWarehouse orgWarehouse2;
-
-  @Mock
   private Warehouse warehouse1;
 
   @Mock
   private Warehouse warehouse2;
+
+  @Mock
+  private Organization warehouseOrg1;
+
+  @Mock
+  private Organization warehouseOrg2;
+
+  @Mock
+  private OrganizationStructureProvider osp;
 
   @Mock
   private OBDal obDal;
@@ -166,7 +171,7 @@ class SessionBuilderTest {
   private Query<UserRoles> rolesQuery;
 
   @Mock
-  private Query<OrgWarehouse> warehousesQuery;
+  private Query<Warehouse> warehousesQuery;
 
   private MockedStatic<OBDal> obDalStatic;
 
@@ -205,11 +210,10 @@ class SessionBuilderTest {
     when(rolesQuery.setParameter(anyString(), any())).thenReturn(rolesQuery);
     when(rolesQuery.list()).thenReturn(Arrays.asList(userRole1, userRole2));
 
-    // Mock the batched warehouses-by-organization query that replaces
-    // organization.getOrganizationWarehouseList()
-    when(session.createQuery(anyString(), eq(OrgWarehouse.class))).thenReturn(warehousesQuery);
+    // Mock the warehouse query (now queries Warehouse directly, not OrgWarehouse)
+    when(session.createQuery(anyString(), eq(Warehouse.class))).thenReturn(warehousesQuery);
     when(warehousesQuery.setParameter(anyString(), any())).thenReturn(warehousesQuery);
-    when(warehousesQuery.list()).thenReturn(Arrays.asList(orgWarehouse1, orgWarehouse2));
+    when(warehousesQuery.list()).thenReturn(Arrays.asList(warehouse1, warehouse2));
 
     // Setup user roles
     when(userRole1.getRole()).thenReturn(role1);
@@ -242,17 +246,22 @@ class SessionBuilderTest {
     when(org2.getId()).thenReturn(ORG2_ID);
     when(org2.get(eq(Organization.PROPERTY_NAME), any(), eq(ORG2_ID))).thenReturn("Organization 2");
 
-    // Setup org warehouses (now resolved through the batched query result, grouped by organization)
-    when(orgWarehouse1.getOrganization()).thenReturn(org1);
-    when(orgWarehouse1.getWarehouse()).thenReturn(warehouse1);
-    when(orgWarehouse2.getOrganization()).thenReturn(org2);
-    when(orgWarehouse2.getWarehouse()).thenReturn(warehouse2);
-
-    // Setup warehouses
+    // Setup warehouses with their owning organizations (for natural tree distribution)
     when(warehouse1.getId()).thenReturn("warehouse1-id");
     when(warehouse1.get(eq(Warehouse.PROPERTY_NAME), any(), eq("warehouse1-id"))).thenReturn("Warehouse 1");
+    when(warehouse1.getOrganization()).thenReturn(warehouseOrg1);
+    when(warehouseOrg1.getId()).thenReturn("org1-id");
+
     when(warehouse2.getId()).thenReturn("warehouse2-id");
     when(warehouse2.get(eq(Warehouse.PROPERTY_NAME), any(), eq("warehouse2-id"))).thenReturn("Warehouse 2");
+    when(warehouse2.getOrganization()).thenReturn(warehouseOrg2);
+    when(warehouseOrg2.getId()).thenReturn(ORG2_ID);
+
+    // Setup OrganizationStructureProvider for natural tree distribution
+    when(obContext.getOrganizationStructureProvider(anyString())).thenReturn(osp);
+    // Each org's natural tree contains its own id (warehouse matches its own org)
+    when(osp.getNaturalTree("org1-id")).thenReturn(Set.of("org1-id"));
+    when(osp.getNaturalTree(ORG2_ID)).thenReturn(Set.of(ORG2_ID));
   }
 
   @AfterEach
@@ -310,7 +319,7 @@ class SessionBuilderTest {
 
       // The role tree must come from a single batched query, not per-role lazy navigation
       verify(session, times(1)).createQuery(anyString(), eq(UserRoles.class));
-      verify(session, times(1)).createQuery(anyString(), eq(OrgWarehouse.class));
+      verify(session, times(1)).createQuery(anyString(), eq(Warehouse.class));
     }
   }
 

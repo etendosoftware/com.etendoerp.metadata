@@ -32,6 +32,7 @@ import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.dal.core.OBContext;
+import org.openbravo.dal.security.OrganizationStructureProvider;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.erpCommon.utility.DimensionDisplayUtility;
 import org.openbravo.model.ad.access.Role;
@@ -68,14 +69,15 @@ public class SessionBuilder extends Builder {
             + " order by ro.name, org.name";
 
     /**
-     * Loads the warehouses for every organization referenced by the user's roles in a single
-     * round trip, replacing the per-organization {@code organization.getOrganizationWarehouseList()}
-     * lazy navigation.
+     * Loads active warehouses whose organization belongs to the role's org set,
+     * matching Classic's RoleInfo.getOrganizationWarehouses() query.
      */
     private static final String WAREHOUSES_BY_ORGANIZATION_HQL =
-        "select distinct ow from OrganizationWarehouse ow"
-            + " join fetch ow.warehouse w"
-            + " where ow.organization.id in (:orgIds)"
+        "select w from Warehouse w"
+            + " where w.active = true"
+            + " and w.organization.id in (:orgIds)"
+            + " and w.client.id = :clientId"
+            + " and w.organization.active = true"
             + " order by w.name";
 
     /**
@@ -131,7 +133,7 @@ public class SessionBuilder extends Builder {
                 .setParameter("userId", cacheKey)
                 .list();
 
-            Map<String, List<OrgWarehouse>> warehousesByOrganization = getWarehousesByOrganization(userRoleList);
+            Map<String, List<Warehouse>> warehousesByOrganization = getWarehousesByOrganization(userRoleList);
 
             for (UserRoles userRole : userRoleList) {
                 JSONObject json = new JSONObject();
@@ -155,13 +157,19 @@ public class SessionBuilder extends Builder {
     }
 
     /**
-     * Batches the warehouse lookup for every organization referenced by the given roles into a
-     * single query, keyed by organization id, instead of lazily loading warehouses per organization.
+     * Distributes warehouses across organizations using the natural tree,
+     * matching Classic's RoleInfo.getOrganizationWarehouses() behavior:
+     * a warehouse appears under every org whose natural tree contains
+     * the warehouse's own organization.
      */
-    private Map<String, List<OrgWarehouse>> getWarehousesByOrganization(List<UserRoles> userRoleList) {
+    private Map<String, List<Warehouse>> getWarehousesByOrganization(List<UserRoles> userRoleList) {
         Set<String> orgIds = new LinkedHashSet<>();
+        String clientId = null;
         for (UserRoles userRole : userRoleList) {
             try {
+                if (clientId == null) {
+                    clientId = userRole.getRole().getClient().getId();
+                }
                 for (RoleOrganization roleOrg : userRole.getRole().getADRoleOrganizationList()) {
                     orgIds.add(roleOrg.getOrganization().getId());
                 }
@@ -170,21 +178,33 @@ public class SessionBuilder extends Builder {
             }
         }
 
-        if (orgIds.isEmpty()) {
+        if (orgIds.isEmpty() || clientId == null) {
             return Collections.emptyMap();
         }
 
         try {
-            List<OrgWarehouse> orgWarehouses = OBDal.getInstance().getSession()
-                .createQuery(WAREHOUSES_BY_ORGANIZATION_HQL, OrgWarehouse.class)
+            List<Warehouse> warehouses = OBDal.getInstance().getSession()
+                .createQuery(WAREHOUSES_BY_ORGANIZATION_HQL, Warehouse.class)
                 .setParameter("orgIds", orgIds)
+                .setParameter("clientId", clientId)
                 .list();
 
-            Map<String, List<OrgWarehouse>> warehousesByOrganization = new HashMap<>();
-            for (OrgWarehouse orgWarehouse : orgWarehouses) {
-                warehousesByOrganization
-                    .computeIfAbsent(orgWarehouse.getOrganization().getId(), id -> new ArrayList<>())
-                    .add(orgWarehouse);
+            OrganizationStructureProvider osp = OBContext.getOBContext()
+                .getOrganizationStructureProvider(clientId);
+
+            // ponytail: replicate Classic's natural-tree distribution
+            Map<String, List<Warehouse>> warehousesByOrganization = new HashMap<>();
+            for (String orgId : orgIds) {
+                warehousesByOrganization.put(orgId, new ArrayList<>());
+            }
+            for (Warehouse wh : warehouses) {
+                String whOrgId = wh.getOrganization().getId();
+                for (String orgId : orgIds) {
+                    Set<String> naturalTree = osp.getNaturalTree(orgId);
+                    if (naturalTree.contains(whOrgId)) {
+                        warehousesByOrganization.get(orgId).add(wh);
+                    }
+                }
             }
 
             return warehousesByOrganization;
@@ -195,7 +215,7 @@ public class SessionBuilder extends Builder {
         }
     }
 
-    private JSONArray getOrganizations(Role role, Map<String, List<OrgWarehouse>> warehousesByOrganization) {
+    private JSONArray getOrganizations(Role role, Map<String, List<Warehouse>> warehousesByOrganization) {
         JSONArray organizations = new JSONArray();
 
         try {
@@ -245,16 +265,15 @@ public class SessionBuilder extends Builder {
         return attributes;
     }
 
-    private JSONArray getWarehouses(Organization organization, Map<String, List<OrgWarehouse>> warehousesByOrganization) {
+    private JSONArray getWarehouses(Organization organization, Map<String, List<Warehouse>> warehousesByOrganization) {
         JSONArray warehouses = new JSONArray();
 
         try {
-            List<OrgWarehouse> orgWarehouses = warehousesByOrganization.getOrDefault(organization.getId(),
+            List<Warehouse> orgWarehouses = warehousesByOrganization.getOrDefault(organization.getId(),
                 Collections.emptyList());
 
-            for (OrgWarehouse orgWarehouse : orgWarehouses) {
+            for (Warehouse warehouse : orgWarehouses) {
                 JSONObject json = new JSONObject();
-                Warehouse warehouse = orgWarehouse.getWarehouse();
 
                 json.put("id", warehouse.getId());
                 json.put("name", warehouse.get(Warehouse.PROPERTY_NAME, language, warehouse.getId()));
