@@ -93,7 +93,7 @@ class SessionBuilderTest {
   private static final String KEY_ACCT_CENTRALLY = "$IsAcctDimCentrally";
   private static final String KEY_BP_APP_L = "$Element_BP_APP_L";
   private static final String KEY_PR_APP_L = "$Element_PR_APP_L";
-  private static final String ORG1_ID = ORG1_ID;
+  private static final String ORG1_ID = "org1-id";
   private static final String ORG2_ID = "org2-id";
 
   @Mock
