@@ -93,6 +93,7 @@ class SessionBuilderTest {
   private static final String KEY_ACCT_CENTRALLY = "$IsAcctDimCentrally";
   private static final String KEY_BP_APP_L = "$Element_BP_APP_L";
   private static final String KEY_PR_APP_L = "$Element_PR_APP_L";
+  private static final String ORG1_ID = ORG1_ID;
   private static final String ORG2_ID = "org2-id";
 
   @Mock
@@ -241,8 +242,8 @@ class SessionBuilderTest {
     when(roleOrg2.getOrganization()).thenReturn(org2);
 
     // Setup organizations
-    when(org1.getId()).thenReturn("org1-id");
-    when(org1.get(eq(Organization.PROPERTY_NAME), any(), eq("org1-id"))).thenReturn("Organization 1");
+    when(org1.getId()).thenReturn(ORG1_ID);
+    when(org1.get(eq(Organization.PROPERTY_NAME), any(), eq(ORG1_ID))).thenReturn("Organization 1");
     when(org2.getId()).thenReturn(ORG2_ID);
     when(org2.get(eq(Organization.PROPERTY_NAME), any(), eq(ORG2_ID))).thenReturn("Organization 2");
 
@@ -250,7 +251,7 @@ class SessionBuilderTest {
     when(warehouse1.getId()).thenReturn("warehouse1-id");
     when(warehouse1.get(eq(Warehouse.PROPERTY_NAME), any(), eq("warehouse1-id"))).thenReturn("Warehouse 1");
     when(warehouse1.getOrganization()).thenReturn(warehouseOrg1);
-    when(warehouseOrg1.getId()).thenReturn("org1-id");
+    when(warehouseOrg1.getId()).thenReturn(ORG1_ID);
 
     when(warehouse2.getId()).thenReturn("warehouse2-id");
     when(warehouse2.get(eq(Warehouse.PROPERTY_NAME), any(), eq("warehouse2-id"))).thenReturn("Warehouse 2");
@@ -260,7 +261,7 @@ class SessionBuilderTest {
     // Setup OrganizationStructureProvider for natural tree distribution
     when(obContext.getOrganizationStructureProvider(anyString())).thenReturn(osp);
     // Each org's natural tree contains its own id (warehouse matches its own org)
-    when(osp.getNaturalTree("org1-id")).thenReturn(Set.of("org1-id"));
+    when(osp.getNaturalTree(ORG1_ID)).thenReturn(Set.of(ORG1_ID));
     when(osp.getNaturalTree(ORG2_ID)).thenReturn(Set.of(ORG2_ID));
   }
 

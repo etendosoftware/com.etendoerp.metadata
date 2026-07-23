@@ -164,19 +164,7 @@ public class SessionBuilder extends Builder {
      */
     private Map<String, List<Warehouse>> getWarehousesByOrganization(List<UserRoles> userRoleList) {
         Set<String> orgIds = new LinkedHashSet<>();
-        String clientId = null;
-        for (UserRoles userRole : userRoleList) {
-            try {
-                if (clientId == null) {
-                    clientId = userRole.getRole().getClient().getId();
-                }
-                for (RoleOrganization roleOrg : userRole.getRole().getADRoleOrganizationList()) {
-                    orgIds.add(roleOrg.getOrganization().getId());
-                }
-            } catch (Exception e) {
-                logger.error(e.getMessage(), e);
-            }
-        }
+        String clientId = collectOrgIdsAndClient(userRoleList, orgIds);
 
         if (orgIds.isEmpty() || clientId == null) {
             return Collections.emptyMap();
@@ -192,27 +180,49 @@ public class SessionBuilder extends Builder {
             OrganizationStructureProvider osp = OBContext.getOBContext()
                 .getOrganizationStructureProvider(clientId);
 
-            // ponytail: replicate Classic's natural-tree distribution
-            Map<String, List<Warehouse>> warehousesByOrganization = new HashMap<>();
-            for (String orgId : orgIds) {
-                warehousesByOrganization.put(orgId, new ArrayList<>());
-            }
-            for (Warehouse wh : warehouses) {
-                String whOrgId = wh.getOrganization().getId();
-                for (String orgId : orgIds) {
-                    Set<String> naturalTree = osp.getNaturalTree(orgId);
-                    if (naturalTree.contains(whOrgId)) {
-                        warehousesByOrganization.get(orgId).add(wh);
-                    }
-                }
-            }
-
-            return warehousesByOrganization;
+            return distributeByNaturalTree(warehouses, orgIds, osp);
         } catch (Exception e) {
             logger.error(e.getMessage(), e);
-
             return Collections.emptyMap();
         }
+    }
+
+    private String collectOrgIdsAndClient(List<UserRoles> userRoleList, Set<String> orgIds) {
+        String clientId = null;
+        for (UserRoles userRole : userRoleList) {
+            try {
+                if (clientId == null) {
+                    clientId = userRole.getRole().getClient().getId();
+                }
+                for (RoleOrganization roleOrg : userRole.getRole().getADRoleOrganizationList()) {
+                    orgIds.add(roleOrg.getOrganization().getId());
+                }
+            } catch (Exception e) {
+                logger.error(e.getMessage(), e);
+            }
+        }
+        return clientId;
+    }
+
+    /**
+     * Distributes warehouses across organizations using the natural tree,
+     * replicating Classic's RoleInfo behavior.
+     */
+    private Map<String, List<Warehouse>> distributeByNaturalTree(
+            List<Warehouse> warehouses, Set<String> orgIds, OrganizationStructureProvider osp) {
+        Map<String, List<Warehouse>> result = new HashMap<>();
+        for (String orgId : orgIds) {
+            result.put(orgId, new ArrayList<>());
+        }
+        for (Warehouse wh : warehouses) {
+            String whOrgId = wh.getOrganization().getId();
+            for (String orgId : orgIds) {
+                if (osp.getNaturalTree(orgId).contains(whOrgId)) {
+                    result.get(orgId).add(wh);
+                }
+            }
+        }
+        return result;
     }
 
     private JSONArray getOrganizations(Role role, Map<String, List<Warehouse>> warehousesByOrganization) {
