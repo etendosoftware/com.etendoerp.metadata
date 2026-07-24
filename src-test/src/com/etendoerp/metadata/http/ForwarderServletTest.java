@@ -57,7 +57,6 @@ public class ForwarderServletTest {
     private static final String ENTITY_NAME = "ETASK_TaskType";
     private static final String OPERATION_TYPE_PARAM = "_operationType";
     private static final String EXTRA_PROPERTIES_PARAM = "_extraProperties";
-    private static final String DISTINCT_PARAM = "_distinct";
     private static final String FETCH_OPERATION  = "fetch";
     private static final String REMOVE_OPERATION = "remove";
     private static final String COLOR_EXTRA_PROP = "priority.color";
@@ -228,33 +227,6 @@ public class ForwarderServletTest {
 
             verify(dataSourceServlet).doPost(reqCaptor.capture(), eq(response));
             assertEquals("existing.prop," + COLOR_EXTRA_PROP, reqCaptor.getValue().getParameter(EXTRA_PROPERTIES_PARAM));
-        }
-    }
-
-    /**
-     * A POST fetch request that carries {@code _distinct} must be forwarded with the original
-     * (unwrapped) request, without {@code _extraProperties}, even when the entity has FK fields
-     * with Color columns. A distinct query re-parents the result set to the referenced entity,
-     * so color paths built for the grid's own entity would fail to resolve and NPE during
-     * serialization.
-     *
-     * @throws ServletException if servlet processing fails
-     * @throws IOException      if an I/O error occurs
-     */
-    @Test
-    public void processDistinctFetchPostShouldNotInjectExtraProperties()
-            throws ServletException, IOException {
-        try (MockedStatic<WeldUtils> weldUtilsMock = mockStatic(WeldUtils.class)) {
-            weldUtilsMock.when(() -> WeldUtils.getInstanceFromStaticBeanManager(DataSourceServlet.class))
-                    .thenReturn(dataSourceServlet);
-            when(request.getMethod()).thenReturn("POST");
-            when(request.getPathInfo()).thenReturn(ENTITY_PATH);
-            when(request.getParameter(OPERATION_TYPE_PARAM)).thenReturn(FETCH_OPERATION);
-            when(request.getParameter(DISTINCT_PARAM)).thenReturn("priority");
-
-            forwarderServlet.process(request, response);
-
-            verify(dataSourceServlet).doPost(request, response);
         }
     }
 

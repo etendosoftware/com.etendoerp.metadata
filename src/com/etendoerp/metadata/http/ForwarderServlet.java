@@ -33,7 +33,6 @@ import javax.servlet.http.HttpServletResponse;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.openbravo.base.weld.WeldUtils;
-import org.openbravo.service.json.JsonConstants;
 
 /**
  * Servlet that intercepts datasource requests and enriches form-urlencoded fetch requests
@@ -95,13 +94,6 @@ public class ForwarderServlet extends BaseWebService {
 
         if (operationType != null && !operationType.isEmpty() &&
                 !"fetch".equals(operationType) && !"add".equals(operationType) && !"update".equals(operationType)) {
-            return request;
-        }
-        // A _distinct query re-parents the result set to the referenced entity, so color paths
-        // computed for the grid's own entity (e.g. "leadStatus.color") no longer resolve and would
-        // NPE during serialization. Pick-list/distinct responses never render color tags, so skip
-        // enrichment entirely — matching Classic, which never adds color extra-properties to pick lists.
-        if (request.getParameter(JsonConstants.DISTINCT_PARAMETER) != null) {
             return request;
         }
         String entityName = request.getParameter("_entityName");
