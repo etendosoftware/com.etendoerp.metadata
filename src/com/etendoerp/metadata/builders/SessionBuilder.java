@@ -150,8 +150,12 @@ public class SessionBuilder extends Builder {
                 // into this role's organization bucket whenever this role's org happened to be
                 // an ancestor, in the org tree, of that other role's org.
                 Set<String> roleOrgIds = new LinkedHashSet<>();
-                for (RoleOrganization roleOrg : role.getADRoleOrganizationList()) {
-                    roleOrgIds.add(roleOrg.getOrganization().getId());
+                try {
+                    for (RoleOrganization roleOrg : role.getADRoleOrganizationList()) {
+                        roleOrgIds.add(roleOrg.getOrganization().getId());
+                    }
+                } catch (Exception e) {
+                    logger.error(e.getMessage(), e);
                 }
                 Map<String, List<Warehouse>> warehousesByOrganization = osp != null
                     ? distributeByNaturalTree(pooledWarehouses, roleOrgIds, osp)
