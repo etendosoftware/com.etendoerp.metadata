@@ -36,10 +36,15 @@ import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.hibernate.criterion.Restrictions;
 import org.openbravo.base.exception.OBException;
+import org.openbravo.base.exception.OBSecurityException;
+import org.openbravo.base.model.Entity;
+import org.openbravo.base.model.ModelProvider;
 import org.openbravo.base.provider.OBProvider;
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
+import org.openbravo.base.structure.OrganizationEnabled;
 import org.openbravo.client.application.Note;
 import org.openbravo.dal.core.OBContext;
+import org.openbravo.dal.security.SecurityChecker;
 import org.openbravo.dal.service.OBCriteria;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.datamodel.Table;
@@ -61,6 +66,8 @@ public class NotesServlet extends HttpSecureAppServlet {
     private static final String CHARSET_UTF8 = "UTF-8";
     private static final String ISO_DATE_FORMAT = "yyyy-MM-dd'T'HH:mm:ss'Z'";
     private static final String ERROR_PROCESSING_REQUEST = "Error processing request: ";
+    private static final String ERROR_INVALID_TABLE_ID = "Invalid table ID: ";
+    private static final String ERROR_RECORD_NOT_ACCESSIBLE = "Insufficient permissions to access record: ";
 
     @Override
     public void doGet(HttpServletRequest request, HttpServletResponse response)
@@ -115,9 +122,16 @@ public class NotesServlet extends HttpSecureAppServlet {
         }
 
         // Validate table exists
-        if (!isValidTable(tableId)) {
+        if (findTable(tableId) == null) {
             sendErrorResponse(response, HttpStatus.SC_BAD_REQUEST,
-                    "Invalid table ID: " + tableId);
+                    ERROR_INVALID_TABLE_ID + tableId);
+            return;
+        }
+
+        // Validate the user can read the record the notes belong to
+        if (!isRecordReadable(tableId, recordId)) {
+            sendErrorResponse(response, HttpStatus.SC_FORBIDDEN,
+                    ERROR_RECORD_NOT_ACCESSIBLE + recordId);
             return;
         }
 
@@ -161,14 +175,22 @@ public class NotesServlet extends HttpSecureAppServlet {
         }
 
         // Validate table exists
-        if (!isValidTable(tableId)) {
+        Table table = findTable(tableId);
+        if (table == null) {
             sendErrorResponse(response, HttpStatus.SC_BAD_REQUEST,
-                    "Invalid table ID: " + tableId);
+                    ERROR_INVALID_TABLE_ID + tableId);
+            return;
+        }
+
+        // Validate the user can read the record the note is attached to
+        if (!isRecordReadable(tableId, recordId)) {
+            sendErrorResponse(response, HttpStatus.SC_FORBIDDEN,
+                    ERROR_RECORD_NOT_ACCESSIBLE + recordId);
             return;
         }
 
         // Create note
-        Note note = createNote(tableId, recordId, noteContent);
+        Note note = createNote(table, recordId, noteContent);
 
         // Convert to JSON
         JSONObject jsonObject = noteToJson(note);
@@ -200,6 +222,12 @@ public class NotesServlet extends HttpSecureAppServlet {
                 return;
             }
 
+            if (!isRecordReadable(note.getTable().getId(), note.getRecord())) {
+                sendErrorResponse(response, HttpStatus.SC_FORBIDDEN,
+                        ERROR_RECORD_NOT_ACCESSIBLE + note.getRecord());
+                return;
+            }
+
             if (!canDeleteNote(note)) {
                 sendErrorResponse(response, HttpStatus.SC_FORBIDDEN,
                         "Insufficient permissions to delete note");
@@ -222,14 +250,55 @@ public class NotesServlet extends HttpSecureAppServlet {
     }
 
     /**
-     * Validates if a table ID exists in the system
+     * Loads the AD_Table row for the given id. It runs in administrator mode because AD_Table is
+     * System level metadata and therefore is not readable by functional roles, which would make the
+     * read fail with an OBSecurityException.
+     *
+     * @param tableId
+     *            the AD_Table_ID received from the client
+     * @return the table, or null when it does not exist or it cannot be loaded
      */
-    private boolean isValidTable(String tableId) {
+    private Table findTable(String tableId) {
         try {
-            Table table = OBDal.getInstance().get(Table.class, tableId);
-            return table != null;
+            OBContext.setAdminMode(true);
+            return OBDal.getInstance().get(Table.class, tableId);
         } catch (Exception e) {
-            log.error("Error validating table", e);
+            log.error("Error validating table {}", tableId, e);
+            return null;
+        } finally {
+            OBContext.restorePreviousMode();
+        }
+    }
+
+    /**
+     * Checks whether the current user is allowed to read the record the note belongs to. It mirrors
+     * the classic NoteDataSource behaviour: the entity is resolved from the in-memory runtime model
+     * (no privileged metadata read) and the target record is loaded with the caller privileges.
+     * When invoked inside an administrator mode block, as the delete flow does, the entity level
+     * check is bypassed by the platform and only organization readability is enforced.
+     *
+     * @param tableId
+     *            the AD_Table_ID of the record
+     * @param recordId
+     *            the id of the record the note is attached to
+     * @return true when the record is readable, or when the table has no entity in the runtime
+     *         model; false when the platform denies the read
+     */
+    private boolean isRecordReadable(String tableId, String recordId) {
+        try {
+            Entity entity = ModelProvider.getInstance().getEntityByTableId(tableId);
+            if (entity == null) {
+                return true;
+            }
+
+            Object record = OBDal.getInstance().get(entity.getMappingClass(), recordId);
+            if (record instanceof OrganizationEnabled) {
+                SecurityChecker.getInstance().checkReadableAccess((OrganizationEnabled) record);
+            }
+
+            return true;
+        } catch (OBSecurityException e) {
+            log.warn("Record {} of table {} is not readable by the current user", recordId, tableId, e);
             return false;
         }
     }
@@ -255,13 +324,19 @@ public class NotesServlet extends HttpSecureAppServlet {
     }
 
     /**
-     * Creates a new note
+     * Creates a new note for the given table and record
+     *
+     * @param table
+     *            the table the record belongs to, already loaded by {@link #findTable(String)}
+     * @param recordId
+     *            the id of the record the note is attached to
+     * @param noteContent
+     *            the text of the note
+     * @return the persisted note
      */
-    private Note createNote(String tableId, String recordId, String noteContent) {
+    private Note createNote(Table table, String recordId, String noteContent) {
         try {
             OBContext.setAdminMode(true);
-
-            Table table = OBDal.getInstance().get(Table.class, tableId);
 
             Note note = OBProvider.getInstance().get(Note.class);
             note.setTable(table);

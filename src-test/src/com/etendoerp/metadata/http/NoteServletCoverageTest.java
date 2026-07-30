@@ -53,7 +53,7 @@ import org.openbravo.test.base.OBBaseTest;
 /**
  * Additional coverage tests for {@link NotesServlet}.
  * Targets uncovered paths: exception handlers in doGet/doPost/doDelete,
- * SWS path-based methods, isValidTable exception, empty request body,
+ * SWS path-based methods, findTable exception, empty request body,
  * extractNoteIdFromPath edge cases, deleteNote exception, and
  * canDeleteNote exception path.
  */
@@ -101,6 +101,19 @@ public class NoteServletCoverageTest extends OBBaseTest {
     private void setupDalAndContext(MockedStatic<OBDal> dalMock, MockedStatic<OBContext> contextMock) {
         dalMock.when(OBDal::getInstance).thenReturn(mockDal);
         contextMock.when(OBContext::getOBContext).thenReturn(mockContext);
+    }
+
+    /**
+     * Stubs the note lookup performed by the delete flow, including the table needed by the record
+     * level access check.
+     *
+     * @param creator
+     *            the user that created the note
+     */
+    private void setupNoteForDelete(User creator) {
+        when(mockDal.get(Note.class, TEST_NOTE_ID)).thenReturn(mockNote);
+        when(mockNote.getTable()).thenReturn(mockTable);
+        when(mockNote.getCreatedBy()).thenReturn(creator);
     }
 
     private void setupNoteCriteria(List<Note> notes) {
@@ -204,13 +217,13 @@ public class NoteServletCoverageTest extends OBBaseTest {
         assertTrue("Should mention missing note ID", stringWriter.toString().contains("Missing note ID in path"));
     }
 
-    // ==================== isValidTable exception path ====================
+    // ==================== findTable exception path ====================
 
     /**
-     * Tests isValidTable returns false when an exception is thrown.
+     * Tests findTable returns null when an exception is thrown.
      */
     @Test
-    public void testGetNotes_IsValidTableException() throws Exception {
+    public void testGetNotes_FindTableException() throws Exception {
         when(mockRequest.getParameter(TABLE_PARAM)).thenReturn(TEST_TABLE_ID);
         when(mockRequest.getParameter(RECORD_PARAM)).thenReturn(TEST_RECORD_ID);
 
@@ -321,8 +334,7 @@ public class NoteServletCoverageTest extends OBBaseTest {
              MockedStatic<OBContext> contextMock = mockStatic(OBContext.class)) {
 
             setupDalAndContext(dalMock, contextMock);
-            when(mockDal.get(Note.class, TEST_NOTE_ID)).thenReturn(mockNote);
-            when(mockNote.getCreatedBy()).thenReturn(mockUser);
+            setupNoteForDelete(mockUser);
             when(mockUser.getId()).thenReturn(TEST_USER_ID);
 
             doThrow(new OBException("Delete failed")).when(mockDal).remove(mockNote);
@@ -346,10 +358,9 @@ public class NoteServletCoverageTest extends OBBaseTest {
              MockedStatic<OBContext> contextMock = mockStatic(OBContext.class)) {
 
             setupDalAndContext(dalMock, contextMock);
-            when(mockDal.get(Note.class, TEST_NOTE_ID)).thenReturn(mockNote);
             User creatorUser = mock(User.class);
             when(creatorUser.getId()).thenThrow(new RuntimeException("User error"));
-            when(mockNote.getCreatedBy()).thenReturn(creatorUser);
+            setupNoteForDelete(creatorUser);
 
             servlet.doDelete(mockRequest, mockResponse);
 
@@ -416,10 +427,10 @@ public class NoteServletCoverageTest extends OBBaseTest {
     // ==================== POST with invalid table for create ====================
 
     /**
-     * Tests POST creates note but isValidTable exception returns false.
+     * Tests POST is rejected when findTable fails with an exception.
      */
     @Test
-    public void testCreateNote_IsValidTableException() throws Exception {
+    public void testCreateNote_FindTableException() throws Exception {
         String body = "{\"table\":\"" + TEST_TABLE_ID + "\",\"record\":\"" + TEST_RECORD_ID
                 + "\",\"note\":\"" + TEST_NOTE_CONTENT + "\"}";
         when(mockRequest.getReader()).thenReturn(new BufferedReader(new StringReader(body)));

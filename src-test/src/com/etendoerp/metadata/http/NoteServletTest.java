@@ -388,8 +388,7 @@ public class NoteServletTest extends OBBaseTest {
     public void testDeleteNote_Success() throws Exception {
         // Arrange
         when(mockRequest.getPathInfo()).thenReturn("/" + TEST_NOTE_ID);
-        when(mockDal.get(Note.class, TEST_NOTE_ID)).thenReturn(mockNote);
-        when(mockNote.getCreatedBy()).thenReturn(mockUser);
+        setupNoteForDelete(mockUser);
         when(mockUser.getId()).thenReturn(TEST_USER_ID);
 
         try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
@@ -470,8 +469,7 @@ public class NoteServletTest extends OBBaseTest {
         User differentUser = mock(User.class);
         when(differentUser.getId()).thenReturn(DIFFERENT_USER_ID);
 
-        when(mockDal.get(Note.class, TEST_NOTE_ID)).thenReturn(mockNote);
-        when(mockNote.getCreatedBy()).thenReturn(differentUser);
+        setupNoteForDelete(differentUser);
         when(mockUser.getId()).thenReturn(TEST_USER_ID);
 
         try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
@@ -500,8 +498,7 @@ public class NoteServletTest extends OBBaseTest {
     public void testDeleteNote_NullCreator() throws Exception {
         // Arrange
         when(mockRequest.getPathInfo()).thenReturn("/" + TEST_NOTE_ID);
-        when(mockDal.get(Note.class, TEST_NOTE_ID)).thenReturn(mockNote);
-        when(mockNote.getCreatedBy()).thenReturn(null); // Null creator
+        setupNoteForDelete(null); // Null creator
         when(mockNote.getId()).thenReturn(TEST_NOTE_ID);
 
         try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
@@ -524,6 +521,19 @@ public class NoteServletTest extends OBBaseTest {
     }
 
     // ==================== Helper Methods ====================
+
+    /**
+     * Stubs the note lookup performed by the delete flow, including the table needed by the record
+     * level access check.
+     *
+     * @param creator
+     *            the user that created the note, null to simulate a note without creator
+     */
+    private void setupNoteForDelete(User creator) {
+        when(mockDal.get(Note.class, TEST_NOTE_ID)).thenReturn(mockNote);
+        when(mockNote.getTable()).thenReturn(mockTable);
+        when(mockNote.getCreatedBy()).thenReturn(creator);
+    }
 
     /**
      * Creates a list of mock notes for testing.
