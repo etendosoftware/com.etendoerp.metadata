@@ -16,15 +16,10 @@
  */
 package com.etendoerp.metadata.http;
 
-import static com.etendoerp.metadata.MetadataTestConstants.TABLE_ID;
-import static com.etendoerp.metadata.MetadataTestConstants.TEST_USER_ID;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
@@ -32,19 +27,9 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.io.BufferedReader;
-import java.io.PrintWriter;
-import java.io.StringReader;
-import java.io.StringWriter;
 import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 
 import org.apache.http.HttpStatus;
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
@@ -55,15 +40,11 @@ import org.openbravo.base.model.Entity;
 import org.openbravo.base.model.ModelProvider;
 import org.openbravo.base.provider.OBProvider;
 import org.openbravo.base.structure.OrganizationEnabled;
-import org.openbravo.client.application.Note;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.security.SecurityChecker;
-import org.openbravo.dal.service.OBCriteria;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.access.User;
 import org.openbravo.model.ad.datamodel.Table;
-import org.openbravo.model.common.enterprise.Organization;
-import org.openbravo.test.base.OBBaseTest;
 
 /**
  * Security related unit tests for {@link NotesServlet}.
@@ -80,33 +61,13 @@ import org.openbravo.test.base.OBBaseTest;
  * </ul>
  */
 @RunWith(MockitoJUnitRunner.class)
-public class NoteServletSecurityTest extends OBBaseTest {
+public class NoteServletSecurityTest extends NoteServletTestSupport {
 
-    private static final String TEST_RECORD_ID = "test-record-123";
-    private static final String TEST_NOTE_ID = "note-456";
-    private static final String TEST_NOTE_CONTENT = "This is a test note";
-    private static final String PARAM_TABLE = "table";
-    private static final String PARAM_RECORD = "record";
     private static final String INVALID_TABLE_MESSAGE = "Invalid table ID";
     private static final String FORBIDDEN_RECORD_MESSAGE = "Insufficient permissions to access record";
     private static final String SHOULD_REPORT_INVALID_TABLE = "Should report an invalid table ID";
     private static final String SHOULD_REPORT_FORBIDDEN_RECORD = "Should report a forbidden record";
     private static final String ACCESS_DENIED = "Access denied";
-
-    @Mock
-    private HttpServletRequest mockRequest;
-
-    @Mock
-    private HttpServletResponse mockResponse;
-
-    @Mock
-    private OBDal mockDal;
-
-    @Mock
-    private OBProvider mockProvider;
-
-    @Mock
-    private OBContext mockContext;
 
     @Mock
     private ModelProvider mockModelProvider;
@@ -116,45 +77,6 @@ public class NoteServletSecurityTest extends OBBaseTest {
 
     @Mock
     private Entity mockEntity;
-
-    @Mock
-    private Table mockTable;
-
-    @Mock
-    private Note mockNote;
-
-    @Mock
-    private User mockUser;
-
-    @Mock
-    private Organization mockOrganization;
-
-    @Mock
-    private OBCriteria<Note> mockCriteria;
-
-    private NotesServlet servlet;
-    private StringWriter stringWriter;
-
-    /**
-     * Initializes the servlet under test, the captured response writer and the context defaults
-     * shared by every scenario.
-     *
-     * @throws Exception
-     *             when the base test setup or the response writer cannot be initialized
-     */
-    @Override
-    @Before
-    public void setUp() throws Exception {
-        super.setUp();
-        servlet = new NotesServlet();
-        stringWriter = new StringWriter();
-        PrintWriter printWriter = new PrintWriter(stringWriter);
-
-        lenient().when(mockResponse.getWriter()).thenReturn(printWriter);
-        lenient().when(mockContext.getUser()).thenReturn(mockUser);
-        lenient().when(mockContext.getCurrentOrganization()).thenReturn(mockOrganization);
-        lenient().when(mockUser.getId()).thenReturn(TEST_USER_ID);
-    }
 
     // ==================== findTable runs in administrator mode ====================
 
@@ -175,7 +97,6 @@ public class NoteServletSecurityTest extends OBBaseTest {
 
             setupDal(dalMock);
             setupModelProvider(modelMock, null);
-            when(mockDal.get(Table.class, TABLE_ID)).thenReturn(mockTable);
             setupNoteCriteria(new ArrayList<>());
 
             servlet.doGet(mockRequest, mockResponse);
@@ -199,12 +120,12 @@ public class NoteServletSecurityTest extends OBBaseTest {
                 MockedStatic<OBContext> contextMock = mockStatic(OBContext.class)) {
 
             setupDal(dalMock);
-            when(mockDal.get(Table.class, TABLE_ID)).thenReturn(null);
+            when(mockDal.get(Table.class, TEST_TABLE_ID)).thenReturn(null);
 
             servlet.doPost(mockRequest, mockResponse);
 
             verify(mockResponse).setStatus(HttpStatus.SC_BAD_REQUEST);
-            assertTrue(SHOULD_REPORT_INVALID_TABLE, stringWriter.toString().contains(INVALID_TABLE_MESSAGE));
+            assertTrue(SHOULD_REPORT_INVALID_TABLE, getResponseContent().contains(INVALID_TABLE_MESSAGE));
             verify(mockDal, never()).save(any());
         }
     }
@@ -224,12 +145,12 @@ public class NoteServletSecurityTest extends OBBaseTest {
                 MockedStatic<OBContext> contextMock = mockStatic(OBContext.class)) {
 
             setupDal(dalMock);
-            when(mockDal.get(Table.class, TABLE_ID)).thenThrow(new OBSecurityException(ACCESS_DENIED));
+            when(mockDal.get(Table.class, TEST_TABLE_ID)).thenThrow(new OBSecurityException(ACCESS_DENIED));
 
             servlet.doPost(mockRequest, mockResponse);
 
             verify(mockResponse).setStatus(HttpStatus.SC_BAD_REQUEST);
-            assertTrue(SHOULD_REPORT_INVALID_TABLE, stringWriter.toString().contains(INVALID_TABLE_MESSAGE));
+            assertTrue(SHOULD_REPORT_INVALID_TABLE, getResponseContent().contains(INVALID_TABLE_MESSAGE));
             contextMock.verify(OBContext::restorePreviousMode, times(1));
         }
     }
@@ -255,17 +176,13 @@ public class NoteServletSecurityTest extends OBBaseTest {
             setupDal(dalMock);
             setupModelProvider(modelMock, mockEntity);
             setupSecurityChecker(checkerMock);
-            when(mockDal.get(Table.class, TABLE_ID)).thenReturn(mockTable);
-
-            OrganizationEnabled record = stubRecord();
-            doThrow(new OBSecurityException(ACCESS_DENIED)).when(mockSecurityChecker)
-                    .checkReadableAccess(record);
+            setupTableLookup();
+            denyRecordAccess(stubRecord());
 
             servlet.doPost(mockRequest, mockResponse);
 
             verify(mockResponse).setStatus(HttpStatus.SC_FORBIDDEN);
-            assertTrue(SHOULD_REPORT_FORBIDDEN_RECORD,
-                    stringWriter.toString().contains(FORBIDDEN_RECORD_MESSAGE));
+            assertTrue(SHOULD_REPORT_FORBIDDEN_RECORD, getResponseContent().contains(FORBIDDEN_RECORD_MESSAGE));
             verify(mockDal, never()).save(any());
         }
     }
@@ -292,12 +209,12 @@ public class NoteServletSecurityTest extends OBBaseTest {
             setupSecurityChecker(checkerMock);
             setupNoteCreation(providerMock);
 
-            OrganizationEnabled record = stubRecord();
+            OrganizationEnabled currentRecord = stubRecord();
 
             servlet.doPost(mockRequest, mockResponse);
 
             verify(mockResponse).setStatus(HttpStatus.SC_OK);
-            verify(mockSecurityChecker).checkReadableAccess(record);
+            verify(mockSecurityChecker).checkReadableAccess(currentRecord);
             verify(mockDal).save(mockNote);
         }
     }
@@ -382,7 +299,7 @@ public class NoteServletSecurityTest extends OBBaseTest {
 
             servlet.doPost(mockRequest, mockResponse);
 
-            verify(mockDal, times(1)).get(Table.class, TABLE_ID);
+            verify(mockDal, times(1)).get(Table.class, TEST_TABLE_ID);
             verify(mockNote).setTable(mockTable);
         }
     }
@@ -397,7 +314,7 @@ public class NoteServletSecurityTest extends OBBaseTest {
      */
     @Test
     public void testDeleteNoteWithUnreadableRecordReturnsForbidden() throws Exception {
-        when(mockRequest.getPathInfo()).thenReturn("/" + TEST_NOTE_ID);
+        stubNotePath();
 
         try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
                 MockedStatic<OBContext> contextMock = mockStatic(OBContext.class);
@@ -407,17 +324,13 @@ public class NoteServletSecurityTest extends OBBaseTest {
             setupDal(dalMock);
             setupModelProvider(modelMock, mockEntity);
             setupSecurityChecker(checkerMock);
-            setupStoredNote();
-
-            OrganizationEnabled record = stubRecord();
-            doThrow(new OBSecurityException(ACCESS_DENIED)).when(mockSecurityChecker)
-                    .checkReadableAccess(record);
+            setupStoredNote(null);
+            denyRecordAccess(stubRecord());
 
             servlet.doDelete(mockRequest, mockResponse);
 
             verify(mockResponse).setStatus(HttpStatus.SC_FORBIDDEN);
-            assertTrue(SHOULD_REPORT_FORBIDDEN_RECORD,
-                    stringWriter.toString().contains(FORBIDDEN_RECORD_MESSAGE));
+            assertTrue(SHOULD_REPORT_FORBIDDEN_RECORD, getResponseContent().contains(FORBIDDEN_RECORD_MESSAGE));
             verify(mockDal, never()).remove(any());
         }
     }
@@ -430,7 +343,7 @@ public class NoteServletSecurityTest extends OBBaseTest {
      */
     @Test
     public void testDeleteNoteWithReadableRecordRemovesNote() throws Exception {
-        when(mockRequest.getPathInfo()).thenReturn("/" + TEST_NOTE_ID);
+        stubNotePath();
 
         try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
                 MockedStatic<OBContext> contextMock = mockStatic(OBContext.class);
@@ -440,9 +353,7 @@ public class NoteServletSecurityTest extends OBBaseTest {
             setupDalAndContext(dalMock, contextMock);
             setupModelProvider(modelMock, mockEntity);
             setupSecurityChecker(checkerMock);
-            setupStoredNote();
-            when(mockNote.getCreatedBy()).thenReturn(mockUser);
-
+            setupStoredNote(mockUser);
             stubRecord();
 
             servlet.doDelete(mockRequest, mockResponse);
@@ -456,30 +367,6 @@ public class NoteServletSecurityTest extends OBBaseTest {
     // ==================== Helper Methods ====================
 
     /**
-     * Wires the DAL singleton to its mock.
-     *
-     * @param dalMock
-     *            static mock of {@link OBDal}
-     */
-    private void setupDal(MockedStatic<OBDal> dalMock) {
-        dalMock.when(OBDal::getInstance).thenReturn(mockDal);
-    }
-
-    /**
-     * Wires the DAL and context singletons to their mocks. Only needed by the flows that read the
-     * current user, client or organization from the context.
-     *
-     * @param dalMock
-     *            static mock of {@link OBDal}
-     * @param contextMock
-     *            static mock of {@link OBContext}
-     */
-    private void setupDalAndContext(MockedStatic<OBDal> dalMock, MockedStatic<OBContext> contextMock) {
-        setupDal(dalMock);
-        contextMock.when(OBContext::getOBContext).thenReturn(mockContext);
-    }
-
-    /**
      * Wires the runtime model singleton so that the given entity is resolved for the test table.
      *
      * @param modelMock
@@ -489,7 +376,7 @@ public class NoteServletSecurityTest extends OBBaseTest {
      */
     private void setupModelProvider(MockedStatic<ModelProvider> modelMock, Entity entity) {
         modelMock.when(ModelProvider::getInstance).thenReturn(mockModelProvider);
-        when(mockModelProvider.getEntityByTableId(TABLE_ID)).thenReturn(entity);
+        when(mockModelProvider.getEntityByTableId(TEST_TABLE_ID)).thenReturn(entity);
     }
 
     /**
@@ -508,11 +395,22 @@ public class NoteServletSecurityTest extends OBBaseTest {
      * @return the record returned by the DAL for the test record id
      */
     private OrganizationEnabled stubRecord() {
-        OrganizationEnabled record = mock(OrganizationEnabled.class);
+        OrganizationEnabled currentRecord = mock(OrganizationEnabled.class);
         stubMappingClass();
-        when(mockDal.get(Object.class, TEST_RECORD_ID)).thenReturn(record);
+        when(mockDal.get(Object.class, TEST_RECORD_ID)).thenReturn(currentRecord);
 
-        return record;
+        return currentRecord;
+    }
+
+    /**
+     * Makes the platform reject the read of the given record.
+     *
+     * @param currentRecord
+     *            the record the caller is not allowed to read
+     */
+    private void denyRecordAccess(OrganizationEnabled currentRecord) {
+        doThrow(new OBSecurityException(ACCESS_DENIED)).when(mockSecurityChecker)
+                .checkReadableAccess(currentRecord);
     }
 
     /**
@@ -525,73 +423,15 @@ public class NoteServletSecurityTest extends OBBaseTest {
     }
 
     /**
-     * Prepares the request parameters of a notes fetch.
-     */
-    private void stubGetParameters() {
-        when(mockRequest.getParameter(PARAM_TABLE)).thenReturn(TABLE_ID);
-        when(mockRequest.getParameter(PARAM_RECORD)).thenReturn(TEST_RECORD_ID);
-    }
-
-    /**
-     * Prepares a valid note creation request body.
+     * Prepares the note lookup performed by the delete flow, including the ids read by the record
+     * level access check.
      *
-     * @throws Exception
-     *             when the request reader cannot be stubbed
+     * @param creator
+     *            the user that created the note, null when the creator is not relevant
      */
-    private void stubPostBody() throws Exception {
-        String body = "{\"table\":\"" + TABLE_ID + "\",\"record\":\"" + TEST_RECORD_ID + "\",\"note\":\""
-                + TEST_NOTE_CONTENT + "\"}";
-        when(mockRequest.getReader()).thenReturn(new BufferedReader(new StringReader(body)));
-    }
-
-    /**
-     * Prepares the criteria used to fetch the notes of a record.
-     *
-     * @param notes
-     *            the notes returned by the criteria
-     */
-    private void setupNoteCriteria(List<Note> notes) {
-        when(mockDal.createCriteria(Note.class)).thenReturn(mockCriteria);
-        when(mockCriteria.add(any())).thenReturn(mockCriteria);
-        when(mockCriteria.addOrderBy(anyString(), anyBoolean())).thenReturn(mockCriteria);
-        when(mockCriteria.list()).thenReturn(notes);
-    }
-
-    /**
-     * Prepares everything needed to create and serialize a new note.
-     *
-     * @param providerMock
-     *            static mock of {@link OBProvider}
-     */
-    private void setupNoteCreation(MockedStatic<OBProvider> providerMock) {
-        providerMock.when(OBProvider::getInstance).thenReturn(mockProvider);
-        when(mockProvider.get(Note.class)).thenReturn(mockNote);
-        when(mockDal.get(Table.class, TABLE_ID)).thenReturn(mockTable);
-        stubNoteSerialization();
-    }
-
-    /**
-     * Prepares the note lookup performed by the delete flow.
-     */
-    private void setupStoredNote() {
-        when(mockDal.get(Note.class, TEST_NOTE_ID)).thenReturn(mockNote);
-        when(mockNote.getTable()).thenReturn(mockTable);
-        when(mockTable.getId()).thenReturn(TABLE_ID);
+    private void setupStoredNote(User creator) {
+        setupNoteForDelete(creator);
+        when(mockTable.getId()).thenReturn(TEST_TABLE_ID);
         when(mockNote.getRecord()).thenReturn(TEST_RECORD_ID);
-    }
-
-    /**
-     * Prepares the note getters read while building the JSON response.
-     */
-    private void stubNoteSerialization() {
-        lenient().when(mockNote.getId()).thenReturn(TEST_NOTE_ID);
-        lenient().when(mockNote.getNote()).thenReturn(TEST_NOTE_CONTENT);
-        lenient().when(mockNote.getTable()).thenReturn(mockTable);
-        lenient().when(mockNote.getRecord()).thenReturn(TEST_RECORD_ID);
-        lenient().when(mockNote.getCreatedBy()).thenReturn(mockUser);
-        lenient().when(mockNote.getCreationDate()).thenReturn(new Date());
-        lenient().when(mockNote.getUpdated()).thenReturn(new Date());
-        lenient().when(mockTable.getId()).thenReturn(TABLE_ID);
-        lenient().when(mockUser.getIdentifier()).thenReturn("Test User");
     }
 }

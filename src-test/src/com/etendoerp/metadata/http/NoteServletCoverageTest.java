@@ -21,34 +21,20 @@ import static org.junit.Assert.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-import java.io.BufferedReader;
-import java.io.PrintWriter;
-import java.io.StringReader;
-import java.io.StringWriter;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
 import org.apache.http.HttpStatus;
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.MockitoJUnitRunner;
 import org.openbravo.base.exception.OBException;
-import org.openbravo.base.provider.OBProvider;
 import org.openbravo.client.application.Note;
 import org.openbravo.dal.core.OBContext;
-import org.openbravo.dal.service.OBCriteria;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.access.User;
 import org.openbravo.model.ad.datamodel.Table;
-import org.openbravo.model.common.enterprise.Organization;
-import org.openbravo.test.base.OBBaseTest;
 
 /**
  * Additional coverage tests for {@link NotesServlet}.
@@ -58,71 +44,11 @@ import org.openbravo.test.base.OBBaseTest;
  * canDeleteNote exception path.
  */
 @RunWith(MockitoJUnitRunner.class)
-public class NoteServletCoverageTest extends OBBaseTest {
+public class NoteServletCoverageTest extends NoteServletTestSupport {
 
-    private static final String TABLE_PARAM = "table";
-    private static final String RECORD_PARAM = "record";
     private static final String ERROR_PROCESSING_REQUEST = "Error processing request";
     private static final String SHOULD_CONTAIN_ERROR_PROCESSING = "Should contain error processing";
-    private static final String TEST_TABLE_ID = "259";
-    private static final String TEST_RECORD_ID = "test-record-123";
-    private static final String TEST_NOTE_ID = "note-456";
-    private static final String TEST_NOTE_CONTENT = "This is a test note";
-    private static final String TEST_USER_ID = "user-789";
     private static final String TEST_PATH = "/test/path";
-
-    @Mock private HttpServletRequest mockRequest;
-    @Mock private HttpServletResponse mockResponse;
-    @Mock private OBDal mockDal;
-    @Mock private OBContext mockContext;
-    @Mock private Table mockTable;
-    @Mock private Note mockNote;
-    @Mock private User mockUser;
-    @Mock private Organization mockOrganization;
-    @Mock private OBCriteria<Note> mockCriteria;
-
-    private NotesServlet servlet;
-    private StringWriter stringWriter;
-
-    @Override
-    @Before
-    public void setUp() throws Exception {
-        super.setUp();
-        servlet = new NotesServlet();
-        stringWriter = new StringWriter();
-        PrintWriter printWriter = new PrintWriter(stringWriter);
-
-        lenient().when(mockResponse.getWriter()).thenReturn(printWriter);
-        lenient().when(mockContext.getUser()).thenReturn(mockUser);
-        lenient().when(mockContext.getCurrentOrganization()).thenReturn(mockOrganization);
-        lenient().when(mockUser.getId()).thenReturn(TEST_USER_ID);
-    }
-
-    private void setupDalAndContext(MockedStatic<OBDal> dalMock, MockedStatic<OBContext> contextMock) {
-        dalMock.when(OBDal::getInstance).thenReturn(mockDal);
-        contextMock.when(OBContext::getOBContext).thenReturn(mockContext);
-    }
-
-    /**
-     * Stubs the note lookup performed by the delete flow, including the table needed by the record
-     * level access check.
-     *
-     * @param creator
-     *            the user that created the note
-     */
-    private void setupNoteForDelete(User creator) {
-        when(mockDal.get(Note.class, TEST_NOTE_ID)).thenReturn(mockNote);
-        when(mockNote.getTable()).thenReturn(mockTable);
-        when(mockNote.getCreatedBy()).thenReturn(creator);
-    }
-
-    private void setupNoteCriteria(List<Note> notes) {
-        when(mockDal.get(Table.class, TEST_TABLE_ID)).thenReturn(mockTable);
-        when(mockDal.createCriteria(Note.class)).thenReturn(mockCriteria);
-        when(mockCriteria.add(any())).thenReturn(mockCriteria);
-        when(mockCriteria.addOrderBy(anyString(), anyBoolean())).thenReturn(mockCriteria);
-        when(mockCriteria.list()).thenReturn(notes);
-    }
 
     // ==================== Exception Handling in doGet ====================
 
@@ -131,12 +57,12 @@ public class NoteServletCoverageTest extends OBBaseTest {
      */
     @Test
     public void testDoGet_ExceptionHandling() throws Exception {
-        when(mockRequest.getParameter(TABLE_PARAM)).thenThrow(new RuntimeException("Unexpected error"));
+        when(mockRequest.getParameter(PARAM_TABLE)).thenThrow(new RuntimeException("Unexpected error"));
 
         servlet.doGet(mockRequest, mockResponse);
 
         verify(mockResponse).setStatus(HttpStatus.SC_INTERNAL_SERVER_ERROR);
-        assertTrue(SHOULD_CONTAIN_ERROR_PROCESSING, stringWriter.toString().contains(ERROR_PROCESSING_REQUEST));
+        assertTrue(SHOULD_CONTAIN_ERROR_PROCESSING, getResponseContent().contains(ERROR_PROCESSING_REQUEST));
     }
 
     // ==================== Exception Handling in doPost ====================
@@ -151,7 +77,7 @@ public class NoteServletCoverageTest extends OBBaseTest {
         servlet.doPost(mockRequest, mockResponse);
 
         verify(mockResponse).setStatus(HttpStatus.SC_INTERNAL_SERVER_ERROR);
-        assertTrue(SHOULD_CONTAIN_ERROR_PROCESSING, stringWriter.toString().contains(ERROR_PROCESSING_REQUEST));
+        assertTrue(SHOULD_CONTAIN_ERROR_PROCESSING, getResponseContent().contains(ERROR_PROCESSING_REQUEST));
     }
 
     // ==================== Exception Handling in doDelete ====================
@@ -166,7 +92,7 @@ public class NoteServletCoverageTest extends OBBaseTest {
         servlet.doDelete(mockRequest, mockResponse);
 
         verify(mockResponse).setStatus(HttpStatus.SC_INTERNAL_SERVER_ERROR);
-        assertTrue(SHOULD_CONTAIN_ERROR_PROCESSING, stringWriter.toString().contains(ERROR_PROCESSING_REQUEST));
+        assertTrue(SHOULD_CONTAIN_ERROR_PROCESSING, getResponseContent().contains(ERROR_PROCESSING_REQUEST));
     }
 
     // ==================== SWS Path-Based Methods ====================
@@ -176,8 +102,7 @@ public class NoteServletCoverageTest extends OBBaseTest {
      */
     @Test
     public void testSWSDoGet() throws Exception {
-        when(mockRequest.getParameter(TABLE_PARAM)).thenReturn(TEST_TABLE_ID);
-        when(mockRequest.getParameter(RECORD_PARAM)).thenReturn(TEST_RECORD_ID);
+        stubGetParameters();
 
         try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
              MockedStatic<OBContext> contextMock = mockStatic(OBContext.class)) {
@@ -196,12 +121,12 @@ public class NoteServletCoverageTest extends OBBaseTest {
      */
     @Test
     public void testSWSDoPost() throws Exception {
-        when(mockRequest.getReader()).thenReturn(new BufferedReader(new StringReader("{}")));
+        stubRequestBody("{}");
 
         servlet.doPost(TEST_PATH, mockRequest, mockResponse);
 
         verify(mockResponse).setStatus(HttpStatus.SC_BAD_REQUEST);
-        assertTrue("Should mention missing table", stringWriter.toString().contains("Missing required parameter: table"));
+        assertTrue("Should mention missing table", getResponseContent().contains("Missing required parameter: table"));
     }
 
     /**
@@ -214,7 +139,7 @@ public class NoteServletCoverageTest extends OBBaseTest {
         servlet.doDelete(TEST_PATH, mockRequest, mockResponse);
 
         verify(mockResponse).setStatus(HttpStatus.SC_BAD_REQUEST);
-        assertTrue("Should mention missing note ID", stringWriter.toString().contains("Missing note ID in path"));
+        assertTrue("Should mention missing note ID", getResponseContent().contains("Missing note ID in path"));
     }
 
     // ==================== findTable exception path ====================
@@ -224,17 +149,16 @@ public class NoteServletCoverageTest extends OBBaseTest {
      */
     @Test
     public void testGetNotes_FindTableException() throws Exception {
-        when(mockRequest.getParameter(TABLE_PARAM)).thenReturn(TEST_TABLE_ID);
-        when(mockRequest.getParameter(RECORD_PARAM)).thenReturn(TEST_RECORD_ID);
+        stubGetParameters();
 
         try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class)) {
-            dalMock.when(OBDal::getInstance).thenReturn(mockDal);
+            setupDal(dalMock);
             when(mockDal.get(Table.class, TEST_TABLE_ID)).thenThrow(new RuntimeException("DB error"));
 
             servlet.doGet(mockRequest, mockResponse);
 
             verify(mockResponse).setStatus(HttpStatus.SC_BAD_REQUEST);
-            assertTrue("Should mention invalid table", stringWriter.toString().contains("Invalid table ID"));
+            assertTrue("Should mention invalid table", getResponseContent().contains("Invalid table ID"));
         }
     }
 
@@ -252,7 +176,7 @@ public class NoteServletCoverageTest extends OBBaseTest {
         servlet.doDelete(mockRequest, mockResponse);
 
         verify(mockResponse).setStatus(HttpStatus.SC_BAD_REQUEST);
-        assertTrue("Should mention missing note ID", stringWriter.toString().contains("Missing note ID in path"));
+        assertTrue("Should mention missing note ID", getResponseContent().contains("Missing note ID in path"));
     }
 
     // ==================== readRequestBody empty body ====================
@@ -262,12 +186,12 @@ public class NoteServletCoverageTest extends OBBaseTest {
      */
     @Test
     public void testCreateNote_EmptyRequestBody() throws Exception {
-        when(mockRequest.getReader()).thenReturn(new BufferedReader(new StringReader("")));
+        stubRequestBody("");
 
         servlet.doPost(mockRequest, mockResponse);
 
         verify(mockResponse).setStatus(HttpStatus.SC_BAD_REQUEST);
-        assertTrue("Should mention missing table", stringWriter.toString().contains("Missing required parameter: table"));
+        assertTrue("Should mention missing table", getResponseContent().contains("Missing required parameter: table"));
     }
 
     // ==================== GET with empty table/record strings ====================
@@ -277,8 +201,8 @@ public class NoteServletCoverageTest extends OBBaseTest {
      */
     @Test
     public void testGetNotes_EmptyTableParameter() throws Exception {
-        when(mockRequest.getParameter(TABLE_PARAM)).thenReturn("");
-        when(mockRequest.getParameter(RECORD_PARAM)).thenReturn(TEST_RECORD_ID);
+        when(mockRequest.getParameter(PARAM_TABLE)).thenReturn("");
+        when(mockRequest.getParameter(PARAM_RECORD)).thenReturn(TEST_RECORD_ID);
 
         servlet.doGet(mockRequest, mockResponse);
 
@@ -290,8 +214,8 @@ public class NoteServletCoverageTest extends OBBaseTest {
      */
     @Test
     public void testGetNotes_EmptyRecordParameter() throws Exception {
-        when(mockRequest.getParameter(TABLE_PARAM)).thenReturn(TEST_TABLE_ID);
-        when(mockRequest.getParameter(RECORD_PARAM)).thenReturn("");
+        when(mockRequest.getParameter(PARAM_TABLE)).thenReturn(TEST_TABLE_ID);
+        when(mockRequest.getParameter(PARAM_RECORD)).thenReturn("");
 
         servlet.doGet(mockRequest, mockResponse);
 
@@ -305,8 +229,7 @@ public class NoteServletCoverageTest extends OBBaseTest {
      */
     @Test
     public void testGetNotes_EmptyList() throws Exception {
-        when(mockRequest.getParameter(TABLE_PARAM)).thenReturn(TEST_TABLE_ID);
-        when(mockRequest.getParameter(RECORD_PARAM)).thenReturn(TEST_RECORD_ID);
+        stubGetParameters();
 
         try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
              MockedStatic<OBContext> contextMock = mockStatic(OBContext.class)) {
@@ -317,7 +240,7 @@ public class NoteServletCoverageTest extends OBBaseTest {
             servlet.doGet(mockRequest, mockResponse);
 
             verify(mockResponse).setStatus(HttpStatus.SC_OK);
-            assertEquals("Should return empty array", "[]", stringWriter.toString());
+            assertEquals("Should return empty array", "[]", getResponseContent());
         }
     }
 
@@ -328,7 +251,7 @@ public class NoteServletCoverageTest extends OBBaseTest {
      */
     @Test
     public void testDeleteNote_DeleteThrowsException() throws Exception {
-        when(mockRequest.getPathInfo()).thenReturn("/" + TEST_NOTE_ID);
+        stubNotePath();
 
         try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
              MockedStatic<OBContext> contextMock = mockStatic(OBContext.class)) {
@@ -352,7 +275,7 @@ public class NoteServletCoverageTest extends OBBaseTest {
      */
     @Test
     public void testDeleteNote_CanDeleteThrowsException() throws Exception {
-        when(mockRequest.getPathInfo()).thenReturn("/" + TEST_NOTE_ID);
+        stubNotePath();
 
         try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
              MockedStatic<OBContext> contextMock = mockStatic(OBContext.class)) {
@@ -375,19 +298,12 @@ public class NoteServletCoverageTest extends OBBaseTest {
      */
     @Test
     public void testGetNotes_NullDates() throws Exception {
-        when(mockRequest.getParameter(TABLE_PARAM)).thenReturn(TEST_TABLE_ID);
-        when(mockRequest.getParameter(RECORD_PARAM)).thenReturn(TEST_RECORD_ID);
+        stubGetParameters();
 
         Note note1 = mock(Note.class);
-        when(note1.getId()).thenReturn(TEST_NOTE_ID);
-        when(note1.getNote()).thenReturn(TEST_NOTE_CONTENT);
-        when(note1.getTable()).thenReturn(mockTable);
-        when(note1.getRecord()).thenReturn(TEST_RECORD_ID);
-        when(note1.getCreatedBy()).thenReturn(mockUser);
+        stubNoteJsonFields(note1);
         when(note1.getCreationDate()).thenReturn(null);
         when(note1.getUpdated()).thenReturn(null);
-        when(mockTable.getId()).thenReturn(TEST_TABLE_ID);
-        when(mockUser.getIdentifier()).thenReturn("Test User");
 
         List<Note> notes = new ArrayList<>();
         notes.add(note1);
@@ -401,7 +317,7 @@ public class NoteServletCoverageTest extends OBBaseTest {
             servlet.doGet(mockRequest, mockResponse);
 
             verify(mockResponse).setStatus(HttpStatus.SC_OK);
-            String content = stringWriter.toString();
+            String content = getResponseContent();
             assertFalse("Should not contain creationDate for null", content.contains("creationDate"));
             assertFalse("Should not contain updated for null", content.contains("updated"));
         }
@@ -414,8 +330,8 @@ public class NoteServletCoverageTest extends OBBaseTest {
      */
     @Test
     public void testSendErrorResponse_IOException() throws Exception {
-        when(mockRequest.getParameter(TABLE_PARAM)).thenReturn(null);
-        when(mockRequest.getParameter(RECORD_PARAM)).thenReturn(TEST_RECORD_ID);
+        when(mockRequest.getParameter(PARAM_TABLE)).thenReturn(null);
+        when(mockRequest.getParameter(PARAM_RECORD)).thenReturn(TEST_RECORD_ID);
         // Override writer to throw on first call after error
         when(mockResponse.getWriter()).thenThrow(new java.io.IOException("Write failed"));
 
@@ -431,18 +347,16 @@ public class NoteServletCoverageTest extends OBBaseTest {
      */
     @Test
     public void testCreateNote_FindTableException() throws Exception {
-        String body = "{\"table\":\"" + TEST_TABLE_ID + "\",\"record\":\"" + TEST_RECORD_ID
-                + "\",\"note\":\"" + TEST_NOTE_CONTENT + "\"}";
-        when(mockRequest.getReader()).thenReturn(new BufferedReader(new StringReader(body)));
+        stubPostBody();
 
         try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class)) {
-            dalMock.when(OBDal::getInstance).thenReturn(mockDal);
+            setupDal(dalMock);
             when(mockDal.get(Table.class, TEST_TABLE_ID)).thenThrow(new RuntimeException("DB error"));
 
             servlet.doPost(mockRequest, mockResponse);
 
             verify(mockResponse).setStatus(HttpStatus.SC_BAD_REQUEST);
-            assertTrue("Should mention invalid table", stringWriter.toString().contains("Invalid table ID"));
+            assertTrue("Should mention invalid table", getResponseContent().contains("Invalid table ID"));
         }
     }
 }

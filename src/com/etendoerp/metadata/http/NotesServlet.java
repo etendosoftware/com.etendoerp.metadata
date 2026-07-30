@@ -291,9 +291,9 @@ public class NotesServlet extends HttpSecureAppServlet {
                 return true;
             }
 
-            Object record = OBDal.getInstance().get(entity.getMappingClass(), recordId);
-            if (record instanceof OrganizationEnabled) {
-                SecurityChecker.getInstance().checkReadableAccess((OrganizationEnabled) record);
+            Object currentRecord = OBDal.getInstance().get(entity.getMappingClass(), recordId);
+            if (currentRecord instanceof OrganizationEnabled) {
+                SecurityChecker.getInstance().checkReadableAccess((OrganizationEnabled) currentRecord);
             }
 
             return true;
