@@ -41,6 +41,8 @@ import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.erpCommon.utility.SystemInfo;
 import org.openbravo.model.ad.access.User;
+import org.openbravo.model.ad.system.Client;
+import org.openbravo.model.common.enterprise.Organization;
 
 import javax.servlet.ServletException;
 
@@ -264,12 +266,13 @@ public class SSOService {
             return;
         }
 
-        String userId = extractUserIdFromBearer(request);
-        if (userId == null) {
+        DecodedJWT bearerClaims = decodeBearerToken(request);
+        if (bearerClaims == null) {
             writeJson(response, HttpServletResponse.SC_UNAUTHORIZED,
                 errorJson("unauthorized", "Valid Authorization: Bearer <token> header required"));
             return;
         }
+        String userId = bearerClaims.getClaim("user").asString();
 
         Properties props = OBPropertiesProvider.getInstance().getOpenbravoProperties();
         String authType = StringUtils.trimToEmpty(props.getProperty(SSO_AUTH_TYPE));
@@ -322,9 +325,17 @@ public class SSOService {
                 OBDal.getInstance().flush();
             }
 
+            // Use the active session's client/organization (from the JWT, derived from the
+            // logged-in role) rather than the user's own defaults: a multi-client user (e.g.
+            // the System Administrator, whose own Client is "0") can be linking while acting
+            // under a real tenant role, and the ETRX_TokenUser must belong to that tenant.
+            Client client = OBDal.getInstance().get(Client.class, bearerClaims.getClaim("client").asString());
+            Organization organization = OBDal.getInstance().get(Organization.class,
+                bearerClaims.getClaim("organization").asString());
+
             ETRXTokenUser tokenUser = new ETRXTokenUser();
-            tokenUser.setClient(user.getClient());
-            tokenUser.setOrganization(user.getOrganization());
+            tokenUser.setClient(client);
+            tokenUser.setOrganization(organization);
             tokenUser.setSub(sub);
             tokenUser.setOAuthToken(ssoToken);
             tokenUser.setTokenProvider(tokenProvider);
@@ -348,10 +359,10 @@ public class SSOService {
     }
 
     /**
-     * Extracts the user ID from the Authorization: Bearer header.
+     * Decodes the Authorization: Bearer header into its JWT claims.
      * Returns null if the header is missing or the token is invalid.
      */
-    private String extractUserIdFromBearer(HttpServletRequest request) {
+    private DecodedJWT decodeBearerToken(HttpServletRequest request) {
         String authHeader = request.getHeader("Authorization");
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             return null;
@@ -361,8 +372,7 @@ public class SSOService {
             return null;
         }
         try {
-            DecodedJWT decoded = Utils.decodeToken(token);
-            return decoded.getClaim("user").asString();
+            return Utils.decodeToken(token);
         } catch (Exception e) {
             log.debug("Failed to decode bearer token for SSO link", e);
             return null;
