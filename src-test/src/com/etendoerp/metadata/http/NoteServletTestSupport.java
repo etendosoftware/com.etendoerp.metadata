@@ -32,6 +32,8 @@ import java.util.List;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.codehaus.jettison.json.JSONException;
+import org.codehaus.jettison.json.JSONObject;
 import org.junit.Before;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
@@ -66,7 +68,6 @@ public abstract class NoteServletTestSupport extends OBBaseTest {
     protected static final String PARAM_TABLE = "table";
     protected static final String PARAM_RECORD = "record";
     protected static final String PARAM_NOTE = "note";
-    protected static final String JSON_QUOTE = "\":\"";
 
     @Mock
     protected HttpServletRequest mockRequest;
@@ -261,9 +262,15 @@ public abstract class NoteServletTestSupport extends OBBaseTest {
      * Builds a valid note creation request body.
      *
      * @return the JSON body containing table, record and note
+     * @throws JSONException
+     *             when the body cannot be built
      */
-    protected String createNoteRequestBody() {
-        return "{\"" + PARAM_TABLE + JSON_QUOTE + TEST_TABLE_ID + JSON_QUOTE + "\",\"" + PARAM_RECORD + JSON_QUOTE + TEST_RECORD_ID + JSON_QUOTE
-                + "\",\"" + PARAM_NOTE + JSON_QUOTE + TEST_NOTE_CONTENT + JSON_QUOTE + "\"}";
+    protected String createNoteRequestBody() throws JSONException {
+        JSONObject requestBody = new JSONObject();
+        requestBody.put(PARAM_TABLE, TEST_TABLE_ID);
+        requestBody.put(PARAM_RECORD, TEST_RECORD_ID);
+        requestBody.put(PARAM_NOTE, TEST_NOTE_CONTENT);
+
+        return requestBody.toString();
     }
 }
