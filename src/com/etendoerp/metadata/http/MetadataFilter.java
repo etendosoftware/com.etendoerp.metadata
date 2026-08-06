@@ -36,6 +36,8 @@ import org.apache.logging.log4j.Logger;
 import org.openbravo.client.kernel.RequestContext;
 
 import com.etendoerp.metadata.service.MetadataService;
+import com.etendoerp.metadata.service.SSOService;
+import com.etendoerp.metadata.utils.Constants;
 import com.etendoerp.metadata.utils.Utils;
 
 /**
@@ -67,7 +69,7 @@ import com.etendoerp.metadata.utils.Utils;
  *
  * @author luuchorocha
  */
-@WebFilter(urlPatterns = { "/meta", "/meta/*" })
+@WebFilter(urlPatterns = { "/meta", "/meta/*", "/sws/com.etendoerp.metadata.meta/sso/*" })
 public class MetadataFilter implements Filter {
     private static final Logger log4j = LogManager.getLogger(MetadataFilter.class);
     public static final String HTML = ".html";
@@ -103,6 +105,9 @@ public class MetadataFilter implements Filter {
                         return;
                     } else if (pathInfo.startsWith(forwardPath)) {
                         new ForwarderServlet().process(httpReq, httpRes);
+                        return;
+                    } else if (isSSOPath(pathInfo)) {
+                        new SSOService().handle(normalizeSSORequest(httpReq, pathInfo), httpRes);
                         return;
                     }
                 }
@@ -267,5 +272,33 @@ public class MetadataFilter implements Filter {
     private String escape(String v) {
         if (v == null) return "";
         return v.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+    }
+
+    /**
+     * Checks if the pathInfo contains an SSO path, whether accessed via /meta/sso/* or
+     * /sws/com.etendoerp.metadata.meta/sso/*.
+     */
+    private boolean isSSOPath(String pathInfo) {
+        return pathInfo.startsWith(Constants.SSO_PATH)
+            || pathInfo.contains(Constants.SSO_PATH);
+    }
+
+    /**
+     * Normalizes the request so SSOService always sees pathInfo as /sso/...
+     * For /meta/sso/config pathInfo is already /sso/config.
+     * For /sws/.../sso/config pathInfo is /com.etendoerp.metadata.meta/sso/config.
+     */
+    private HttpServletRequest normalizeSSORequest(HttpServletRequest original, String pathInfo) {
+        int ssoIdx = pathInfo.indexOf(Constants.SSO_PATH);
+        if (ssoIdx == 0) {
+            return original;
+        }
+        String normalizedPath = pathInfo.substring(ssoIdx);
+        return new javax.servlet.http.HttpServletRequestWrapper(original) {
+            @Override
+            public String getPathInfo() {
+                return normalizedPath;
+            }
+        };
     }
 }
