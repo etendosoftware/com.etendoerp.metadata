@@ -300,7 +300,10 @@ public class TabBuilder extends Builder {
         .orElse(null);
 
     if (keyColumn != null) {
-      fieldsJson.put(ID_HQL_NAME, buildSyntheticFieldJson(keyColumn, ID_HQL_NAME));
+      JSONObject syntheticFieldJson = buildSyntheticFieldJson(keyColumn, ID_HQL_NAME);
+      if (syntheticFieldJson != null) {
+        fieldsJson.put(ID_HQL_NAME, syntheticFieldJson);
+      }
     }
   }
 
@@ -334,7 +337,10 @@ public class TabBuilder extends Builder {
           .orElse(null);
 
       if (matchingColumn != null) {
-        fieldsJson.put(propertyName, buildSyntheticFieldJson(matchingColumn, propertyName));
+        JSONObject syntheticFieldJson = buildSyntheticFieldJson(matchingColumn, propertyName);
+        if (syntheticFieldJson != null) {
+          fieldsJson.put(propertyName, syntheticFieldJson);
+        }
       }
     }
   }
@@ -353,35 +359,44 @@ public class TabBuilder extends Builder {
    *
    * @param column  the column with no AD_Field to build a synthetic field for
    * @param hqlName the hql property name this field must be keyed/reported under
-   * @return the field JSON, built through the standard field-building pipeline
+   * @return the field JSON, built through the standard field-building pipeline, or {@code null}
+   *         if the synthetic field could not be built for this column
    * @throws JSONException if there is an error manipulating the JSON structure
    */
   private JSONObject buildSyntheticFieldJson(Column column, String hqlName) throws JSONException {
-    Field syntheticField = (Field) OBProvider.getInstance().get(Field.class);
-    // client/organization: the FieldBuilder constructor converts the field to JSON via
-    // converter.toJsonObject() before any of the enrichment steps run — unlike those steps,
-    // that call isn't wrapped in a try/catch, so it must not throw for a plain transient
-    // object. Setting them to the tab's own client/org keeps that conversion safe and is
-    // also semantically correct (the field conceptually belongs to the same client/org).
-    syntheticField.setClient(tab.getClient());
-    syntheticField.setOrganization(tab.getOrganization());
-    // The column's own id is already a unique 32-char identifier — a column can't be both
-    // this tab's key column and a parent-link column at once, so reusing it verbatim as
-    // the synthetic field's id can't collide with another field on the same tab. AD_Field.id
-    // is a varchar(32); any added prefix (e.g. "id_" + column.getId()) overflows that length
-    // and Openbravo rejects the transient object with "Value too long".
-    syntheticField.setId(column.getId());
-    syntheticField.setTab(tab);
-    syntheticField.setColumn(column);
-    syntheticField.setName(column.getName());
-    syntheticField.setDisplayed(false);
-    syntheticField.setReadOnly(true);
-    syntheticField.setShowInGridView(false);
+    try {
+      Field syntheticField = (Field) OBProvider.getInstance().get(Field.class);
+      // client/organization: the FieldBuilder constructor converts the field to JSON via
+      // converter.toJsonObject() before any of the enrichment steps run — unlike those steps,
+      // that call isn't wrapped in a try/catch, so it must not throw for a plain transient
+      // object. Setting them to the tab's own client/org keeps that conversion safe and is
+      // also semantically correct (the field conceptually belongs to the same client/org).
+      syntheticField.setClient(tab.getClient());
+      syntheticField.setOrganization(tab.getOrganization());
+      // The column's own id is already a unique 32-char identifier — a column can't be both
+      // this tab's key column and a parent-link column at once, so reusing it verbatim as
+      // the synthetic field's id can't collide with another field on the same tab. AD_Field.id
+      // is a varchar(32); any added prefix (e.g. "id_" + column.getId()) overflows that length
+      // and Openbravo rejects the transient object with "Value too long".
+      syntheticField.setId(column.getId());
+      syntheticField.setTab(tab);
+      syntheticField.setColumn(column);
+      syntheticField.setName(column.getName());
+      syntheticField.setDisplayed(false);
+      syntheticField.setReadOnly(true);
+      syntheticField.setShowInGridView(false);
 
-    JSONObject fieldJson = new FieldBuilderWithColumn(syntheticField, null).toJSON();
-    fieldJson.put("hqlName", hqlName);
+      JSONObject fieldJson = new FieldBuilderWithColumn(syntheticField, null).toJSON();
+      fieldJson.put("hqlName", hqlName);
 
-    return fieldJson;
+      return fieldJson;
+    } catch (RuntimeException e) {
+      // A single malformed/exotic column (e.g. missing reference metadata) must not take down
+      // the whole tab's JSON - log and omit this synthetic field, the rest of the tab still builds.
+      logger.warn("Error building synthetic field for column {} ({}): {}", column.getId(), hqlName,
+          e.getMessage(), e);
+      return null;
+    }
   }
 
   /**
