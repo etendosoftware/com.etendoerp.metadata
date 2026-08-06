@@ -25,12 +25,14 @@ import org.apache.commons.lang3.StringUtils;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
+import org.openbravo.base.provider.OBProvider;
 import org.openbravo.client.kernel.KernelUtils;
 import org.openbravo.client.application.ApplicationUtils;
 import org.openbravo.model.ad.access.FieldAccess;
 import org.openbravo.model.ad.access.TabAccess;
 import org.openbravo.model.ad.datamodel.Column;
 import org.openbravo.model.ad.datamodel.Table;
+import org.openbravo.model.ad.ui.Field;
 import org.openbravo.model.ad.ui.Tab;
 import org.openbravo.model.ad.utility.TableTree;
 import org.openbravo.service.json.DataResolvingMode;
@@ -51,6 +53,9 @@ public class TabBuilder extends Builder {
       Constants.CREATED_BY, Constants.DB_CREATED_BY,
       Constants.UPDATED, Constants.DB_UPDATED,
       Constants.UPDATED_BY, Constants.DB_UPDATED_BY);
+
+  /** HQL property name every entity's primary key is universally mapped to. */
+  private static final String ID_HQL_NAME = "id";
 
   private final Tab tab;
   private final TabAccess tabAccess;
@@ -110,10 +115,13 @@ public class TabBuilder extends Builder {
       }
 
       json.put("entityName", tab.getTable().getName());
-      json.put("parentColumns", getParentColumns());
+      JSONArray parentColumns = getParentColumns();
+      json.put("parentColumns", parentColumns);
 
       JSONObject fields = getFields();
       enrichWithAuditFields(fields);
+      enrichWithKeyColumnField(fields);
+      enrichWithParentColumnFields(fields, parentColumns);
       json.put("fields", fields);
 
       Tab parentTab = getParentTab();
@@ -266,6 +274,114 @@ public class TabBuilder extends Builder {
         }
       }
     }
+  }
+
+  /**
+   * Ensures the tab's own primary key column is represented in the fields JSON, even when
+   * no AD_Field exposes it as a UI element (e.g. a child tab whose record ID is never shown
+   * as a field, only used as an implicit target for other tabs' FKs, such as Mentors).
+   * <p>
+   * Without this, the frontend has no way to resolve the key column's DB name/input name,
+   * so it can't correctly build the FormInitializationComponent (session/callout) request,
+   * and record creation silently loses server-computed defaults for that tab.
+   *
+   * @param fieldsJson the JSON object containing the tab's fields
+   * @throws JSONException if there is an error manipulating the JSON structure
+   */
+  private void enrichWithKeyColumnField(JSONObject fieldsJson) throws JSONException {
+    Table table = tab.getTable();
+    if (table == null || fieldsJson.has(ID_HQL_NAME)) {
+      return;
+    }
+
+    Column keyColumn = table.getADColumnList().stream()
+        .filter(column -> Boolean.TRUE.equals(column.isKeyColumn()))
+        .findFirst()
+        .orElse(null);
+
+    if (keyColumn != null) {
+      fieldsJson.put(ID_HQL_NAME, buildSyntheticFieldJson(keyColumn, ID_HQL_NAME));
+    }
+  }
+
+  /**
+   * Ensures every column listed in {@code parentColumns} is also represented in the fields
+   * JSON, even when no AD_Field exposes it as a UI element. Child tabs that link to their
+   * parent purely through an implicit FK (marked {@code isLinkToParentColumn}, with no visible
+   * field) would otherwise leave the frontend unable to resolve the DB column/input name for
+   * that property, so it could never send the parent's id when creating a new record.
+   *
+   * @param fieldsJson    the JSON object containing the tab's fields
+   * @param parentColumns the hql property names already computed by {@link #getParentColumns()}
+   * @throws JSONException if there is an error manipulating the JSON structure
+   */
+  private void enrichWithParentColumnFields(JSONObject fieldsJson, JSONArray parentColumns) throws JSONException {
+    Table table = tab.getTable();
+    if (table == null) {
+      return;
+    }
+
+    for (int i = 0; i < parentColumns.length(); i++) {
+      String propertyName = parentColumns.getString(i);
+      if (fieldsJson.has(propertyName)) {
+        continue;
+      }
+
+      Column matchingColumn = table.getADColumnList().stream()
+          .filter(Column::isLinkToParentColumn)
+          .filter(column -> propertyName.equals(TabProcessor.getEntityColumnName(column)))
+          .findFirst()
+          .orElse(null);
+
+      if (matchingColumn != null) {
+        fieldsJson.put(propertyName, buildSyntheticFieldJson(matchingColumn, propertyName));
+      }
+    }
+  }
+
+  /**
+   * Builds a field JSON for a column that has no real AD_Field, by delegating to
+   * {@link FieldBuilderWithColumn} against a transient (never persisted) {@link Field}
+   * wrapping that column. This reuses the exact same logic used for real fields —
+   * column metadata, reference info, selector info, read-only logic — instead of
+   * hand-duplicating a parallel JSON shape that could drift out of sync over time.
+   * <p>
+   * The resulting JSON's {@code hqlName} is forced to the given {@code hqlName} parameter
+   * afterwards, since the caller (either {@link #enrichWithKeyColumnField} or
+   * {@link #enrichWithParentColumnFields}) already computed the authoritative property name
+   * for this column and the fields map is keyed by it; the two must always agree.
+   *
+   * @param column  the column with no AD_Field to build a synthetic field for
+   * @param hqlName the hql property name this field must be keyed/reported under
+   * @return the field JSON, built through the standard field-building pipeline
+   * @throws JSONException if there is an error manipulating the JSON structure
+   */
+  private JSONObject buildSyntheticFieldJson(Column column, String hqlName) throws JSONException {
+    Field syntheticField = (Field) OBProvider.getInstance().get(Field.class);
+    // client/organization: the FieldBuilder constructor converts the field to JSON via
+    // converter.toJsonObject() before any of the enrichment steps run — unlike those steps,
+    // that call isn't wrapped in a try/catch, so it must not throw for a plain transient
+    // object. Setting them to the tab's own client/org keeps that conversion safe and is
+    // also semantically correct (the field conceptually belongs to the same client/org).
+    syntheticField.setClient(tab.getClient());
+    syntheticField.setOrganization(tab.getOrganization());
+    // The column's own id is already a unique 32-char identifier — a column can't be both
+    // this tab's key column and a parent-link column at once, so reusing it verbatim as
+    // the synthetic field's id can't collide with another field on the same tab. AD_Field.id
+    // is a varchar(32); any added prefix (e.g. "id_" + column.getId()) overflows that length
+    // and Openbravo rejects the transient object with "Value too long".
+    syntheticField.setId(column.getId());
+    syntheticField.setTab(tab);
+    syntheticField.setColumn(column);
+    syntheticField.setName(column.getName());
+    syntheticField.setDisplayed(false);
+    syntheticField.setReadOnly(true);
+    syntheticField.setShowInGridView(false);
+
+    JSONObject fieldJson = new FieldBuilderWithColumn(syntheticField, null).toJSON();
+    fieldJson.put("hqlName", hqlName);
+
+    return fieldJson;
   }
 
   /**

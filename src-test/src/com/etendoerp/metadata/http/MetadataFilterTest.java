@@ -687,4 +687,54 @@ public class MetadataFilterTest extends WeldBaseTest {
     assertNotNull(result);
     assertFalse(result.contains("Hint"));
   }
+
+  // --- SSO path tests ---
+
+  private static final String IS_SSO_PATH = "isSSOPath";
+  private static final String NORMALIZE_SSO_REQUEST = "normalizeSSORequest";
+  private static final String SSO_CONFIG_PATH = "/sso/config";
+  private static final String SSO_CALLBACK_PATH = "/sso/callback";
+
+  @Test
+  public void testIsSSOPathWithDirectPath() throws Exception {
+    Method method = getPrivateMethod(IS_SSO_PATH, String.class);
+    assertTrue((boolean) method.invoke(filter, SSO_CONFIG_PATH));
+    assertTrue((boolean) method.invoke(filter, SSO_CALLBACK_PATH));
+    assertTrue((boolean) method.invoke(filter, "/sso/link"));
+  }
+
+  @Test
+  public void testIsSSOPathWithSwsPath() throws Exception {
+    Method method = getPrivateMethod(IS_SSO_PATH, String.class);
+    assertTrue((boolean) method.invoke(filter,
+        "/com.etendoerp.metadata.meta/sso/config"));
+  }
+
+  @Test
+  public void testIsSSOPathReturnsFalseForNonSSO() throws Exception {
+    Method method = getPrivateMethod(IS_SSO_PATH, String.class);
+    assertFalse((boolean) method.invoke(filter, "/api/test"));
+    assertFalse((boolean) method.invoke(filter, "/forward/page.html"));
+  }
+
+  @Test
+  public void testNormalizeSSORequestDirectPath() throws Exception {
+    Method method = getPrivateMethod(NORMALIZE_SSO_REQUEST,
+        HttpServletRequest.class, String.class);
+    when(request.getPathInfo()).thenReturn(SSO_CONFIG_PATH);
+    HttpServletRequest result = (HttpServletRequest) method.invoke(
+        filter, request, SSO_CONFIG_PATH);
+    assertEquals(request, result);
+  }
+
+  @Test
+  public void testNormalizeSSORequestSwsPath() throws Exception {
+    Method method = getPrivateMethod(NORMALIZE_SSO_REQUEST,
+        HttpServletRequest.class, String.class);
+    String swsPath = "/com.etendoerp.metadata.meta" + SSO_CALLBACK_PATH;
+    HttpServletRequest result = (HttpServletRequest) method.invoke(
+        filter, request, swsPath);
+    assertNotNull(result);
+    assertEquals(SSO_CALLBACK_PATH, result.getPathInfo());
+  }
 }
