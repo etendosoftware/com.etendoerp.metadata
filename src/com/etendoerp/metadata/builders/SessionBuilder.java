@@ -233,12 +233,15 @@ public class SessionBuilder extends Builder {
 
     /**
      * Distributes warehouses across organizations using the natural tree, replicating Classic's
-     * RoleInfo behavior: a warehouse is only eligible at all if its own organization is among
-     * {@code orgIds} (i.e. explicitly granted to the role these org ids belong to - this must be
-     * a single role's own organizations, never a set pooled across multiple roles, or a
-     * warehouse granted to a different role could leak into this role's bucket whenever one of
-     * these orgIds is an ancestor of that other role's organization). Once eligible, it is added
-     * to every bucket org whose natural tree contains the warehouse's own organization.
+     * RoleInfo behavior: a warehouse is added to every bucket org (from {@code orgIds}) whose
+     * natural tree contains the warehouse's own organization. {@code orgIds} must be a single
+     * role's own granted organizations, never a set pooled across multiple roles - the natural
+     * tree membership check is itself what scopes eligibility, so pooling would let a warehouse
+     * granted to a different role leak into this role's bucket whenever one of these orgIds is
+     * an ancestor of that other role's organization. A parent org legitimately exposes the
+     * warehouses of its descendant orgs, even though the warehouse's own organization is never
+     * itself one of the role's granted orgIds - that is precisely the case the natural tree is
+     * there to cover, so it must not be pre-filtered away.
      */
     private Map<String, List<Warehouse>> distributeByNaturalTree(
             List<Warehouse> warehouses, Set<String> orgIds, OrganizationStructureProvider osp) {
@@ -248,9 +251,6 @@ public class SessionBuilder extends Builder {
         }
         for (Warehouse wh : warehouses) {
             String whOrgId = wh.getOrganization().getId();
-            if (!orgIds.contains(whOrgId)) {
-                continue;
-            }
             for (String orgId : orgIds) {
                 if (osp.getNaturalTree(orgId).contains(whOrgId)) {
                     result.get(orgId).add(wh);

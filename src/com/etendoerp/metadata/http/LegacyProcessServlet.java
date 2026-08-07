@@ -31,6 +31,9 @@ import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.base.HttpBaseUtils;
 import org.openbravo.base.exception.OBException;
+import org.openbravo.base.model.Entity;
+import org.openbravo.base.model.ModelProvider;
+import org.openbravo.base.model.Property;
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
 import org.openbravo.base.secureApp.VariablesSecureApp;
 import org.openbravo.base.session.OBPropertiesProvider;
@@ -759,6 +762,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             }
             preprocessRequest(req, wrappedRequest);
             handleCreateFromSession(req, path, req.getSession(true));
+            handleUsedByLinkSession(req, path, req.getSession(true));
 
             wrappedRequest.getRequestDispatcher(path).include(wrappedRequest, responseWrapper);
 
@@ -1987,6 +1991,49 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         return result.toString();
     }
     
+    /**
+     * UsedByLink.html falls back to a session attribute keyed {@code windowId + "|" + idColumnName}
+     * when the legacy "inp&lt;columnName&gt;" request parameter isn't present, which is always the
+     * case for WorkspaceUI's JSON calls (it sends {@code windowId}/{@code entityName}/{@code recordId}
+     * instead of the legacy inp-prefixed params). Without this, every UsedByLink.html call from
+     * WorkspaceUI fails with "Session attribute required" and Linked Items shows no categories.
+     *
+     * @param req     the request, expected to carry windowId/entityName/recordId when path is UsedByLink
+     * @param path    the resolved legacy path being dispatched
+     * @param session the current HTTP session to populate
+     */
+    private static void handleUsedByLinkSession(HttpServletRequest req, String path, HttpSession session) {
+        if (!LegacyPaths.USED_BY_LINK.equals(path)) {
+            return;
+        }
+
+        String windowId = req.getParameter("windowId");
+        String entityName = req.getParameter("entityName");
+        String recordId = req.getParameter("recordId");
+
+        if (windowId == null || entityName == null || recordId == null) {
+            return;
+        }
+
+        Entity entity = ModelProvider.getInstance().getEntity(entityName);
+        if (entity == null) {
+            log.warn("Entity '{}' not found in ModelProvider, cannot set session for UsedByLink", entityName);
+            return;
+        }
+
+        List<Property> idProps = entity.getIdProperties();
+        if (idProps == null || idProps.size() != 1) {
+            log.warn("Expected exactly one ID property for entity '{}', got {}", entityName, idProps);
+            return;
+        }
+
+        // VariablesBase.getSessionValue()/setSessionValue() always uppercase the attribute
+        // name (see VariablesBase#getSessionValue), so the key must be uppercased here too or
+        // UsedByLink's lookup ("WINDOWID|COLUMN") never matches what we store.
+        String key = (windowId + "|" + idProps.get(0).getColumnName()).toUpperCase();
+        session.setAttribute(key, recordId);
+    }
+
     private static void handleCreateFromSession(HttpServletRequest req, String path, HttpSession session) {
         if (LegacyPaths.CREATE_FROM_HTML.equals(path) && "SAVE".equals(req.getParameter("Command"))) {
             String windowId = req.getParameter("inpWindowId");
