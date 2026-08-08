@@ -27,7 +27,6 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import com.etendoerp.metadata.exceptions.InternalServerException;
 import com.etendoerp.metadata.exceptions.NotFoundException;
-import com.etendoerp.metadata.utils.LegacyPaths;
 import com.etendoerp.metadata.utils.LegacyUtils;
 
 import java.io.IOException;
@@ -97,24 +96,13 @@ public final class ServiceFactory {
     }
 
     private static void handleLegacySession(HttpServletRequest req, String path) {
-        if (!LegacyPaths.USED_BY_LINK.equals(path)) {
-            return;
-        }
-        String windowId = req.getParameter("windowId");
-        String entityName = req.getParameter("entityName");
-        String recordId = req.getParameter("recordId");
-
-        if (windowId == null || entityName == null || recordId == null) {
-            return;
-        }
-
-        String columnName = LegacyUtils.resolveSingleIdColumnName(entityName);
-        if (columnName == null) {
+        LegacyUtils.UsedByLinkSessionKey key = LegacyUtils.resolveUsedByLinkSessionKey(req, path);
+        if (key == null) {
             return;
         }
 
         HttpSession session = req.getSession(true);
-        session.setAttribute(windowId + "|" + columnName, recordId);
+        session.setAttribute(key.windowId() + "|" + key.columnName(), key.recordId());
     }
 
     private static void forwardToPath(HttpServletRequest req, HttpServletResponse res, String path)

@@ -28,6 +28,8 @@ import org.openbravo.dal.service.OBDal;
 import org.openbravo.dal.service.OBQuery;
 import org.openbravo.model.ad.ui.Tab;
 import org.apache.commons.lang3.StringUtils;
+
+import javax.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Set;
 
@@ -138,5 +140,47 @@ public class LegacyUtils {
         }
 
         return idProps.get(0).getColumnName();
+    }
+
+    /**
+     * The {@code windowId}/{@code columnName}/{@code recordId} triple needed to build the
+     * legacy {@code windowId + "|" + columnName} session-attribute key that UsedByLink-style
+     * lookups fall back to.
+     */
+    public record UsedByLinkSessionKey(String windowId, String columnName, String recordId) {
+    }
+
+    /**
+     * Resolves the {@code windowId}/{@code columnName}/{@code recordId} triple for a legacy
+     * UsedByLink.html session key from a request carrying {@code windowId}/{@code entityName}/
+     * {@code recordId} parameters (WorkspaceUI's JSON call shape, as opposed to the legacy
+     * inp-prefixed params UsedByLink.html itself expects). Centralizes the path/param
+     * validation shared by every caller that needs to populate this session fallback, so each
+     * caller only has to decide how to key and scope the resulting session attribute.
+     *
+     * @param req  the request, expected to carry windowId/entityName/recordId when path is UsedByLink
+     * @param path the resolved legacy path being dispatched
+     * @return the resolved key, or {@code null} if the path isn't UsedByLink.html, a required
+     *         parameter is missing, or the entity's id column couldn't be resolved
+     */
+    public static UsedByLinkSessionKey resolveUsedByLinkSessionKey(HttpServletRequest req, String path) {
+        if (!LegacyPaths.USED_BY_LINK.equals(path)) {
+            return null;
+        }
+
+        String windowId = req.getParameter("windowId");
+        String entityName = req.getParameter("entityName");
+        String recordId = req.getParameter("recordId");
+
+        if (windowId == null || entityName == null || recordId == null) {
+            return null;
+        }
+
+        String columnName = resolveSingleIdColumnName(entityName);
+        if (columnName == null) {
+            return null;
+        }
+
+        return new UsedByLinkSessionKey(windowId, columnName, recordId);
     }
 }

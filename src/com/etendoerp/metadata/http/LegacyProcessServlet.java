@@ -2000,27 +2000,15 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
      * @param session the current HTTP session to populate
      */
     private static void handleUsedByLinkSession(HttpServletRequest req, String path, HttpSession session) {
-        if (!LegacyPaths.USED_BY_LINK.equals(path)) {
-            return;
-        }
-
-        String windowId = req.getParameter("windowId");
-        String entityName = req.getParameter("entityName");
-        String recordId = req.getParameter("recordId");
-
-        if (windowId == null || entityName == null || recordId == null) {
-            return;
-        }
-
-        String columnName = LegacyUtils.resolveSingleIdColumnName(entityName);
-        if (columnName == null) {
+        LegacyUtils.UsedByLinkSessionKey key = LegacyUtils.resolveUsedByLinkSessionKey(req, path);
+        if (key == null) {
             return;
         }
 
         // VariablesBase.getSessionValue()/setSessionValue() always uppercase the attribute
         // name (see VariablesBase#getSessionValue), so the key must be uppercased here too or
         // UsedByLink's lookup ("WINDOWID|COLUMN") never matches what we store.
-        session.setAttribute((windowId + "|" + columnName).toUpperCase(), recordId);
+        session.setAttribute((key.windowId() + "|" + key.columnName()).toUpperCase(), key.recordId());
     }
 
     private static void handleCreateFromSession(HttpServletRequest req, String path, HttpSession session) {

@@ -101,10 +101,6 @@ public class LegacyProcessServletTest extends OBBaseTest {
     private static final String WRITE_REQUEST_FAILED_FORWARDER = "writeRequestFailedForwarder";
     private static final String POST_MESSAGE_SCRIPT_KEY = "POST_MESSAGE_SCRIPT";
     private static final String CREATE_FROM_SESSION_KEY = "CREATEFROM|TABID";
-    private static final String PARAM_WINDOW_ID = "windowId";
-    private static final String PARAM_ENTITY_NAME = "entityName";
-    private static final String PARAM_RECORD_ID = "recordId";
-    private static final String ENTITY_ORDER = "Order";
     private static final String RECORD_ID_VALUE = "RECORD_1";
     private static final String COMMAND_KEY = "Command";
     private static final String INP_WINDOW_ID_KEY = "inpWindowId";
@@ -1757,14 +1753,13 @@ public class LegacyProcessServletTest extends OBBaseTest {
     }
 
     @Test
-    public void handleUsedByLinkSessionSetsUppercasedAttributeWhenAllParamsPresent() throws Exception {
+    public void handleUsedByLinkSessionSetsUppercasedAttributeWhenKeyResolved() throws Exception {
         // GIVEN
-        when(request.getParameter(PARAM_WINDOW_ID)).thenReturn("143");
-        when(request.getParameter(PARAM_ENTITY_NAME)).thenReturn(ENTITY_ORDER);
-        when(request.getParameter(PARAM_RECORD_ID)).thenReturn(RECORD_ID_VALUE);
+        LegacyUtils.UsedByLinkSessionKey key = new LegacyUtils.UsedByLinkSessionKey("143", "C_Order_ID", RECORD_ID_VALUE);
 
         try (MockedStatic<LegacyUtils> legacyUtils = mockStatic(LegacyUtils.class)) {
-            legacyUtils.when(() -> LegacyUtils.resolveSingleIdColumnName(ENTITY_ORDER)).thenReturn("C_Order_ID");
+            legacyUtils.when(() -> LegacyUtils.resolveUsedByLinkSessionKey(request, LegacyPaths.USED_BY_LINK))
+                    .thenReturn(key);
 
             invokeHandleUsedByLinkSession(request, LegacyPaths.USED_BY_LINK, session);
 
@@ -1774,61 +1769,13 @@ public class LegacyProcessServletTest extends OBBaseTest {
     }
 
     @Test
-    public void handleUsedByLinkSessionSkipsForNonUsedByLinkPath() throws Exception {
+    public void handleUsedByLinkSessionSkipsWhenKeyUnresolved() throws Exception {
         // GIVEN
-        invokeHandleUsedByLinkSession(request, "/other/path.html", session);
-
-        // THEN
-        verify(session, never()).setAttribute(anyString(), any());
-    }
-
-    @Test
-    public void handleUsedByLinkSessionSkipsWhenWindowIdMissing() throws Exception {
-        // GIVEN
-        when(request.getParameter(PARAM_ENTITY_NAME)).thenReturn(ENTITY_ORDER);
-        when(request.getParameter(PARAM_RECORD_ID)).thenReturn(RECORD_ID_VALUE);
-
-        invokeHandleUsedByLinkSession(request, LegacyPaths.USED_BY_LINK, session);
-
-        // THEN
-        verify(session, never()).setAttribute(anyString(), any());
-    }
-
-    @Test
-    public void handleUsedByLinkSessionSkipsWhenEntityNameMissing() throws Exception {
-        // GIVEN
-        when(request.getParameter(PARAM_WINDOW_ID)).thenReturn("143");
-        when(request.getParameter(PARAM_RECORD_ID)).thenReturn(RECORD_ID_VALUE);
-
-        invokeHandleUsedByLinkSession(request, LegacyPaths.USED_BY_LINK, session);
-
-        // THEN
-        verify(session, never()).setAttribute(anyString(), any());
-    }
-
-    @Test
-    public void handleUsedByLinkSessionSkipsWhenRecordIdMissing() throws Exception {
-        // GIVEN
-        when(request.getParameter(PARAM_WINDOW_ID)).thenReturn("143");
-        when(request.getParameter(PARAM_ENTITY_NAME)).thenReturn(ENTITY_ORDER);
-
-        invokeHandleUsedByLinkSession(request, LegacyPaths.USED_BY_LINK, session);
-
-        // THEN
-        verify(session, never()).setAttribute(anyString(), any());
-    }
-
-    @Test
-    public void handleUsedByLinkSessionSkipsWhenColumnNameUnresolved() throws Exception {
-        // GIVEN
-        when(request.getParameter(PARAM_WINDOW_ID)).thenReturn("143");
-        when(request.getParameter(PARAM_ENTITY_NAME)).thenReturn("Unknown");
-        when(request.getParameter(PARAM_RECORD_ID)).thenReturn(RECORD_ID_VALUE);
-
         try (MockedStatic<LegacyUtils> legacyUtils = mockStatic(LegacyUtils.class)) {
-            legacyUtils.when(() -> LegacyUtils.resolveSingleIdColumnName("Unknown")).thenReturn(null);
+            legacyUtils.when(() -> LegacyUtils.resolveUsedByLinkSessionKey(request, "/other/path.html"))
+                    .thenReturn(null);
 
-            invokeHandleUsedByLinkSession(request, LegacyPaths.USED_BY_LINK, session);
+            invokeHandleUsedByLinkSession(request, "/other/path.html", session);
 
             // THEN
             verify(session, never()).setAttribute(anyString(), any());
