@@ -1739,6 +1739,97 @@ public class LegacyProcessServletTest extends OBBaseTest {
         }
     }
 
+    // --- Tests for handleUsedByLinkSession ---
+
+    private void invokeHandleUsedByLinkSession(HttpServletRequest req, String path, HttpSession session)
+            throws Exception {
+        Method method = LegacyProcessServlet.class.getDeclaredMethod(
+            "handleUsedByLinkSession",
+            HttpServletRequest.class, String.class, HttpSession.class
+        );
+        method.setAccessible(true);
+        method.invoke(null, req, path, session);
+    }
+
+    @Test
+    public void handleUsedByLinkSessionSetsUppercasedAttributeWhenAllParamsPresent() throws Exception {
+        // GIVEN
+        when(request.getParameter("windowId")).thenReturn("143");
+        when(request.getParameter("entityName")).thenReturn("Order");
+        when(request.getParameter("recordId")).thenReturn("RECORD_1");
+
+        try (MockedStatic<LegacyUtils> legacyUtils = mockStatic(LegacyUtils.class)) {
+            legacyUtils.when(() -> LegacyUtils.resolveSingleIdColumnName("Order")).thenReturn("C_Order_ID");
+
+            invokeHandleUsedByLinkSession(request, LegacyPaths.USED_BY_LINK, session);
+
+            // THEN — the key must be uppercased, matching VariablesBase's own lookup convention
+            verify(session).setAttribute("143|C_ORDER_ID", "RECORD_1");
+        }
+    }
+
+    @Test
+    public void handleUsedByLinkSessionSkipsForNonUsedByLinkPath() throws Exception {
+        // GIVEN
+        invokeHandleUsedByLinkSession(request, "/other/path.html", session);
+
+        // THEN
+        verify(session, never()).setAttribute(anyString(), any());
+    }
+
+    @Test
+    public void handleUsedByLinkSessionSkipsWhenWindowIdMissing() throws Exception {
+        // GIVEN
+        when(request.getParameter("entityName")).thenReturn("Order");
+        when(request.getParameter("recordId")).thenReturn("RECORD_1");
+
+        invokeHandleUsedByLinkSession(request, LegacyPaths.USED_BY_LINK, session);
+
+        // THEN
+        verify(session, never()).setAttribute(anyString(), any());
+    }
+
+    @Test
+    public void handleUsedByLinkSessionSkipsWhenEntityNameMissing() throws Exception {
+        // GIVEN
+        when(request.getParameter("windowId")).thenReturn("143");
+        when(request.getParameter("recordId")).thenReturn("RECORD_1");
+
+        invokeHandleUsedByLinkSession(request, LegacyPaths.USED_BY_LINK, session);
+
+        // THEN
+        verify(session, never()).setAttribute(anyString(), any());
+    }
+
+    @Test
+    public void handleUsedByLinkSessionSkipsWhenRecordIdMissing() throws Exception {
+        // GIVEN
+        when(request.getParameter("windowId")).thenReturn("143");
+        when(request.getParameter("entityName")).thenReturn("Order");
+
+        invokeHandleUsedByLinkSession(request, LegacyPaths.USED_BY_LINK, session);
+
+        // THEN
+        verify(session, never()).setAttribute(anyString(), any());
+    }
+
+    @Test
+    public void handleUsedByLinkSessionSkipsWhenColumnNameUnresolved() throws Exception {
+        // GIVEN
+        when(request.getParameter("windowId")).thenReturn("143");
+        when(request.getParameter("entityName")).thenReturn("Unknown");
+        when(request.getParameter("recordId")).thenReturn("RECORD_1");
+
+        try (MockedStatic<LegacyUtils> legacyUtils = mockStatic(LegacyUtils.class)) {
+            legacyUtils.when(() -> LegacyUtils.resolveSingleIdColumnName("Unknown")).thenReturn(null);
+
+            invokeHandleUsedByLinkSession(request, LegacyPaths.USED_BY_LINK, session);
+
+            // THEN
+            verify(session, never()).setAttribute(anyString(), any());
+        }
+    }
+
     @Test
     public void isValidLocationReturnsTrueForRelativePath() throws Exception {
         boolean result = (boolean) invokePrivateMethod(legacyProcessServlet, METHOD_IS_VALID_LOCATION,

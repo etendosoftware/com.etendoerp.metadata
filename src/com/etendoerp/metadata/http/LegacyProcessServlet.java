@@ -31,9 +31,6 @@ import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.base.HttpBaseUtils;
 import org.openbravo.base.exception.OBException;
-import org.openbravo.base.model.Entity;
-import org.openbravo.base.model.ModelProvider;
-import org.openbravo.base.model.Property;
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
 import org.openbravo.base.secureApp.VariablesSecureApp;
 import org.openbravo.base.session.OBPropertiesProvider;
@@ -2015,23 +2012,15 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             return;
         }
 
-        Entity entity = ModelProvider.getInstance().getEntity(entityName);
-        if (entity == null) {
-            log.warn("Entity '{}' not found in ModelProvider, cannot set session for UsedByLink", entityName);
-            return;
-        }
-
-        List<Property> idProps = entity.getIdProperties();
-        if (idProps == null || idProps.size() != 1) {
-            log.warn("Expected exactly one ID property for entity '{}', got {}", entityName, idProps);
+        String columnName = LegacyUtils.resolveSingleIdColumnName(entityName);
+        if (columnName == null) {
             return;
         }
 
         // VariablesBase.getSessionValue()/setSessionValue() always uppercase the attribute
         // name (see VariablesBase#getSessionValue), so the key must be uppercased here too or
         // UsedByLink's lookup ("WINDOWID|COLUMN") never matches what we store.
-        String key = (windowId + "|" + idProps.get(0).getColumnName()).toUpperCase();
-        session.setAttribute(key, recordId);
+        session.setAttribute((windowId + "|" + columnName).toUpperCase(), recordId);
     }
 
     private static void handleCreateFromSession(HttpServletRequest req, String path, HttpSession session) {

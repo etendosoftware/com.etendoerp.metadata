@@ -17,6 +17,11 @@
 
 package com.etendoerp.metadata.utils;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.openbravo.base.model.Entity;
+import org.openbravo.base.model.ModelProvider;
+import org.openbravo.base.model.Property;
 import org.openbravo.base.provider.OBProvider;
 import org.openbravo.model.ad.ui.Process;
 import org.openbravo.dal.service.OBDal;
@@ -33,6 +38,8 @@ import java.util.Set;
  * org.openbravo.model.ad.ui.Field)} and lives there exclusively.
  */
 public class LegacyUtils {
+    private static final Logger log = LogManager.getLogger();
+
     /** Set of legacy paths used in the system. */
     private static final Set<String> LEGACY_PATHS = Set.of(
             LegacyPaths.USED_BY_LINK);
@@ -104,5 +111,32 @@ public class LegacyUtils {
         query.setMaxResult(1);
         List<Tab> tabs = query.list();
         return tabs.isEmpty() ? null : tabs.get(0).getId();
+    }
+
+    /**
+     * Resolves the DB column name of the given entity's single id property, as needed to
+     * build the {@code windowId + "|" + columnName} session-attribute key that legacy
+     * UsedByLink-style lookups fall back to. Entities with zero, multiple, or unresolvable
+     * id properties are not supported by that legacy convention, so this returns {@code null}
+     * for them instead of the column name.
+     *
+     * @param entityName the DAL entity name to resolve (e.g. {@code "Order"})
+     * @return the id column name, or {@code null} if the entity or its single id property
+     *         could not be resolved
+     */
+    public static String resolveSingleIdColumnName(String entityName) {
+        Entity entity = ModelProvider.getInstance().getEntity(entityName);
+        if (entity == null) {
+            log.warn("Entity '{}' not found in ModelProvider, cannot resolve id column", entityName);
+            return null;
+        }
+
+        List<Property> idProps = entity.getIdProperties();
+        if (idProps == null || idProps.size() != 1) {
+            log.warn("Expected exactly one ID property for entity '{}', got {}", entityName, idProps);
+            return null;
+        }
+
+        return idProps.get(0).getColumnName();
     }
 }

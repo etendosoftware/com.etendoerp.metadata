@@ -25,6 +25,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.openbravo.base.model.Entity;
+import org.openbravo.base.model.ModelProvider;
+import org.openbravo.base.model.Property;
 import org.openbravo.base.provider.OBProvider;
 import org.openbravo.model.ad.ui.Process;
 import org.openbravo.dal.service.OBDal;
@@ -206,6 +209,67 @@ class LegacyUtilsTest {
       verify(mockQuery).setNamedParameter("windowId", WINDOW_ID);
       verify(mockQuery).setNamedParameter("tableId", TABLE_ID);
       verify(mockQuery).setMaxResult(1);
+    }
+  }
+
+  @Test
+  void resolveSingleIdColumnNameReturnsColumnNameWhenSingleIdProperty() {
+    Entity entity = mock(Entity.class);
+    Property idProp = mock(Property.class);
+    ModelProvider modelProvider = mock(ModelProvider.class);
+
+    when(entity.getIdProperties()).thenReturn(List.of(idProp));
+    when(idProp.getColumnName()).thenReturn("C_Order_ID");
+
+    try (MockedStatic<ModelProvider> staticModelProvider = mockStatic(ModelProvider.class)) {
+      staticModelProvider.when(ModelProvider::getInstance).thenReturn(modelProvider);
+      when(modelProvider.getEntity("Order")).thenReturn(entity);
+
+      String result = LegacyUtils.resolveSingleIdColumnName("Order");
+
+      assertEquals("C_Order_ID", result);
+    }
+  }
+
+  @Test
+  void resolveSingleIdColumnNameReturnsNullWhenEntityNotFound() {
+    ModelProvider modelProvider = mock(ModelProvider.class);
+
+    try (MockedStatic<ModelProvider> staticModelProvider = mockStatic(ModelProvider.class)) {
+      staticModelProvider.when(ModelProvider::getInstance).thenReturn(modelProvider);
+      when(modelProvider.getEntity("Unknown")).thenReturn(null);
+
+      assertNull(LegacyUtils.resolveSingleIdColumnName("Unknown"));
+    }
+  }
+
+  @Test
+  void resolveSingleIdColumnNameReturnsNullWhenMultipleIdProperties() {
+    Entity entity = mock(Entity.class);
+    ModelProvider modelProvider = mock(ModelProvider.class);
+
+    when(entity.getIdProperties()).thenReturn(List.of(mock(Property.class), mock(Property.class)));
+
+    try (MockedStatic<ModelProvider> staticModelProvider = mockStatic(ModelProvider.class)) {
+      staticModelProvider.when(ModelProvider::getInstance).thenReturn(modelProvider);
+      when(modelProvider.getEntity("Order")).thenReturn(entity);
+
+      assertNull(LegacyUtils.resolveSingleIdColumnName("Order"));
+    }
+  }
+
+  @Test
+  void resolveSingleIdColumnNameReturnsNullWhenIdPropsIsNull() {
+    Entity entity = mock(Entity.class);
+    ModelProvider modelProvider = mock(ModelProvider.class);
+
+    when(entity.getIdProperties()).thenReturn(null);
+
+    try (MockedStatic<ModelProvider> staticModelProvider = mockStatic(ModelProvider.class)) {
+      staticModelProvider.when(ModelProvider::getInstance).thenReturn(modelProvider);
+      when(modelProvider.getEntity("Order")).thenReturn(entity);
+
+      assertNull(LegacyUtils.resolveSingleIdColumnName("Order"));
     }
   }
 

@@ -25,10 +25,6 @@ import javax.servlet.http.HttpSession;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.openbravo.base.model.Entity;
-import org.openbravo.base.model.ModelProvider;
-import org.openbravo.base.model.Property;
-
 import com.etendoerp.metadata.exceptions.InternalServerException;
 import com.etendoerp.metadata.exceptions.NotFoundException;
 import com.etendoerp.metadata.utils.LegacyPaths;
@@ -112,19 +108,11 @@ public final class ServiceFactory {
             return;
         }
 
-        Entity entity = ModelProvider.getInstance().getEntity(entityName);
-        if (entity == null) {
-            log.warn("Entity '{}' not found in ModelProvider, cannot set session for UsedByLink", entityName);
+        String columnName = LegacyUtils.resolveSingleIdColumnName(entityName);
+        if (columnName == null) {
             return;
         }
 
-        java.util.List<Property> idProps = entity.getIdProperties();
-        if (idProps == null || idProps.size() != 1) {
-            log.warn("Expected exactly one ID property for entity '{}', got {}", entityName, idProps);
-            return;
-        }
-
-        String columnName = idProps.get(0).getColumnName();
         HttpSession session = req.getSession(true);
         session.setAttribute(windowId + "|" + columnName, recordId);
     }
