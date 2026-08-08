@@ -101,6 +101,11 @@ public class LegacyProcessServletTest extends OBBaseTest {
     private static final String WRITE_REQUEST_FAILED_FORWARDER = "writeRequestFailedForwarder";
     private static final String POST_MESSAGE_SCRIPT_KEY = "POST_MESSAGE_SCRIPT";
     private static final String CREATE_FROM_SESSION_KEY = "CREATEFROM|TABID";
+    private static final String PARAM_WINDOW_ID = "windowId";
+    private static final String PARAM_ENTITY_NAME = "entityName";
+    private static final String PARAM_RECORD_ID = "recordId";
+    private static final String ENTITY_ORDER = "Order";
+    private static final String RECORD_ID_VALUE = "RECORD_1";
     private static final String COMMAND_KEY = "Command";
     private static final String INP_WINDOW_ID_KEY = "inpWindowId";
     private static final String INP_TABLE_ID_KEY = "inpTableId";
@@ -1754,17 +1759,17 @@ public class LegacyProcessServletTest extends OBBaseTest {
     @Test
     public void handleUsedByLinkSessionSetsUppercasedAttributeWhenAllParamsPresent() throws Exception {
         // GIVEN
-        when(request.getParameter("windowId")).thenReturn("143");
-        when(request.getParameter("entityName")).thenReturn("Order");
-        when(request.getParameter("recordId")).thenReturn("RECORD_1");
+        when(request.getParameter(PARAM_WINDOW_ID)).thenReturn("143");
+        when(request.getParameter(PARAM_ENTITY_NAME)).thenReturn(ENTITY_ORDER);
+        when(request.getParameter(PARAM_RECORD_ID)).thenReturn(RECORD_ID_VALUE);
 
         try (MockedStatic<LegacyUtils> legacyUtils = mockStatic(LegacyUtils.class)) {
-            legacyUtils.when(() -> LegacyUtils.resolveSingleIdColumnName("Order")).thenReturn("C_Order_ID");
+            legacyUtils.when(() -> LegacyUtils.resolveSingleIdColumnName(ENTITY_ORDER)).thenReturn("C_Order_ID");
 
             invokeHandleUsedByLinkSession(request, LegacyPaths.USED_BY_LINK, session);
 
             // THEN — the key must be uppercased, matching VariablesBase's own lookup convention
-            verify(session).setAttribute("143|C_ORDER_ID", "RECORD_1");
+            verify(session).setAttribute("143|C_ORDER_ID", RECORD_ID_VALUE);
         }
     }
 
@@ -1780,8 +1785,8 @@ public class LegacyProcessServletTest extends OBBaseTest {
     @Test
     public void handleUsedByLinkSessionSkipsWhenWindowIdMissing() throws Exception {
         // GIVEN
-        when(request.getParameter("entityName")).thenReturn("Order");
-        when(request.getParameter("recordId")).thenReturn("RECORD_1");
+        when(request.getParameter(PARAM_ENTITY_NAME)).thenReturn(ENTITY_ORDER);
+        when(request.getParameter(PARAM_RECORD_ID)).thenReturn(RECORD_ID_VALUE);
 
         invokeHandleUsedByLinkSession(request, LegacyPaths.USED_BY_LINK, session);
 
@@ -1792,8 +1797,8 @@ public class LegacyProcessServletTest extends OBBaseTest {
     @Test
     public void handleUsedByLinkSessionSkipsWhenEntityNameMissing() throws Exception {
         // GIVEN
-        when(request.getParameter("windowId")).thenReturn("143");
-        when(request.getParameter("recordId")).thenReturn("RECORD_1");
+        when(request.getParameter(PARAM_WINDOW_ID)).thenReturn("143");
+        when(request.getParameter(PARAM_RECORD_ID)).thenReturn(RECORD_ID_VALUE);
 
         invokeHandleUsedByLinkSession(request, LegacyPaths.USED_BY_LINK, session);
 
@@ -1804,8 +1809,8 @@ public class LegacyProcessServletTest extends OBBaseTest {
     @Test
     public void handleUsedByLinkSessionSkipsWhenRecordIdMissing() throws Exception {
         // GIVEN
-        when(request.getParameter("windowId")).thenReturn("143");
-        when(request.getParameter("entityName")).thenReturn("Order");
+        when(request.getParameter(PARAM_WINDOW_ID)).thenReturn("143");
+        when(request.getParameter(PARAM_ENTITY_NAME)).thenReturn(ENTITY_ORDER);
 
         invokeHandleUsedByLinkSession(request, LegacyPaths.USED_BY_LINK, session);
 
@@ -1816,9 +1821,9 @@ public class LegacyProcessServletTest extends OBBaseTest {
     @Test
     public void handleUsedByLinkSessionSkipsWhenColumnNameUnresolved() throws Exception {
         // GIVEN
-        when(request.getParameter("windowId")).thenReturn("143");
-        when(request.getParameter("entityName")).thenReturn("Unknown");
-        when(request.getParameter("recordId")).thenReturn("RECORD_1");
+        when(request.getParameter(PARAM_WINDOW_ID)).thenReturn("143");
+        when(request.getParameter(PARAM_ENTITY_NAME)).thenReturn("Unknown");
+        when(request.getParameter(PARAM_RECORD_ID)).thenReturn(RECORD_ID_VALUE);
 
         try (MockedStatic<LegacyUtils> legacyUtils = mockStatic(LegacyUtils.class)) {
             legacyUtils.when(() -> LegacyUtils.resolveSingleIdColumnName("Unknown")).thenReturn(null);

@@ -47,6 +47,9 @@ class LegacyUtilsTest {
   private static final String LEGACY_PROCESS_NAME = "Legacy Process Placeholder";
   private static final String TABLE_ID = "319";
   private static final String WINDOW_ID = "169";
+  private static final String ENTITY_ORDER = "Order";
+  private static final String COLUMN_ORDER_ID = "C_Order_ID";
+  private static final String ENTITY_UNKNOWN = "Unknown";
 
   /**
    * Tests the getLegacyProcess method to ensure it creates and populates a Process instance correctly.
@@ -219,15 +222,15 @@ class LegacyUtilsTest {
     ModelProvider modelProvider = mock(ModelProvider.class);
 
     when(entity.getIdProperties()).thenReturn(List.of(idProp));
-    when(idProp.getColumnName()).thenReturn("C_Order_ID");
+    when(idProp.getColumnName()).thenReturn(COLUMN_ORDER_ID);
 
     try (MockedStatic<ModelProvider> staticModelProvider = mockStatic(ModelProvider.class)) {
       staticModelProvider.when(ModelProvider::getInstance).thenReturn(modelProvider);
-      when(modelProvider.getEntity("Order")).thenReturn(entity);
+      when(modelProvider.getEntity(ENTITY_ORDER)).thenReturn(entity);
 
-      String result = LegacyUtils.resolveSingleIdColumnName("Order");
+      String result = LegacyUtils.resolveSingleIdColumnName(ENTITY_ORDER);
 
-      assertEquals("C_Order_ID", result);
+      assertEquals(COLUMN_ORDER_ID, result);
     }
   }
 
@@ -237,9 +240,9 @@ class LegacyUtilsTest {
 
     try (MockedStatic<ModelProvider> staticModelProvider = mockStatic(ModelProvider.class)) {
       staticModelProvider.when(ModelProvider::getInstance).thenReturn(modelProvider);
-      when(modelProvider.getEntity("Unknown")).thenReturn(null);
+      when(modelProvider.getEntity(ENTITY_UNKNOWN)).thenReturn(null);
 
-      assertNull(LegacyUtils.resolveSingleIdColumnName("Unknown"));
+      assertNull(LegacyUtils.resolveSingleIdColumnName(ENTITY_UNKNOWN));
     }
   }
 
@@ -252,9 +255,9 @@ class LegacyUtilsTest {
 
     try (MockedStatic<ModelProvider> staticModelProvider = mockStatic(ModelProvider.class)) {
       staticModelProvider.when(ModelProvider::getInstance).thenReturn(modelProvider);
-      when(modelProvider.getEntity("Order")).thenReturn(entity);
+      when(modelProvider.getEntity(ENTITY_ORDER)).thenReturn(entity);
 
-      assertNull(LegacyUtils.resolveSingleIdColumnName("Order"));
+      assertNull(LegacyUtils.resolveSingleIdColumnName(ENTITY_ORDER));
     }
   }
 
@@ -267,9 +270,9 @@ class LegacyUtilsTest {
 
     try (MockedStatic<ModelProvider> staticModelProvider = mockStatic(ModelProvider.class)) {
       staticModelProvider.when(ModelProvider::getInstance).thenReturn(modelProvider);
-      when(modelProvider.getEntity("Order")).thenReturn(entity);
+      when(modelProvider.getEntity(ENTITY_ORDER)).thenReturn(entity);
 
-      assertNull(LegacyUtils.resolveSingleIdColumnName("Order"));
+      assertNull(LegacyUtils.resolveSingleIdColumnName(ENTITY_ORDER));
     }
   }
 
