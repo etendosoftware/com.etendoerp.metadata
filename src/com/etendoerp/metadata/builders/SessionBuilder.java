@@ -40,11 +40,13 @@ import org.openbravo.model.ad.access.RoleOrganization;
 import org.openbravo.model.ad.access.User;
 import org.openbravo.model.ad.access.UserRoles;
 import org.openbravo.model.ad.system.Client;
+import org.openbravo.model.ad.system.Language;
 import org.openbravo.model.common.enterprise.OrgWarehouse;
 import org.openbravo.model.common.enterprise.Organization;
 import org.openbravo.model.common.enterprise.Warehouse;
 
 import com.etendoerp.metadata.exceptions.InternalServerException;
+import com.etendoerp.metadata.utils.PasswordExpirationUtils;
 
 /**
  * Builds a JSON representation of the current user session including roles, organizations, and warehouses.
@@ -107,8 +109,10 @@ public class SessionBuilder extends Builder {
             json.put("currentOrganization", getJsonObject(organization));
             json.put("currentWarehouse", getJsonObject(warehouse));
             json.put("roles", getRoles(user));
+            json.put("currentLanguage", getLanguageCode(context));
             json.put("languages", new LanguageBuilder().toJSON());
             json.put("attributes", buildAcctDimensionSessionAttributes(client));
+            json.put("passwordExpired", PasswordExpirationUtils.isExpired(user));
 
             return json;
         } catch (JSONException e) {
@@ -116,6 +120,20 @@ public class SessionBuilder extends Builder {
 
             throw new InternalServerException();
         }
+    }
+
+    /**
+     * Returns the language code the session actually runs with, which the context resolves from the
+     * user, the client and finally the system. The user's own default language is optional, so it is
+     * not enough for the client to know which language the backend is answering in.
+     *
+     * @param context the current context
+     * @return the language code (e.g. {@code en_US}), or null when the context defines none
+     */
+    private String getLanguageCode(OBContext context) {
+        Language language = context.getLanguage();
+
+        return language != null ? language.getLanguage() : null;
     }
 
     private JSONArray getRoles(User user) {

@@ -42,6 +42,20 @@ public class Constants {
     public static final String MESSAGE_PATH = "/message";
     public static final String LABELS_PATH = "/labels";
     public static final String PREFERENCES_PATH = "/preferences";
+    /**
+     * Endpoints still reachable while the user's password is expired. They are the minimum the new UI
+     * needs to render the mandatory password-change screen: the session payload carrying the
+     * {@code passwordExpired} flag, the translations, the language list and the preferences the client
+     * always loads right after the session. Every other metadata endpoint is rejected with 401 until
+     * the password is updated.
+     */
+    public static final List<String> PASSWORD_EXPIRED_ALLOWED_PATHS = Collections.unmodifiableList(Arrays.asList(
+            SESSION_PATH, LABELS_PATH, LANGUAGE_PATH, PREFERENCES_PATH));
+    /**
+     * Stable error code returned when the caller's password is expired. The new UI matches it exactly
+     * to tell this rejection apart from a generic session failure, so it must not be turned into prose.
+     */
+    public static final String PASSWORD_EXPIRED_ERROR = "PasswordExpired";
     public static final boolean DEFAULT_CHECKON_SAVE = true;
     public static final boolean DEFAULT_EDITABLE_FIELD = true;
     public static final String LIST_REFERENCE_ID = "17";

@@ -32,6 +32,7 @@ import static com.etendoerp.metadata.MetadataTestConstants.WAREHOUSES;
 import static com.etendoerp.metadata.MetadataTestConstants.WAREHOUSE_ID;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -95,6 +96,8 @@ class SessionBuilderTest {
   private static final String KEY_PR_APP_L = "$Element_PR_APP_L";
   private static final String ORG1_ID = "org1-id";
   private static final String ORG2_ID = "org2-id";
+  private static final String PASSWORD_EXPIRED = "passwordExpired";
+  private static final String CURRENT_LANGUAGE = "currentLanguage";
 
   @Mock
   private OBContext obContext;
@@ -621,6 +624,92 @@ class SessionBuilderTest {
       // The centralized configuration helper must not be invoked in decentralized mode.
       dimStatic.verify(() -> DimensionDisplayUtility.getAccountingDimensionConfiguration(client),
           org.mockito.Mockito.never());
+    }
+  }
+
+  /**
+   * Verifies that the session payload reports {@code passwordExpired=false} for a user whose
+   * password is neither flagged as expired nor past the client's validity window.
+   *
+   * @throws JSONException if JSON operations fail during assertions or building
+   */
+  @Test
+  void testToJSONReportsPasswordNotExpired() throws JSONException {
+    try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
+         MockedStatic<Utils> utilsStatic = mockStatic(Utils.class)) {
+
+      obContextStatic.when(OBContext::getOBContext).thenReturn(obContext);
+      utilsStatic.when(() -> Utils.getJsonObject(any())).thenReturn(new JSONObject());
+
+      JSONObject result = new SessionBuilder().toJSON();
+
+      assertTrue(result.has(PASSWORD_EXPIRED));
+      assertFalse(result.getBoolean(PASSWORD_EXPIRED));
+    }
+  }
+
+  /**
+   * Verifies that the session payload reports {@code passwordExpired=true} when the administrator
+   * flagged the user's password as expired, which is what drives the mandatory change screen.
+   *
+   * @throws JSONException if JSON operations fail during assertions or building
+   */
+  @Test
+  void testToJSONReportsPasswordExpiredWhenUserFlagged() throws JSONException {
+    when(user.isPasswordExpired()).thenReturn(true);
+
+    try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
+         MockedStatic<Utils> utilsStatic = mockStatic(Utils.class)) {
+
+      obContextStatic.when(OBContext::getOBContext).thenReturn(obContext);
+      utilsStatic.when(() -> Utils.getJsonObject(any())).thenReturn(new JSONObject());
+
+      JSONObject result = new SessionBuilder().toJSON();
+
+      assertTrue(result.getBoolean(PASSWORD_EXPIRED));
+    }
+  }
+
+  /**
+   * Verifies that the session payload reports the language the context resolved, which the client
+   * needs to load the message dictionary when the user has no default language of their own.
+   *
+   * @throws JSONException if JSON operations fail during assertions or building
+   */
+  @Test
+  void testToJSONReportsCurrentLanguage() throws JSONException {
+    try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
+         MockedStatic<Utils> utilsStatic = mockStatic(Utils.class)) {
+
+      obContextStatic.when(OBContext::getOBContext).thenReturn(obContext);
+      utilsStatic.when(() -> Utils.getJsonObject(any())).thenReturn(new JSONObject());
+
+      JSONObject result = new SessionBuilder().toJSON();
+
+      assertEquals(LANGUAGE_CODE, result.getString(CURRENT_LANGUAGE));
+    }
+  }
+
+  /**
+   * Verifies that a context without a language does not break the payload, so a missing language
+   * degrades to the client fallback instead of failing the whole session request.
+   *
+   * @throws JSONException if JSON operations fail during assertions or building
+   */
+  @Test
+  void testToJSONWithoutContextLanguage() throws JSONException {
+    when(obContext.getLanguage()).thenReturn(null);
+
+    try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
+         MockedStatic<Utils> utilsStatic = mockStatic(Utils.class)) {
+
+      obContextStatic.when(OBContext::getOBContext).thenReturn(obContext);
+      utilsStatic.when(() -> Utils.getJsonObject(any())).thenReturn(new JSONObject());
+
+      JSONObject result = new SessionBuilder().toJSON();
+
+      assertNotNull(result);
+      assertTrue(result.isNull(CURRENT_LANGUAGE));
     }
   }
 
