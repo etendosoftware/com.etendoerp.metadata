@@ -16,39 +16,25 @@
  */
 package com.etendoerp.metadata.http;
 
-import static com.etendoerp.metadata.MetadataTestConstants.*;
 import static org.junit.Assert.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-import java.io.BufferedReader;
-import java.io.PrintWriter;
-import java.io.StringReader;
-import java.io.StringWriter;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
-
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 
 import org.apache.http.HttpStatus;
 import org.codehaus.jettison.json.JSONObject;
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.MockitoJUnitRunner;
 import org.openbravo.base.provider.OBProvider;
 import org.openbravo.client.application.Note;
 import org.openbravo.dal.core.OBContext;
-import org.openbravo.dal.service.OBCriteria;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.datamodel.Table;
 import org.openbravo.model.ad.access.User;
-import org.openbravo.model.common.enterprise.Organization;
-import org.openbravo.test.base.OBBaseTest;
 
 /**
  * Unit tests for the {@link NotesServlet} class.
@@ -68,68 +54,9 @@ import org.openbravo.test.base.OBBaseTest;
  * </ul>
  */
 @RunWith(MockitoJUnitRunner.class)
-public class NoteServletTest extends OBBaseTest {
+public class NoteServletTest extends NoteServletTestSupport {
 
-    private static final String TEST_TABLE_ID = "259";
-    private static final String TEST_RECORD_ID = "test-record-123";
-    private static final String TEST_NOTE_ID = "note-456";
-    private static final String TEST_NOTE_CONTENT = "This is a test note";
-    private static final String TEST_USER_ID = "user-789";
     private static final String DIFFERENT_USER_ID = "user-999";
-    private static final String PARAM_TABLE = "table";
-    private static final String PARAM_RECORD = "record";
-    private static final String PARAM_NOTE = "note";
-
-    @Mock
-    private HttpServletRequest mockRequest;
-
-    @Mock
-    private HttpServletResponse mockResponse;
-
-    @Mock
-    private OBDal mockDal;
-
-    @Mock
-    private OBProvider mockProvider;
-
-    @Mock
-    private OBContext mockContext;
-
-    @Mock
-    private Table mockTable;
-
-    @Mock
-    private Note mockNote;
-
-    @Mock
-    private User mockUser;
-
-    @Mock
-    private Organization mockOrganization;
-
-    @Mock
-    private OBCriteria<Note> mockCriteria;
-
-    private NotesServlet servlet;
-    private StringWriter stringWriter;
-
-    /**
-     * Sets up the test environment before each test method execution.
-     * Initialize mocks and configures common behavior.
-     */
-    @Override
-    @Before
-    public void setUp() throws Exception {
-        super.setUp();
-        servlet = new NotesServlet();
-        stringWriter = new StringWriter();
-        PrintWriter printWriter = new PrintWriter(stringWriter);
-
-        when(mockResponse.getWriter()).thenReturn(printWriter);
-        when(mockContext.getUser()).thenReturn(mockUser);
-        when(mockContext.getCurrentOrganization()).thenReturn(mockOrganization);
-        when(mockUser.getId()).thenReturn(TEST_USER_ID);
-    }
 
     // ==================== GET Tests ====================
 
@@ -139,22 +66,15 @@ public class NoteServletTest extends OBBaseTest {
     @Test
     public void testGetNotes_Success() throws Exception {
         // Arrange
-        when(mockRequest.getParameter(PARAM_TABLE)).thenReturn(TEST_TABLE_ID);
-        when(mockRequest.getParameter(PARAM_RECORD)).thenReturn(TEST_RECORD_ID);
+        stubGetParameters();
 
         List<Note> mockNotes = createMockNotesList();
 
         try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
              MockedStatic<OBContext> contextMock = mockStatic(OBContext.class)) {
 
-            dalMock.when(OBDal::getInstance).thenReturn(mockDal);
-            contextMock.when(OBContext::getOBContext).thenReturn(mockContext);
-
-            when(mockDal.get(Table.class, TEST_TABLE_ID)).thenReturn(mockTable);
-            when(mockDal.createCriteria(Note.class)).thenReturn(mockCriteria);
-            when(mockCriteria.add(any())).thenReturn(mockCriteria);
-            when(mockCriteria.addOrderBy(anyString(), anyBoolean())).thenReturn(mockCriteria);
-            when(mockCriteria.list()).thenReturn(mockNotes);
+            setupDalAndContext(dalMock, contextMock);
+            setupNoteCriteria(mockNotes);
 
             // Act
             servlet.doGet(mockRequest, mockResponse);
@@ -164,7 +84,7 @@ public class NoteServletTest extends OBBaseTest {
             verify(mockResponse).setContentType("application/json");
             verify(mockResponse).setCharacterEncoding("UTF-8");
 
-            String responseContent = stringWriter.toString();
+            String responseContent = getResponseContent();
             assertNotNull("Response should not be null", responseContent);
             assertTrue("Response should be a JSON array", responseContent.startsWith("["));
         }
@@ -184,7 +104,7 @@ public class NoteServletTest extends OBBaseTest {
 
         // Assert
         verify(mockResponse).setStatus(HttpStatus.SC_BAD_REQUEST);
-        String responseContent = stringWriter.toString();
+        String responseContent = getResponseContent();
         assertTrue("Error message should mention missing parameters",
                 responseContent.contains("Missing required parameters"));
     }
@@ -203,7 +123,7 @@ public class NoteServletTest extends OBBaseTest {
 
         // Assert
         verify(mockResponse).setStatus(HttpStatus.SC_BAD_REQUEST);
-        String responseContent = stringWriter.toString();
+        String responseContent = getResponseContent();
         assertTrue("Error message should mention missing parameters",
                 responseContent.contains("Missing required parameters"));
     }
@@ -218,7 +138,7 @@ public class NoteServletTest extends OBBaseTest {
         when(mockRequest.getParameter(PARAM_RECORD)).thenReturn(TEST_RECORD_ID);
 
         try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class)) {
-            dalMock.when(OBDal::getInstance).thenReturn(mockDal);
+            setupDal(dalMock);
             when(mockDal.get(Table.class, "invalid-table")).thenReturn(null);
 
             // Act
@@ -226,7 +146,7 @@ public class NoteServletTest extends OBBaseTest {
 
             // Assert
             verify(mockResponse).setStatus(HttpStatus.SC_BAD_REQUEST);
-            String responseContent = stringWriter.toString();
+            String responseContent = getResponseContent();
             assertTrue("Error message should mention invalid table",
                     responseContent.contains("Invalid table ID"));
         }
@@ -240,29 +160,14 @@ public class NoteServletTest extends OBBaseTest {
     @Test
     public void testCreateNote_Success() throws Exception {
         // Arrange
-        String requestBody = createNoteRequestBody();
-        BufferedReader reader = new BufferedReader(new StringReader(requestBody));
-        when(mockRequest.getReader()).thenReturn(reader);
+        stubPostBody();
 
         try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
              MockedStatic<OBProvider> providerMock = mockStatic(OBProvider.class);
              MockedStatic<OBContext> contextMock = mockStatic(OBContext.class)) {
 
-            dalMock.when(OBDal::getInstance).thenReturn(mockDal);
-            providerMock.when(OBProvider::getInstance).thenReturn(mockProvider);
-            contextMock.when(OBContext::getOBContext).thenReturn(mockContext);
-
-            when(mockDal.get(Table.class, TEST_TABLE_ID)).thenReturn(mockTable);
-            when(mockProvider.get(Note.class)).thenReturn(mockNote);
-            when(mockNote.getId()).thenReturn(TEST_NOTE_ID);
-            when(mockNote.getNote()).thenReturn(TEST_NOTE_CONTENT);
-            when(mockNote.getTable()).thenReturn(mockTable);
-            when(mockNote.getRecord()).thenReturn(TEST_RECORD_ID);
-            when(mockNote.getCreatedBy()).thenReturn(mockUser);
-            when(mockNote.getCreationDate()).thenReturn(new Date());
-            when(mockNote.getUpdated()).thenReturn(new Date());
-            when(mockTable.getId()).thenReturn(TEST_TABLE_ID);
-            when(mockUser.getIdentifier()).thenReturn("Test User");
+            setupDalAndContext(dalMock, contextMock);
+            setupNoteCreation(providerMock);
 
             // Act
             servlet.doPost(mockRequest, mockResponse);
@@ -276,7 +181,7 @@ public class NoteServletTest extends OBBaseTest {
             verify(mockDal).save(mockNote);
             verify(mockDal).flush();
 
-            String responseContent = stringWriter.toString();
+            String responseContent = getResponseContent();
             assertNotNull("Response should not be null", responseContent);
             assertTrue("Response should contain note ID", responseContent.contains(TEST_NOTE_ID));
         }
@@ -292,16 +197,14 @@ public class NoteServletTest extends OBBaseTest {
         requestJson.put(PARAM_RECORD, TEST_RECORD_ID);
         requestJson.put(PARAM_NOTE, TEST_NOTE_CONTENT);
 
-        BufferedReader reader = new BufferedReader(
-                new StringReader(requestJson.toString()));
-        when(mockRequest.getReader()).thenReturn(reader);
+        stubRequestBody(requestJson.toString());
 
         // Act
         servlet.doPost(mockRequest, mockResponse);
 
         // Assert
         verify(mockResponse).setStatus(HttpStatus.SC_BAD_REQUEST);
-        String responseContent = stringWriter.toString();
+        String responseContent = getResponseContent();
         assertTrue("Error message should mention missing table",
                 responseContent.contains("Missing required parameter: table"));
     }
@@ -316,16 +219,14 @@ public class NoteServletTest extends OBBaseTest {
         requestJson.put(PARAM_TABLE, TEST_TABLE_ID);
         requestJson.put(PARAM_NOTE, TEST_NOTE_CONTENT);
 
-        BufferedReader reader = new BufferedReader(
-                new StringReader(requestJson.toString()));
-        when(mockRequest.getReader()).thenReturn(reader);
+        stubRequestBody(requestJson.toString());
 
         // Act
         servlet.doPost(mockRequest, mockResponse);
 
         // Assert
         verify(mockResponse).setStatus(HttpStatus.SC_BAD_REQUEST);
-        String responseContent = stringWriter.toString();
+        String responseContent = getResponseContent();
         assertTrue("Error message should mention missing record",
                 responseContent.contains("Missing required parameter: record"));
     }
@@ -340,16 +241,14 @@ public class NoteServletTest extends OBBaseTest {
         requestJson.put(PARAM_TABLE, TEST_TABLE_ID);
         requestJson.put(PARAM_RECORD, TEST_RECORD_ID);
 
-        BufferedReader reader = new BufferedReader(
-                new StringReader(requestJson.toString()));
-        when(mockRequest.getReader()).thenReturn(reader);
+        stubRequestBody(requestJson.toString());
 
         // Act
         servlet.doPost(mockRequest, mockResponse);
 
         // Assert
         verify(mockResponse).setStatus(HttpStatus.SC_BAD_REQUEST);
-        String responseContent = stringWriter.toString();
+        String responseContent = getResponseContent();
         assertTrue("Error message should mention missing note",
                 responseContent.contains("Missing required parameter: note"));
     }
@@ -360,12 +259,10 @@ public class NoteServletTest extends OBBaseTest {
     @Test
     public void testCreateNote_InvalidTableId() throws Exception {
         // Arrange
-        String requestBody = createNoteRequestBody();
-        BufferedReader reader = new BufferedReader(new StringReader(requestBody));
-        when(mockRequest.getReader()).thenReturn(reader);
+        stubPostBody();
 
         try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class)) {
-            dalMock.when(OBDal::getInstance).thenReturn(mockDal);
+            setupDal(dalMock);
             when(mockDal.get(Table.class, TEST_TABLE_ID)).thenReturn(null);
 
             // Act
@@ -373,7 +270,7 @@ public class NoteServletTest extends OBBaseTest {
 
             // Assert
             verify(mockResponse).setStatus(HttpStatus.SC_BAD_REQUEST);
-            String responseContent = stringWriter.toString();
+            String responseContent = getResponseContent();
             assertTrue("Error message should mention invalid table",
                     responseContent.contains("Invalid table ID"));
         }
@@ -387,16 +284,14 @@ public class NoteServletTest extends OBBaseTest {
     @Test
     public void testDeleteNote_Success() throws Exception {
         // Arrange
-        when(mockRequest.getPathInfo()).thenReturn("/" + TEST_NOTE_ID);
-        when(mockDal.get(Note.class, TEST_NOTE_ID)).thenReturn(mockNote);
-        when(mockNote.getCreatedBy()).thenReturn(mockUser);
+        stubNotePath();
+        setupNoteForDelete(mockUser);
         when(mockUser.getId()).thenReturn(TEST_USER_ID);
 
         try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
              MockedStatic<OBContext> contextMock = mockStatic(OBContext.class)) {
 
-            dalMock.when(OBDal::getInstance).thenReturn(mockDal);
-            contextMock.when(OBContext::getOBContext).thenReturn(mockContext);
+            setupDalAndContext(dalMock, contextMock);
 
             // Act
             servlet.doDelete(mockRequest, mockResponse);
@@ -406,7 +301,7 @@ public class NoteServletTest extends OBBaseTest {
             verify(mockDal).remove(mockNote);
             verify(mockDal).flush();
 
-            String responseContent = stringWriter.toString();
+            String responseContent = getResponseContent();
             assertTrue("Response should indicate success",
                     responseContent.contains("\"success\":true"));
             assertTrue("Response should contain note ID",
@@ -427,7 +322,7 @@ public class NoteServletTest extends OBBaseTest {
 
         // Assert
         verify(mockResponse).setStatus(HttpStatus.SC_BAD_REQUEST);
-        String responseContent = stringWriter.toString();
+        String responseContent = getResponseContent();
         assertTrue("Error message should mention missing note ID",
                 responseContent.contains("Missing note ID in path"));
     }
@@ -438,14 +333,13 @@ public class NoteServletTest extends OBBaseTest {
     @Test
     public void testDeleteNote_NoteNotFound() throws Exception {
         // Arrange
-        when(mockRequest.getPathInfo()).thenReturn("/" + TEST_NOTE_ID);
+        stubNotePath();
         when(mockDal.get(Note.class, TEST_NOTE_ID)).thenReturn(null);
 
         try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
              MockedStatic<OBContext> contextMock = mockStatic(OBContext.class)) {
 
-            dalMock.when(OBDal::getInstance).thenReturn(mockDal);
-            contextMock.when(OBContext::getOBContext).thenReturn(mockContext);
+            setupDalAndContext(dalMock, contextMock);
 
             // Act
             servlet.doDelete(mockRequest, mockResponse);
@@ -453,7 +347,7 @@ public class NoteServletTest extends OBBaseTest {
             // Assert
             verify(mockResponse).setStatus(HttpStatus.SC_NOT_FOUND);
 
-            String responseContent = stringWriter.toString();
+            String responseContent = getResponseContent();
             assertTrue("Error message should mention note not found",
                     responseContent.contains("Note not found"));
         }
@@ -465,20 +359,18 @@ public class NoteServletTest extends OBBaseTest {
     @Test
     public void testDeleteNote_InsufficientPermissions() throws Exception {
         // Arrange
-        when(mockRequest.getPathInfo()).thenReturn("/" + TEST_NOTE_ID);
+        stubNotePath();
 
         User differentUser = mock(User.class);
         when(differentUser.getId()).thenReturn(DIFFERENT_USER_ID);
 
-        when(mockDal.get(Note.class, TEST_NOTE_ID)).thenReturn(mockNote);
-        when(mockNote.getCreatedBy()).thenReturn(differentUser);
+        setupNoteForDelete(differentUser);
         when(mockUser.getId()).thenReturn(TEST_USER_ID);
 
         try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
              MockedStatic<OBContext> contextMock = mockStatic(OBContext.class)) {
 
-            dalMock.when(OBDal::getInstance).thenReturn(mockDal);
-            contextMock.when(OBContext::getOBContext).thenReturn(mockContext);
+            setupDalAndContext(dalMock, contextMock);
 
             // Act
             servlet.doDelete(mockRequest, mockResponse);
@@ -487,7 +379,7 @@ public class NoteServletTest extends OBBaseTest {
             verify(mockResponse).setStatus(HttpStatus.SC_FORBIDDEN);
             verify(mockDal, never()).remove(any());
 
-            String responseContent = stringWriter.toString();
+            String responseContent = getResponseContent();
             assertTrue("Error message should mention insufficient permissions",
                     responseContent.contains("Insufficient permissions"));
         }
@@ -499,16 +391,14 @@ public class NoteServletTest extends OBBaseTest {
     @Test
     public void testDeleteNote_NullCreator() throws Exception {
         // Arrange
-        when(mockRequest.getPathInfo()).thenReturn("/" + TEST_NOTE_ID);
-        when(mockDal.get(Note.class, TEST_NOTE_ID)).thenReturn(mockNote);
-        when(mockNote.getCreatedBy()).thenReturn(null); // Null creator
+        stubNotePath();
+        setupNoteForDelete(null); // Null creator
         when(mockNote.getId()).thenReturn(TEST_NOTE_ID);
 
         try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
              MockedStatic<OBContext> contextMock = mockStatic(OBContext.class)) {
 
-            dalMock.when(OBDal::getInstance).thenReturn(mockDal);
-            contextMock.when(OBContext::getOBContext).thenReturn(mockContext);
+            setupDalAndContext(dalMock, contextMock);
 
             // Act
             servlet.doDelete(mockRequest, mockResponse);
@@ -517,7 +407,7 @@ public class NoteServletTest extends OBBaseTest {
             verify(mockResponse).setStatus(HttpStatus.SC_FORBIDDEN);
             verify(mockDal, never()).remove(any());
 
-            String responseContent = stringWriter.toString();
+            String responseContent = getResponseContent();
             assertTrue("Error message should mention insufficient permissions",
                     responseContent.contains("Insufficient permissions"));
         }
@@ -527,33 +417,16 @@ public class NoteServletTest extends OBBaseTest {
 
     /**
      * Creates a list of mock notes for testing.
+     *
+     * @return a list holding a single note ready to be serialized
      */
     private List<Note> createMockNotesList() {
         List<Note> notes = new ArrayList<>();
 
         Note note1 = mock(Note.class);
-        when(note1.getId()).thenReturn(TEST_NOTE_ID);
-        when(note1.getNote()).thenReturn(TEST_NOTE_CONTENT);
-        when(note1.getTable()).thenReturn(mockTable);
-        when(note1.getRecord()).thenReturn(TEST_RECORD_ID);
-        when(note1.getCreatedBy()).thenReturn(mockUser);
-        when(note1.getCreationDate()).thenReturn(new Date());
-        when(note1.getUpdated()).thenReturn(new Date());
-        when(mockTable.getId()).thenReturn(TEST_TABLE_ID);
-        when(mockUser.getIdentifier()).thenReturn("Test User");
+        stubNoteJsonFields(note1);
 
         notes.add(note1);
         return notes;
-    }
-
-    /**
-     * Creates a JSON request body for note creation.
-     */
-    private String createNoteRequestBody() throws Exception {
-        JSONObject json = new JSONObject();
-        json.put(PARAM_TABLE, TEST_TABLE_ID);
-        json.put(PARAM_RECORD, TEST_RECORD_ID);
-        json.put(PARAM_NOTE, TEST_NOTE_CONTENT);
-        return json.toString();
     }
 }

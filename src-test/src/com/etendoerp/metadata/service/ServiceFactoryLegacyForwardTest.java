@@ -47,7 +47,6 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class ServiceFactoryLegacyForwardTest {
 
-  private static final String EXAMPLE_MUTABLE_SESSION_ATTRIBUTE = "143|C_ORDER_ID";
   private static final String PARAM_WINDOW_ID = "windowId";
   private static final String PARAM_ENTITY_NAME = "entityName";
   private static final String PARAM_RECORD_ID = "recordId";
@@ -85,17 +84,16 @@ class ServiceFactoryLegacyForwardTest {
   }
 
   @Test
-  void buildLegacyForwardServiceThrowsWhenAttributeNotAllowed() {
-    HttpSession session = mock(HttpSession.class);
-
-    when(legacyReq.getSession(true)).thenReturn(session);
-    when(legacyReq.getParameter(PARAM_RECORD_ID)).thenReturn("A123");
-
+  void buildLegacyForwardServiceSkipsSessionAttributeWhenKeyUnresolved() throws Exception {
     try (MockedStatic<LegacyUtils> legacy = mockStatic(LegacyUtils.class)) {
-      legacy.when(() -> LegacyUtils.isMutableSessionAttribute(EXAMPLE_MUTABLE_SESSION_ATTRIBUTE)).thenReturn(false);
+      legacy.when(() -> LegacyUtils.resolveUsedByLinkSessionKey(legacyReq, LegacyPaths.USED_BY_LINK)).thenReturn(null);
 
       MetadataService service = invokeBuildLegacyForwardService(legacyReq, legacyRes, LegacyPaths.USED_BY_LINK);
-      assertThrows(InternalServerException.class, service::process);
+      service.process();
+
+      // Forwarding must still proceed even when there's no session attribute to populate.
+      verify(legacyReq, never()).getSession(true);
+      verify(legacyDispatcher).forward(legacyReq, legacyRes);
     }
   }
 

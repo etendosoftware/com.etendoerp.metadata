@@ -56,6 +56,7 @@ public class Constants {
      * to tell this rejection apart from a generic session failure, so it must not be turned into prose.
      */
     public static final String PASSWORD_EXPIRED_ERROR = "PasswordExpired";
+    public static final String SSO_PATH = "/sso/";
     public static final boolean DEFAULT_CHECKON_SAVE = true;
     public static final boolean DEFAULT_EDITABLE_FIELD = true;
     public static final String LIST_REFERENCE_ID = "17";

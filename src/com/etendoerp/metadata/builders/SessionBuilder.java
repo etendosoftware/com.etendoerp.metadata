@@ -151,12 +151,26 @@ public class SessionBuilder extends Builder {
                 .setParameter("userId", cacheKey)
                 .list();
 
-            Map<String, List<Warehouse>> warehousesByOrganization = getWarehousesByOrganization(userRoleList);
+            Set<String> allOrgIds = new LinkedHashSet<>();
+            String clientId = collectOrgIdsAndClient(userRoleList, allOrgIds);
+            List<Warehouse> pooledWarehouses = fetchWarehouses(allOrgIds, clientId);
+            OrganizationStructureProvider osp = clientId != null
+                ? OBContext.getOBContext().getOrganizationStructureProvider(clientId)
+                : null;
 
             for (UserRoles userRole : userRoleList) {
                 JSONObject json = new JSONObject();
                 Role role = userRole.getRole();
                 Client client = role.getClient();
+
+                // Scoped to this role's own granted organizations only - pooling every role's
+                // orgIds together (as before) let a warehouse granted to a DIFFERENT role leak
+                // into this role's organization bucket whenever this role's org happened to be
+                // an ancestor, in the org tree, of that other role's org.
+                Set<String> roleOrgIds = collectRoleOrgIds(role);
+                Map<String, List<Warehouse>> warehousesByOrganization = osp != null
+                    ? distributeByNaturalTree(pooledWarehouses, roleOrgIds, osp)
+                    : Collections.emptyMap();
 
                 json.put("id", role.getId());
                 json.put("name", role.get(Role.PROPERTY_NAME, language, role.getId()));
@@ -175,33 +189,26 @@ public class SessionBuilder extends Builder {
     }
 
     /**
-     * Distributes warehouses across organizations using the natural tree,
-     * matching Classic's RoleInfo.getOrganizationWarehouses() behavior:
-     * a warehouse appears under every org whose natural tree contains
-     * the warehouse's own organization.
+     * Fetches the warehouses belonging to any of the given organizations (pooled across every
+     * role the user has, as a single round trip). Callers must still scope eligibility to a
+     * single role's own granted organizations when distributing these via
+     * {@link #distributeByNaturalTree(List, Set, OrganizationStructureProvider)} - this method
+     * only avoids the N+1 query, it does not decide which role a warehouse belongs to.
      */
-    private Map<String, List<Warehouse>> getWarehousesByOrganization(List<UserRoles> userRoleList) {
-        Set<String> orgIds = new LinkedHashSet<>();
-        String clientId = collectOrgIdsAndClient(userRoleList, orgIds);
-
+    private List<Warehouse> fetchWarehouses(Set<String> orgIds, String clientId) {
         if (orgIds.isEmpty() || clientId == null) {
-            return Collections.emptyMap();
+            return Collections.emptyList();
         }
 
         try {
-            List<Warehouse> warehouses = OBDal.getInstance().getSession()
+            return OBDal.getInstance().getSession()
                 .createQuery(WAREHOUSES_BY_ORGANIZATION_HQL, Warehouse.class)
                 .setParameter("orgIds", orgIds)
                 .setParameter("clientId", clientId)
                 .list();
-
-            OrganizationStructureProvider osp = OBContext.getOBContext()
-                .getOrganizationStructureProvider(clientId);
-
-            return distributeByNaturalTree(warehouses, orgIds, osp);
         } catch (Exception e) {
             logger.error(e.getMessage(), e);
-            return Collections.emptyMap();
+            return Collections.emptyList();
         }
     }
 
@@ -223,8 +230,36 @@ public class SessionBuilder extends Builder {
     }
 
     /**
-     * Distributes warehouses across organizations using the natural tree,
-     * replicating Classic's RoleInfo behavior.
+     * Collects the organization ids explicitly granted to a single role, tolerating an
+     * inaccessible or failing {@code getADRoleOrganizationList()} by returning whatever was
+     * gathered so far instead of failing the whole roles/organizations tree build.
+     *
+     * @param role the role to collect granted organization ids for
+     * @return the role's own organization ids, or an empty set if they couldn't be loaded
+     */
+    private Set<String> collectRoleOrgIds(Role role) {
+        Set<String> roleOrgIds = new LinkedHashSet<>();
+        try {
+            for (RoleOrganization roleOrg : role.getADRoleOrganizationList()) {
+                roleOrgIds.add(roleOrg.getOrganization().getId());
+            }
+        } catch (Exception e) {
+            logger.error(e.getMessage(), e);
+        }
+        return roleOrgIds;
+    }
+
+    /**
+     * Distributes warehouses across organizations using the natural tree, replicating Classic's
+     * RoleInfo behavior: a warehouse is added to every bucket org (from {@code orgIds}) whose
+     * natural tree contains the warehouse's own organization. {@code orgIds} must be a single
+     * role's own granted organizations, never a set pooled across multiple roles - the natural
+     * tree membership check is itself what scopes eligibility, so pooling would let a warehouse
+     * granted to a different role leak into this role's bucket whenever one of these orgIds is
+     * an ancestor of that other role's organization. A parent org legitimately exposes the
+     * warehouses of its descendant orgs, even though the warehouse's own organization is never
+     * itself one of the role's granted orgIds - that is precisely the case the natural tree is
+     * there to cover, so it must not be pre-filtered away.
      */
     private Map<String, List<Warehouse>> distributeByNaturalTree(
             List<Warehouse> warehouses, Set<String> orgIds, OrganizationStructureProvider osp) {

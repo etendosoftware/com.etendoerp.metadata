@@ -25,13 +25,8 @@ import javax.servlet.http.HttpSession;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.openbravo.base.model.Entity;
-import org.openbravo.base.model.ModelProvider;
-import org.openbravo.base.model.Property;
-
 import com.etendoerp.metadata.exceptions.InternalServerException;
 import com.etendoerp.metadata.exceptions.NotFoundException;
-import com.etendoerp.metadata.utils.LegacyPaths;
 import com.etendoerp.metadata.utils.LegacyUtils;
 
 import java.io.IOException;
@@ -101,32 +96,13 @@ public final class ServiceFactory {
     }
 
     private static void handleLegacySession(HttpServletRequest req, String path) {
-        if (!LegacyPaths.USED_BY_LINK.equals(path)) {
-            return;
-        }
-        String windowId = req.getParameter("windowId");
-        String entityName = req.getParameter("entityName");
-        String recordId = req.getParameter("recordId");
-
-        if (windowId == null || entityName == null || recordId == null) {
+        LegacyUtils.UsedByLinkSessionKey key = LegacyUtils.resolveUsedByLinkSessionKey(req, path);
+        if (key == null) {
             return;
         }
 
-        Entity entity = ModelProvider.getInstance().getEntity(entityName);
-        if (entity == null) {
-            log.warn("Entity '{}' not found in ModelProvider, cannot set session for UsedByLink", entityName);
-            return;
-        }
-
-        java.util.List<Property> idProps = entity.getIdProperties();
-        if (idProps == null || idProps.size() != 1) {
-            log.warn("Expected exactly one ID property for entity '{}', got {}", entityName, idProps);
-            return;
-        }
-
-        String columnName = idProps.get(0).getColumnName();
         HttpSession session = req.getSession(true);
-        session.setAttribute(windowId + "|" + columnName, recordId);
+        session.setAttribute(key.windowId() + "|" + key.columnName(), key.recordId());
     }
 
     private static void forwardToPath(HttpServletRequest req, HttpServletResponse res, String path)
