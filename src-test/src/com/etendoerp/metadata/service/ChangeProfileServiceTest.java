@@ -54,6 +54,8 @@ import com.etendoerp.metadata.exceptions.UnprocessableContentException;
  */
 @RunWith(MockitoJUnitRunner.Silent.class)
 public class ChangeProfileServiceTest {
+    private static final String USER_ID = "user-1";
+    private static final String ROLE_ID = "role-1";
 
     @Mock
     private HttpServletRequest mockRequest;
@@ -74,6 +76,9 @@ public class ChangeProfileServiceTest {
     private MockedStatic<OBDal> obDalMock;
     private MockedStatic<com.etendoerp.metadata.auth.Utils> authUtilsMock;
 
+    /**
+     * Initializes the static mocks shared by every test.
+     */
     @Before
     public void setUp() {
         obContextMock = mockStatic(OBContext.class);
@@ -81,12 +86,15 @@ public class ChangeProfileServiceTest {
         authUtilsMock = mockStatic(com.etendoerp.metadata.auth.Utils.class);
 
         obContextMock.when(OBContext::getOBContext).thenReturn(obContext);
-        when(contextUser.getId()).thenReturn("user-1");
+        when(contextUser.getId()).thenReturn(USER_ID);
         when(obContext.getUser()).thenReturn(contextUser);
 
         obDalMock.when(OBDal::getInstance).thenReturn(obDal);
     }
 
+    /**
+     * Releases the static mocks opened in {@link #setUp()}.
+     */
     @After
     public void tearDown() {
         authUtilsMock.close();
@@ -98,6 +106,9 @@ public class ChangeProfileServiceTest {
         when(mockRequest.getReader()).thenReturn(new BufferedReader(new StringReader(body)));
     }
 
+    /**
+     * A GET request must be rejected with {@link MethodNotAllowedException}.
+     */
     @Test
     public void testProcessThrowsMethodNotAllowedForGet() {
         when(mockRequest.getMethod()).thenReturn("GET");
@@ -113,6 +124,9 @@ public class ChangeProfileServiceTest {
         }
     }
 
+    /**
+     * A valid role/organization/warehouse combination should produce a JWT.
+     */
     @Test
     public void testProcessHappyPath() throws Exception {
         when(mockRequest.getMethod()).thenReturn("POST");
@@ -127,8 +141,8 @@ public class ChangeProfileServiceTest {
         Organization mockOrg = mock(Organization.class);
         Warehouse mockWarehouse = mock(Warehouse.class);
 
-        when(obDal.get(User.class, "user-1")).thenReturn(mockUser);
-        when(obDal.get(Role.class, "role-1")).thenReturn(mockRole);
+        when(obDal.get(User.class, USER_ID)).thenReturn(mockUser);
+        when(obDal.get(Role.class, ROLE_ID)).thenReturn(mockRole);
         when(obDal.get(Organization.class, "org-1")).thenReturn(mockOrg);
         when(obDal.get(Warehouse.class, "wh-1")).thenReturn(mockWarehouse);
 
@@ -143,13 +157,16 @@ public class ChangeProfileServiceTest {
         assertTrue("Output should contain the generated token", output.contains("fake-jwt-token"));
     }
 
+    /**
+     * An unresolvable role id should be rejected with {@link UnprocessableContentException}.
+     */
     @Test
     public void testProcessInvalidRoleThrowsUnprocessable() throws Exception {
         when(mockRequest.getMethod()).thenReturn("POST");
         setRequestBody("{\"role\":\"missing-role\"}");
 
         User mockUser = mock(User.class);
-        when(obDal.get(User.class, "user-1")).thenReturn(mockUser);
+        when(obDal.get(User.class, USER_ID)).thenReturn(mockUser);
         when(obDal.get(Role.class, "missing-role")).thenReturn(null);
 
         ChangeProfileService service = new ChangeProfileService(mockRequest, mockResponse);
@@ -161,6 +178,9 @@ public class ChangeProfileServiceTest {
         }
     }
 
+    /**
+     * An unresolvable organization id should be rejected with {@link UnprocessableContentException}.
+     */
     @Test
     public void testProcessInvalidOrganizationThrowsUnprocessable() throws Exception {
         when(mockRequest.getMethod()).thenReturn("POST");
@@ -169,8 +189,8 @@ public class ChangeProfileServiceTest {
         User mockUser = mock(User.class);
         Role mockRole = mock(Role.class);
         when(mockRole.getClient()).thenReturn(mock(Client.class));
-        when(obDal.get(User.class, "user-1")).thenReturn(mockUser);
-        when(obDal.get(Role.class, "role-1")).thenReturn(mockRole);
+        when(obDal.get(User.class, USER_ID)).thenReturn(mockUser);
+        when(obDal.get(Role.class, ROLE_ID)).thenReturn(mockRole);
         when(obDal.get(Organization.class, "missing-org")).thenReturn(null);
 
         ChangeProfileService service = new ChangeProfileService(mockRequest, mockResponse);
@@ -182,6 +202,9 @@ public class ChangeProfileServiceTest {
         }
     }
 
+    /**
+     * An unresolvable warehouse id should be rejected with {@link UnprocessableContentException}.
+     */
     @Test
     public void testProcessInvalidWarehouseThrowsUnprocessable() throws Exception {
         when(mockRequest.getMethod()).thenReturn("POST");
@@ -190,8 +213,8 @@ public class ChangeProfileServiceTest {
         User mockUser = mock(User.class);
         Role mockRole = mock(Role.class);
         when(mockRole.getClient()).thenReturn(mock(Client.class));
-        when(obDal.get(User.class, "user-1")).thenReturn(mockUser);
-        when(obDal.get(Role.class, "role-1")).thenReturn(mockRole);
+        when(obDal.get(User.class, USER_ID)).thenReturn(mockUser);
+        when(obDal.get(Role.class, ROLE_ID)).thenReturn(mockRole);
         when(obDal.get(Warehouse.class, "missing-wh")).thenReturn(null);
 
         ChangeProfileService service = new ChangeProfileService(mockRequest, mockResponse);

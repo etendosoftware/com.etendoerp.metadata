@@ -75,6 +75,8 @@ public class
 AuthUtilsGenerateTokenTest {
 
     private static final String OLD_SIMPLE_KEY = "old-simple-key";
+    private static final String WAREHOUSE_CLAIM = "warehouse";
+    private static final String ORG_HAS_NO_ROLE_MESSAGE = "SMFSWS_OrgHasNoRole";
 
     @Mock
     private AuthData authData;
@@ -239,6 +241,8 @@ AuthUtilsGenerateTokenTest {
      * real warehouse with that id, so {@code OBContext#initialize}'s warehouse lookup resolves it
      * to {@code null} downstream, giving Classic's same tolerance for an empty warehouse without
      * getting the token itself rejected on the next request.
+     *
+     * @throws Exception if token generation fails
      */
     @Test
     public void testGenerateTokenToleratesOrganizationWithNoWarehouses() throws Exception {
@@ -257,15 +261,15 @@ AuthUtilsGenerateTokenTest {
                 .thenReturn(new ArrayList<>());
 
         try (MockedStatic<Utility> utilityMock = mockStatic(Utility.class)) {
-            utilityMock.when(() -> Utility.messageBD(any(), eq("SMFSWS_OrgHasNoRole"), any()))
-                    .thenReturn("SMFSWS_OrgHasNoRole");
+            utilityMock.when(() -> Utility.messageBD(any(), eq(ORG_HAS_NO_ROLE_MESSAGE), any()))
+                    .thenReturn(ORG_HAS_NO_ROLE_MESSAGE);
 
             String token = Utils.generateToken(authData, "session-no-wh");
 
             assertNotNull("Token should still be generated when the organization has no warehouses", token);
             DecodedJWT decoded = JWT.decode(token);
             assertEquals("warehouse claim should be the \"0\" sentinel, never omitted",
-                    "0", decoded.getClaim("warehouse").asString());
+                    "0", decoded.getClaim(WAREHOUSE_CLAIM).asString());
         }
     }
 
@@ -296,14 +300,14 @@ AuthUtilsGenerateTokenTest {
                 .thenReturn(new ArrayList<>());
 
         try (MockedStatic<Utility> utilityMock = mockStatic(Utility.class)) {
-            utilityMock.when(() -> Utility.messageBD(any(), eq("SMFSWS_OrgHasNoRole"), any()))
-                    .thenReturn("SMFSWS_OrgHasNoRole");
+            utilityMock.when(() -> Utility.messageBD(any(), eq(ORG_HAS_NO_ROLE_MESSAGE), any()))
+                    .thenReturn(ORG_HAS_NO_ROLE_MESSAGE);
 
             String token = Utils.generateToken(authData, "session-stale-default");
 
             DecodedJWT decoded = JWT.decode(token);
             assertEquals("a default warehouse from another organization must never leak through",
-                    "0", decoded.getClaim("warehouse").asString());
+                    "0", decoded.getClaim(WAREHOUSE_CLAIM).asString());
         }
     }
 
@@ -331,7 +335,7 @@ AuthUtilsGenerateTokenTest {
 
         DecodedJWT decoded = JWT.decode(token);
         assertEquals("should fall back to the organization's own warehouse, not the stale default",
-                "WH_ID", decoded.getClaim("warehouse").asString());
+                "WH_ID", decoded.getClaim(WAREHOUSE_CLAIM).asString());
     }
 
     /** Verifies that getRole wraps reflection errors in OBException. */

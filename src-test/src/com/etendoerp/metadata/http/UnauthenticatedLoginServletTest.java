@@ -49,6 +49,8 @@ public class UnauthenticatedLoginServletTest {
      * a request reporting {@code getPathInfo() == "/com.etendoerp.metadata.meta/login"} - the
      * exact-path {@code @WebServlet} mapping otherwise leaves it {@code null}, which
      * {@link ServiceFactory} would 404 on since it routes purely off that value.
+     *
+     * @throws Exception if the servlet invocation fails
      */
     @Test
     public void testDoPostDelegatesToMetadataServletWithPathInfoForRouting() throws Exception {

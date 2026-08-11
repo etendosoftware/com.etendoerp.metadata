@@ -59,6 +59,8 @@ import com.etendoerp.metadata.exceptions.UnprocessableContentException;
  */
 @RunWith(MockitoJUnitRunner.Silent.class)
 public class LoginServiceTest {
+    private static final String USERNAME = "lorena";
+    private static final String PASSWORD = "tecnicia";
 
     @Mock
     private HttpServletRequest mockRequest;
@@ -77,6 +79,9 @@ public class LoginServiceTest {
     private MockedStatic<PasswordHash> passwordHashMock;
     private MockedStatic<Utils> authUtilsMock;
 
+    /**
+     * Initializes the static mocks shared by every test.
+     */
     @Before
     public void setUp() {
         obContextMock = mockStatic(OBContext.class);
@@ -88,6 +93,9 @@ public class LoginServiceTest {
         obDalMock.when(OBDal::getInstance).thenReturn(obDal);
     }
 
+    /**
+     * Releases the static mocks opened in {@link #setUp()}.
+     */
     @After
     public void tearDown() {
         authUtilsMock.close();
@@ -100,6 +108,9 @@ public class LoginServiceTest {
         when(mockRequest.getReader()).thenReturn(new BufferedReader(new StringReader(body)));
     }
 
+    /**
+     * A GET request must be rejected with {@link MethodNotAllowedException}.
+     */
     @Test
     public void testProcessThrowsMethodNotAllowedForGet() {
         when(mockRequest.getMethod()).thenReturn("GET");
@@ -115,6 +126,9 @@ public class LoginServiceTest {
         }
     }
 
+    /**
+     * A request without username/password must be rejected with {@link UnprocessableContentException}.
+     */
     @Test
     public void testProcessMissingCredentialsThrowsUnprocessable() throws Exception {
         when(mockRequest.getMethod()).thenReturn("POST");
@@ -129,12 +143,15 @@ public class LoginServiceTest {
         }
     }
 
+    /**
+     * Wrong credentials must be rejected with {@link UnauthorizedException}.
+     */
     @Test
     public void testProcessInvalidCredentialsThrowsUnauthorized() throws Exception {
         when(mockRequest.getMethod()).thenReturn("POST");
         setRequestBody("{\"username\":\"lorena\",\"password\":\"wrong\"}");
 
-        passwordHashMock.when(() -> PasswordHash.getUserWithPassword("lorena", "wrong"))
+        passwordHashMock.when(() -> PasswordHash.getUserWithPassword(USERNAME, "wrong"))
                 .thenReturn(Optional.empty());
 
         LoginService service = new LoginService(mockRequest, mockResponse);
@@ -146,6 +163,9 @@ public class LoginServiceTest {
         }
     }
 
+    /**
+     * When no role is specified in the request, the user's default role should be used.
+     */
     @Test
     public void testProcessHappyPathUsesDefaultRoleWhenNotSpecified() throws Exception {
         when(mockRequest.getMethod()).thenReturn("POST");
@@ -160,7 +180,7 @@ public class LoginServiceTest {
         when(defaultRole.getClient()).thenReturn(mock(Client.class));
         when(mockUser.getDefaultRole()).thenReturn(defaultRole);
 
-        passwordHashMock.when(() -> PasswordHash.getUserWithPassword("lorena", "tecnicia"))
+        passwordHashMock.when(() -> PasswordHash.getUserWithPassword(USERNAME, PASSWORD))
                 .thenReturn(Optional.of(mockUser));
         when(obDal.get(Role.class, "default-role-id")).thenReturn(defaultRole);
 
@@ -174,6 +194,10 @@ public class LoginServiceTest {
         assertTrue("Output should contain the generated token", output.contains("fake-jwt-token"));
     }
 
+    /**
+     * When neither the request nor the user provides a role, resolution must fail
+     * with {@link UnprocessableContentException}.
+     */
     @Test
     public void testProcessNoRoleAvailableThrowsUnprocessable() throws Exception {
         when(mockRequest.getMethod()).thenReturn("POST");
@@ -182,7 +206,7 @@ public class LoginServiceTest {
         User mockUser = mock(User.class);
         when(mockUser.getDefaultRole()).thenReturn(null);
 
-        passwordHashMock.when(() -> PasswordHash.getUserWithPassword("lorena", "tecnicia"))
+        passwordHashMock.when(() -> PasswordHash.getUserWithPassword(USERNAME, PASSWORD))
                 .thenReturn(Optional.of(mockUser));
 
         LoginService service = new LoginService(mockRequest, mockResponse);
@@ -194,6 +218,9 @@ public class LoginServiceTest {
         }
     }
 
+    /**
+     * An unresolvable organization id should be rejected with {@link UnprocessableContentException}.
+     */
     @Test
     public void testProcessInvalidOrganizationThrowsUnprocessable() throws Exception {
         when(mockRequest.getMethod()).thenReturn("POST");
@@ -203,7 +230,7 @@ public class LoginServiceTest {
         Role role = mock(Role.class);
         when(role.getClient()).thenReturn(mock(Client.class));
 
-        passwordHashMock.when(() -> PasswordHash.getUserWithPassword("lorena", "tecnicia"))
+        passwordHashMock.when(() -> PasswordHash.getUserWithPassword(USERNAME, PASSWORD))
                 .thenReturn(Optional.of(mockUser));
         when(obDal.get(Role.class, "role-1")).thenReturn(role);
         when(obDal.get(Organization.class, "missing-org")).thenReturn(null);
@@ -217,6 +244,9 @@ public class LoginServiceTest {
         }
     }
 
+    /**
+     * An unresolvable warehouse id should be rejected with {@link UnprocessableContentException}.
+     */
     @Test
     public void testProcessInvalidWarehouseThrowsUnprocessable() throws Exception {
         when(mockRequest.getMethod()).thenReturn("POST");
@@ -226,7 +256,7 @@ public class LoginServiceTest {
         Role role = mock(Role.class);
         when(role.getClient()).thenReturn(mock(Client.class));
 
-        passwordHashMock.when(() -> PasswordHash.getUserWithPassword("lorena", "tecnicia"))
+        passwordHashMock.when(() -> PasswordHash.getUserWithPassword(USERNAME, PASSWORD))
                 .thenReturn(Optional.of(mockUser));
         when(obDal.get(Role.class, "role-1")).thenReturn(role);
         when(obDal.get(Warehouse.class, "missing-wh")).thenReturn(null);

@@ -120,7 +120,13 @@ public class LoginService extends MetadataService {
 
     private Role resolveRole(JSONObject body, User user) {
         String roleId = getStringOrNull(body, ROLE);
-        String id = roleId != null ? roleId : (user.getDefaultRole() != null ? user.getDefaultRole().getId() : null);
+        String id;
+        if (roleId != null) {
+            id = roleId;
+        } else {
+            Role defaultRole = user.getDefaultRole();
+            id = defaultRole != null ? defaultRole.getId() : null;
+        }
 
         if (id == null) {
             throw new UnprocessableContentException("No role available for this user");
