@@ -128,6 +128,8 @@ public class LoginServiceTest {
 
     /**
      * A request without username/password must be rejected with {@link UnprocessableContentException}.
+     *
+     * @throws Exception if the request body cannot be read
      */
     @Test
     public void testProcessMissingCredentialsThrowsUnprocessable() throws Exception {
@@ -145,6 +147,8 @@ public class LoginServiceTest {
 
     /**
      * Wrong credentials must be rejected with {@link UnauthorizedException}.
+     *
+     * @throws Exception if the request body cannot be read
      */
     @Test
     public void testProcessInvalidCredentialsThrowsUnauthorized() throws Exception {
@@ -165,6 +169,8 @@ public class LoginServiceTest {
 
     /**
      * When no role is specified in the request, the user's default role should be used.
+     *
+     * @throws Exception if the request body cannot be read
      */
     @Test
     public void testProcessHappyPathUsesDefaultRoleWhenNotSpecified() throws Exception {
@@ -197,6 +203,8 @@ public class LoginServiceTest {
     /**
      * When neither the request nor the user provides a role, resolution must fail
      * with {@link UnprocessableContentException}.
+     *
+     * @throws Exception if the request body cannot be read
      */
     @Test
     public void testProcessNoRoleAvailableThrowsUnprocessable() throws Exception {
@@ -220,6 +228,8 @@ public class LoginServiceTest {
 
     /**
      * An unresolvable organization id should be rejected with {@link UnprocessableContentException}.
+     *
+     * @throws Exception if the request body cannot be read
      */
     @Test
     public void testProcessInvalidOrganizationThrowsUnprocessable() throws Exception {
@@ -246,6 +256,8 @@ public class LoginServiceTest {
 
     /**
      * An unresolvable warehouse id should be rejected with {@link UnprocessableContentException}.
+     *
+     * @throws Exception if the request body cannot be read
      */
     @Test
     public void testProcessInvalidWarehouseThrowsUnprocessable() throws Exception {

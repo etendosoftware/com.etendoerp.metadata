@@ -281,6 +281,8 @@ AuthUtilsGenerateTokenTest {
      * validation of its own - {@code Utils#resolveWarehouseFallback} must discard a stale default
      * before it ever reaches that parameter, so the "no warehouses" path (and its {@code "0"}
      * sentinel) is still reached instead of returning the stale warehouse.
+     *
+     * @throws Exception if token generation fails
      */
     @Test
     public void testGenerateTokenDoesNotLeakStaleDefaultWarehouseWhenOrgHasNone() throws Exception {
@@ -315,6 +317,8 @@ AuthUtilsGenerateTokenTest {
      * Regression test: when the organization being switched to DOES have its own warehouse, a
      * stale default warehouse from another organization must not suppress it - the fallback
      * should resolve to the organization's own warehouse, not to the {@code "0"} sentinel.
+     *
+     * @throws Exception if token generation fails
      */
     @Test
     public void testGenerateTokenFallsBackToOrganizationsOwnWarehouseOverStaleDefault() throws Exception {

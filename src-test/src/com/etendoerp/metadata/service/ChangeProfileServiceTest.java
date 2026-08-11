@@ -126,6 +126,8 @@ public class ChangeProfileServiceTest {
 
     /**
      * A valid role/organization/warehouse combination should produce a JWT.
+     *
+     * @throws Exception if the request body cannot be read
      */
     @Test
     public void testProcessHappyPath() throws Exception {
@@ -159,6 +161,8 @@ public class ChangeProfileServiceTest {
 
     /**
      * An unresolvable role id should be rejected with {@link UnprocessableContentException}.
+     *
+     * @throws Exception if the request body cannot be read
      */
     @Test
     public void testProcessInvalidRoleThrowsUnprocessable() throws Exception {
@@ -180,6 +184,8 @@ public class ChangeProfileServiceTest {
 
     /**
      * An unresolvable organization id should be rejected with {@link UnprocessableContentException}.
+     *
+     * @throws Exception if the request body cannot be read
      */
     @Test
     public void testProcessInvalidOrganizationThrowsUnprocessable() throws Exception {
@@ -204,6 +210,8 @@ public class ChangeProfileServiceTest {
 
     /**
      * An unresolvable warehouse id should be rejected with {@link UnprocessableContentException}.
+     *
+     * @throws Exception if the request body cannot be read
      */
     @Test
     public void testProcessInvalidWarehouseThrowsUnprocessable() throws Exception {
