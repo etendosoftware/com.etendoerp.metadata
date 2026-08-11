@@ -106,13 +106,69 @@ public class Utils {
   }
 
   /**
+   * Message key {@code SecureWebServicesUtils} raises (wrapped in an {@code OBException}) when
+   * the selected organization has no warehouses at all - see its {@code pickFallbackWarehouse}.
+   */
+  private static final String ORG_HAS_NO_WAREHOUSES_MESSAGE_KEY = "SMFSWS_OrgHasNoRole";
+
+  /**
+   * Picks a fallback warehouse to offer {@code SecureWebServicesUtils#getWarehouse} as its
+   * {@code defaultWarehouse} parameter, but only if it actually belongs to the resolved
+   * organization.
+   * <p>
+   * That method returns whatever non-null {@code defaultWarehouse} it's given as-is, with no
+   * validation of its own - it's meant purely as a last-resort value once the requested warehouse
+   * didn't match the organization. Passing {@code user.getDefaultWarehouse()} unconditionally (as
+   * this method used to) meant that once a user saved warehouse X as their default while on one
+   * role, switching to any OTHER role/organization that doesn't have X would silently carry it
+   * over anyway - e.g. a role whose organization has no warehouses at all would still end up with
+   * X as its warehouse instead of correctly having none. Discarding it here when it doesn't
+   * belong lets {@code getWarehouse} fall through to picking a real warehouse for the
+   * organization, or to none if it has none.
+   *
+   * @param defaultWarehouse the user's stored default warehouse, or {@code null}
+   * @param warehouse        the explicitly requested warehouse, or {@code null}
+   * @param selectedOrg      the resolved organization the fallback must belong to
+   * @return {@code defaultWarehouse} or {@code warehouse}, whichever is non-null and belongs to
+   *         {@code selectedOrg}, checked in that order; {@code null} if neither does
+   */
+  private static Warehouse resolveWarehouseFallback(Warehouse defaultWarehouse, Warehouse warehouse,
+      Organization selectedOrg) {
+    if (defaultWarehouse != null && belongsToOrganization(defaultWarehouse, selectedOrg)) {
+      return defaultWarehouse;
+    }
+    if (warehouse != null && belongsToOrganization(warehouse, selectedOrg)) {
+      return warehouse;
+    }
+    return null;
+  }
+
+  /**
+   * Checks whether a warehouse is among the organization's own warehouses.
+   *
+   * @param warehouse    the warehouse to check
+   * @param organization the organization to check against
+   * @return {@code true} if the warehouse belongs to the organization
+   */
+  private static boolean belongsToOrganization(Warehouse warehouse, Organization organization) {
+    return SecureWebServicesUtils.getOrganizationWarehouses(organization).stream()
+        .anyMatch(orgWarehouse -> orgWarehouse.getId().equals(warehouse.getId()));
+  }
+
+  /**
    * Retrieves the appropriate warehouse for the user based on the provided parameters.
+   * <p>
+   * Classic tolerates an organization with no warehouses at all - the session's warehouse is
+   * simply left empty (see {@code LoginUtils#fillSessionArguments}, which accepts an empty
+   * warehouse id). {@code SecureWebServicesUtils#getWarehouse} does not: it throws when the
+   * organization has none. Since that class cannot be modified here, that specific failure is
+   * caught and treated as "no warehouse" instead, matching Classic's behavior.
    *
    * @param warehouse         The warehouse to evaluate.
    * @param selectedOrg       The selected organization.
    * @param defaultWarehouse  The default warehouse.
    * @param selectedRole      The selected role.
-   * @return The selected warehouse.
+   * @return The selected warehouse, or {@code null} if the organization has no warehouses.
    */
   private static Warehouse getWarehouse(Warehouse warehouse, Organization selectedOrg,
       Warehouse defaultWarehouse, Role selectedRole) {
@@ -122,9 +178,26 @@ public class Utils {
       method.setAccessible(true);
 
       return (Warehouse) method.invoke(null, warehouse, selectedOrg, defaultWarehouse, selectedRole);
-    } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
+    } catch (InvocationTargetException e) {
+      if (isOrgHasNoWarehousesError(e.getCause())) {
+        return null;
+      }
+      throw new OBException(e);
+    } catch (NoSuchMethodException | IllegalAccessException e) {
       throw new OBException(e);
     }
+  }
+
+  /**
+   * Checks whether a throwable is the "organization has no warehouses" error that
+   * {@code SecureWebServicesUtils#pickFallbackWarehouse} raises.
+   *
+   * @param cause the throwable to check, typically an {@code InvocationTargetException}'s cause
+   * @return {@code true} if it is that specific error
+   */
+  private static boolean isOrgHasNoWarehousesError(Throwable cause) {
+    return cause != null && cause.getMessage() != null
+        && cause.getMessage().contains(ORG_HAS_NO_WAREHOUSES_MESSAGE_KEY);
   }
 
   /**
@@ -207,11 +280,12 @@ public class Utils {
       Role defaultRole = user.getDefaultRole();
       Organization defaultOrg = user.getDefaultOrganization();
       Warehouse defaultWarehouse = user.getDefaultWarehouse();
-      // If there is no default warehouse, use the provided warehouse
-      Warehouse warehouseFallback = defaultWarehouse != null ? defaultWarehouse : warehouse;
 
       Role selectedRole = getRole(role, userRoleList, defaultWsRole, defaultRole);
       Organization selectedOrg = getOrganization(org, selectedRole, defaultRole, defaultOrg);
+      // Only offer a fallback warehouse if it actually belongs to the resolved organization -
+      // see resolveWarehouseFallback for why this check is required.
+      Warehouse warehouseFallback = resolveWarehouseFallback(defaultWarehouse, warehouse, selectedOrg);
       Warehouse selectedWarehouse = getWarehouse(warehouse, selectedOrg, warehouseFallback, selectedRole);
 
       if (SecureWebServicesUtils.isNewVersionPrivKey(privateKey)) {
@@ -264,20 +338,44 @@ public class Utils {
   }
 
   /**
+   * Sentinel warehouse id meaning "no warehouse", used the same way {@code "0"} already means
+   * "no organization" elsewhere in this codebase. Unlike the organization case, there is no real
+   * {@code M_Warehouse} row with id {@code "0"} - that's precisely why it works as a sentinel
+   * here: {@code BaseSecureWebServiceServlet} requires the {@code warehouse} claim to be present
+   * and non-empty on every authenticated request (not just login), so the claim can never be
+   * omitted; but {@code OBContext#initialize} looks the id up and silently leaves the context's
+   * warehouse {@code null} when nothing matches (see its warehouse query), so this id is accepted
+   * everywhere while still resolving to "no warehouse" - exactly Classic's tolerance for an
+   * organization with none.
+   */
+  private static final String NO_WAREHOUSE_SENTINEL_ID = "0";
+
+  /**
    * Builds a JWT token with the provided user, role, organization, warehouse, and session ID.
+   * <p>
+   * {@code selectedWarehouse} may be {@code null} for an organization that has none (Classic
+   * tolerates this - see {@link #getWarehouse}) - in that case the {@code warehouse} claim is
+   * set to {@link #NO_WAREHOUSE_SENTINEL_ID} rather than omitted, since every other request also
+   * requires this claim to be present.
    *
    * @param user             The authenticated user.
    * @param selectedRole     The selected role.
    * @param selectedOrg      The selected organization.
-   * @param selectedWarehouse The selected warehouse.
+   * @param selectedWarehouse The selected warehouse, or {@code null} if the organization has none.
    * @param sessionId        The session ID.
    * @return The JWT builder.
    */
   private static JWTCreator.Builder getJwtBuilder(User user, Role selectedRole, Organization selectedOrg,
       Warehouse selectedWarehouse, String sessionId) {
-    return JWT.create().withIssuer("sws").withAudience("sws").withClaim("user", user.getId()).withClaim("client",
-        selectedRole.getClient().getId()).withClaim("role", selectedRole.getId()).withClaim("organization",
-        selectedOrg.getId()).withClaim("warehouse", selectedWarehouse.getId()).withClaim("jti", sessionId).withIssuedAt(
-        new Date());
+    String warehouseId = selectedWarehouse != null ? selectedWarehouse.getId() : NO_WAREHOUSE_SENTINEL_ID;
+
+    return JWT.create().withIssuer("sws").withAudience("sws")
+        .withClaim("user", user.getId())
+        .withClaim("client", selectedRole.getClient().getId())
+        .withClaim("role", selectedRole.getId())
+        .withClaim("organization", selectedOrg.getId())
+        .withClaim("warehouse", warehouseId)
+        .withClaim("jti", sessionId)
+        .withIssuedAt(new Date());
   }
 }

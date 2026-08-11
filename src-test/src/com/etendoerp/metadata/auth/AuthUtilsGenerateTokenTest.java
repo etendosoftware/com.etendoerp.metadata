@@ -17,6 +17,7 @@
 
 package com.etendoerp.metadata.auth;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
@@ -33,6 +34,8 @@ import java.util.ArrayList;
 
 import java.util.List;
 
+import static org.mockito.ArgumentMatchers.eq;
+
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -41,14 +44,18 @@ import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 import org.mockito.junit.MockitoJUnitRunner;
+import com.auth0.jwt.JWT;
+import com.auth0.jwt.interfaces.DecodedJWT;
 import org.openbravo.base.exception.OBException;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.erpCommon.businessUtility.Preferences;
+import org.openbravo.erpCommon.utility.Utility;
 import org.openbravo.model.ad.access.Role;
 import org.openbravo.model.ad.access.RoleOrganization;
 import org.openbravo.model.ad.access.User;
 import org.openbravo.model.ad.access.UserRoles;
 import org.openbravo.model.ad.system.Client;
+import org.openbravo.model.ad.system.Language;
 import org.openbravo.model.common.enterprise.Organization;
 import org.openbravo.model.common.enterprise.Warehouse;
 
@@ -219,6 +226,112 @@ AuthUtilsGenerateTokenTest {
         String token = generateToken("session-456", 0L);
 
         assertNotNull("Token should not be null with null default warehouse", token);
+    }
+
+    /**
+     * Verifies that an organization with no warehouses at all does not fail token generation, and
+     * that the resulting token's {@code warehouse} claim is the {@code "0"} sentinel rather than
+     * omitted. {@code SecureWebServicesUtils#getWarehouse} throws in that case;
+     * {@code Utils#getWarehouse} must catch that specific error and fall back to {@code null}.
+     * The claim itself can't simply be omitted, though: every authenticated request (not only
+     * login) requires it to be present and non-empty (see
+     * {@code BaseSecureWebServiceServlet#doFilter}), so {@code "0"} is used instead - there is no
+     * real warehouse with that id, so {@code OBContext#initialize}'s warehouse lookup resolves it
+     * to {@code null} downstream, giving Classic's same tolerance for an empty warehouse without
+     * getting the token itself rejected on the next request.
+     */
+    @Test
+    public void testGenerateTokenToleratesOrganizationWithNoWarehouses() throws Exception {
+        lenient().when(authData.getWarehouse()).thenReturn(null);
+        lenient().when(user.getDefaultWarehouse()).thenReturn(null);
+
+        Language language = mock(Language.class);
+        lenient().when(language.getLanguage()).thenReturn("en_US");
+        lenient().when(obContext.getLanguage()).thenReturn(language);
+
+        // configureTokenGeneration() stubs getOrganizationWarehouses() with a non-empty list -
+        // re-stub it afterwards (last stub wins) so pickFallbackWarehouse actually hits the
+        // "no warehouses at all" branch this test is about.
+        configureTokenGeneration(0L);
+        swsUtilsMock.when(() -> SecureWebServicesUtils.getOrganizationWarehouses(any(Organization.class)))
+                .thenReturn(new ArrayList<>());
+
+        try (MockedStatic<Utility> utilityMock = mockStatic(Utility.class)) {
+            utilityMock.when(() -> Utility.messageBD(any(), eq("SMFSWS_OrgHasNoRole"), any()))
+                    .thenReturn("SMFSWS_OrgHasNoRole");
+
+            String token = Utils.generateToken(authData, "session-no-wh");
+
+            assertNotNull("Token should still be generated when the organization has no warehouses", token);
+            DecodedJWT decoded = JWT.decode(token);
+            assertEquals("warehouse claim should be the \"0\" sentinel, never omitted",
+                    "0", decoded.getClaim("warehouse").asString());
+        }
+    }
+
+    /**
+     * Regression test: a warehouse saved as the user's default while on a DIFFERENT role/org must
+     * not leak into a role switch to an organization that has no warehouses at all.
+     * {@code SecureWebServicesUtils#getWarehouse} returns its {@code defaultWarehouse} parameter
+     * unconditionally once the requested warehouse doesn't match the organization, with no
+     * validation of its own - {@code Utils#resolveWarehouseFallback} must discard a stale default
+     * before it ever reaches that parameter, so the "no warehouses" path (and its {@code "0"}
+     * sentinel) is still reached instead of returning the stale warehouse.
+     */
+    @Test
+    public void testGenerateTokenDoesNotLeakStaleDefaultWarehouseWhenOrgHasNone() throws Exception {
+        Warehouse staleDefaultWarehouse = mock(Warehouse.class);
+        lenient().when(staleDefaultWarehouse.getId()).thenReturn("STALE_WH_ID");
+        lenient().when(user.getDefaultWarehouse()).thenReturn(staleDefaultWarehouse);
+        lenient().when(authData.getWarehouse()).thenReturn(null);
+
+        Language language = mock(Language.class);
+        lenient().when(language.getLanguage()).thenReturn("en_US");
+        lenient().when(obContext.getLanguage()).thenReturn(language);
+
+        configureTokenGeneration(0L);
+        // The organization being switched to has no warehouses of its own - the stale default
+        // must not be found among them and must not leak through as a result.
+        swsUtilsMock.when(() -> SecureWebServicesUtils.getOrganizationWarehouses(any(Organization.class)))
+                .thenReturn(new ArrayList<>());
+
+        try (MockedStatic<Utility> utilityMock = mockStatic(Utility.class)) {
+            utilityMock.when(() -> Utility.messageBD(any(), eq("SMFSWS_OrgHasNoRole"), any()))
+                    .thenReturn("SMFSWS_OrgHasNoRole");
+
+            String token = Utils.generateToken(authData, "session-stale-default");
+
+            DecodedJWT decoded = JWT.decode(token);
+            assertEquals("a default warehouse from another organization must never leak through",
+                    "0", decoded.getClaim("warehouse").asString());
+        }
+    }
+
+    /**
+     * Regression test: when the organization being switched to DOES have its own warehouse, a
+     * stale default warehouse from another organization must not suppress it - the fallback
+     * should resolve to the organization's own warehouse, not to the {@code "0"} sentinel.
+     */
+    @Test
+    public void testGenerateTokenFallsBackToOrganizationsOwnWarehouseOverStaleDefault() throws Exception {
+        Warehouse staleDefaultWarehouse = mock(Warehouse.class);
+        lenient().when(staleDefaultWarehouse.getId()).thenReturn("STALE_WH_ID");
+        lenient().when(user.getDefaultWarehouse()).thenReturn(staleDefaultWarehouse);
+        lenient().when(authData.getWarehouse()).thenReturn(null);
+
+        lenient().when(warehouse.getClient()).thenReturn(client);
+
+        configureTokenGeneration(0L);
+        List<Warehouse> orgOwnWarehouses = new ArrayList<>();
+        orgOwnWarehouses.add(warehouse);
+        swsUtilsMock.when(() -> SecureWebServicesUtils.getOrganizationWarehouses(any(Organization.class)))
+                .thenReturn(orgOwnWarehouses);
+
+        String token = Utils.generateToken(authData, "session-org-has-wh");
+
+        DecodedJWT decoded = JWT.decode(token);
+        assertEquals("should fall back to the organization's own warehouse, not the stale default",
+                "WH_ID", decoded.getClaim("warehouse").asString());
     }
 
     /** Verifies that getRole wraps reflection errors in OBException. */
