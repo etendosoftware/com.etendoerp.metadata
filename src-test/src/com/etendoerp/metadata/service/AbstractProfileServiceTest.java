@@ -17,6 +17,7 @@
 
 package com.etendoerp.metadata.service;
 
+import static org.junit.Assert.fail;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
@@ -32,6 +33,8 @@ import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
+
+import com.etendoerp.metadata.exceptions.UnprocessableContentException;
 
 /**
  * Shared mocks and helpers for the JWT-issuing services' tests
@@ -88,5 +91,23 @@ public abstract class AbstractProfileServiceTest {
      */
     protected void setRequestBody(String body) throws Exception {
         when(mockRequest.getReader()).thenReturn(new BufferedReader(new StringReader(body)));
+    }
+
+    /**
+     * Asserts that invoking {@code service.process()} fails with
+     * {@link UnprocessableContentException}.
+     *
+     * @param service        the service under test
+     * @param failureMessage the message to report if the expected exception is not thrown
+     * @throws Exception if {@code process()} throws anything other than the expected exception
+     */
+    protected void assertProcessThrowsUnprocessable(MetadataService service, String failureMessage)
+            throws Exception {
+        try {
+            service.process();
+            fail(failureMessage);
+        } catch (UnprocessableContentException expected) {
+            // expected
+        }
     }
 }

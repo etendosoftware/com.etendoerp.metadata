@@ -127,12 +127,7 @@ public class ChangeProfileServiceTest extends AbstractProfileServiceTest {
         when(obDal.get(Role.class, "missing-role")).thenReturn(null);
 
         ChangeProfileService service = new ChangeProfileService(mockRequest, mockResponse);
-        try {
-            service.process();
-            fail("Expected UnprocessableContentException for an unresolvable role id");
-        } catch (UnprocessableContentException expected) {
-            // expected
-        }
+        assertProcessThrowsUnprocessable(service, "Expected UnprocessableContentException for an unresolvable role id");
     }
 
     /**
@@ -153,12 +148,8 @@ public class ChangeProfileServiceTest extends AbstractProfileServiceTest {
         when(obDal.get(Organization.class, "missing-org")).thenReturn(null);
 
         ChangeProfileService service = new ChangeProfileService(mockRequest, mockResponse);
-        try {
-            service.process();
-            fail("Expected UnprocessableContentException for an unresolvable organization id");
-        } catch (UnprocessableContentException expected) {
-            // expected
-        }
+        assertProcessThrowsUnprocessable(service,
+                "Expected UnprocessableContentException for an unresolvable organization id");
     }
 
     /**
@@ -179,11 +170,7 @@ public class ChangeProfileServiceTest extends AbstractProfileServiceTest {
         when(obDal.get(Warehouse.class, "missing-wh")).thenReturn(null);
 
         ChangeProfileService service = new ChangeProfileService(mockRequest, mockResponse);
-        try {
-            service.process();
-            fail("Expected UnprocessableContentException for an unresolvable warehouse id");
-        } catch (UnprocessableContentException expected) {
-            // expected
-        }
+        assertProcessThrowsUnprocessable(service,
+                "Expected UnprocessableContentException for an unresolvable warehouse id");
     }
 }

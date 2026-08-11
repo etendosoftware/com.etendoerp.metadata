@@ -51,8 +51,8 @@ import com.etendoerp.metadata.exceptions.UnprocessableContentException;
  */
 @RunWith(MockitoJUnitRunner.Silent.class)
 public class LoginServiceTest extends AbstractProfileServiceTest {
-    private static final String USERNAME = "lorena";
-    private static final String PASSWORD = "tecnicia";
+    private static final String USERNAME = "test-user";
+    private static final String PASSWORD = "test-password"; // NOSONAR - fake value, only used to stub a mocked PasswordHash call
 
     private MockedStatic<PasswordHash> passwordHashMock;
 
@@ -102,12 +102,7 @@ public class LoginServiceTest extends AbstractProfileServiceTest {
         setRequestBody("{}");
 
         LoginService service = new LoginService(mockRequest, mockResponse);
-        try {
-            service.process();
-            fail("Expected UnprocessableContentException");
-        } catch (UnprocessableContentException expected) {
-            // expected
-        }
+        assertProcessThrowsUnprocessable(service, "Expected UnprocessableContentException");
     }
 
     /**
@@ -118,7 +113,7 @@ public class LoginServiceTest extends AbstractProfileServiceTest {
     @Test
     public void testProcessInvalidCredentialsThrowsUnauthorized() throws Exception {
         when(mockRequest.getMethod()).thenReturn("POST");
-        setRequestBody("{\"username\":\"lorena\",\"password\":\"wrong\"}");
+        setRequestBody("{\"username\":\"test-user\",\"password\":\"wrong\"}");
 
         passwordHashMock.when(() -> PasswordHash.getUserWithPassword(USERNAME, "wrong"))
                 .thenReturn(Optional.empty());
@@ -140,7 +135,7 @@ public class LoginServiceTest extends AbstractProfileServiceTest {
     @Test
     public void testProcessHappyPathUsesDefaultRoleWhenNotSpecified() throws Exception {
         when(mockRequest.getMethod()).thenReturn("POST");
-        setRequestBody("{\"username\":\"lorena\",\"password\":\"tecnicia\"}");
+        setRequestBody("{\"username\":\"test-user\",\"password\":\"test-password\"}");
 
         StringWriter stringWriter = new StringWriter();
         when(mockResponse.getWriter()).thenReturn(new PrintWriter(stringWriter));
@@ -174,7 +169,7 @@ public class LoginServiceTest extends AbstractProfileServiceTest {
     @Test
     public void testProcessNoRoleAvailableThrowsUnprocessable() throws Exception {
         when(mockRequest.getMethod()).thenReturn("POST");
-        setRequestBody("{\"username\":\"lorena\",\"password\":\"tecnicia\"}");
+        setRequestBody("{\"username\":\"test-user\",\"password\":\"test-password\"}");
 
         User mockUser = mock(User.class);
         when(mockUser.getDefaultRole()).thenReturn(null);
@@ -183,12 +178,7 @@ public class LoginServiceTest extends AbstractProfileServiceTest {
                 .thenReturn(Optional.of(mockUser));
 
         LoginService service = new LoginService(mockRequest, mockResponse);
-        try {
-            service.process();
-            fail("Expected UnprocessableContentException when no role can be resolved");
-        } catch (UnprocessableContentException expected) {
-            // expected
-        }
+        assertProcessThrowsUnprocessable(service, "Expected UnprocessableContentException when no role can be resolved");
     }
 
     /**
@@ -199,7 +189,7 @@ public class LoginServiceTest extends AbstractProfileServiceTest {
     @Test
     public void testProcessInvalidOrganizationThrowsUnprocessable() throws Exception {
         when(mockRequest.getMethod()).thenReturn("POST");
-        setRequestBody("{\"username\":\"lorena\",\"password\":\"tecnicia\",\"role\":\"role-1\",\"organization\":\"missing-org\"}");
+        setRequestBody("{\"username\":\"test-user\",\"password\":\"test-password\",\"role\":\"role-1\",\"organization\":\"missing-org\"}");
 
         User mockUser = mock(User.class);
         Role role = mock(Role.class);
@@ -211,12 +201,8 @@ public class LoginServiceTest extends AbstractProfileServiceTest {
         when(obDal.get(Organization.class, "missing-org")).thenReturn(null);
 
         LoginService service = new LoginService(mockRequest, mockResponse);
-        try {
-            service.process();
-            fail("Expected UnprocessableContentException for an unresolvable organization id");
-        } catch (UnprocessableContentException expected) {
-            // expected
-        }
+        assertProcessThrowsUnprocessable(service,
+                "Expected UnprocessableContentException for an unresolvable organization id");
     }
 
     /**
@@ -227,7 +213,7 @@ public class LoginServiceTest extends AbstractProfileServiceTest {
     @Test
     public void testProcessInvalidWarehouseThrowsUnprocessable() throws Exception {
         when(mockRequest.getMethod()).thenReturn("POST");
-        setRequestBody("{\"username\":\"lorena\",\"password\":\"tecnicia\",\"role\":\"role-1\",\"warehouse\":\"missing-wh\"}");
+        setRequestBody("{\"username\":\"test-user\",\"password\":\"test-password\",\"role\":\"role-1\",\"warehouse\":\"missing-wh\"}");
 
         User mockUser = mock(User.class);
         Role role = mock(Role.class);
@@ -239,11 +225,7 @@ public class LoginServiceTest extends AbstractProfileServiceTest {
         when(obDal.get(Warehouse.class, "missing-wh")).thenReturn(null);
 
         LoginService service = new LoginService(mockRequest, mockResponse);
-        try {
-            service.process();
-            fail("Expected UnprocessableContentException for an unresolvable warehouse id");
-        } catch (UnprocessableContentException expected) {
-            // expected
-        }
+        assertProcessThrowsUnprocessable(service,
+                "Expected UnprocessableContentException for an unresolvable warehouse id");
     }
 }
