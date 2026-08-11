@@ -78,8 +78,8 @@ public class ChangeProfileService extends MetadataService {
             User user = OBDal.getInstance().get(User.class, OBContext.getOBContext().getUser().getId());
 
             Role role = resolveRole(body);
-            Organization organization = resolveOrganization(body);
-            Warehouse warehouse = resolveWarehouse(body);
+            Organization organization = ProfileRequestUtils.resolveOrganization(body, ORGANIZATION);
+            Warehouse warehouse = ProfileRequestUtils.resolveWarehouse(body, WAREHOUSE);
             Client client = role.getClient();
 
             AuthData authData = new AuthData(user, role, organization, warehouse, client);
@@ -97,7 +97,7 @@ public class ChangeProfileService extends MetadataService {
     }
 
     private Role resolveRole(JSONObject body) {
-        String roleId = getStringOrNull(body, ROLE);
+        String roleId = ProfileRequestUtils.getStringOrNull(body, ROLE);
         String id = roleId != null ? roleId : OBContext.getOBContext().getRole().getId();
         Role role = OBDal.getInstance().get(Role.class, id);
 
@@ -106,46 +106,5 @@ public class ChangeProfileService extends MetadataService {
         }
 
         return role;
-    }
-
-    private Organization resolveOrganization(JSONObject body) {
-        String organizationId = getStringOrNull(body, ORGANIZATION);
-        if (organizationId == null) {
-            return null;
-        }
-
-        Organization organization = OBDal.getInstance().get(Organization.class, organizationId);
-        if (organization == null) {
-            throw new UnprocessableContentException("Invalid organization: " + organizationId);
-        }
-
-        return organization;
-    }
-
-    private Warehouse resolveWarehouse(JSONObject body) {
-        String warehouseId = getStringOrNull(body, WAREHOUSE);
-        if (warehouseId == null) {
-            return null;
-        }
-
-        Warehouse warehouse = OBDal.getInstance().get(Warehouse.class, warehouseId);
-        if (warehouse == null) {
-            throw new UnprocessableContentException("Invalid warehouse: " + warehouseId);
-        }
-
-        return warehouse;
-    }
-
-    private String getStringOrNull(JSONObject body, String key) {
-        if (!body.has(key) || body.isNull(key)) {
-            return null;
-        }
-
-        try {
-            String value = body.getString(key);
-            return value.isEmpty() ? null : value;
-        } catch (Exception e) {
-            return null;
-        }
     }
 }

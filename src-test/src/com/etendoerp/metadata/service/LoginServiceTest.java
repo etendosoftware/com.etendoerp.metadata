@@ -23,25 +23,17 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
-import java.io.BufferedReader;
 import java.io.PrintWriter;
-import java.io.StringReader;
 import java.io.StringWriter;
 import java.util.Optional;
-
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.MockitoJUnitRunner;
 import org.openbravo.authentication.hashing.PasswordHash;
-import org.openbravo.dal.core.OBContext;
-import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.access.Role;
 import org.openbravo.model.ad.access.User;
 import org.openbravo.model.ad.system.Client;
@@ -58,54 +50,27 @@ import com.etendoerp.metadata.exceptions.UnprocessableContentException;
  * Test class for LoginService.
  */
 @RunWith(MockitoJUnitRunner.Silent.class)
-public class LoginServiceTest {
+public class LoginServiceTest extends AbstractProfileServiceTest {
     private static final String USERNAME = "lorena";
     private static final String PASSWORD = "tecnicia";
 
-    @Mock
-    private HttpServletRequest mockRequest;
-
-    @Mock
-    private HttpServletResponse mockResponse;
-
-    @Mock
-    private OBContext obContext;
-
-    @Mock
-    private OBDal obDal;
-
-    private MockedStatic<OBContext> obContextMock;
-    private MockedStatic<OBDal> obDalMock;
     private MockedStatic<PasswordHash> passwordHashMock;
-    private MockedStatic<Utils> authUtilsMock;
 
     /**
-     * Initializes the static mocks shared by every test.
+     * Initializes the {@code PasswordHash} static mock, on top of the shared mocks from
+     * {@link AbstractProfileServiceTest}.
      */
     @Before
-    public void setUp() {
-        obContextMock = mockStatic(OBContext.class);
-        obDalMock = mockStatic(OBDal.class);
+    public void setUpPasswordHashMock() {
         passwordHashMock = mockStatic(PasswordHash.class);
-        authUtilsMock = mockStatic(Utils.class);
-
-        obContextMock.when(OBContext::getOBContext).thenReturn(obContext);
-        obDalMock.when(OBDal::getInstance).thenReturn(obDal);
     }
 
     /**
-     * Releases the static mocks opened in {@link #setUp()}.
+     * Releases the static mock opened in {@link #setUpPasswordHashMock()}.
      */
     @After
-    public void tearDown() {
-        authUtilsMock.close();
+    public void tearDownPasswordHashMock() {
         passwordHashMock.close();
-        obDalMock.close();
-        obContextMock.close();
-    }
-
-    private void setRequestBody(String body) throws Exception {
-        when(mockRequest.getReader()).thenReturn(new BufferedReader(new StringReader(body)));
     }
 
     /**

@@ -20,26 +20,16 @@ package com.etendoerp.metadata.service;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
-import java.io.BufferedReader;
 import java.io.PrintWriter;
-import java.io.StringReader;
 import java.io.StringWriter;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
-import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
-import org.mockito.MockedStatic;
 import org.mockito.junit.MockitoJUnitRunner;
-import org.openbravo.dal.core.OBContext;
-import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.access.Role;
 import org.openbravo.model.ad.access.User;
 import org.openbravo.model.ad.system.Client;
@@ -53,57 +43,20 @@ import com.etendoerp.metadata.exceptions.UnprocessableContentException;
  * Test class for ChangeProfileService.
  */
 @RunWith(MockitoJUnitRunner.Silent.class)
-public class ChangeProfileServiceTest {
+public class ChangeProfileServiceTest extends AbstractProfileServiceTest {
     private static final String USER_ID = "user-1";
     private static final String ROLE_ID = "role-1";
 
     @Mock
-    private HttpServletRequest mockRequest;
-
-    @Mock
-    private HttpServletResponse mockResponse;
-
-    @Mock
-    private OBContext obContext;
-
-    @Mock
-    private OBDal obDal;
-
-    @Mock
     private User contextUser;
 
-    private MockedStatic<OBContext> obContextMock;
-    private MockedStatic<OBDal> obDalMock;
-    private MockedStatic<com.etendoerp.metadata.auth.Utils> authUtilsMock;
-
     /**
-     * Initializes the static mocks shared by every test.
+     * Stubs the current context's user, on top of the shared mocks from {@link AbstractProfileServiceTest}.
      */
     @Before
-    public void setUp() {
-        obContextMock = mockStatic(OBContext.class);
-        obDalMock = mockStatic(OBDal.class);
-        authUtilsMock = mockStatic(com.etendoerp.metadata.auth.Utils.class);
-
-        obContextMock.when(OBContext::getOBContext).thenReturn(obContext);
+    public void setUpContextUser() {
         when(contextUser.getId()).thenReturn(USER_ID);
         when(obContext.getUser()).thenReturn(contextUser);
-
-        obDalMock.when(OBDal::getInstance).thenReturn(obDal);
-    }
-
-    /**
-     * Releases the static mocks opened in {@link #setUp()}.
-     */
-    @After
-    public void tearDown() {
-        authUtilsMock.close();
-        obDalMock.close();
-        obContextMock.close();
-    }
-
-    private void setRequestBody(String body) throws Exception {
-        when(mockRequest.getReader()).thenReturn(new BufferedReader(new StringReader(body)));
     }
 
     /**
