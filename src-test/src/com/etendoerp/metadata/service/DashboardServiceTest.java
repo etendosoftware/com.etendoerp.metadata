@@ -25,21 +25,40 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.MockedConstruction;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.openbravo.model.ad.access.Role;
+import org.openbravo.model.ad.system.Client;
+import org.openbravo.model.ad.access.User;
 
+import java.io.BufferedReader;
+import java.io.StringReader;
+
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.etendoerp.metadata.exceptions.InternalServerException;
+import com.etendoerp.metadata.exceptions.UnauthorizedException;
 import com.etendoerp.metadata.widgets.DashboardLayoutResolver;
 
 @ExtendWith(MockitoExtension.class)
 class DashboardServiceTest extends AbstractMockedContextTest {
 
+    private static final String RESTRICTED_CLASS_ID = "class-a";
+    private static final String OTHER_ROLE_ID = "role-y";
+
     @Mock Query<Object[]> enrichQuery;
+    @Mock Role role;
+    @Mock User user;
+    @Mock Client client;
 
     @Test
     void getLayoutReturnsWidgetArray() throws Exception {
@@ -63,5 +82,48 @@ class DashboardServiceTest extends AbstractMockedContextTest {
                 assertTrue(responseCapture.toString().contains("id1"));
             });
         }
+    }
+
+    @Test
+    void handlePostWidgetRejectsRestrictedTypeForOtherRole() throws Exception {
+        when(request.getMethod()).thenReturn("POST");
+        when(request.getPathInfo()).thenReturn("/dashboard/widget");
+        when(request.getReader()).thenReturn(new BufferedReader(
+                new StringReader("{\"widgetClassId\":\"" + RESTRICTED_CLASS_ID + "\"}")));
+
+        when(obContext.getRole()).thenReturn(role);
+        when(role.getId()).thenReturn(OTHER_ROLE_ID);
+        when(role.isClientAdmin()).thenReturn(false);
+        when(obContext.getUser()).thenReturn(user);
+        when(user.getId()).thenReturn("user-1");
+        when(obContext.getCurrentClient()).thenReturn(client);
+        when(client.getId()).thenReturn("client-1");
+
+        // Class A has access rows (restricted) but none for OTHER_ROLE_ID (not granted)
+        Query<Long> restrictedCountQuery = mock();
+        when(restrictedCountQuery.setParameter(anyString(), any())).thenReturn(restrictedCountQuery);
+        when(restrictedCountQuery.uniqueResult()).thenReturn(1L);
+
+        Query<Long> grantedCountQuery = mock();
+        when(grantedCountQuery.setParameter(anyString(), any())).thenReturn(grantedCountQuery);
+        when(grantedCountQuery.uniqueResult()).thenReturn(0L);
+
+        when(session.createQuery(
+                argThat(s -> s != null && s.contains("etmeta_Widget_Class_Access") && !s.contains("a.role.id")),
+                eq(Long.class)))
+                .thenReturn(restrictedCountQuery);
+        when(session.createQuery(
+                argThat(s -> s != null && s.contains("etmeta_Widget_Class_Access") && s.contains("a.role.id")),
+                eq(Long.class)))
+                .thenReturn(grantedCountQuery);
+
+        runWithMockedContext(() -> {
+            DashboardService svc = new DashboardService(request, response);
+            InternalServerException ex = assertThrows(InternalServerException.class, svc::process);
+            assertInstanceOf(UnauthorizedException.class, ex.getCause());
+        });
+
+        verify(session, never()).createQuery(
+                argThat(s -> s != null && s.contains("delete from etmeta_Dashboard_Widget")));
     }
 }
