@@ -58,19 +58,25 @@ Table columns (mirror `ETMETA_WIDGET_CLASS.xml`): standard AD audit set + two FK
 
 Add a unique constraint on `(ETMETA_WIDGET_CLASS_ID, AD_ROLE_ID)` so a role can't be granted twice.
 
-- [ ] **Step 1: Create the table + columns via the AD webhook**
+- [x] **Step 1: Create the table + columns via the AD webhook**
 
 Use `/etendo:alter-db` to create table `ETMETA_WIDGET_CLASS_ACCESS` with the columns above (DB prefix `ETMETA`, data package `com.etendoerp.metadata.data`). Let the tool generate the model XML and AD_TABLE/AD_COLUMN/AD_ELEMENT sourcedata + UUIDs — do NOT hand-write UUIDs.
 
-- [ ] **Step 2: Add the "Access" child tab to the Widget Class window**
+> Note: `com.etendoerp.copilot.devassistant` (the webhooks module) is not installed in this environment. Done via direct SQL instead (get_uuid(), mirroring ETMETA_WIDGET_CLASS's exact AD_COLUMN/AD_ELEMENT conventions), then synced to XML with `export.database`.
+
+- [x] **Step 2: Add the "Access" child tab to the Widget Class window**
 
 Use `/etendo:window` to add a child tab **Access** (tab level 1) under the existing Widget Class window, based on `ETMETA_WIDGET_CLASS_ACCESS`, with the **Role** field shown (the widget class is the parent key). This gives admins the classic-equivalent config UI.
 
-- [ ] **Step 3: Generate the entity and verify it compiles**
+> Also done via SQL fallback (AD_TAB + AD_FIELD), same reason as Step 1.
+
+- [x] **Step 3: Generate the entity and verify it compiles**
 
 Run: `../../gradlew generate.entities` (from the Etendo root), then `./gradlew compileJava` in the module.
 Expected: entity `com.etendoerp.metadata.data.WidgetClassAccess` generated with `getWidgetClass()`, `getRole()`, `isActive()`; build SUCCESS.
 Note: generated entities land at the **Etendo-root** `src-gen/com/etendoerp/metadata/data/` (regenerated, not committed per-module), NOT the module's `src/com/etendoerp/metadata/data/` (hand-written helpers only). Don't look for the entity under the module `src`.
+
+> Confirmed: `getWidgetClass()` returns `WidgetClass`, `getRole()` returns `Role`. Both `generate.entities` and `compileJava` BUILD SUCCESSFUL. `export.database` run afterward to sync AD changes into `src-db/database/model` and `sourcedata` XML (not yet committed — see Step 4).
 
 - [ ] **Step 4: Commit**
 
@@ -87,35 +93,15 @@ git commit -m "feat: add ETMETA_WIDGET_CLASS_ACCESS table and admin tab"
 - Modify: `src/com/etendoerp/metadata/service/WidgetClassesService.java:39` (CLASS_HQL), `process()`
 - Test: `src-test/src/com/etendoerp/metadata/service/WidgetClassesServiceTest.java`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
-Add integration tests that seed two widget classes (A restricted to ROLE_X, B with no access rows) and assert catalog contents per role:
+> Adapted to this codebase's actual test style: there is no integration-test / real-DB harness here (all `src-test` tests are Mockito unit tests mocking `Session`/`Query`/`OBContext`; `session.createQuery(...)` returns whatever list you hand it regardless of the HQL text, so a mocked test cannot literally exercise per-role DB filtering). Instead, `WidgetClassesServiceTest.catalogQueryIncludesRoleAccessFilter` asserts the CLASS_HQL sent to `createQuery` contains the `etmeta_Widget_Class_Access` correlated-subquery and a `:roleId` placeholder, and that `query.setParameter("roleId", ...)` is called with the current role's id. The existing `getClassesReturnsClassesArray` test was updated to stub `obContext.getRole()` since `process()` now needs it.
 
-```java
-@Test
-public void catalog_hidesRestrictedTypeForOtherRole() throws Exception {
-    // GIVEN: class A has an access row for ROLE_X only; class B has none
-    // WHEN: running the catalog as ROLE_Y
-    JSONArray classes = runCatalogAsRole(ROLE_Y_ID);
-    // THEN: B present (default visible), A absent (restricted)
-    assertTrue(containsClass(classes, CLASS_B_ID));
-    assertFalse(containsClass(classes, CLASS_A_ID));
-}
+- [x] **Step 2: Run to verify they fail**
 
-@Test
-public void catalog_showsRestrictedTypeForGrantedRole() throws Exception {
-    JSONArray classes = runCatalogAsRole(ROLE_X_ID);
-    assertTrue(containsClass(classes, CLASS_A_ID)); // granted
-    assertTrue(containsClass(classes, CLASS_B_ID)); // default visible
-}
-```
+> Could not actually run `./gradlew test` — discovered a pre-existing, unrelated environment issue: this module's `build.gradle` never wired `src-test/src` as a JUnit source set (`compileTestJava` reports `NO-SOURCE`), and CI only runs SonarQube, never `./gradlew test`, so this gap was never caught. Tried adding the missing `sourceSets.test.java.srcDirs("src-test/src")` — that fixed source discovery but then hit ~100 compile errors from missing test dependencies (JUnit/Mockito/Hibernate/Openbravo DAL never wired into the test classpath either, despite `com.etendoerp.testing.gradleplugin` being applied at root and appearing (from decompiled bytecode) to intend to do this automatically). Reverted the build.gradle change per your call to not go down that hole now. Verified the new test fails against the *old* production code by manual trace instead: with the old `CLASS_HQL` (no access clause), `hql.contains("etmeta_Widget_Class_Access")` is false → assertion would fail.
 
-- [ ] **Step 2: Run to verify they fail**
-
-Run: `./gradlew test --tests '*WidgetClassesServiceTest'`
-Expected: FAIL — restricted class A still returned for ROLE_Y.
-
-- [ ] **Step 3: Add the access filter to CLASS_HQL**
+- [x] **Step 3: Add the access filter to CLASS_HQL**
 
 Insert the shared rule into `CLASS_HQL` (alias `wc`) and bind `:roleId` from the session role:
 
@@ -139,10 +125,9 @@ Query<Object[]> q = OBDal.getInstance().getSession().createQuery(CLASS_HQL, Obje
 q.setParameter("roleId", roleId);
 ```
 
-- [ ] **Step 4: Run to verify they pass**
+- [x] **Step 4: Run to verify they pass**
 
-Run: `./gradlew test --tests '*WidgetClassesServiceTest'`
-Expected: PASS.
+> Same limitation as Step 2 — verified by manual trace against the new production code rather than an actual test run: `hql` now contains `etmeta_Widget_Class_Access` and `:roleId`, and `q.setParameter("roleId", roleId)` runs unconditionally, so both new assertions and the existing regression test hold. Actual `./gradlew test` execution is still blocked by the pre-existing harness gap — flagged for a separate fix outside this plan's scope.
 
 - [ ] **Step 5: Commit**
 
@@ -159,26 +144,15 @@ git commit -m "feat: filter widget catalog by role access"
 - Modify: `src/com/etendoerp/metadata/widgets/DashboardLayoutResolver.java:55` (HQL), `resolve()`
 - Test: `src-test/src/com/etendoerp/metadata/widgets/DashboardLayoutResolverTest.java` (create)
 
-- [ ] **Step 1: Write failing test**
+- [x] **Step 1: Write failing test**
 
-Seed a SYSTEM layout row for a restricted class A (restricted to ROLE_X) and one for unrestricted class B; resolve as ROLE_Y:
+> Adapted like Task 2 — this test file already existed (Mockito-mocked `Session`/`Query`, not a real DB). Added `resolveQueryIncludesRoleAccessFilter`, asserting the HQL sent to `createQuery` contains the `etmeta_Widget_Class_Access` correlated subquery correlated on `dw.widgetClass`. Role/user/client mocking (`setupContextMocks()`) already existed in this file from before.
 
-```java
-@Test
-public void layout_omitsDisallowedTypesForRole() throws Exception {
-    // GIVEN: SYSTEM widgets for class A (restricted to ROLE_X) and class B (unrestricted)
-    JSONArray widgets = resolveAsRole(ROLE_Y_ID);
-    assertFalse(containsClass(widgets, CLASS_A_ID)); // restricted → omitted
-    assertTrue(containsClass(widgets, CLASS_B_ID));  // default visible
-}
-```
+- [x] **Step 2: Run to verify it fails**
 
-- [ ] **Step 2: Run to verify it fails**
+> Same `./gradlew test` harness gap as Task 2 (not re-litigated here). Verified by manual trace: against the old HQL, `hql.contains("etmeta_Widget_Class_Access")` is false → assertion would fail.
 
-Run: `./gradlew test --tests '*DashboardLayoutResolverTest'`
-Expected: FAIL — class A widget still resolved for ROLE_Y.
-
-- [ ] **Step 3: Add the access filter to HQL**
+- [x] **Step 3: Add the access filter to HQL**
 
 `:roleId` is already bound in `resolve()`. Append the shared rule (path `dw.widgetClass`) to the WHERE clause, before `order by`:
 
@@ -191,10 +165,9 @@ Expected: FAIL — class A widget still resolved for ROLE_Y.
 
 (No new `setParameter` needed — `:roleId` is already set.)
 
-- [ ] **Step 4: Run to verify it passes**
+- [x] **Step 4: Run to verify it passes**
 
-Run: `./gradlew test --tests '*DashboardLayoutResolverTest'`
-Expected: PASS.
+> Manual trace again (same harness gap): new HQL contains `etmeta_Widget_Class_Access` and correlates on `dw.widgetClass`; `:roleId` was already bound in `resolve()` before this change, so no new `setParameter` was needed, matching the plan's note.
 
 - [ ] **Step 5: Commit**
 
@@ -212,23 +185,15 @@ git commit -m "feat: omit role-restricted widget types from resolved layout"
 - Modify: `src/com/etendoerp/metadata/service/DashboardService.java:246` (`handlePostWidget`)
 - Test: `src-test/src/com/etendoerp/metadata/service/DashboardServiceTest.java` (add case)
 
-- [ ] **Step 1: Write failing test**
+- [x] **Step 1: Write failing test**
 
-```java
-@Test
-public void post_rejectsRestrictedTypeForOtherRole() throws Exception {
-    // GIVEN: class A restricted to ROLE_X; session role = ROLE_Y
-    // WHEN: POST /dashboard/widget with widgetClassId = A
-    // THEN: 403 (or error status), no ETMETA_DASHBOARD_WIDGET row inserted
-}
-```
+> Adapted to the Mockito-mocked harness: `DashboardServiceTest.handlePostWidgetRejectsRestrictedTypeForOtherRole` mocks both `WidgetClassAccessRule.isAllowed` HQL count queries (restricted=1, granted-to-this-role=0) so the rule evaluates to "not allowed", then asserts `svc.process()` throws and no delete/insert mutation query is issued.
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
-Run: `./gradlew test --tests '*DashboardServiceTest'`
-Expected: FAIL — widget inserted for a disallowed class.
+> Same `./gradlew test` harness gap as prior tasks. This one genuinely couldn't even compile-fail meaningfully before the fix, since `WidgetClassAccessRule` didn't exist yet — verified by trace that without the guard, `handlePostWidget` would proceed straight to the delete/insert queries regardless of access rows.
 
-- [ ] **Step 3: Create the shared helper**
+- [x] **Step 3: Create the shared helper**
 
 ```java
 package com.etendoerp.metadata.widgets;
@@ -256,7 +221,7 @@ public final class WidgetClassAccessRule {
 }
 ```
 
-- [ ] **Step 4: Enforce it at the top of `handlePostWidget`**
+- [x] **Step 4: Enforce it at the top of `handlePostWidget`**
 
 After reading `classId` and `roleId` (lines ~248-251), before any DB mutation:
 
@@ -268,10 +233,11 @@ if (!WidgetClassAccessRule.isAllowed(classId, roleId)) {
 
 Use the module's existing exception type for 4xx (check `com.etendoerp.metadata.exceptions`; if no 403 type exists, reuse the closest client-error exception rather than a generic 500).
 
-- [ ] **Step 5: Run to verify it passes**
+> Used `UnauthorizedException` (maps to HTTP 401 via `Utils.buildExceptionMap()`) — no 403 type exists in this module. Note: `DashboardService.process()` wraps every exception from its dispatch methods into `InternalServerException(e.getMessage(), e)`, preserving the original as `getCause()`; `MetadataServlet.handleException()` unwraps via `getRootCause(t)` before status-code lookup, so the correct 401 still reaches the client — verified by reading that code path, not by running it.
 
-Run: `./gradlew test --tests '*DashboardServiceTest'`
-Expected: PASS — POST rejected, no row inserted.
+- [x] **Step 5: Run to verify it passes**
+
+> Manual trace (same harness gap): with the guard in place, `isAllowed("class-a", "role-y")` returns `false` (restricted=1, granted=0) → `UnauthorizedException` thrown → wrapped as `InternalServerException` with that cause → test's `assertThrows`/`assertInstanceOf` hold, and the delete/insert queries are never reached.
 
 - [ ] **Step 6: Commit**
 
@@ -299,15 +265,21 @@ public void layout_defaultVisibleWhenNoAccessRows() throws Exception {
 }
 ```
 
+- [x] Added `resolveDefaultVisibleWhenNoAccessRows` to `DashboardLayoutResolverTest`: asserts the resolved row for an unrestricted class survives, and that the layout HQL contains the `not exists (...)` opt-out branch. Same mocked-`Query` harness limitation as elsewhere (the mock returns whatever rows it's told regardless of role, so the row-survives half is trivially true here — the HQL-content assertion is what actually pins the safe-default guarantee).
+
 - [ ] **Step 2: Run the whole widget/dashboard suite**
 
 Run: `./gradlew test --tests '*Widget*' --tests '*Dashboard*'`
 Expected: PASS.
 
+> Blocked by the pre-existing `./gradlew test` harness gap documented in Task 2 Step 2 (missing `src-test` sourceSet wiring + missing test dependencies in this module's `build.gradle` / the `com.etendoerp.testing.gradleplugin` convention). Not fixed as part of this plan — flagged separately.
+
 - [ ] **Step 3: Full module build**
 
 Run: `./gradlew compileJava test`
 Expected: BUILD SUCCESSFUL.
+
+> `compileJava` verified BUILD SUCCESSFUL after every task in this plan (Tasks 1-4). `test` is blocked by the same gap as Step 2.
 
 - [ ] **Step 4: Commit**
 
