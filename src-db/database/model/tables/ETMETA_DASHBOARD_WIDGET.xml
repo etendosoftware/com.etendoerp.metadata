@@ -81,11 +81,11 @@
         <default><![CDATA[0]]></default>
         <onCreateDefault><![CDATA['0']]></onCreateDefault>
       </column>
-      <foreign-key foreignTable="AD_MODULE" name="ETMETA_DWG_AD_MODULE">
-        <reference local="AD_MODULE_ID" foreign="AD_MODULE_ID"/>
-      </foreign-key>
       <foreign-key foreignTable="AD_CLIENT" name="ETMETA_DWG_AD_CLIENT">
         <reference local="AD_CLIENT_ID" foreign="AD_CLIENT_ID"/>
+      </foreign-key>
+      <foreign-key foreignTable="AD_MODULE" name="ETMETA_DWG_AD_MODULE">
+        <reference local="AD_MODULE_ID" foreign="AD_MODULE_ID"/>
       </foreign-key>
       <foreign-key foreignTable="AD_ORG" name="ETMETA_DWG_AD_ORG">
         <reference local="AD_ORG_ID" foreign="AD_ORG_ID"/>
