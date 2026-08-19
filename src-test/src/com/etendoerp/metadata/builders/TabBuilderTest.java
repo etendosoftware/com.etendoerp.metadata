@@ -556,6 +556,64 @@ class TabBuilderTest extends TabBuilderTestBase {
     }
 
     /**
+     * Tests that a null answer from ApplicationUtils is normalized to an empty string.
+     * <p>
+     * The classic helper returns null for a tab whose parent link cannot be determined, and
+     * {@code parentProperty} is a key clients read unconditionally: publishing a JSON null there
+     * would make them fall back to guessing a column, which is the bug the key exists to prevent.
+     *
+     * @throws Exception if the mocked builder run fails
+     */
+    @Test
+    void parentPropertyIsEmptyWhenApplicationUtilsAnswersNull() throws Exception {
+        TestContext ctx = setupTestContext();
+        Tab mockParentTab = mock(Tab.class);
+
+        setupBasicMocks(ctx.context, ctx.language, ctx.tab, ctx.table, ctx.kernelUtils, List.of());
+        when(ctx.tab.getTabLevel()).thenReturn(1L);
+        when(ctx.kernelUtils.getParentTab(ctx.tab)).thenReturn(mockParentTab);
+
+        try (MockedStatic<ApplicationUtils> mockedAppUtils = mockStatic(ApplicationUtils.class)) {
+            mockedAppUtils.when(() -> ApplicationUtils.getParentProperty(ctx.tab, mockParentTab))
+                    .thenReturn(null);
+
+            executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), result -> {
+                try {
+                    assertEquals("", result.getString(PARENT_PROPERTY_KEY));
+                    assertEquals(0, result.getJSONArray(PARENT_COLUMN_KEY).length());
+                } catch (JSONException e) {
+                    fail(JSON_EXCEPTION + ": " + e.getMessage());
+                }
+            });
+        }
+    }
+
+    /**
+     * Tests that a level-zero tab reports an empty parentProperty even when KernelUtils hands back
+     * a parent tab, without consulting ApplicationUtils at all: a header tab has no parent to link
+     * to, so its own tab level is the authority.
+     *
+     * @throws Exception if the mocked builder run fails
+     */
+    @Test
+    void parentPropertyIsEmptyForLevelZeroEvenWithAParentTab() throws Exception {
+        TestContext ctx = setupTestContext();
+        Tab mockParentTab = mock(Tab.class);
+
+        setupBasicMocks(ctx.context, ctx.language, ctx.tab, ctx.table, ctx.kernelUtils, List.of());
+        when(ctx.kernelUtils.getParentTab(ctx.tab)).thenReturn(mockParentTab);
+
+        executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), result -> {
+            try {
+                assertEquals("", result.getString(PARENT_PROPERTY_KEY));
+                assertEquals(0, result.getJSONArray(PARENT_COLUMN_KEY).length());
+            } catch (JSONException e) {
+                fail(JSON_EXCEPTION + ": " + e.getMessage());
+            }
+        });
+    }
+
+    /**
      * Tests that parentColumns falls back to link to parent columns when no parent
      * property is found.
      */

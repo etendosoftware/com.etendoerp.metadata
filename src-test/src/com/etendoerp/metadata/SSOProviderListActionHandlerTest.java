@@ -19,14 +19,22 @@ package com.etendoerp.metadata;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.function.Consumer;
+
+import javax.servlet.ServletException;
 
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
@@ -34,16 +42,21 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
+import org.openbravo.erpCommon.utility.SystemInfo;
 
 import com.etendoerp.etendorx.data.ETRXoAuthProvider;
+import com.sun.net.httpserver.HttpServer;
 
 /**
  * Tests for {@link SSOProviderListActionHandler}.
  * <p>
- * The outbound HTTP call is replaced by overriding
- * {@link SSOProviderListActionHandler#fetchAvailableProviders(String)}, so every path is exercised
- * without network access.
+ * The request paths replace the outbound call by overriding
+ * {@link SSOProviderListActionHandler#fetchAvailableProviders(String)}, so every branch of
+ * {@code execute} is exercised without network access. That method has its own two tests, which
+ * answer it from a throw-away HTTP server bound to the loopback address — it is the only way to
+ * cover the connection handling, and it still contacts nothing outside the machine.
  */
 @ExtendWith(MockitoExtension.class)
 class SSOProviderListActionHandlerTest {
@@ -255,5 +268,113 @@ class SSOProviderListActionHandlerTest {
 
         assertEquals(ERROR_STATUS, result.getString(STATUS_KEY));
         assertEquals(SSOProviderListActionHandler.ERROR_UNREADABLE_RESPONSE, result.getString(ERROR_CODE_KEY));
+    }
+
+    /**
+     * The account id is the instance's System Identifier, read under admin mode and trimmed. The
+     * mode must be restored, since leaking it would let the rest of the request bypass access
+     * control.
+     */
+    @Test
+    void readsTheSystemIdentifierAsAccountId() {
+        try (MockedStatic<OBContext> contextMock = mockStatic(OBContext.class);
+                MockedStatic<SystemInfo> systemInfoMock = mockStatic(SystemInfo.class)) {
+            systemInfoMock.when(SystemInfo::getSystemIdentifier).thenReturn("  " + ACCOUNT_ID + "  ");
+
+            assertEquals(ACCOUNT_ID, new SSOProviderListActionHandler().getAccountId());
+
+            contextMock.verify(() -> OBContext.setAdminMode(true));
+            contextMock.verify(OBContext::restorePreviousMode);
+        }
+    }
+
+    /**
+     * An unreadable identifier downgrades to an empty account id instead of failing the whole call:
+     * the chooser is still worth rendering, and the middleware is the one that judges the account.
+     * The admin mode was entered before the failure, so it must still be restored.
+     */
+    @Test
+    void reportsEmptyAccountIdWhenTheSystemIdentifierCannotBeRead() {
+        try (MockedStatic<OBContext> contextMock = mockStatic(OBContext.class);
+                MockedStatic<SystemInfo> systemInfoMock = mockStatic(SystemInfo.class)) {
+            systemInfoMock.when(SystemInfo::getSystemIdentifier)
+                    .thenThrow(new ServletException("No database connection"));
+
+            assertEquals("", new SSOProviderListActionHandler().getAccountId());
+
+            contextMock.verify(OBContext::restorePreviousMode);
+        }
+    }
+
+    /**
+     * A 200 answer is returned verbatim, so the caller parses exactly what the middleware published.
+     *
+     * @throws IOException if the stub server cannot be started or the read fails
+     */
+    @Test
+    void fetchReturnsTheBodyWhenTheMiddlewareAnswersOk() throws IOException {
+        HttpServer server = startMiddlewareStub(HttpURLConnection.HTTP_OK, MIDDLEWARE_PAYLOAD);
+        try {
+            assertEquals(MIDDLEWARE_PAYLOAD,
+                    new SSOProviderListActionHandler().fetchAvailableProviders(stubUrl(server)));
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    /**
+     * A non-200 answer is raised with its status in the message, which is what {@code execute} turns
+     * into the "unreachable" business error the user finally sees.
+     *
+     * @throws IOException if the stub server cannot be started
+     */
+    @Test
+    void fetchRaisesWhenTheMiddlewareAnswersAnError() throws IOException {
+        HttpServer server = startMiddlewareStub(HttpURLConnection.HTTP_UNAVAILABLE, "service unavailable");
+        try {
+            SSOProviderListActionHandler handler = new SSOProviderListActionHandler();
+            String url = stubUrl(server);
+
+            IOException failure = assertThrows(IOException.class, () -> handler.fetchAvailableProviders(url));
+
+            assertTrue(failure.getMessage().contains(String.valueOf(HttpURLConnection.HTTP_UNAVAILABLE)));
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    /**
+     * Starts a throw-away HTTP server on a free loopback port, answering the available-providers
+     * path with the given status and body. Nothing outside the machine is contacted.
+     *
+     * @param status the HTTP status to answer
+     * @param body   the response body, never empty so the content length is always explicit
+     * @return the started server; the caller stops it
+     * @throws IOException if the server cannot be bound
+     */
+    private HttpServer startMiddlewareStub(int status, String body) throws IOException {
+        HttpServer server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+        server.createContext(SSOProviderListActionHandler.AVAILABLE_PROVIDERS_PATH, exchange -> {
+            byte[] payload = body.getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(status, payload.length);
+            try (OutputStream out = exchange.getResponseBody()) {
+                out.write(payload);
+            }
+            exchange.close();
+        });
+        server.start();
+        return server;
+    }
+
+    /**
+     * Builds the URL the handler would have derived from a provider record pointing at the stub.
+     *
+     * @param server the started stub server
+     * @return the absolute URL of the available-providers path
+     */
+    private String stubUrl(HttpServer server) {
+        InetSocketAddress address = server.getAddress();
+        return "http://" + address.getHostString() + ":" + address.getPort()
+                + SSOProviderListActionHandler.AVAILABLE_PROVIDERS_PATH;
     }
 }
