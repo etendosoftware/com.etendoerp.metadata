@@ -38,6 +38,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
@@ -99,23 +100,15 @@ class DashboardServiceTest extends AbstractMockedContextTest {
         when(obContext.getCurrentClient()).thenReturn(client);
         when(client.getId()).thenReturn("client-1");
 
-        // Class A has access rows (restricted) but none for OTHER_ROLE_ID (not granted)
-        Query<Long> restrictedCountQuery = mock();
-        when(restrictedCountQuery.setParameter(anyString(), any())).thenReturn(restrictedCountQuery);
-        when(restrictedCountQuery.uniqueResult()).thenReturn(1L);
-
-        Query<Long> grantedCountQuery = mock();
-        when(grantedCountQuery.setParameter(anyString(), any())).thenReturn(grantedCountQuery);
-        when(grantedCountQuery.uniqueResult()).thenReturn(0L);
+        // Class A has 1 active access row (restricted) but not for OTHER_ROLE_ID (not granted)
+        Query<Object[]> accessCountsQuery = mock();
+        when(accessCountsQuery.setParameter(anyString(), any())).thenReturn(accessCountsQuery);
+        when(accessCountsQuery.uniqueResult()).thenReturn(new Object[] { 1L, 0L });
 
         when(session.createQuery(
-                argThat(s -> s != null && s.contains("etmeta_Widget_Class_Access") && !s.contains("a.role.id")),
-                eq(Long.class)))
-                .thenReturn(restrictedCountQuery);
-        when(session.createQuery(
-                argThat(s -> s != null && s.contains("etmeta_Widget_Class_Access") && s.contains("a.role.id")),
-                eq(Long.class)))
-                .thenReturn(grantedCountQuery);
+                argThat(s -> s != null && s.contains("etmeta_Widget_Class_Access")),
+                eq(Object[].class)))
+                .thenReturn(accessCountsQuery);
 
         runWithMockedContext(() -> {
             DashboardService svc = new DashboardService(request, response);
@@ -123,7 +116,6 @@ class DashboardServiceTest extends AbstractMockedContextTest {
             assertInstanceOf(UnauthorizedException.class, ex.getCause());
         });
 
-        verify(session, never()).createQuery(
-                argThat(s -> s != null && s.contains("delete from etmeta_Dashboard_Widget")));
+        verify(session, never()).createQuery(contains("delete from etmeta_Dashboard_Widget"));
     }
 }

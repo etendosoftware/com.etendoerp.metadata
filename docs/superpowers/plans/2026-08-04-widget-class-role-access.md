@@ -58,6 +58,8 @@ Table columns (mirror `ETMETA_WIDGET_CLASS.xml`): standard AD audit set + two FK
 
 Add a unique constraint on `(ETMETA_WIDGET_CLASS_ID, AD_ROLE_ID)` so a role can't be granted twice.
 
+> **Amended after code review:** a hard unique constraint on just these two columns broke the revoke-then-regrant workflow (soft-deleting a grant via `ISACTIVE='N'` then re-granting the same role hits the constraint, since the old inactive row still occupies that key — confirmed live against the DB). The classic `OBKMO_WidgetClassAccess` table this design mirrors has **no** such constraint at all, relying purely on the `EXISTS` check for correctness. Dropped the constraint entirely to match that precedent — duplicate active grants for the same class+role are harmless (the HQL rule only checks existence, not count).
+
 - [x] **Step 1: Create the table + columns via the AD webhook**
 
 Use `/etendo:alter-db` to create table `ETMETA_WIDGET_CLASS_ACCESS` with the columns above (DB prefix `ETMETA`, data package `com.etendoerp.metadata.data`). Let the tool generate the model XML and AD_TABLE/AD_COLUMN/AD_ELEMENT sourcedata + UUIDs — do NOT hand-write UUIDs.
@@ -287,6 +289,20 @@ Expected: BUILD SUCCESSFUL.
 git add src-test
 git commit -m "test: cover safe-default visibility for widget access"
 ```
+
+---
+
+## Post-review fixes (PR #199)
+
+Opened the PR and got real signal from CI (unlike the local harness, Jenkins actually compiles+runs `src-test`):
+
+- **Jenkins compile error:** `verify(session, never()).createQuery(argThat(...))` in `DashboardServiceTest` was an ambiguous overload call (Hibernate 6's `Session` has multiple single-arg `createQuery` overloads — `String`, `CriteriaUpdate`, `CriteriaDelete`, ...). Fixed with `ArgumentMatchers.contains(...)`, which returns a concrete `String` and resolves unambiguously.
+- **Sonar — missing column default:** added an `onCreateDefault` placeholder to the PK column in `ETMETA_WIDGET_CLASS_ACCESS.xml`, matching the pattern already used by every sibling table in this module (`ETMETA_TOOLBAR_BUTTON`, `ETMETA_USER_FAVORITE`, `ETMETA_WIDGET_PARAM`) — ours was empty only because it came from a manual SQL export instead of the standard webhook flow.
+- **Sonar — duplicated literals:** extracted `"SYSTEM"` and `"sys-id"` to constants in `DashboardLayoutResolverTest`.
+- **Code review finding — unique constraint (see Task 1 amendment above).**
+- **Code review finding — TOCTOU in `WidgetClassAccessRule.isAllowed()`:** collapsed the two sequential `count()` queries into one query returning `{total, grantedToRole}` via conditional aggregation (`sum(case when a.role.id = :rid then 1 else 0 end)`), removing both the race window and a round trip. Updated `DashboardServiceTest` to mock the single query accordingly.
+
+Deferred (per explicit scope decision, not forgotten): the 3-way rule duplication (catalog HQL / layout HQL / `WidgetClassAccessRule` Java), the nullable-`widgetClass` edge case in the layout HQL, and whether Client/Dashboard admins should bypass the rule.
 
 ---
 

@@ -37,17 +37,18 @@ public final class WidgetClassAccessRule {
      * @return true if the class has no access rows, or the role is explicitly granted
      */
     public static boolean isAllowed(String widgetClassId, String roleId) {
-        Query<Long> restricted = OBDal.getInstance().getSession().createQuery(
-                "select count(a) from etmeta_Widget_Class_Access a " +
-                "where a.widgetClass.id = :cid and a.active = true", Long.class)
-                .setParameter("cid", widgetClassId);
-        if (restricted.uniqueResult() == 0L) {
+        Query<Object[]> counts = OBDal.getInstance().getSession().createQuery(
+                "select count(a), sum(case when a.role.id = :rid then 1 else 0 end) " +
+                "from etmeta_Widget_Class_Access a " +
+                "where a.widgetClass.id = :cid and a.active = true", Object[].class)
+                .setParameter("cid", widgetClassId)
+                .setParameter("rid", roleId);
+        Object[] result = counts.uniqueResult();
+        long totalAccessRows = ((Number) result[0]).longValue();
+        if (totalAccessRows == 0L) {
             return true;
         }
-        Query<Long> granted = OBDal.getInstance().getSession().createQuery(
-                "select count(a) from etmeta_Widget_Class_Access a " +
-                "where a.widgetClass.id = :cid and a.role.id = :rid and a.active = true", Long.class)
-                .setParameter("cid", widgetClassId).setParameter("rid", roleId);
-        return granted.uniqueResult() > 0L;
+        long grantedToRole = result[1] == null ? 0L : ((Number) result[1]).longValue();
+        return grantedToRole > 0L;
     }
 }
