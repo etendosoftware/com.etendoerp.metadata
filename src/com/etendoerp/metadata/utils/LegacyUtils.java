@@ -17,12 +17,19 @@
 
 package com.etendoerp.metadata.utils;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.openbravo.base.model.Entity;
+import org.openbravo.base.model.ModelProvider;
+import org.openbravo.base.model.Property;
 import org.openbravo.base.provider.OBProvider;
 import org.openbravo.model.ad.ui.Process;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.dal.service.OBQuery;
 import org.openbravo.model.ad.ui.Tab;
 import org.apache.commons.lang3.StringUtils;
+
+import javax.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Set;
 
@@ -33,6 +40,8 @@ import java.util.Set;
  * org.openbravo.model.ad.ui.Field)} and lives there exclusively.
  */
 public class LegacyUtils {
+    private static final Logger log = LogManager.getLogger();
+
     /** Set of legacy paths used in the system. */
     private static final Set<String> LEGACY_PATHS = Set.of(
             LegacyPaths.USED_BY_LINK);
@@ -104,5 +113,74 @@ public class LegacyUtils {
         query.setMaxResult(1);
         List<Tab> tabs = query.list();
         return tabs.isEmpty() ? null : tabs.get(0).getId();
+    }
+
+    /**
+     * Resolves the DB column name of the given entity's single id property, as needed to
+     * build the {@code windowId + "|" + columnName} session-attribute key that legacy
+     * UsedByLink-style lookups fall back to. Entities with zero, multiple, or unresolvable
+     * id properties are not supported by that legacy convention, so this returns {@code null}
+     * for them instead of the column name.
+     *
+     * @param entityName the DAL entity name to resolve (e.g. {@code "Order"})
+     * @return the id column name, or {@code null} if the entity or its single id property
+     *         could not be resolved
+     */
+    public static String resolveSingleIdColumnName(String entityName) {
+        Entity entity = ModelProvider.getInstance().getEntity(entityName);
+        if (entity == null) {
+            log.warn("Entity '{}' not found in ModelProvider, cannot resolve id column", entityName);
+            return null;
+        }
+
+        List<Property> idProps = entity.getIdProperties();
+        if (idProps == null || idProps.size() != 1) {
+            log.warn("Expected exactly one ID property for entity '{}', got {}", entityName, idProps);
+            return null;
+        }
+
+        return idProps.get(0).getColumnName();
+    }
+
+    /**
+     * The {@code windowId}/{@code columnName}/{@code recordId} triple needed to build the
+     * legacy {@code windowId + "|" + columnName} session-attribute key that UsedByLink-style
+     * lookups fall back to.
+     */
+    public record UsedByLinkSessionKey(String windowId, String columnName, String recordId) {
+    }
+
+    /**
+     * Resolves the {@code windowId}/{@code columnName}/{@code recordId} triple for a legacy
+     * UsedByLink.html session key from a request carrying {@code windowId}/{@code entityName}/
+     * {@code recordId} parameters (WorkspaceUI's JSON call shape, as opposed to the legacy
+     * inp-prefixed params UsedByLink.html itself expects). Centralizes the path/param
+     * validation shared by every caller that needs to populate this session fallback, so each
+     * caller only has to decide how to key and scope the resulting session attribute.
+     *
+     * @param req  the request, expected to carry windowId/entityName/recordId when path is UsedByLink
+     * @param path the resolved legacy path being dispatched
+     * @return the resolved key, or {@code null} if the path isn't UsedByLink.html, a required
+     *         parameter is missing, or the entity's id column couldn't be resolved
+     */
+    public static UsedByLinkSessionKey resolveUsedByLinkSessionKey(HttpServletRequest req, String path) {
+        if (!LegacyPaths.USED_BY_LINK.equals(path)) {
+            return null;
+        }
+
+        String windowId = req.getParameter("windowId");
+        String entityName = req.getParameter("entityName");
+        String recordId = req.getParameter("recordId");
+
+        if (windowId == null || entityName == null || recordId == null) {
+            return null;
+        }
+
+        String columnName = resolveSingleIdColumnName(entityName);
+        if (columnName == null) {
+            return null;
+        }
+
+        return new UsedByLinkSessionKey(windowId, columnName, recordId);
     }
 }

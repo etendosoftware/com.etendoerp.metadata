@@ -759,6 +759,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             }
             preprocessRequest(req, wrappedRequest);
             handleCreateFromSession(req, path, req.getSession(true));
+            handleUsedByLinkSession(req, path, req.getSession(true));
 
             wrappedRequest.getRequestDispatcher(path).include(wrappedRequest, responseWrapper);
 
@@ -1987,6 +1988,29 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         return result.toString();
     }
     
+    /**
+     * UsedByLink.html falls back to a session attribute keyed {@code windowId + "|" + idColumnName}
+     * when the legacy "inp&lt;columnName&gt;" request parameter isn't present, which is always the
+     * case for WorkspaceUI's JSON calls (it sends {@code windowId}/{@code entityName}/{@code recordId}
+     * instead of the legacy inp-prefixed params). Without this, every UsedByLink.html call from
+     * WorkspaceUI fails with "Session attribute required" and Linked Items shows no categories.
+     *
+     * @param req     the request, expected to carry windowId/entityName/recordId when path is UsedByLink
+     * @param path    the resolved legacy path being dispatched
+     * @param session the current HTTP session to populate
+     */
+    private static void handleUsedByLinkSession(HttpServletRequest req, String path, HttpSession session) {
+        LegacyUtils.UsedByLinkSessionKey key = LegacyUtils.resolveUsedByLinkSessionKey(req, path);
+        if (key == null) {
+            return;
+        }
+
+        // VariablesBase.getSessionValue()/setSessionValue() always uppercase the attribute
+        // name (see VariablesBase#getSessionValue), so the key must be uppercased here too or
+        // UsedByLink's lookup ("WINDOWID|COLUMN") never matches what we store.
+        session.setAttribute((key.windowId() + "|" + key.columnName()).toUpperCase(), key.recordId());
+    }
+
     private static void handleCreateFromSession(HttpServletRequest req, String path, HttpSession session) {
         if (LegacyPaths.CREATE_FROM_HTML.equals(path) && "SAVE".equals(req.getParameter("Command"))) {
             String windowId = req.getParameter("inpWindowId");

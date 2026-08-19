@@ -42,6 +42,7 @@ public class Constants {
     public static final String MESSAGE_PATH = "/message";
     public static final String LABELS_PATH = "/labels";
     public static final String PREFERENCES_PATH = "/preferences";
+    public static final String SSO_PATH = "/sso/";
     public static final boolean DEFAULT_CHECKON_SAVE = true;
     public static final boolean DEFAULT_EDITABLE_FIELD = true;
     public static final String LIST_REFERENCE_ID = "17";
@@ -116,6 +117,8 @@ public class Constants {
     public static final String WIDGET_DATA_PATH = "/widget/";
     public static final String WIDGET_CLASSES_PATH = "/widget/classes";
     public static final String FAVORITES_PATH = "/favorites";
+    public static final String CHANGE_PROFILE_PATH = "/change-profile";
+    public static final String LOGIN_PATH = "/login";
 
     // Audit Fields
     public static final String CREATION_DATE = "creationDate";

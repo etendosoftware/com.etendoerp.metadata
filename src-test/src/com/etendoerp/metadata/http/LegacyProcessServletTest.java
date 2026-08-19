@@ -101,6 +101,8 @@ public class LegacyProcessServletTest extends OBBaseTest {
     private static final String WRITE_REQUEST_FAILED_FORWARDER = "writeRequestFailedForwarder";
     private static final String POST_MESSAGE_SCRIPT_KEY = "POST_MESSAGE_SCRIPT";
     private static final String CREATE_FROM_SESSION_KEY = "CREATEFROM|TABID";
+    private static final String RECORD_ID_VALUE = "RECORD_1";
+    private static final String OTHER_PATH = "/other/path.html";
     private static final String COMMAND_KEY = "Command";
     private static final String INP_WINDOW_ID_KEY = "inpWindowId";
     private static final String INP_TABLE_ID_KEY = "inpTableId";
@@ -1684,7 +1686,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
     @Test
     public void handleCreateFromSessionSkipsForNonCreateFromPath() throws Exception {
         // GIVEN
-        invokeHandleCreateFromSession(request, "/other/path.html", session);
+        invokeHandleCreateFromSession(request, OTHER_PATH, session);
 
         // THEN
         verify(session, never()).setAttribute(anyString(), any());
@@ -1736,6 +1738,48 @@ public class LegacyProcessServletTest extends OBBaseTest {
                 assertTrue("Cause should be InternalServerException",
                         e.getCause() instanceof InternalServerException);
             }
+        }
+    }
+
+    // --- Tests for handleUsedByLinkSession ---
+
+    private void invokeHandleUsedByLinkSession(HttpServletRequest req, String path, HttpSession session)
+            throws Exception {
+        Method method = LegacyProcessServlet.class.getDeclaredMethod(
+            "handleUsedByLinkSession",
+            HttpServletRequest.class, String.class, HttpSession.class
+        );
+        method.setAccessible(true);
+        method.invoke(null, req, path, session);
+    }
+
+    @Test
+    public void handleUsedByLinkSessionSetsUppercasedAttributeWhenKeyResolved() throws Exception {
+        // GIVEN
+        LegacyUtils.UsedByLinkSessionKey key = new LegacyUtils.UsedByLinkSessionKey("143", "C_Order_ID", RECORD_ID_VALUE);
+
+        try (MockedStatic<LegacyUtils> legacyUtils = mockStatic(LegacyUtils.class)) {
+            legacyUtils.when(() -> LegacyUtils.resolveUsedByLinkSessionKey(request, LegacyPaths.USED_BY_LINK))
+                    .thenReturn(key);
+
+            invokeHandleUsedByLinkSession(request, LegacyPaths.USED_BY_LINK, session);
+
+            // THEN — the key must be uppercased, matching VariablesBase's own lookup convention
+            verify(session).setAttribute("143|C_ORDER_ID", RECORD_ID_VALUE);
+        }
+    }
+
+    @Test
+    public void handleUsedByLinkSessionSkipsWhenKeyUnresolved() throws Exception {
+        // GIVEN
+        try (MockedStatic<LegacyUtils> legacyUtils = mockStatic(LegacyUtils.class)) {
+            legacyUtils.when(() -> LegacyUtils.resolveUsedByLinkSessionKey(request, OTHER_PATH))
+                    .thenReturn(null);
+
+            invokeHandleUsedByLinkSession(request, OTHER_PATH, session);
+
+            // THEN
+            verify(session, never()).setAttribute(anyString(), any());
         }
     }
 

@@ -25,6 +25,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.openbravo.base.model.Entity;
+import org.openbravo.base.model.ModelProvider;
+import org.openbravo.base.model.Property;
 import org.openbravo.base.provider.OBProvider;
 import org.openbravo.model.ad.ui.Process;
 import org.openbravo.dal.service.OBDal;
@@ -33,6 +36,8 @@ import org.openbravo.model.ad.ui.Tab;
 import java.util.List;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.anyString;
+
+import javax.servlet.http.HttpServletRequest;
 
 /**
  * Unit tests for {@link LegacyUtils}.
@@ -44,6 +49,14 @@ class LegacyUtilsTest {
   private static final String LEGACY_PROCESS_NAME = "Legacy Process Placeholder";
   private static final String TABLE_ID = "319";
   private static final String WINDOW_ID = "169";
+  private static final String ENTITY_ORDER = "Order";
+  private static final String COLUMN_ORDER_ID = "C_Order_ID";
+  private static final String ENTITY_UNKNOWN = "Unknown";
+  private static final String PARAM_WINDOW_ID = "windowId";
+  private static final String PARAM_ENTITY_NAME = "entityName";
+  private static final String PARAM_RECORD_ID = "recordId";
+  private static final String RECORD_ID_VALUE = "RECORD_1";
+  private static final String USED_BY_LINK_WINDOW_ID = "143";
 
   /**
    * Tests the getLegacyProcess method to ensure it creates and populates a Process instance correctly.
@@ -206,6 +219,148 @@ class LegacyUtilsTest {
       verify(mockQuery).setNamedParameter("windowId", WINDOW_ID);
       verify(mockQuery).setNamedParameter("tableId", TABLE_ID);
       verify(mockQuery).setMaxResult(1);
+    }
+  }
+
+  @Test
+  void resolveSingleIdColumnNameReturnsColumnNameWhenSingleIdProperty() {
+    Entity entity = mock(Entity.class);
+    Property idProp = mock(Property.class);
+    ModelProvider modelProvider = mock(ModelProvider.class);
+
+    when(entity.getIdProperties()).thenReturn(List.of(idProp));
+    when(idProp.getColumnName()).thenReturn(COLUMN_ORDER_ID);
+
+    try (MockedStatic<ModelProvider> staticModelProvider = mockStatic(ModelProvider.class)) {
+      staticModelProvider.when(ModelProvider::getInstance).thenReturn(modelProvider);
+      when(modelProvider.getEntity(ENTITY_ORDER)).thenReturn(entity);
+
+      String result = LegacyUtils.resolveSingleIdColumnName(ENTITY_ORDER);
+
+      assertEquals(COLUMN_ORDER_ID, result);
+    }
+  }
+
+  @Test
+  void resolveSingleIdColumnNameReturnsNullWhenEntityNotFound() {
+    ModelProvider modelProvider = mock(ModelProvider.class);
+
+    try (MockedStatic<ModelProvider> staticModelProvider = mockStatic(ModelProvider.class)) {
+      staticModelProvider.when(ModelProvider::getInstance).thenReturn(modelProvider);
+      when(modelProvider.getEntity(ENTITY_UNKNOWN)).thenReturn(null);
+
+      assertNull(LegacyUtils.resolveSingleIdColumnName(ENTITY_UNKNOWN));
+    }
+  }
+
+  @Test
+  void resolveSingleIdColumnNameReturnsNullWhenMultipleIdProperties() {
+    Entity entity = mock(Entity.class);
+    ModelProvider modelProvider = mock(ModelProvider.class);
+
+    when(entity.getIdProperties()).thenReturn(List.of(mock(Property.class), mock(Property.class)));
+
+    try (MockedStatic<ModelProvider> staticModelProvider = mockStatic(ModelProvider.class)) {
+      staticModelProvider.when(ModelProvider::getInstance).thenReturn(modelProvider);
+      when(modelProvider.getEntity(ENTITY_ORDER)).thenReturn(entity);
+
+      assertNull(LegacyUtils.resolveSingleIdColumnName(ENTITY_ORDER));
+    }
+  }
+
+  @Test
+  void resolveSingleIdColumnNameReturnsNullWhenIdPropsIsNull() {
+    Entity entity = mock(Entity.class);
+    ModelProvider modelProvider = mock(ModelProvider.class);
+
+    when(entity.getIdProperties()).thenReturn(null);
+
+    try (MockedStatic<ModelProvider> staticModelProvider = mockStatic(ModelProvider.class)) {
+      staticModelProvider.when(ModelProvider::getInstance).thenReturn(modelProvider);
+      when(modelProvider.getEntity(ENTITY_ORDER)).thenReturn(entity);
+
+      assertNull(LegacyUtils.resolveSingleIdColumnName(ENTITY_ORDER));
+    }
+  }
+
+  @Test
+  void resolveUsedByLinkSessionKeyReturnsKeyWhenAllParamsResolve() {
+    HttpServletRequest req = mock(HttpServletRequest.class);
+    Entity entity = mock(Entity.class);
+    Property idProp = mock(Property.class);
+    ModelProvider modelProvider = mock(ModelProvider.class);
+
+    when(req.getParameter(PARAM_WINDOW_ID)).thenReturn(USED_BY_LINK_WINDOW_ID);
+    when(req.getParameter(PARAM_ENTITY_NAME)).thenReturn(ENTITY_ORDER);
+    when(req.getParameter(PARAM_RECORD_ID)).thenReturn(RECORD_ID_VALUE);
+    when(entity.getIdProperties()).thenReturn(List.of(idProp));
+    when(idProp.getColumnName()).thenReturn(COLUMN_ORDER_ID);
+
+    try (MockedStatic<ModelProvider> staticModelProvider = mockStatic(ModelProvider.class)) {
+      staticModelProvider.when(ModelProvider::getInstance).thenReturn(modelProvider);
+      when(modelProvider.getEntity(ENTITY_ORDER)).thenReturn(entity);
+
+      LegacyUtils.UsedByLinkSessionKey key =
+          LegacyUtils.resolveUsedByLinkSessionKey(req, LegacyPaths.USED_BY_LINK);
+
+      assertNotNull(key);
+      assertEquals(USED_BY_LINK_WINDOW_ID, key.windowId());
+      assertEquals(COLUMN_ORDER_ID, key.columnName());
+      assertEquals(RECORD_ID_VALUE, key.recordId());
+    }
+  }
+
+  @Test
+  void resolveUsedByLinkSessionKeyReturnsNullForNonUsedByLinkPath() {
+    HttpServletRequest req = mock(HttpServletRequest.class);
+
+    assertNull(LegacyUtils.resolveUsedByLinkSessionKey(req, "/some/other/path.html"));
+  }
+
+  @Test
+  void resolveUsedByLinkSessionKeyReturnsNullWhenWindowIdMissing() {
+    HttpServletRequest req = mock(HttpServletRequest.class);
+    when(req.getParameter(PARAM_WINDOW_ID)).thenReturn(null);
+    when(req.getParameter(PARAM_ENTITY_NAME)).thenReturn(ENTITY_ORDER);
+    when(req.getParameter(PARAM_RECORD_ID)).thenReturn(RECORD_ID_VALUE);
+
+    assertNull(LegacyUtils.resolveUsedByLinkSessionKey(req, LegacyPaths.USED_BY_LINK));
+  }
+
+  @Test
+  void resolveUsedByLinkSessionKeyReturnsNullWhenEntityNameMissing() {
+    HttpServletRequest req = mock(HttpServletRequest.class);
+    when(req.getParameter(PARAM_WINDOW_ID)).thenReturn(USED_BY_LINK_WINDOW_ID);
+    when(req.getParameter(PARAM_ENTITY_NAME)).thenReturn(null);
+    when(req.getParameter(PARAM_RECORD_ID)).thenReturn(RECORD_ID_VALUE);
+
+    assertNull(LegacyUtils.resolveUsedByLinkSessionKey(req, LegacyPaths.USED_BY_LINK));
+  }
+
+  @Test
+  void resolveUsedByLinkSessionKeyReturnsNullWhenRecordIdMissing() {
+    HttpServletRequest req = mock(HttpServletRequest.class);
+    when(req.getParameter(PARAM_WINDOW_ID)).thenReturn(USED_BY_LINK_WINDOW_ID);
+    when(req.getParameter(PARAM_ENTITY_NAME)).thenReturn(ENTITY_ORDER);
+    when(req.getParameter(PARAM_RECORD_ID)).thenReturn(null);
+
+    assertNull(LegacyUtils.resolveUsedByLinkSessionKey(req, LegacyPaths.USED_BY_LINK));
+  }
+
+  @Test
+  void resolveUsedByLinkSessionKeyReturnsNullWhenColumnNameUnresolved() {
+    HttpServletRequest req = mock(HttpServletRequest.class);
+    ModelProvider modelProvider = mock(ModelProvider.class);
+
+    when(req.getParameter(PARAM_WINDOW_ID)).thenReturn(USED_BY_LINK_WINDOW_ID);
+    when(req.getParameter(PARAM_ENTITY_NAME)).thenReturn(ENTITY_UNKNOWN);
+    when(req.getParameter(PARAM_RECORD_ID)).thenReturn(RECORD_ID_VALUE);
+
+    try (MockedStatic<ModelProvider> staticModelProvider = mockStatic(ModelProvider.class)) {
+      staticModelProvider.when(ModelProvider::getInstance).thenReturn(modelProvider);
+      when(modelProvider.getEntity(ENTITY_UNKNOWN)).thenReturn(null);
+
+      assertNull(LegacyUtils.resolveUsedByLinkSessionKey(req, LegacyPaths.USED_BY_LINK));
     }
   }
 
