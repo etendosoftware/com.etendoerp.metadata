@@ -54,6 +54,18 @@ public class TabBuilder extends Builder {
       Constants.UPDATED, Constants.DB_UPDATED,
       Constants.UPDATED_BY, Constants.DB_UPDATED_BY);
 
+  /**
+   * Initial grid visibility of the audit fields this builder injects. Etendo Classic never shows
+   * them when a tab is opened: {@code OBViewFieldHandler.OBViewFieldAudit.isShowInitiallyInGrid()}
+   * unconditionally returns false, which the view template renders as {@code showIf: 'false'}.
+   * The fields still travel in the payload (flagged with {@code isAuditField}), so the frontend
+   * column-visibility menu can enable them on demand.
+   * <p>
+   * This only affects the synthetic fields: a tab that defines its own AD_Field for Created or
+   * Updated never reaches this code and keeps its dictionary configuration.
+   */
+  private static final boolean AUDIT_FIELD_SHOWN_IN_GRID_BY_DEFAULT = false;
+
   /** HQL property name every entity's primary key is universally mapped to. */
   private static final String ID_HQL_NAME = "id";
 
@@ -275,7 +287,7 @@ public class TabBuilder extends Builder {
 
   /**
    * Enriches the fields object with standard audit fields if they are not already defined.
-   * Only creationDate and updated are visible in grid by default.
+   * They are injected hidden from the grid, see {@link #AUDIT_FIELD_SHOWN_IN_GRID_BY_DEFAULT}.
    * Skips audit fields if the corresponding database columns don't exist in the table.
    *
    * @param fieldsJson the JSON object containing the tab's fields
@@ -296,9 +308,8 @@ public class TabBuilder extends Builder {
         Column column = findColumnByDBName(table, dbColumnName);
 
         if (column != null) {
-          boolean showInGrid = shouldShowInGrid(auditField);
           JSONObject syntheticField = createAuditField(column, auditField, baseGridPosition + order,
-              showInGrid);
+              AUDIT_FIELD_SHOWN_IN_GRID_BY_DEFAULT);
           fieldsJson.put(auditField, syntheticField);
           order++;
         } else {
@@ -444,17 +455,6 @@ public class TabBuilder extends Builder {
         .filter(col -> StringUtils.equalsIgnoreCase(col.getDBColumnName(), dbColumnName))
         .findFirst()
         .orElse(null);
-  }
-
-  /**
-   * Determines if an audit field should be visible in the grid by default.
-   * Only creationDate and updated are shown by default.
-   *
-   * @param fieldName the name of the audit field
-   * @return true if the field should be visible in grid, false otherwise
-   */
-  private boolean shouldShowInGrid(String fieldName) {
-    return StringUtils.equals(fieldName, Constants.CREATION_DATE) || StringUtils.equals(fieldName, Constants.UPDATED);
   }
 
   /**

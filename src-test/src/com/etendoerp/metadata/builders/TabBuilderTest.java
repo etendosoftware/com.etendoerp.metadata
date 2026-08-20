@@ -60,9 +60,14 @@ class TabBuilderTest extends TabBuilderTestBase {
     private static final String UPDATED_FIELD = "updated";
     private static final String UPDATED_BY_FIELD = "updatedBy";
 
+    /** Every audit field TabBuilder injects, in injection order. */
+    private static final String[] ALL_AUDIT_FIELDS = { CREATION_DATE_FIELD, CREATED_BY_FIELD, UPDATED_FIELD,
+            UPDATED_BY_FIELD };
+
     // JSON keys
     private static final String FIELDS_KEY = "fields";
     private static final String SHOW_IN_GRID_VIEW_KEY = "showInGridView";
+    private static final String IS_AUDIT_FIELD_KEY = "isAuditField";
     private static final String REFERENCED_ENTITY_KEY = "referencedEntity";
     private static final String GRID_POSITION_KEY = "gridPosition";
     private static final String IS_READ_ONLY_KEY = "isReadOnly";
@@ -135,10 +140,13 @@ class TabBuilderTest extends TabBuilderTestBase {
     }
 
     /**
-     * Tests that only creationDate and updated are visible in grid by default
+     * Tests that no injected audit field is visible in the grid by default, mirroring Etendo
+     * Classic, whose OBViewFieldAudit.isShowInitiallyInGrid() unconditionally returns false.
+     *
+     * @throws Exception if the TabBuilder execution or the mock setup fails
      */
     @Test
-    void auditFieldsHaveCorrectDefaultVisibility() throws Exception {
+    void auditFieldsAreHiddenInGridByDefault() throws Exception {
         TestContext ctx = setupTestContext();
 
         Column createdColumn = createMockColumn(CREATED_ID, CREATED_ID, CREATION_DATE_NAME);
@@ -153,14 +161,38 @@ class TabBuilderTest extends TabBuilderTestBase {
             try {
                 JSONObject fields = result.getJSONObject(FIELDS_KEY);
 
-                assertTrue(fields.getJSONObject(CREATION_DATE_FIELD).getBoolean(SHOW_IN_GRID_VIEW_KEY),
-                        "creationDate should be visible in grid");
-                assertTrue(fields.getJSONObject(UPDATED_FIELD).getBoolean(SHOW_IN_GRID_VIEW_KEY),
-                        "updated should be visible in grid");
-                assertFalse(fields.getJSONObject(CREATED_BY_FIELD).getBoolean(SHOW_IN_GRID_VIEW_KEY),
-                        "createdBy should NOT be visible in grid");
-                assertFalse(fields.getJSONObject(UPDATED_BY_FIELD).getBoolean(SHOW_IN_GRID_VIEW_KEY),
-                        "updatedBy should NOT be visible in grid");
+                for (String fieldName : ALL_AUDIT_FIELDS) {
+                    assertFalse(fields.getJSONObject(fieldName).getBoolean(SHOW_IN_GRID_VIEW_KEY),
+                            fieldName + " should NOT be visible in grid");
+                }
+            } catch (JSONException e) {
+                fail(JSON_EXCEPTION + ": " + e.getMessage());
+            }
+        });
+    }
+
+    /**
+     * Tests that hidden audit fields still travel in the payload flagged with isAuditField. That
+     * flag is the contract the frontend column-visibility menu relies on to keep listing them
+     * even though they are no longer shown in the grid by default.
+     *
+     * @throws Exception if the TabBuilder execution or the mock setup fails
+     */
+    @Test
+    void auditFieldsKeepIsAuditFieldFlagWhenHidden() throws Exception {
+        TestContext ctx = setupTestContext();
+        List<Column> columns = createAllAuditColumns();
+        setupBasicMocks(ctx.context, ctx.language, ctx.tab, ctx.table, ctx.kernelUtils, columns);
+
+        executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), result -> {
+            try {
+                JSONObject fields = result.getJSONObject(FIELDS_KEY);
+
+                for (String fieldName : ALL_AUDIT_FIELDS) {
+                    assertTrue(fields.has(fieldName), fieldName + " should be present in the payload");
+                    assertTrue(fields.getJSONObject(fieldName).getBoolean(IS_AUDIT_FIELD_KEY),
+                            fieldName + " should be flagged as an audit field");
+                }
             } catch (JSONException e) {
                 fail(JSON_EXCEPTION + ": " + e.getMessage());
             }
@@ -169,6 +201,8 @@ class TabBuilderTest extends TabBuilderTestBase {
 
     /**
      * Tests that audit fields are always read-only
+     *
+     * @throws Exception if the TabBuilder execution or the mock setup fails
      */
     @Test
     void auditFieldsAreAlwaysReadOnly() throws Exception {
@@ -180,8 +214,7 @@ class TabBuilderTest extends TabBuilderTestBase {
             try {
                 JSONObject fields = result.getJSONObject(FIELDS_KEY);
 
-                for (String fieldName : new String[] { CREATION_DATE_FIELD, CREATED_BY_FIELD, UPDATED_FIELD,
-                        UPDATED_BY_FIELD }) {
+                for (String fieldName : ALL_AUDIT_FIELDS) {
                     JSONObject field = fields.getJSONObject(fieldName);
                     assertTrue(field.getBoolean(IS_READ_ONLY_KEY), fieldName + " should be read-only");
                     assertFalse(field.getBoolean(IS_EDITABLE_KEY), fieldName + " should not be editable");
