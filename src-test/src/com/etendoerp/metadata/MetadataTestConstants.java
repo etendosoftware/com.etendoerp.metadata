@@ -87,6 +87,7 @@ public final class MetadataTestConstants {
   public static final String ENTITY_NAME = "entityName";
   public static final String PARENT_COLUMNS = "parentColumns";
   public static final String FIELDS = "fields";
+  public static final String TABS = "tabs";
   public static final String TAB_ID_HYPHEN = "tab-id";
   public static final String TEST_CONTEXT = "#testContext";
   public static final String TEST_EXCEPTION = "Test exception";
