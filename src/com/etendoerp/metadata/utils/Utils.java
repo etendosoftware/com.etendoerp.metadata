@@ -17,6 +17,7 @@
 
 package com.etendoerp.metadata.utils;
 
+import static org.apache.http.HttpStatus.SC_CONFLICT;
 import static org.apache.http.HttpStatus.SC_INTERNAL_SERVER_ERROR;
 import static org.apache.http.HttpStatus.SC_METHOD_NOT_ALLOWED;
 import static org.apache.http.HttpStatus.SC_UNAUTHORIZED;
@@ -61,6 +62,7 @@ import org.openbravo.service.json.DataToJsonConverter;
 import java.io.BufferedReader;
 
 import com.etendoerp.metadata.builders.ProcessDefinitionBuilder;
+import com.etendoerp.metadata.exceptions.ConflictException;
 import com.etendoerp.metadata.exceptions.MethodNotAllowedException;
 import com.etendoerp.metadata.exceptions.NotFoundException;
 import com.etendoerp.metadata.exceptions.UnauthorizedException;
@@ -93,6 +95,7 @@ public class Utils {
         map.put(MethodNotAllowedException.class.getName(), SC_METHOD_NOT_ALLOWED);
         map.put(UnprocessableContentException.class.getName(), SC_UNPROCESSABLE_ENTITY);
         map.put(NotFoundException.class.getName(), HttpStatus.SC_NOT_FOUND);
+        map.put(ConflictException.class.getName(), SC_CONFLICT);
 
         return map;
     }
