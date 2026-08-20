@@ -94,6 +94,8 @@ public class ForwarderServletTest {
             + "clicking the refresh button.";
     private static final String TRANSLATED_STALE_BODY = "{\"response\":{\"status\":-1,\"error\":{\"message\":\""
             + TRANSLATED_STALE_TEXT + "\",\"type\":\"Error\",\"title\":\"\"},\"totalRows\":0}}";
+    private static final String STALE_OBJECT_CODE_JSON = "\"code\":\"STALE_OBJECT\"";
+    private static final String TEST_LANGUAGE = "en_US";
 
     private ForwarderServlet forwarderServlet;
 
@@ -108,7 +110,11 @@ public class ForwarderServletTest {
 
     private ByteArrayOutputStream realOutput;
 
-    /** Initializes the servlet under test. */
+    /**
+     * Initializes the servlet under test.
+     *
+     * @throws IOException if test setup fails
+     */
     @Before
     public void setUp() throws IOException {
         forwarderServlet = new ForwarderServlet();
@@ -254,6 +260,8 @@ public class ForwarderServletTest {
      * A PUT (update) whose forwarded response body contains the core's stale-object marker must
      * be rewritten as a distinct HTTP 409 with a structured {@code STALE_OBJECT} conflict body,
      * instead of the generic HTTP 200 the core itself would have written.
+     *
+     * @throws Exception if an error occurs during test execution
      */
     @Test
     public void processPutWithStaleObjectConflictShouldReturn409WithStaleObjectCode() throws Exception {
@@ -267,7 +275,7 @@ public class ForwarderServletTest {
 
             verify(response).setStatus(HttpStatus.SC_CONFLICT);
             String written = realOutput.toString(StandardCharsets.UTF_8);
-            assertTrue(written.contains("\"code\":\"STALE_OBJECT\""));
+            assertTrue(written.contains(STALE_OBJECT_CODE_JSON));
             assertTrue(written.contains("@OBJSON_StaleDate@"));
         }
     }
@@ -275,6 +283,8 @@ public class ForwarderServletTest {
     /**
      * The same detection must also apply to the {@code @APRM_StaleDate@} marker used by
      * payment-related action handlers.
+     *
+     * @throws Exception if an error occurs during test execution
      */
     @Test
     public void processPutWithAprmStaleObjectConflictShouldReturn409() throws Exception {
@@ -287,13 +297,15 @@ public class ForwarderServletTest {
             forwarderServlet.process(request, response);
 
             verify(response).setStatus(HttpStatus.SC_CONFLICT);
-            assertTrue(realOutput.toString(StandardCharsets.UTF_8).contains("\"code\":\"STALE_OBJECT\""));
+            assertTrue(realOutput.toString(StandardCharsets.UTF_8).contains(STALE_OBJECT_CODE_JSON));
         }
     }
 
     /**
      * A POST {@code add}/{@code update} whose forwarded response contains the stale-object
      * marker must also be rewritten as HTTP 409, the same as PUT.
+     *
+     * @throws Exception if an error occurs during test execution
      */
     @Test
     public void processPostUpdateWithStaleObjectConflictShouldReturn409() throws Exception {
@@ -309,7 +321,7 @@ public class ForwarderServletTest {
 
             verify(dataSourceServlet).doPost(any(), any(BufferedResponseWrapper.class));
             verify(response).setStatus(HttpStatus.SC_CONFLICT);
-            assertTrue(realOutput.toString(StandardCharsets.UTF_8).contains("\"code\":\"STALE_OBJECT\""));
+            assertTrue(realOutput.toString(StandardCharsets.UTF_8).contains(STALE_OBJECT_CODE_JSON));
         }
     }
 
@@ -317,6 +329,8 @@ public class ForwarderServletTest {
      * A POST {@code add} (new record) whose forwarded response contains the stale-object marker
      * must also be rewritten as HTTP 409 -- same handling as {@code update}, since both are
      * save operations that carry the {@code updated} timestamp for optimistic locking.
+     *
+     * @throws Exception if an error occurs during test execution
      */
     @Test
     public void processPostAddWithStaleObjectConflictShouldReturn409() throws Exception {
@@ -332,7 +346,7 @@ public class ForwarderServletTest {
 
             verify(dataSourceServlet).doPost(any(), any(BufferedResponseWrapper.class));
             verify(response).setStatus(HttpStatus.SC_CONFLICT);
-            assertTrue(realOutput.toString(StandardCharsets.UTF_8).contains("\"code\":\"STALE_OBJECT\""));
+            assertTrue(realOutput.toString(StandardCharsets.UTF_8).contains(STALE_OBJECT_CODE_JSON));
         }
     }
 
@@ -341,6 +355,8 @@ public class ForwarderServletTest {
      * the core already resolved it into the current session language's AD_Message text before
      * writing the response, which is what a real deployment actually returns -- must still be
      * detected and rewritten as HTTP 409, by matching against that translated text instead.
+     *
+     * @throws Exception if an error occurs during test execution
      */
     @Test
     public void processPutWithTranslatedStaleObjectConflictShouldReturn409() throws Exception {
@@ -349,10 +365,10 @@ public class ForwarderServletTest {
                 MockedStatic<Utility> utilityMock = mockStatic(Utility.class)) {
             weldUtilsMock.when(() -> WeldUtils.getInstanceFromStaticBeanManager(DataSourceServlet.class))
                     .thenReturn(dataSourceServlet);
-            stubSessionLanguage(obContextMock, "en_US");
-            utilityMock.when(() -> Utility.messageBD(any(), eq("OBJSON_StaleDate"), eq("en_US")))
+            stubSessionLanguage(obContextMock, TEST_LANGUAGE);
+            utilityMock.when(() -> Utility.messageBD(any(), eq("OBJSON_StaleDate"), eq(TEST_LANGUAGE)))
                     .thenReturn(TRANSLATED_STALE_TEXT);
-            utilityMock.when(() -> Utility.messageBD(any(), eq("APRM_StaleDate"), eq("en_US")))
+            utilityMock.when(() -> Utility.messageBD(any(), eq("APRM_StaleDate"), eq(TEST_LANGUAGE)))
                     .thenReturn("");
             when(request.getMethod()).thenReturn("PUT");
             stubForwardedWrite(false, TRANSLATED_STALE_BODY);
@@ -361,7 +377,7 @@ public class ForwarderServletTest {
 
             verify(response).setStatus(HttpStatus.SC_CONFLICT);
             String written = realOutput.toString(StandardCharsets.UTF_8);
-            assertTrue(written.contains("\"code\":\"STALE_OBJECT\""));
+            assertTrue(written.contains(STALE_OBJECT_CODE_JSON));
             assertTrue(written.contains("@OBJSON_StaleDate@"));
         }
     }
@@ -369,6 +385,8 @@ public class ForwarderServletTest {
     /**
      * A successful save (no {@code "error"} key in the body) must skip the AD_Message translation
      * lookups entirely -- only failed saves pay that cost.
+     *
+     * @throws Exception if an error occurs during test execution
      */
     @Test
     public void processPutWithSuccessShouldNotQueryMessageTranslation() throws Exception {
@@ -402,6 +420,8 @@ public class ForwarderServletTest {
      * A save whose response is a normal validation error (no stale-object marker) must be
      * passed through to the real response completely unchanged -- no regression for any other
      * kind of save error (validation, permissions, DB constraints, etc.).
+     *
+     * @throws Exception if an error occurs during test execution
      */
     @Test
     public void processPutWithValidationErrorShouldPassThroughUnchanged() throws Exception {
@@ -420,6 +440,8 @@ public class ForwarderServletTest {
 
     /**
      * A successful save must be passed through to the real response completely unchanged.
+     *
+     * @throws Exception if an error occurs during test execution
      */
     @Test
     public void processPutWithSuccessShouldPassThroughUnchanged() throws Exception {

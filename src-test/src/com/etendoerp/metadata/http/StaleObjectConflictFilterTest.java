@@ -74,6 +74,12 @@ public class StaleObjectConflictFilterTest {
 
     private ByteArrayOutputStream realOutput;
 
+    /**
+     * Initializes the filter under test and a response whose output stream/writer both capture
+     * everything written into {@link #realOutput}.
+     *
+     * @throws Exception if test setup fails
+     */
     @Before
     public void setUp() throws Exception {
         filter = new StaleObjectConflictFilter();
@@ -113,6 +119,12 @@ public class StaleObjectConflictFilterTest {
         }).when(chain).doFilter(any(), any());
     }
 
+    /**
+     * A PUT (update) whose response body contains the core's stale-object marker must be
+     * rewritten as a distinct HTTP 409 with a structured {@code STALE_OBJECT} conflict body.
+     *
+     * @throws Exception if an error occurs during test execution
+     */
     @Test
     public void putWithStaleObjectConflictShouldReturn409() throws Exception {
         when(request.getMethod()).thenReturn("PUT");
@@ -126,6 +138,12 @@ public class StaleObjectConflictFilterTest {
         assertTrue(written.contains("@OBJSON_StaleDate@"));
     }
 
+    /**
+     * A POST {@code update} whose response contains the stale-object marker must also be
+     * rewritten as HTTP 409, the same as PUT.
+     *
+     * @throws Exception if an error occurs during test execution
+     */
     @Test
     public void postUpdateWithStaleObjectConflictShouldReturn409() throws Exception {
         when(request.getMethod()).thenReturn("POST");
@@ -137,6 +155,12 @@ public class StaleObjectConflictFilterTest {
         verify(response).setStatus(HttpStatus.SC_CONFLICT);
     }
 
+    /**
+     * A POST {@code add} (new record) whose response contains the stale-object marker must also
+     * be rewritten as HTTP 409 -- same handling as {@code update}.
+     *
+     * @throws Exception if an error occurs during test execution
+     */
     @Test
     public void postAddWithStaleObjectConflictShouldReturn409() throws Exception {
         when(request.getMethod()).thenReturn("POST");
@@ -151,6 +175,8 @@ public class StaleObjectConflictFilterTest {
     /**
      * A fetch (read) request is not a save operation -- the filter must not buffer it at all,
      * passing the original, unwrapped response straight down the chain.
+     *
+     * @throws Exception if an error occurs during test execution
      */
     @Test
     public void postFetchShouldBypassBufferingEntirely() throws Exception {
@@ -167,6 +193,8 @@ public class StaleObjectConflictFilterTest {
      * A save whose response is a normal validation error (no stale-object marker) must be
      * passed through to the real response completely unchanged -- no regression for any other
      * kind of save error.
+     *
+     * @throws Exception if an error occurs during test execution
      */
     @Test
     public void putWithValidationErrorShouldPassThroughUnchanged() throws Exception {
@@ -181,6 +209,8 @@ public class StaleObjectConflictFilterTest {
 
     /**
      * A successful save must be passed through to the real response completely unchanged.
+     *
+     * @throws Exception if an error occurs during test execution
      */
     @Test
     public void putWithSuccessShouldPassThroughUnchanged() throws Exception {
