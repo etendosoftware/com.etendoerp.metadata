@@ -80,6 +80,7 @@ import org.openbravo.model.common.enterprise.Organization;
 import org.openbravo.model.common.enterprise.Warehouse;
 
 import com.etendoerp.metadata.utils.Utils;
+import com.smf.securewebservices.utils.SecureWebServicesUtils;
 
 /**
  * Test class for SessionBuilder.
@@ -261,11 +262,11 @@ class SessionBuilderTest {
     when(warehouse2.getOrganization()).thenReturn(warehouseOrg2);
     when(warehouseOrg2.getId()).thenReturn(ORG2_ID);
 
-    // Setup OrganizationStructureProvider for natural tree distribution
+    // Setup OrganizationStructureProvider for descendant-tree distribution
     when(obContext.getOrganizationStructureProvider(anyString())).thenReturn(osp);
-    // Each org's natural tree contains its own id (warehouse matches its own org)
-    when(osp.getNaturalTree(ORG1_ID)).thenReturn(Set.of(ORG1_ID));
-    when(osp.getNaturalTree(ORG2_ID)).thenReturn(Set.of(ORG2_ID));
+    // Each org's descendant tree contains (at least) its own id (warehouse matches its own org)
+    when(osp.getChildTree(ORG1_ID, true)).thenReturn(Set.of(ORG1_ID));
+    when(osp.getChildTree(ORG2_ID, true)).thenReturn(Set.of(ORG2_ID));
   }
 
   @AfterEach
@@ -324,6 +325,43 @@ class SessionBuilderTest {
       // The role tree must come from a single batched query, not per-role lazy navigation
       verify(session, times(1)).createQuery(anyString(), eq(UserRoles.class));
       verify(session, times(1)).createQuery(anyString(), eq(Warehouse.class));
+    }
+  }
+
+  /**
+   * Regression test: a warehouse that belongs to neither the current role nor the current
+   * organization (e.g. a stale token issued before switching to a role/org that has no
+   * warehouses of its own) must resolve to no warehouse at all in the session response - never
+   * to that unrelated warehouse as-is. This is what made "Oficina" (belonging to org "0") keep
+   * reappearing as the current warehouse for a role whose own organization has none.
+   *
+   * @throws JSONException if JSON operations fail during assertions or building
+   */
+  @Test
+  void testToJSONWarehouseNotBelongingToOrgOrRoleResolvesToNull() throws JSONException {
+    // The context's warehouse belongs to org1, but the role's own organizations don't include
+    // org1, and the current organization owns/descends-from no warehouses of its own (regardless
+    // of any AD_ORG_WAREHOUSE assignment it might have to an unrelated one).
+    when(role.getADRoleOrganizationList()).thenReturn(Arrays.asList(roleOrg2));
+    when(roleOrg2.getOrganization()).thenReturn(org2);
+    when(org2.getId()).thenReturn(ORG2_ID);
+
+    try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
+         MockedStatic<Utils> utilsStatic = mockStatic(Utils.class);
+         MockedStatic<SecureWebServicesUtils> swsUtilsStatic = mockStatic(SecureWebServicesUtils.class)) {
+
+      obContextStatic.when(OBContext::getOBContext).thenReturn(obContext);
+      utilsStatic.when(() -> Utils.getJsonObject(any())).thenReturn(new JSONObject());
+      utilsStatic.when(() -> Utils.getJsonObject(null)).thenReturn(null);
+      swsUtilsStatic.when(() -> SecureWebServicesUtils.getOrganizationWarehouses(organization))
+          .thenReturn(Collections.emptyList());
+
+      SessionBuilder sessionBuilder = new SessionBuilder();
+      JSONObject result = sessionBuilder.toJSON();
+
+      assertNotNull(result);
+      assertTrue(result.isNull(CURRENT_WAREHOUSE) || !result.has(CURRENT_WAREHOUSE),
+          "An unrelated warehouse must never be returned as the current warehouse");
     }
   }
 
@@ -511,6 +549,52 @@ class SessionBuilderTest {
 
       // Only org2's id (role1's org list could not be read) should reach the batch query
       verify(warehousesQuery).setParameter(eq("orgIds"), eq(Collections.singleton(ORG2_ID)));
+    }
+  }
+
+  /**
+   * Regression test: a warehouse owned by an organization that is only an ANCESTOR of a role's
+   * granted organization (org "0", the {@code *} org, is defined as an ancestor of every
+   * organization - see {@code OrganizationStructureProvider#isInNaturalTree}) must never be
+   * attributed to that role. Distribution must be based on the role's org's descendant subtree
+   * ({@code getChildTree}), not its natural tree ({@code getChildTree} + ancestors), or any
+   * warehouse owned by org "0" would leak into every role regardless of actual access.
+   *
+   * @throws JSONException if JSON operations fail during assertions or building
+   */
+  @Test
+  void testWarehouseFromAncestorOrgIsNotAttributedToRole() throws JSONException {
+    Warehouse ancestorOrgWarehouse = org.mockito.Mockito.mock(Warehouse.class);
+    Organization ancestorOrg = org.mockito.Mockito.mock(Organization.class);
+    when(ancestorOrg.getId()).thenReturn("ancestor-org-id");
+    when(ancestorOrgWarehouse.getId()).thenReturn("ancestor-warehouse-id");
+    when(ancestorOrgWarehouse.getOrganization()).thenReturn(ancestorOrg);
+
+    when(warehousesQuery.list()).thenReturn(Arrays.asList(warehouse1, warehouse2, ancestorOrgWarehouse));
+    // org1's descendant tree does not include the ancestor org - only itself, as set up above
+    when(osp.getChildTree(ORG1_ID, true)).thenReturn(Set.of(ORG1_ID));
+
+    try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
+         MockedStatic<Utils> utilsStatic = mockStatic(Utils.class)) {
+
+      obContextStatic.when(OBContext::getOBContext).thenReturn(obContext);
+      utilsStatic.when(() -> Utils.getJsonObject(any())).thenReturn(new JSONObject());
+
+      SessionBuilder sessionBuilder = new SessionBuilder();
+      JSONObject result = sessionBuilder.toJSON();
+
+      JSONArray roles = result.getJSONArray(ROLES);
+      for (int i = 0; i < roles.length(); i++) {
+        JSONObject roleObj = roles.getJSONObject(i);
+        JSONArray orgs = roleObj.getJSONArray(ORGANIZATIONS);
+        for (int j = 0; j < orgs.length(); j++) {
+          JSONArray warehouses = orgs.getJSONObject(j).getJSONArray(WAREHOUSES);
+          for (int k = 0; k < warehouses.length(); k++) {
+            assertTrue(!"ancestor-warehouse-id".equals(warehouses.getJSONObject(k).getString("id")),
+                "Warehouse owned by an ancestor-only org must not be attributed to any role");
+          }
+        }
+      }
     }
   }
 

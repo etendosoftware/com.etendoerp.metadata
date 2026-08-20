@@ -17,9 +17,12 @@
 package com.etendoerp.metadata.builders;
 
 import static com.etendoerp.metadata.MetadataTestConstants.ROLE_NAME;
+import static com.etendoerp.metadata.MetadataTestConstants.TABS;
 import static com.etendoerp.metadata.MetadataTestConstants.TAB_ID_HYPHEN;
 import static com.etendoerp.metadata.MetadataTestConstants.WINDOW_ID;
+import static com.etendoerp.metadata.utils.Constants.JSON_IS_WINDOW_ACCESSIBLE_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -286,8 +289,8 @@ class WindowBuilderTest {
     JSONObject result = executeToJSON(windowBuilder);
 
     assertNotNull(result);
-    assertTrue(result.has("tabs"));
-    JSONArray tabs = result.getJSONArray("tabs");
+    assertTrue(result.has(TABS));
+    JSONArray tabs = result.getJSONArray(TABS);
     assertNotNull(tabs);
     assertEquals(0, tabs.length());
   }
@@ -354,8 +357,8 @@ class WindowBuilderTest {
     JSONObject result = executeToJSONWithTabs(windowBuilder, "mock-tab-id");
 
     assertNotNull(result);
-    assertTrue(result.has("tabs"));
-    JSONArray tabs = result.getJSONArray("tabs");
+    assertTrue(result.has(TABS));
+    JSONArray tabs = result.getJSONArray(TABS);
     assertEquals(3, tabs.length());
   }
 
@@ -401,8 +404,8 @@ class WindowBuilderTest {
     JSONObject result = executeToJSON(windowBuilder);
 
     assertNotNull(result);
-    assertTrue(result.has("tabs"));
-    JSONArray tabs = result.getJSONArray("tabs");
+    assertTrue(result.has(TABS));
+    JSONArray tabs = result.getJSONArray(TABS);
     assertEquals(0, tabs.length());
   }
 
@@ -422,8 +425,8 @@ class WindowBuilderTest {
     JSONObject result = executeToJSON(windowBuilder);
 
     assertNotNull(result);
-    assertTrue(result.has("tabs"));
-    JSONArray tabs = result.getJSONArray("tabs");
+    assertTrue(result.has(TABS));
+    JSONArray tabs = result.getJSONArray(TABS);
     assertEquals(0, tabs.length());
   }
 
@@ -443,8 +446,8 @@ class WindowBuilderTest {
     JSONObject result = executeToJSONWithTabs(windowBuilder, TAB_ID_HYPHEN);
 
     assertNotNull(result);
-    assertTrue(result.has("tabs"));
-    JSONArray tabs = result.getJSONArray("tabs");
+    assertTrue(result.has(TABS));
+    JSONArray tabs = result.getJSONArray(TABS);
     assertEquals(1, tabs.length());
 
     JSONObject tabJson = tabs.getJSONObject(0);
@@ -486,7 +489,7 @@ class WindowBuilderTest {
     }
 
     assertNotNull(result);
-    JSONArray tabs = result.getJSONArray("tabs");
+    JSONArray tabs = result.getJSONArray(TABS);
     assertEquals(3, tabs.length());
 
     verify(mockOBDal, times(1)).createQuery(eq(TabAccess.class), anyString(), anyMap());
@@ -501,22 +504,14 @@ class WindowBuilderTest {
    */
   @Test
   void toJSONWithNoRoleAccessButWindowExistsForOtherRoleReturnsJSON() throws Exception {
-    when(mockOBDal.get(Window.class, WINDOW_ID)).thenReturn(mockWindow);
-    when(mockOBDal.createCriteria(WindowAccess.class)).thenReturn(mockCriteria);
-    when(mockCriteria.add(any())).thenReturn(mockCriteria);
-    when(mockCriteria.setMaxResults(1)).thenReturn(mockCriteria);
-    // First uniqueResult call: role-specific query → null (no explicit access for this role)
-    // Second uniqueResult call: fallback query → mockWindowAccess (window exists for another role)
-    when(mockCriteria.uniqueResult()).thenReturn(null, mockWindowAccess);
-    when(mockWindow.getId()).thenReturn(WINDOW_ID);
-    when(mockWindow.getADTabList()).thenReturn(new ArrayList<>());
+    setupImplicitWindowAccess();
 
     WindowBuilder windowBuilder = createWindowBuilder();
     JSONObject result = executeToJSON(windowBuilder);
 
     assertNotNull(result);
-    assertTrue(result.has("tabs"), "Result must contain a tabs array");
-    assertEquals(0, result.getJSONArray("tabs").length(), "No tabs should be present (empty access list)");
+    assertTrue(result.has(TABS), "Result must contain a tabs array");
+    assertEquals(0, result.getJSONArray(TABS).length(), "No tabs should be present (empty access list)");
   }
 
   /**
@@ -562,5 +557,83 @@ class WindowBuilderTest {
     when(mockTabAccess.getTab()).thenReturn(mockTab);
     when(mockTab.getId()).thenReturn(TAB_ID_HYPHEN);
     when(mockTab.getDisplayLogic()).thenReturn(null);
+  }
+
+  /**
+   * Sets up the mock behavior for the implicit read-only access path: the current role has no
+   * active {@link WindowAccess} for the window, but another role does. The first
+   * {@code uniqueResult()} call (role-scoped query) returns {@code null} and the second one
+   * (window-scoped fallback query) returns a non-null access, which is what makes
+   * {@code getWindowAccess()} return {@code null} instead of throwing.
+   */
+  private void setupImplicitWindowAccess() {
+    when(mockOBDal.get(Window.class, WINDOW_ID)).thenReturn(mockWindow);
+    when(mockOBDal.createCriteria(WindowAccess.class)).thenReturn(mockCriteria);
+    when(mockCriteria.add(any())).thenReturn(mockCriteria);
+    when(mockCriteria.setMaxResults(1)).thenReturn(mockCriteria);
+    when(mockCriteria.uniqueResult()).thenReturn(null, mockWindowAccess);
+    when(mockWindow.getId()).thenReturn(WINDOW_ID);
+    when(mockWindow.getADTabList()).thenReturn(new ArrayList<>());
+  }
+
+  /**
+   * Tests that a window served through a real {@link WindowAccess} grant is marked as accessible.
+   * This is the positive half of the accessibility contract: the client must be able to tell a
+   * genuine grant apart from the implicit read-only fallback, and a genuine grant must never
+   * trigger the "Access Denied" screen.
+   *
+   * @throws Exception if any unexpected error occurs during the test execution.
+   */
+  @Test
+  void toJSONWithExplicitWindowAccessMarksWindowAsAccessible() throws Exception {
+    setupWindowAccess(true, true);
+    WindowBuilder windowBuilder = createWindowBuilder();
+
+    JSONObject result = executeToJSON(windowBuilder);
+
+    assertTrue(result.has(JSON_IS_WINDOW_ACCESSIBLE_KEY), "The accessibility flag must always be emitted");
+    assertTrue(result.getBoolean(JSON_IS_WINDOW_ACCESSIBLE_KEY),
+        "A role with an explicit WindowAccess must be reported as having access");
+  }
+
+  /**
+   * Tests that a window served through the implicit read-only fallback (no {@link WindowAccess}
+   * for the current role, but at least one other role has it) is marked as NOT accessible, while
+   * still answering with full metadata. The response stays HTTP 200 and the flag is the only
+   * signal the client has to render "Access Denied" on a deep-link.
+   *
+   * @throws Exception if any unexpected error occurs during the test execution.
+   */
+  @Test
+  void toJSONWithImplicitReadOnlyAccessMarksWindowAsNotAccessible() throws Exception {
+    setupImplicitWindowAccess();
+    WindowBuilder windowBuilder = createWindowBuilder();
+
+    JSONObject result = executeToJSON(windowBuilder);
+
+    assertTrue(result.has(JSON_IS_WINDOW_ACCESSIBLE_KEY), "The accessibility flag must always be emitted");
+    assertFalse(result.getBoolean(JSON_IS_WINDOW_ACCESSIBLE_KEY),
+        "The implicit read-only fallback must not be reported as real access");
+  }
+
+  /**
+   * Regression guard for the flag's position inside {@code toJSON()}: the accessibility flag is
+   * written before the tab array, whose builder swallows JSONException and only logs. Emitting the
+   * flag first guarantees the client still gets a trustworthy access signal on a degraded
+   * response. Asserted here through the tab-bearing path so both keys coexist.
+   *
+   * @throws Exception if any unexpected error occurs during the test execution.
+   */
+  @Test
+  void toJSONEmitsAccessibilityFlagAlongsideTabs() throws Exception {
+    setupWindowAccess(true, true);
+    setupTabAccess(true, true);
+    WindowBuilder windowBuilder = createWindowBuilder();
+
+    JSONObject result = executeToJSONWithTabs(windowBuilder, TAB_ID_HYPHEN);
+
+    assertTrue(result.getBoolean(JSON_IS_WINDOW_ACCESSIBLE_KEY),
+        "An explicitly granted window must stay accessible when tabs are present");
+    assertEquals(1, result.getJSONArray(TABS).length(), "The mocked tab access must produce one tab");
   }
 }

@@ -62,6 +62,8 @@ public final class ServiceFactory {
         EXACT_MATCH_SERVICES.put(EMAIL_SEND_PATH, EmailSendService::new);
         EXACT_MATCH_SERVICES.put(EMAIL_CONFIG_PATH, EmailConfigService::new);
         EXACT_MATCH_SERVICES.put(EMAIL_ATTACHMENTS_PATH, EmailAttachmentService::new);
+        EXACT_MATCH_SERVICES.put(CHANGE_PROFILE_PATH, ChangeProfileService::new);
+        EXACT_MATCH_SERVICES.put(LOGIN_PATH, LoginService::new);
 
         // Prefix match services (order matters for overlapping prefixes)
         PREFIX_MATCH_SERVICES.put(WINDOW_PATH, WindowService::new);
