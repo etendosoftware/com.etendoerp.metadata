@@ -138,6 +138,20 @@ public class Constants {
 
     // Window types
     public static final String JSON_WINDOW_TYPE_KEY = "windowType";
+
+    // Window access
+    /**
+     * Window JSON key emitted by {@code WindowBuilder}: {@code true} when the current role has an
+     * active {@code AD_Window_Access} record for the window, {@code false} when the window is
+     * served through the implicit read-only fallback (no explicit grant for this role, but some
+     * other role has one). The new UI reads it to render an "Access Denied" screen on deep-links,
+     * since the implicit path still answers HTTP 200 with full metadata.
+     * <p>
+     * Same predicate as the per-field {@code isReferencedWindowAccessible} flag emitted by
+     * {@code FieldBuilderWithColumn}, applied to the window itself.
+     */
+    public static final String JSON_IS_WINDOW_ACCESSIBLE_KEY = "isWindowAccessible";
+
     // === Legacy process action JSON keys ===
     //
     // Keys used to serialize {@link com.etendoerp.metadata.builders.LegacyProcessParams}
