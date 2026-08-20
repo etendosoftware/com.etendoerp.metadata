@@ -33,24 +33,24 @@ import org.openbravo.model.ad.system.Language;
 import org.openbravo.service.datasource.DataSourceServlet;
 
 import javax.servlet.ServletException;
-import javax.servlet.ServletOutputStream;
-import javax.servlet.WriteListener;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.OutputStreamWriter;
-import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 
+import static com.etendoerp.metadata.http.StaleObjectTestFixtures.STALE_JSON_BODY;
+import static com.etendoerp.metadata.http.StaleObjectTestFixtures.STALE_OBJECT_CODE_JSON;
+import static com.etendoerp.metadata.http.StaleObjectTestFixtures.SUCCESS_BODY;
+import static com.etendoerp.metadata.http.StaleObjectTestFixtures.VALIDATION_ERROR_BODY;
+import static com.etendoerp.metadata.http.StaleObjectTestFixtures.captureResponseOutput;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
@@ -79,13 +79,8 @@ public class ForwarderServletTest {
     private static final String ADD_OPERATION = "add";
     private static final String UPDATE_OPERATION = "update";
     private static final String COLOR_EXTRA_PROP = "priority.color";
-    private static final String STALE_JSON_BODY =
-            "{\"response\":{\"status\":-4,\"error\":{\"message\":\"@OBJSON_StaleDate@\",\"type\":\"system\"}}}";
     private static final String STALE_APRM_BODY =
             "{\"response\":{\"status\":-4,\"error\":{\"message\":\"@APRM_StaleDate@\",\"type\":\"system\"}}}";
-    private static final String VALIDATION_ERROR_BODY =
-            "{\"response\":{\"status\":-4,\"error\":{\"message\":\"Some field is required\",\"type\":\"system\"}}}";
-    private static final String SUCCESS_BODY = "{\"response\":{\"status\":0,\"data\":[{\"id\":\"1\"}]}}";
     // The core resolves the "@OBJSON_StaleDate@" placeholder into this AD_Message text before
     // writing the response -- a real conflict response never contains the raw marker (see
     // JsonUtils.convertExceptionToJson -> OBMessageUtils.translateError -> ErrorTextParserPOSTGRE).
@@ -94,7 +89,6 @@ public class ForwarderServletTest {
             + "clicking the refresh button.";
     private static final String TRANSLATED_STALE_BODY = "{\"response\":{\"status\":-1,\"error\":{\"message\":\""
             + TRANSLATED_STALE_TEXT + "\",\"type\":\"Error\",\"title\":\"\"},\"totalRows\":0}}";
-    private static final String STALE_OBJECT_CODE_JSON = "\"code\":\"STALE_OBJECT\"";
     private static final String TEST_LANGUAGE = "en_US";
 
     private ForwarderServlet forwarderServlet;
@@ -118,29 +112,11 @@ public class ForwarderServletTest {
     @Before
     public void setUp() throws IOException {
         forwarderServlet = new ForwarderServlet();
-        realOutput = new ByteArrayOutputStream();
-        ServletOutputStream realSos = new ServletOutputStream() {
-            @Override
-            public boolean isReady() {
-                return true;
-            }
-
-            @Override
-            public void setWriteListener(WriteListener listener) {
-                // no-op
-            }
-
-            @Override
-            public void write(int b) {
-                realOutput.write(b);
-            }
-        };
-        lenient().when(response.getOutputStream()).thenReturn(realSos);
         // Utils.writeJsonResponse (used to write the 409 conflict body) writes via getWriter(),
         // while BufferedResponseWrapper#flushToRealResponse (the passthrough path) writes via
-        // getOutputStream() -- both must land in the same buffer so tests can assert on either path.
-        PrintWriter realWriter = new PrintWriter(new OutputStreamWriter(realOutput, StandardCharsets.UTF_8), true);
-        lenient().when(response.getWriter()).thenReturn(realWriter);
+        // getOutputStream() -- captureResponseOutput wires both into the same buffer so tests
+        // can assert on the result regardless of which path was taken.
+        realOutput = captureResponseOutput(response);
     }
 
     /**

@@ -25,21 +25,21 @@ import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 
 import javax.servlet.FilterChain;
-import javax.servlet.ServletOutputStream;
 import javax.servlet.ServletResponse;
-import javax.servlet.WriteListener;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayOutputStream;
-import java.io.OutputStreamWriter;
-import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
 
+import static com.etendoerp.metadata.http.StaleObjectTestFixtures.STALE_JSON_BODY;
+import static com.etendoerp.metadata.http.StaleObjectTestFixtures.STALE_OBJECT_CODE_JSON;
+import static com.etendoerp.metadata.http.StaleObjectTestFixtures.SUCCESS_BODY;
+import static com.etendoerp.metadata.http.StaleObjectTestFixtures.VALIDATION_ERROR_BODY;
+import static com.etendoerp.metadata.http.StaleObjectTestFixtures.captureResponseOutput;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -55,11 +55,6 @@ import static org.mockito.Mockito.when;
 public class StaleObjectConflictFilterTest {
 
     private static final String OPERATION_TYPE_PARAM = "_operationType";
-    private static final String STALE_JSON_BODY =
-            "{\"response\":{\"status\":-4,\"error\":{\"message\":\"@OBJSON_StaleDate@\",\"type\":\"system\"}}}";
-    private static final String VALIDATION_ERROR_BODY =
-            "{\"response\":{\"status\":-4,\"error\":{\"message\":\"Some field is required\",\"type\":\"system\"}}}";
-    private static final String SUCCESS_BODY = "{\"response\":{\"status\":0,\"data\":[{\"id\":\"1\"}]}}";
 
     private StaleObjectConflictFilter filter;
 
@@ -83,26 +78,7 @@ public class StaleObjectConflictFilterTest {
     @Before
     public void setUp() throws Exception {
         filter = new StaleObjectConflictFilter();
-        realOutput = new ByteArrayOutputStream();
-        ServletOutputStream realSos = new ServletOutputStream() {
-            @Override
-            public boolean isReady() {
-                return true;
-            }
-
-            @Override
-            public void setWriteListener(WriteListener listener) {
-                // no-op
-            }
-
-            @Override
-            public void write(int b) {
-                realOutput.write(b);
-            }
-        };
-        lenient().when(response.getOutputStream()).thenReturn(realSos);
-        PrintWriter realWriter = new PrintWriter(new OutputStreamWriter(realOutput, StandardCharsets.UTF_8), true);
-        lenient().when(response.getWriter()).thenReturn(realWriter);
+        realOutput = captureResponseOutput(response);
     }
 
     /**
@@ -134,7 +110,7 @@ public class StaleObjectConflictFilterTest {
 
         verify(response).setStatus(HttpStatus.SC_CONFLICT);
         String written = realOutput.toString(StandardCharsets.UTF_8);
-        assertTrue(written.contains("\"code\":\"STALE_OBJECT\""));
+        assertTrue(written.contains(STALE_OBJECT_CODE_JSON));
         assertTrue(written.contains("@OBJSON_StaleDate@"));
     }
 
