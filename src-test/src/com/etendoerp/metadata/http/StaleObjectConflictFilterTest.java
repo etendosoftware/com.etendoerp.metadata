@@ -25,10 +25,12 @@ import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 
 import javax.servlet.FilterChain;
+import javax.servlet.ServletException;
 import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
 import static com.etendoerp.metadata.http.StaleObjectTestFixtures.STALE_JSON_BODY;
@@ -73,10 +75,10 @@ public class StaleObjectConflictFilterTest {
      * Initializes the filter under test and a response whose output stream/writer both capture
      * everything written into {@link #realOutput}.
      *
-     * @throws Exception if test setup fails
+     * @throws IOException if test setup fails
      */
     @Before
-    public void setUp() throws Exception {
+    public void setUp() throws IOException {
         filter = new StaleObjectConflictFilter();
         realOutput = captureResponseOutput(response);
     }
@@ -86,7 +88,7 @@ public class StaleObjectConflictFilterTest {
      * (real or buffered), it writes {@code body} to that response's writer -- simulating what
      * the servlet at the end of the chain does.
      */
-    private void stubChainWrite(String body) throws Exception {
+    private void stubChainWrite(String body) throws IOException, ServletException {
         doAnswer(invocation -> {
             ServletResponse resp = invocation.getArgument(1);
             resp.getWriter().write(body);
@@ -99,10 +101,11 @@ public class StaleObjectConflictFilterTest {
      * A PUT (update) whose response body contains the core's stale-object marker must be
      * rewritten as a distinct HTTP 409 with a structured {@code STALE_OBJECT} conflict body.
      *
-     * @throws Exception if an error occurs during test execution
+     * @throws IOException      if an error occurs during test execution
+     * @throws ServletException if an error occurs during test execution
      */
     @Test
-    public void putWithStaleObjectConflictShouldReturn409() throws Exception {
+    public void putWithStaleObjectConflictShouldReturn409() throws IOException, ServletException {
         when(request.getMethod()).thenReturn("PUT");
         stubChainWrite(STALE_JSON_BODY);
 
@@ -118,10 +121,11 @@ public class StaleObjectConflictFilterTest {
      * A POST {@code update} whose response contains the stale-object marker must also be
      * rewritten as HTTP 409, the same as PUT.
      *
-     * @throws Exception if an error occurs during test execution
+     * @throws IOException      if an error occurs during test execution
+     * @throws ServletException if an error occurs during test execution
      */
     @Test
-    public void postUpdateWithStaleObjectConflictShouldReturn409() throws Exception {
+    public void postUpdateWithStaleObjectConflictShouldReturn409() throws IOException, ServletException {
         when(request.getMethod()).thenReturn("POST");
         when(request.getParameter(OPERATION_TYPE_PARAM)).thenReturn("update");
         stubChainWrite(STALE_JSON_BODY);
@@ -135,10 +139,11 @@ public class StaleObjectConflictFilterTest {
      * A POST {@code add} (new record) whose response contains the stale-object marker must also
      * be rewritten as HTTP 409 -- same handling as {@code update}.
      *
-     * @throws Exception if an error occurs during test execution
+     * @throws IOException      if an error occurs during test execution
+     * @throws ServletException if an error occurs during test execution
      */
     @Test
-    public void postAddWithStaleObjectConflictShouldReturn409() throws Exception {
+    public void postAddWithStaleObjectConflictShouldReturn409() throws IOException, ServletException {
         when(request.getMethod()).thenReturn("POST");
         when(request.getParameter(OPERATION_TYPE_PARAM)).thenReturn("add");
         stubChainWrite(STALE_JSON_BODY);
@@ -152,10 +157,11 @@ public class StaleObjectConflictFilterTest {
      * A fetch (read) request is not a save operation -- the filter must not buffer it at all,
      * passing the original, unwrapped response straight down the chain.
      *
-     * @throws Exception if an error occurs during test execution
+     * @throws IOException      if an error occurs during test execution
+     * @throws ServletException if an error occurs during test execution
      */
     @Test
-    public void postFetchShouldBypassBufferingEntirely() throws Exception {
+    public void postFetchShouldBypassBufferingEntirely() throws IOException, ServletException {
         when(request.getMethod()).thenReturn("POST");
         when(request.getParameter(OPERATION_TYPE_PARAM)).thenReturn("fetch");
 
@@ -170,10 +176,11 @@ public class StaleObjectConflictFilterTest {
      * passed through to the real response completely unchanged -- no regression for any other
      * kind of save error.
      *
-     * @throws Exception if an error occurs during test execution
+     * @throws IOException      if an error occurs during test execution
+     * @throws ServletException if an error occurs during test execution
      */
     @Test
-    public void putWithValidationErrorShouldPassThroughUnchanged() throws Exception {
+    public void putWithValidationErrorShouldPassThroughUnchanged() throws IOException, ServletException {
         when(request.getMethod()).thenReturn("PUT");
         stubChainWrite(VALIDATION_ERROR_BODY);
 
@@ -186,10 +193,11 @@ public class StaleObjectConflictFilterTest {
     /**
      * A successful save must be passed through to the real response completely unchanged.
      *
-     * @throws Exception if an error occurs during test execution
+     * @throws IOException      if an error occurs during test execution
+     * @throws ServletException if an error occurs during test execution
      */
     @Test
-    public void putWithSuccessShouldPassThroughUnchanged() throws Exception {
+    public void putWithSuccessShouldPassThroughUnchanged() throws IOException, ServletException {
         when(request.getMethod()).thenReturn("PUT");
         stubChainWrite(SUCCESS_BODY);
 
