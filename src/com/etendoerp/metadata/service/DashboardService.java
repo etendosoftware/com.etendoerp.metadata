@@ -19,7 +19,9 @@ package com.etendoerp.metadata.service;
 
 import com.etendoerp.metadata.exceptions.InternalServerException;
 import com.etendoerp.metadata.exceptions.NotFoundException;
+import com.etendoerp.metadata.exceptions.UnauthorizedException;
 import com.etendoerp.metadata.widgets.DashboardLayoutResolver;
+import com.etendoerp.metadata.widgets.WidgetClassAccessRule;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONObject;
 import org.hibernate.query.Query;
@@ -250,6 +252,10 @@ public class DashboardService extends MetadataService {
         String userId     = OBContext.getOBContext().getUser().getId();
         String roleId     = OBContext.getOBContext().getRole().getId();
         String clientId   = OBContext.getOBContext().getCurrentClient().getId();
+
+        if (!WidgetClassAccessRule.isAllowed(classId, roleId)) {
+            throw new UnauthorizedException("Widget type not allowed for this role");
+        }
 
         // Remove USER shadow record (isvisible=N) so the new widget is not hidden
         OBDal.getInstance().getSession()

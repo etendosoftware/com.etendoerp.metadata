@@ -25,10 +25,12 @@ import org.codehaus.jettison.json.JSONObject;
 import org.hibernate.query.Query;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.openbravo.model.ad.access.Role;
 
 import java.util.Collections;
 import java.util.List;
@@ -55,8 +57,13 @@ class WidgetClassesServiceCoverageTest extends AbstractMockedContextTest {
     private static final String PARAMS_KEY = "params";
     private static final String LIST_VALUES_KEY = "listValues";
 
+    @Mock Role role;
+
     @SuppressWarnings("unchecked")
     private void setupClassAndParamQueries(List<Object[]> classRows, List<Object[]> paramRows) {
+        when(obContext.getRole()).thenReturn(role);
+        when(role.getId()).thenReturn("role1");
+
         Query<Object[]> classQuery = mock(Query.class);
         when(session.createQuery(argThat(s -> s != null && s.contains("etmeta_Widget_Class")), eq(Object[].class)))
                 .thenReturn(classQuery);
