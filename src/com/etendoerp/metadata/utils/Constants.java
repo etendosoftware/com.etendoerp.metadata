@@ -42,6 +42,20 @@ public class Constants {
     public static final String MESSAGE_PATH = "/message";
     public static final String LABELS_PATH = "/labels";
     public static final String PREFERENCES_PATH = "/preferences";
+    /**
+     * Endpoints still reachable while the user's password is expired. They are the minimum the new UI
+     * needs to render the mandatory password-change screen: the session payload carrying the
+     * {@code passwordExpired} flag, the translations, the language list and the preferences the client
+     * always loads right after the session. Every other metadata endpoint is rejected with 401 until
+     * the password is updated.
+     */
+    public static final List<String> PASSWORD_EXPIRED_ALLOWED_PATHS = Collections.unmodifiableList(Arrays.asList(
+            SESSION_PATH, LABELS_PATH, LANGUAGE_PATH, PREFERENCES_PATH));
+    /**
+     * Stable error code returned when the caller's password is expired. The new UI matches it exactly
+     * to tell this rejection apart from a generic session failure, so it must not be turned into prose.
+     */
+    public static final String PASSWORD_EXPIRED_ERROR = "PasswordExpired";
     public static final String SSO_PATH = "/sso/";
     public static final boolean DEFAULT_CHECKON_SAVE = true;
     public static final boolean DEFAULT_EDITABLE_FIELD = true;
@@ -138,6 +152,20 @@ public class Constants {
 
     // Window types
     public static final String JSON_WINDOW_TYPE_KEY = "windowType";
+
+    // Window access
+    /**
+     * Window JSON key emitted by {@code WindowBuilder}: {@code true} when the current role has an
+     * active {@code AD_Window_Access} record for the window, {@code false} when the window is
+     * served through the implicit read-only fallback (no explicit grant for this role, but some
+     * other role has one). The new UI reads it to render an "Access Denied" screen on deep-links,
+     * since the implicit path still answers HTTP 200 with full metadata.
+     * <p>
+     * Same predicate as the per-field {@code isReferencedWindowAccessible} flag emitted by
+     * {@code FieldBuilderWithColumn}, applied to the window itself.
+     */
+    public static final String JSON_IS_WINDOW_ACCESSIBLE_KEY = "isWindowAccessible";
+
     // === Legacy process action JSON keys ===
     //
     // Keys used to serialize {@link com.etendoerp.metadata.builders.LegacyProcessParams}

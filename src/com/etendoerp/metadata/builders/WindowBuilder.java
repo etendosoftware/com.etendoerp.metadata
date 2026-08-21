@@ -44,6 +44,7 @@ import org.openbravo.dal.core.OBContext;
 import com.etendoerp.metadata.cache.ADCacheProvider;
 import com.etendoerp.metadata.exceptions.NotFoundException;
 import com.etendoerp.metadata.exceptions.UnauthorizedException;
+import com.etendoerp.metadata.utils.Constants;
 
 /**
  * Builds a JSON representation of a window including its tabs and role-based access permissions.
@@ -183,6 +184,10 @@ public class WindowBuilder extends Builder {
 
     public JSONObject toJSON() {
         WindowAccess windowAccess = getWindowAccess(id);
+        // getWindowAccess() returns null for the implicit read-only fallback path (no
+        // AD_Window_Access for this role, but another role has one). Surface it so the client can
+        // tell it apart from a real grant instead of assuming any HTTP 200 means "access granted".
+        boolean isWindowAccessible = windowAccess != null;
         boolean isReadOnly = (windowAccess == null) || !windowAccess.isEditableField();
 
         Window window = windowAccess != null
@@ -197,6 +202,9 @@ public class WindowBuilder extends Builder {
 
         try {
             windowJson.put("id", window.getId());
+            // Written before the tabs array on purpose: createTabsJson() may throw a JSONException
+            // that is only logged below, and the access signal must survive a degraded response.
+            windowJson.put(Constants.JSON_IS_WINDOW_ACCESSIBLE_KEY, isWindowAccessible);
             windowJson.put("tabs", createTabsJson(tabAccesses, window.getADTabList(), isReadOnly));
         } catch (JSONException e) {
             logger.error("Error creating JSON for window tabs: {}", e.getMessage(), e);

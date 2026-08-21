@@ -57,10 +57,16 @@ public class TabBuilder extends Builder {
   /** HQL property name every entity's primary key is universally mapped to. */
   private static final String ID_HQL_NAME = "id";
 
+  /** Key under which the authoritative link-to-parent property is published. */
+  private static final String PARENT_PROPERTY = "parentProperty";
+
   private final Tab tab;
   private final TabAccess tabAccess;
   private final boolean isWindowReadOnly;
   private final List<FieldAccess> preloadedFieldAccessList;
+
+  /** Memoized result of {@link #resolveParentProperty()}; {@code null} until first resolved. */
+  private String parentProperty;
 
   /**
    * Constructs a TabBuilder for the given tab.
@@ -128,6 +134,13 @@ public class TabBuilder extends Builder {
 
       if (parentTab != null) {
         json.put("parentTabId", parentTab.getId());
+        // Classic's own answer, empty string included. An empty value is a real answer — "this
+        // tab has no link column to its parent" — and the grid must then filter through the
+        // tab's hqlwhereclause instead of an invented criteria, exactly as OBViewGrid does.
+        // parentColumns cannot carry it: when the property is blank that array falls back to
+        // every isLinkToParentColumn of the table, which is what made clients pick an
+        // unrelated column. See ApplicationUtils.getParentProperty.
+        json.put(PARENT_PROPERTY, resolveParentProperty());
       }
 
       if (Boolean.TRUE.equals(tab.isTreeIncluded())) {
@@ -174,6 +187,26 @@ public class TabBuilder extends Builder {
   }
 
   /**
+   * Resolves this tab's link-to-parent property with the very function the classic UI uses,
+   * {@link ApplicationUtils#getParentProperty(Tab, Tab)}, and memoizes the result so the two
+   * consumers ({@link #getParentColumns()} and the {@code parentProperty} JSON key) never
+   * disagree and never pay for the lookup twice.
+   *
+   * @return the property name, or an empty string when the tab has no link column to its parent
+   *         (a legitimate answer: such tabs are filtered by their hqlwhereclause alone)
+   */
+  private String resolveParentProperty() {
+    if (parentProperty == null) {
+      Tab parentTab = tab.getTabLevel() == 0 ? null : getParentTab();
+      parentProperty = parentTab == null ? "" : ApplicationUtils.getParentProperty(tab, parentTab);
+      if (parentProperty == null) {
+        parentProperty = "";
+      }
+    }
+    return parentProperty;
+  }
+
+  /**
    * Parses the display logic string into a JavaScript expression.
    *
    * @param displayLogic the display logic string to parse
@@ -208,13 +241,13 @@ public class TabBuilder extends Builder {
     }
 
     if (parentTab != null) {
-      String parentProperty = ApplicationUtils.getParentProperty(tab, parentTab);
-      if (StringUtils.isNotBlank(parentProperty)) {
-        jsonColumns.put(parentProperty);
-        if (!linkToParentColumns.isEmpty() && !linkToParentColumns.contains(parentProperty)) {
+      String resolvedParentProperty = resolveParentProperty();
+      if (StringUtils.isNotBlank(resolvedParentProperty)) {
+        jsonColumns.put(resolvedParentProperty);
+        if (!linkToParentColumns.isEmpty() && !linkToParentColumns.contains(resolvedParentProperty)) {
           logger.warn(
               "Parent columns mismatch in tab {} ({}). parentTabId={}, parentProperty='{}', linkToParentColumns={}",
-              tab.getId(), tab.getName(), parentTab.getId(), parentProperty, linkToParentColumns);
+              tab.getId(), tab.getName(), parentTab.getId(), resolvedParentProperty, linkToParentColumns);
         }
         return jsonColumns;
       }
