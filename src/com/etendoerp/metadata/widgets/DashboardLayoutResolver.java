@@ -61,6 +61,8 @@ public class DashboardLayoutResolver {
         "  and (dw.layer = 'SYSTEM' " +
         "       or (dw.layer = 'CLIENT' and dw.client.id = :clientId) " +
         "       or (dw.layer = 'USER'   and dw.user.id   = :userId and dw.role.id = :roleId)) " +
+        "  and ( not exists (from etmeta_Widget_Class_Access a where a.widgetClass = dw.widgetClass and a.active = true) " +
+        "     or exists (from etmeta_Widget_Class_Access a where a.widgetClass = dw.widgetClass and a.active = true and a.role.id = :roleId) ) " +
         "order by dw.layer, dw.sequence";
 
     /**

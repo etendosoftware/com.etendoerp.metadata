@@ -20,9 +20,11 @@ package com.etendoerp.metadata.service;
 import org.codehaus.jettison.json.JSONObject;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.hibernate.query.Query;
+import org.openbravo.model.ad.access.Role;
 
 import java.util.Collections;
 
@@ -33,17 +35,26 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class WidgetClassesServiceTest extends AbstractMockedContextTest {
 
     private static final String CLASSES = "classes";
+    private static final String ROLE_ID = "role-y";
 
     @Mock Query<Object[]> query;
+    @Mock Role role;
+
+    private void stubCurrentRole() {
+        when(obContext.getRole()).thenReturn(role);
+        when(role.getId()).thenReturn(ROLE_ID);
+    }
 
     @Test
     void getClassesReturnsClassesArray() throws Exception {
+        stubCurrentRole();
         Object[] classRow = { "classId1", "my-widget", "KPI", "My Widget",
                               "A test widget", 2, 1, 30 };
         when(session.createQuery(argThat(s -> s != null && s.contains("etmeta_Widget_Class")), eq(Object[].class)))
@@ -65,5 +76,27 @@ class WidgetClassesServiceTest extends AbstractMockedContextTest {
             assertEquals(1, result.getJSONArray(CLASSES).length());
             assertEquals("KPI", result.getJSONArray(CLASSES).getJSONObject(0).getString("type"));
         });
+    }
+
+    @Test
+    void catalogQueryIncludesRoleAccessFilter() throws Exception {
+        stubCurrentRole();
+        when(session.createQuery(argThat(s -> s != null && s.contains("etmeta_Widget_Class")), eq(Object[].class)))
+                .thenReturn(query);
+        when(query.list()).thenReturn(Collections.emptyList());
+
+        runWithMockedContext(() -> {
+            WidgetClassesService svc = new WidgetClassesService(request, response);
+            svc.process();
+        });
+
+        ArgumentCaptor<String> hqlCaptor = ArgumentCaptor.forClass(String.class);
+        verify(session).createQuery(hqlCaptor.capture(), eq(Object[].class));
+        String hql = hqlCaptor.getValue();
+        assertTrue(hql.contains("etmeta_Widget_Class_Access"),
+                "catalog HQL must join the access-control table so restricted types can be filtered out");
+        assertTrue(hql.contains(":roleId"),
+                "catalog HQL must be parameterized by the current role");
+        verify(query).setParameter("roleId", ROLE_ID);
     }
 }

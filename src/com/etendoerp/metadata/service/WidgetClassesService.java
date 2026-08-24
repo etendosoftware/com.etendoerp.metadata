@@ -39,7 +39,10 @@ public class WidgetClassesService extends MetadataService {
     private static final String CLASS_HQL =
         "select wc.id, wc.name, wc.type, wc.title, wc.description, " +
         "wc.defaultWidth, wc.defaultHeight, wc.refreshInterval " +
-        "from etmeta_Widget_Class wc where wc.active = true order by wc.name";
+        "from etmeta_Widget_Class wc where wc.active = true " +
+        "and ( not exists (from etmeta_Widget_Class_Access a where a.widgetClass = wc and a.active = true) " +
+        "   or exists (from etmeta_Widget_Class_Access a where a.widgetClass = wc and a.active = true and a.role.id = :roleId) ) " +
+        "order by wc.name";
 
     private static final String PARAM_HQL =
         "select p.name, p.displayName, p.type, p.isRequired, p.isFixed, " +
@@ -60,10 +63,12 @@ public class WidgetClassesService extends MetadataService {
     @Override
     public void process() throws IOException {
         try {
+            String roleId = OBContext.getOBContext().getRole().getId();
             OBContext.setAdminMode(true);
             JSONArray classes = new JSONArray();
             Query<Object[]> q = OBDal.getInstance().getSession()
                     .createQuery(CLASS_HQL, Object[].class);
+            q.setParameter("roleId", roleId);
             for (Object[] row : q.list()) {
                 String type = (String) row[2];
                 WidgetDataResolver resolver = WidgetResolverRegistryHolder.getInstance().getResolver(type);

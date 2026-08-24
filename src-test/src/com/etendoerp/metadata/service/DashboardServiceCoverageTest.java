@@ -411,7 +411,17 @@ class DashboardServiceCoverageTest {
             when(existsQ.uniqueResult()).thenReturn(count);
         }
 
+        @SuppressWarnings("unchecked")
+        private void mockAccessRuleAllowed() {
+            Query<Object[]> accessQ = mock(Query.class);
+            doReturn(accessQ).when(session).createQuery((String) argThat(s -> s != null && ((String) s).contains("etmeta_Widget_Class_Access")),
+                    eq(Object[].class));
+            when(accessQ.setParameter(anyString(), any())).thenReturn(accessQ);
+            when(accessQ.uniqueResult()).thenReturn(new Object[] { 0L, 0L });
+        }
+
         private void mockPostWidgetQueries(long existsCount) {
+            mockAccessRuleAllowed();
             mockDeleteShadowQuery();
             mockExistsCountQuery(existsCount);
         }
