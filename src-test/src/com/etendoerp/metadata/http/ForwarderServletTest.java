@@ -18,6 +18,7 @@
 package com.etendoerp.metadata.http;
 
 import com.etendoerp.metadata.service.ExtraPropertiesEnricher;
+import org.apache.http.HttpStatus;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -26,18 +27,33 @@ import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.MockitoJUnitRunner;
 import org.openbravo.base.weld.WeldUtils;
+import org.openbravo.dal.core.OBContext;
+import org.openbravo.erpCommon.utility.Utility;
+import org.openbravo.model.ad.system.Language;
 import org.openbravo.service.datasource.DataSourceServlet;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 
+import static com.etendoerp.metadata.http.StaleObjectTestFixtures.STALE_JSON_BODY;
+import static com.etendoerp.metadata.http.StaleObjectTestFixtures.STALE_OBJECT_CODE_JSON;
+import static com.etendoerp.metadata.http.StaleObjectTestFixtures.SUCCESS_BODY;
+import static com.etendoerp.metadata.http.StaleObjectTestFixtures.VALIDATION_ERROR_BODY;
+import static com.etendoerp.metadata.http.StaleObjectTestFixtures.captureResponseOutput;
 import static org.junit.Assert.assertEquals;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.eq;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -60,7 +76,20 @@ public class ForwarderServletTest {
     private static final String DISTINCT_PARAM = "_distinct";
     private static final String FETCH_OPERATION  = "fetch";
     private static final String REMOVE_OPERATION = "remove";
+    private static final String ADD_OPERATION = "add";
+    private static final String UPDATE_OPERATION = "update";
     private static final String COLOR_EXTRA_PROP = "priority.color";
+    private static final String STALE_APRM_BODY =
+            "{\"response\":{\"status\":-4,\"error\":{\"message\":\"@APRM_StaleDate@\",\"type\":\"system\"}}}";
+    // The core resolves the "@OBJSON_StaleDate@" placeholder into this AD_Message text before
+    // writing the response -- a real conflict response never contains the raw marker (see
+    // JsonUtils.convertExceptionToJson -> OBMessageUtils.translateError -> ErrorTextParserPOSTGRE).
+    private static final String TRANSLATED_STALE_TEXT = "The record you are saving has already been "
+            + "changed by another user or process. Cancel your changes and refresh the data by "
+            + "clicking the refresh button.";
+    private static final String TRANSLATED_STALE_BODY = "{\"response\":{\"status\":-1,\"error\":{\"message\":\""
+            + TRANSLATED_STALE_TEXT + "\",\"type\":\"Error\",\"title\":\"\"},\"totalRows\":0}}";
+    private static final String TEST_LANGUAGE = "en_US";
 
     private ForwarderServlet forwarderServlet;
 
@@ -73,10 +102,44 @@ public class ForwarderServletTest {
     @Mock
     private DataSourceServlet dataSourceServlet;
 
-    /** Initializes the servlet under test. */
+    private ByteArrayOutputStream realOutput;
+
+    /**
+     * Initializes the servlet under test.
+     *
+     * @throws IOException if test setup fails
+     */
     @Before
-    public void setUp() {
+    public void setUp() throws IOException {
         forwarderServlet = new ForwarderServlet();
+        // Utils.writeJsonResponse (used to write the 409 conflict body) writes via getWriter(),
+        // while BufferedResponseWrapper#flushToRealResponse (the passthrough path) writes via
+        // getOutputStream() -- captureResponseOutput wires both into the same buffer so tests
+        // can assert on the result regardless of which path was taken.
+        realOutput = captureResponseOutput(response);
+    }
+
+    /**
+     * Stubs {@code dataSourceServlet.doPost}/{@code doPut} so that, when invoked with whatever
+     * response it is given (real or buffered), it writes {@code body} to that response's writer
+     * -- simulating what the core servlet's {@code writeResult()} does.
+     */
+    private void stubForwardedWrite(boolean isPost, String body) throws IOException, ServletException {
+        if (isPost) {
+            doAnswer(invocation -> {
+                HttpServletResponse resp = invocation.getArgument(1);
+                resp.getWriter().write(body);
+                resp.getWriter().flush();
+                return null;
+            }).when(dataSourceServlet).doPost(any(), any());
+        } else {
+            doAnswer(invocation -> {
+                HttpServletResponse resp = invocation.getArgument(1);
+                resp.getWriter().write(body);
+                resp.getWriter().flush();
+                return null;
+            }).when(dataSourceServlet).doPut(any(), any());
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -145,7 +208,9 @@ public class ForwarderServletTest {
     }
 
     /**
-     * PUT requests must be forwarded to {@link DataSourceServlet#doPut}.
+     * PUT requests must be forwarded to {@link DataSourceServlet#doPut}, wrapped in a
+     * {@link BufferedResponseWrapper} so the forwarder can inspect the response before it
+     * reaches the real client (PUT is always a save/update operation).
      *
      * @throws ServletException if servlet processing fails
      * @throws IOException      if an I/O error occurs
@@ -159,7 +224,223 @@ public class ForwarderServletTest {
 
             forwarderServlet.process(request, response);
 
-            verify(dataSourceServlet).doPut(request, response);
+            verify(dataSourceServlet).doPut(eq(request), any(BufferedResponseWrapper.class));
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Optimistic-lock (stale object) conflict detection on forwarded saves
+    // -------------------------------------------------------------------------
+
+    /**
+     * A PUT (update) whose forwarded response body contains the core's stale-object marker must
+     * be rewritten as a distinct HTTP 409 with a structured {@code STALE_OBJECT} conflict body,
+     * instead of the generic HTTP 200 the core itself would have written.
+     *
+     * @throws IOException      if an error occurs during test execution
+     * @throws ServletException if an error occurs during test execution
+     */
+    @Test
+    public void processPutWithStaleObjectConflictShouldReturn409WithStaleObjectCode()
+            throws IOException, ServletException {
+        try (MockedStatic<WeldUtils> weldUtilsMock = mockStatic(WeldUtils.class)) {
+            weldUtilsMock.when(() -> WeldUtils.getInstanceFromStaticBeanManager(DataSourceServlet.class))
+                    .thenReturn(dataSourceServlet);
+            when(request.getMethod()).thenReturn("PUT");
+            stubForwardedWrite(false, STALE_JSON_BODY);
+
+            forwarderServlet.process(request, response);
+
+            verify(response).setStatus(HttpStatus.SC_CONFLICT);
+            String written = realOutput.toString(StandardCharsets.UTF_8);
+            assertTrue(written.contains(STALE_OBJECT_CODE_JSON));
+            assertTrue(written.contains("@OBJSON_StaleDate@"));
+        }
+    }
+
+    /**
+     * The same detection must also apply to the {@code @APRM_StaleDate@} marker used by
+     * payment-related action handlers.
+     *
+     * @throws IOException      if an error occurs during test execution
+     * @throws ServletException if an error occurs during test execution
+     */
+    @Test
+    public void processPutWithAprmStaleObjectConflictShouldReturn409() throws IOException, ServletException {
+        try (MockedStatic<WeldUtils> weldUtilsMock = mockStatic(WeldUtils.class)) {
+            weldUtilsMock.when(() -> WeldUtils.getInstanceFromStaticBeanManager(DataSourceServlet.class))
+                    .thenReturn(dataSourceServlet);
+            when(request.getMethod()).thenReturn("PUT");
+            stubForwardedWrite(false, STALE_APRM_BODY);
+
+            forwarderServlet.process(request, response);
+
+            verify(response).setStatus(HttpStatus.SC_CONFLICT);
+            assertTrue(realOutput.toString(StandardCharsets.UTF_8).contains(STALE_OBJECT_CODE_JSON));
+        }
+    }
+
+    /**
+     * A POST {@code add}/{@code update} whose forwarded response contains the stale-object
+     * marker must also be rewritten as HTTP 409, the same as PUT.
+     *
+     * @throws IOException      if an error occurs during test execution
+     * @throws ServletException if an error occurs during test execution
+     */
+    @Test
+    public void processPostUpdateWithStaleObjectConflictShouldReturn409() throws IOException, ServletException {
+        try (MockedStatic<WeldUtils> weldUtilsMock = mockStatic(WeldUtils.class)) {
+            weldUtilsMock.when(() -> WeldUtils.getInstanceFromStaticBeanManager(DataSourceServlet.class))
+                    .thenReturn(dataSourceServlet);
+            when(request.getMethod()).thenReturn("POST");
+            when(request.getPathInfo()).thenReturn(ENTITY_PATH);
+            when(request.getParameter(OPERATION_TYPE_PARAM)).thenReturn(UPDATE_OPERATION);
+            stubForwardedWrite(true, STALE_JSON_BODY);
+
+            forwarderServlet.process(request, response);
+
+            verify(dataSourceServlet).doPost(any(), any(BufferedResponseWrapper.class));
+            verify(response).setStatus(HttpStatus.SC_CONFLICT);
+            assertTrue(realOutput.toString(StandardCharsets.UTF_8).contains(STALE_OBJECT_CODE_JSON));
+        }
+    }
+
+    /**
+     * A POST {@code add} (new record) whose forwarded response contains the stale-object marker
+     * must also be rewritten as HTTP 409 -- same handling as {@code update}, since both are
+     * save operations that carry the {@code updated} timestamp for optimistic locking.
+     *
+     * @throws IOException      if an error occurs during test execution
+     * @throws ServletException if an error occurs during test execution
+     */
+    @Test
+    public void processPostAddWithStaleObjectConflictShouldReturn409() throws IOException, ServletException {
+        try (MockedStatic<WeldUtils> weldUtilsMock = mockStatic(WeldUtils.class)) {
+            weldUtilsMock.when(() -> WeldUtils.getInstanceFromStaticBeanManager(DataSourceServlet.class))
+                    .thenReturn(dataSourceServlet);
+            when(request.getMethod()).thenReturn("POST");
+            when(request.getPathInfo()).thenReturn(ENTITY_PATH);
+            when(request.getParameter(OPERATION_TYPE_PARAM)).thenReturn(ADD_OPERATION);
+            stubForwardedWrite(true, STALE_JSON_BODY);
+
+            forwarderServlet.process(request, response);
+
+            verify(dataSourceServlet).doPost(any(), any(BufferedResponseWrapper.class));
+            verify(response).setStatus(HttpStatus.SC_CONFLICT);
+            assertTrue(realOutput.toString(StandardCharsets.UTF_8).contains(STALE_OBJECT_CODE_JSON));
+        }
+    }
+
+    /**
+     * A save whose forwarded response carries no raw {@code @OBJSON_StaleDate@} marker -- because
+     * the core already resolved it into the current session language's AD_Message text before
+     * writing the response, which is what a real deployment actually returns -- must still be
+     * detected and rewritten as HTTP 409, by matching against that translated text instead.
+     *
+     * @throws IOException      if an error occurs during test execution
+     * @throws ServletException if an error occurs during test execution
+     */
+    @Test
+    public void processPutWithTranslatedStaleObjectConflictShouldReturn409()
+            throws IOException, ServletException {
+        try (MockedStatic<WeldUtils> weldUtilsMock = mockStatic(WeldUtils.class);
+                MockedStatic<OBContext> obContextMock = mockStatic(OBContext.class);
+                MockedStatic<Utility> utilityMock = mockStatic(Utility.class)) {
+            weldUtilsMock.when(() -> WeldUtils.getInstanceFromStaticBeanManager(DataSourceServlet.class))
+                    .thenReturn(dataSourceServlet);
+            stubSessionLanguage(obContextMock, TEST_LANGUAGE);
+            utilityMock.when(() -> Utility.messageBD(any(), eq("OBJSON_StaleDate"), eq(TEST_LANGUAGE)))
+                    .thenReturn(TRANSLATED_STALE_TEXT);
+            utilityMock.when(() -> Utility.messageBD(any(), eq("APRM_StaleDate"), eq(TEST_LANGUAGE)))
+                    .thenReturn("");
+            when(request.getMethod()).thenReturn("PUT");
+            stubForwardedWrite(false, TRANSLATED_STALE_BODY);
+
+            forwarderServlet.process(request, response);
+
+            verify(response).setStatus(HttpStatus.SC_CONFLICT);
+            String written = realOutput.toString(StandardCharsets.UTF_8);
+            assertTrue(written.contains(STALE_OBJECT_CODE_JSON));
+            assertTrue(written.contains("@OBJSON_StaleDate@"));
+        }
+    }
+
+    /**
+     * A successful save (no {@code "error"} key in the body) must skip the AD_Message translation
+     * lookups entirely -- only failed saves pay that cost.
+     *
+     * @throws IOException      if an error occurs during test execution
+     * @throws ServletException if an error occurs during test execution
+     */
+    @Test
+    public void processPutWithSuccessShouldNotQueryMessageTranslation() throws IOException, ServletException {
+        try (MockedStatic<WeldUtils> weldUtilsMock = mockStatic(WeldUtils.class);
+                MockedStatic<Utility> utilityMock = mockStatic(Utility.class)) {
+            weldUtilsMock.when(() -> WeldUtils.getInstanceFromStaticBeanManager(DataSourceServlet.class))
+                    .thenReturn(dataSourceServlet);
+            when(request.getMethod()).thenReturn("PUT");
+            stubForwardedWrite(false, SUCCESS_BODY);
+
+            forwarderServlet.process(request, response);
+
+            utilityMock.verify(() -> Utility.messageBD(any(), anyString(), anyString()), never());
+            verify(response, never()).setStatus(HttpStatus.SC_CONFLICT);
+        }
+    }
+
+    /**
+     * Stubs {@code OBContext.getOBContext().getLanguage().getLanguage()} to return
+     * {@code languageCode}.
+     */
+    private void stubSessionLanguage(MockedStatic<OBContext> obContextMock, String languageCode) {
+        OBContext context = mock(OBContext.class);
+        Language language = mock(Language.class);
+        when(language.getLanguage()).thenReturn(languageCode);
+        when(context.getLanguage()).thenReturn(language);
+        obContextMock.when(OBContext::getOBContext).thenReturn(context);
+    }
+
+    /**
+     * A save whose response is a normal validation error (no stale-object marker) must be
+     * passed through to the real response completely unchanged -- no regression for any other
+     * kind of save error (validation, permissions, DB constraints, etc.).
+     *
+     * @throws IOException      if an error occurs during test execution
+     * @throws ServletException if an error occurs during test execution
+     */
+    @Test
+    public void processPutWithValidationErrorShouldPassThroughUnchanged() throws IOException, ServletException {
+        try (MockedStatic<WeldUtils> weldUtilsMock = mockStatic(WeldUtils.class)) {
+            weldUtilsMock.when(() -> WeldUtils.getInstanceFromStaticBeanManager(DataSourceServlet.class))
+                    .thenReturn(dataSourceServlet);
+            when(request.getMethod()).thenReturn("PUT");
+            stubForwardedWrite(false, VALIDATION_ERROR_BODY);
+
+            forwarderServlet.process(request, response);
+
+            verify(response, never()).setStatus(HttpStatus.SC_CONFLICT);
+            assertEquals(VALIDATION_ERROR_BODY, realOutput.toString(StandardCharsets.UTF_8));
+        }
+    }
+
+    /**
+     * A successful save must be passed through to the real response completely unchanged.
+     *
+     * @throws IOException      if an error occurs during test execution
+     * @throws ServletException if an error occurs during test execution
+     */
+    @Test
+    public void processPutWithSuccessShouldPassThroughUnchanged() throws IOException, ServletException {
+        try (MockedStatic<WeldUtils> weldUtilsMock = mockStatic(WeldUtils.class)) {
+            weldUtilsMock.when(() -> WeldUtils.getInstanceFromStaticBeanManager(DataSourceServlet.class))
+                    .thenReturn(dataSourceServlet);
+            when(request.getMethod()).thenReturn("PUT");
+            stubForwardedWrite(false, SUCCESS_BODY);
+
+            forwarderServlet.process(request, response);
+
+            verify(response, never()).setStatus(HttpStatus.SC_CONFLICT);
+            assertEquals(SUCCESS_BODY, realOutput.toString(StandardCharsets.UTF_8));
         }
     }
 
