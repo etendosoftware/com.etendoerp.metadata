@@ -56,6 +56,9 @@ public class BufferedResponseWrapperTest {
 
     private BufferedResponseWrapper wrapper;
 
+    /**
+     * Creates a fresh {@link BufferedResponseWrapper} around the mocked response for each test.
+     */
     @Before
     public void setUp() {
         wrapper = new BufferedResponseWrapper(response);

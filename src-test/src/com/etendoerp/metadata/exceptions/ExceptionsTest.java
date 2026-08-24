@@ -116,6 +116,8 @@ public class ExceptionsTest {
         assertEquals("Unprocessable content", exceptionDefault.getMessage());
     }
 
+    private static final String CONFLICT_DEFAULT_MESSAGE = "Conflict";
+
     /**
      * Tests ConflictException with custom message, null message, empty message, and default constructor.
      */
@@ -127,14 +129,14 @@ public class ExceptionsTest {
 
         // Test with null message (should use default)
         ConflictException exceptionWithNullMessage = new ConflictException(null);
-        assertEquals("Conflict", exceptionWithNullMessage.getMessage());
+        assertEquals(CONFLICT_DEFAULT_MESSAGE, exceptionWithNullMessage.getMessage());
 
         // Test with empty message (should use default)
         ConflictException exceptionWithEmptyMessage = new ConflictException("");
-        assertEquals("Conflict", exceptionWithEmptyMessage.getMessage());
+        assertEquals(CONFLICT_DEFAULT_MESSAGE, exceptionWithEmptyMessage.getMessage());
 
         // Test default constructor
         ConflictException exceptionDefault = new ConflictException();
-        assertEquals("Conflict", exceptionDefault.getMessage());
+        assertEquals(CONFLICT_DEFAULT_MESSAGE, exceptionDefault.getMessage());
     }
 }
