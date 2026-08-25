@@ -126,4 +126,31 @@ class LogoutServiceTest {
                 org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()), never());
         verify(response).setStatus(HttpServletResponse.SC_OK);
     }
+
+    /**
+     * A DB failure inside {@code TokenRevocationStore.revoke} must propagate out of
+     * {@code process()} uncaught, not be swallowed - {@code dispatch()}'s revocation guard
+     * doesn't apply to LogoutService's own request, so this surfaces through the normal
+     * exception-to-500 mapping in {@code MetadataServlet.handleException}, matching the design
+     * spec's "client state cleared even if revocation fails" scenario: the failure is real and
+     * visible (a 500), not silently absorbed into a false 200.
+     */
+    @Test
+    void revocationFailurePropagatesUncaught() {
+        when(request.getMethod()).thenReturn("POST");
+        DecodedJWT decoded = mock(DecodedJWT.class);
+        Claim jtiClaim = mock(Claim.class);
+        when(jtiClaim.asString()).thenReturn("session-123");
+        when(decoded.getClaim("jti")).thenReturn(jtiClaim);
+        Date expiresAt = new Date();
+        when(decoded.getExpiresAt()).thenReturn(expiresAt);
+        authUtilsStatic.when(() -> Utils.decodeBearerToken(request)).thenReturn(decoded);
+        revocationStoreStatic.when(() -> TokenRevocationStore.revoke("session-123", expiresAt))
+                .thenThrow(new RuntimeException("DB unavailable"));
+
+        LogoutService service = new LogoutService(request, response);
+        assertThrows(RuntimeException.class, service::process);
+
+        verify(response, never()).setStatus(HttpServletResponse.SC_OK);
+    }
 }

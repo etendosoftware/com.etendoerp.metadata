@@ -43,6 +43,14 @@ import com.etendoerp.metadata.utils.Utils;
  * rejects the request outright if the caller's token was revoked (e.g. via {@code /logout}), then
  * rejects it when the caller's password has expired. This mirrors Etendo Classic, where a
  * user with an expired password never gets a usable session until the password is updated.</p>
+ *
+ * <p><b>Revocation only covers this module.</b> The check queries {@link TokenRevocationStore},
+ * which only ever contains {@code jti}s revoked via this module's own {@code /logout}. A token
+ * accepted here but never routed through this module's own login (e.g. one minted directly by
+ * classic {@code /sws/login}, which sets no {@code jti} claim at all) can never be revoked by
+ * this mechanism, by design — see {@code com.etendoerp.metadata.service.LogoutService} and the
+ * JWT logout revocation design spec for the full reasoning. Other {@code /sws/*} services outside
+ * this module are unaffected either way: a revoked token still works against them.</p>
  */
 public abstract class BaseWebService implements WebService {
 
