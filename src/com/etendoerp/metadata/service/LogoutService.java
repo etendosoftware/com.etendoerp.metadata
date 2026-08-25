@@ -61,8 +61,15 @@ public class LogoutService extends MetadataService {
             throw new UnauthorizedException("Valid Authorization: Bearer <token> header required");
         }
 
+        // Tokens minted outside this module (classic /sws/login, via
+        // SecureWebServicesUtils.generateToken) carry no jti claim and therefore can't be
+        // revoked by this mechanism - same accepted limitation as any other WebService bean
+        // outside com.etendoerp.metadata. Every token this module itself issues (LoginService,
+        // ChangeProfileService) always sets jti, so this only skips tokens already out of scope.
         String jti = decoded.getClaim("jti").asString();
-        TokenRevocationStore.revoke(jti, decoded.getExpiresAt());
+        if (jti != null && !jti.isEmpty()) {
+            TokenRevocationStore.revoke(jti, decoded.getExpiresAt());
+        }
 
         getResponse().setStatus(HttpServletResponse.SC_OK);
     }

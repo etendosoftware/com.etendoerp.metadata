@@ -104,4 +104,26 @@ class LogoutServiceTest {
         revocationStoreStatic.verify(() -> TokenRevocationStore.revoke("session-123", expiresAt));
         verify(response).setStatus(HttpServletResponse.SC_OK);
     }
+
+    /**
+     * A token minted outside this module (e.g. classic /sws/login, which doesn't set a jti
+     * claim) must not crash logout or attempt to revoke a null/blank jti - it's simply out of
+     * this mechanism's reach, same as any other WebService bean outside this module.
+     */
+    @Test
+    void missingJtiClaimDoesNotRevokeOrCrash() throws Exception {
+        when(request.getMethod()).thenReturn("POST");
+        DecodedJWT decoded = mock(DecodedJWT.class);
+        Claim jtiClaim = mock(Claim.class);
+        when(jtiClaim.asString()).thenReturn(null);
+        when(decoded.getClaim("jti")).thenReturn(jtiClaim);
+        authUtilsStatic.when(() -> Utils.decodeBearerToken(request)).thenReturn(decoded);
+
+        LogoutService service = new LogoutService(request, response);
+        service.process();
+
+        revocationStoreStatic.verify(() -> TokenRevocationStore.revoke(
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()), never());
+        verify(response).setStatus(HttpServletResponse.SC_OK);
+    }
 }

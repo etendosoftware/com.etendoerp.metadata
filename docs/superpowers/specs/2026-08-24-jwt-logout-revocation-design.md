@@ -44,6 +44,14 @@ traffic dispatched through this module's services. That covers 100% of what the 
 accepted, documented limitation, not a bug: closing that would require changing
 `com.smf.securewebservices`, which is out of scope (this module can only touch its own code).
 
+**Sharper edge of the same limitation, found during implementation:** classic `/sws/login`
+(`com.smf.securewebservices.utils.SecureWebServicesUtils.generateToken`) mints tokens with no
+`jti` claim at all — only tokens minted by this module's own `LoginService` and
+`ChangeProfileService` (both call `com.etendoerp.metadata.auth.Utils.generateToken`, which
+always sets `jti`) can be revoked. `LogoutService` treats a missing/blank `jti` as a no-op
+(clean 200, nothing to revoke) rather than an error — consistent with the limitation above,
+since such a token was minted outside this module's reach in the first place.
+
 ---
 
 ## Decision
