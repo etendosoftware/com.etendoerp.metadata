@@ -35,10 +35,10 @@ import com.etendoerp.metadata.data.RevokedToken;
 public class TokenRevocationStore {
 
     private static final String COUNT_BY_JTI_HQL =
-            "select count(r) from etmeta_Revoked_Token r where r.jti = :jti";
+            "select count(r) from ETMETA_Revoked_Token r where r.jti = :jti";
 
     private static final String DELETE_EXPIRED_HQL =
-            "delete from etmeta_Revoked_Token r where r.expiresAt is not null and r.expiresAt < :now";
+            "delete from ETMETA_Revoked_Token r where r.expiresAt is not null and r.expiresAt < :now";
 
     private TokenRevocationStore() { }
 
