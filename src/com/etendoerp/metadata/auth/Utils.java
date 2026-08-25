@@ -24,6 +24,8 @@ import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 
+import javax.servlet.http.HttpServletRequest;
+
 import org.openbravo.base.exception.OBException;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.erpCommon.businessUtility.Preferences;
@@ -33,8 +35,6 @@ import org.openbravo.model.ad.access.User;
 import org.openbravo.model.ad.access.UserRoles;
 import org.openbravo.model.common.enterprise.Organization;
 import org.openbravo.model.common.enterprise.Warehouse;
-
-import javax.servlet.http.HttpServletRequest;
 
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.JWTCreator;
@@ -275,7 +275,7 @@ public class Utils {
     }
     try {
       return decodeToken(token);
-    } catch (Exception e) {
+    } catch (OBException e) {
       return null;
     }
   }
