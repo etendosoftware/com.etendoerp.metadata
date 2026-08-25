@@ -347,4 +347,67 @@ public class UtilsTest extends OBBaseTest {
         // Allow a small delta for execution time
         assertTrue(Math.abs(expected - result.getTime()) < 1000);
     }
+
+    /**
+     * Missing Authorization header must return null without touching SecureWebServicesUtils.
+     */
+    @Test
+    public void testDecodeBearerTokenReturnsNullWhenHeaderMissing() {
+        javax.servlet.http.HttpServletRequest request = mock(javax.servlet.http.HttpServletRequest.class);
+        when(request.getHeader("Authorization")).thenReturn(null);
+
+        assertEquals(null, Utils.decodeBearerToken(request));
+    }
+
+    /**
+     * A header without the "Bearer " prefix must return null.
+     */
+    @Test
+    public void testDecodeBearerTokenReturnsNullWhenNotBearer() {
+        javax.servlet.http.HttpServletRequest request = mock(javax.servlet.http.HttpServletRequest.class);
+        when(request.getHeader("Authorization")).thenReturn("Basic abc123");
+
+        assertEquals(null, Utils.decodeBearerToken(request));
+    }
+
+    /**
+     * A "Bearer " prefix with nothing after it must return null.
+     */
+    @Test
+    public void testDecodeBearerTokenReturnsNullWhenTokenBlank() {
+        javax.servlet.http.HttpServletRequest request = mock(javax.servlet.http.HttpServletRequest.class);
+        when(request.getHeader("Authorization")).thenReturn("Bearer    ");
+
+        assertEquals(null, Utils.decodeBearerToken(request));
+    }
+
+    /**
+     * A well-formed header delegates to decodeToken and returns its result.
+     */
+    @Test
+    public void testDecodeBearerTokenDelegatesToDecodeToken() {
+        try (MockedStatic<SecureWebServicesUtils> swsUtilsMock = mockStatic(SecureWebServicesUtils.class)) {
+            javax.servlet.http.HttpServletRequest request = mock(javax.servlet.http.HttpServletRequest.class);
+            when(request.getHeader("Authorization")).thenReturn("Bearer test-token");
+            DecodedJWT decodedJWT = mock(DecodedJWT.class);
+            swsUtilsMock.when(() -> SecureWebServicesUtils.decodeToken("test-token")).thenReturn(decodedJWT);
+
+            assertEquals(decodedJWT, Utils.decodeBearerToken(request));
+        }
+    }
+
+    /**
+     * A malformed token that makes decodeToken throw must return null, not propagate.
+     */
+    @Test
+    public void testDecodeBearerTokenReturnsNullWhenDecodeThrows() {
+        try (MockedStatic<SecureWebServicesUtils> swsUtilsMock = mockStatic(SecureWebServicesUtils.class)) {
+            javax.servlet.http.HttpServletRequest request = mock(javax.servlet.http.HttpServletRequest.class);
+            when(request.getHeader("Authorization")).thenReturn("Bearer garbage");
+            swsUtilsMock.when(() -> SecureWebServicesUtils.decodeToken("garbage"))
+                    .thenThrow(new RuntimeException("bad token"));
+
+            assertEquals(null, Utils.decodeBearerToken(request));
+        }
+    }
 }

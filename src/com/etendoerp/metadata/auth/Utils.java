@@ -34,6 +34,8 @@ import org.openbravo.model.ad.access.UserRoles;
 import org.openbravo.model.common.enterprise.Organization;
 import org.openbravo.model.common.enterprise.Warehouse;
 
+import javax.servlet.http.HttpServletRequest;
+
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.JWTCreator;
 import com.auth0.jwt.algorithms.Algorithm;
@@ -251,6 +253,30 @@ public class Utils {
       return (DecodedJWT) method.invoke(null, token);
     } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
       throw new OBException(e);
+    }
+  }
+
+  /**
+   * Extracts and decodes the {@code Authorization: Bearer <token>} header off a request.
+   * Returns {@code null} — never throws — if the header is missing, isn't a Bearer header, the
+   * token is blank, or {@link #decodeToken} rejects it as malformed.
+   *
+   * @param request the HTTP request
+   * @return the decoded token, or {@code null}
+   */
+  public static DecodedJWT decodeBearerToken(HttpServletRequest request) {
+    String authHeader = request.getHeader("Authorization");
+    if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+      return null;
+    }
+    String token = authHeader.substring(7).trim();
+    if (token.isEmpty()) {
+      return null;
+    }
+    try {
+      return decodeToken(token);
+    } catch (Exception e) {
+      return null;
     }
   }
 
