@@ -42,6 +42,7 @@ public class Constants {
     public static final String MESSAGE_PATH = "/message";
     public static final String LABELS_PATH = "/labels";
     public static final String PREFERENCES_PATH = "/preferences";
+    public static final String LOGOUT_PATH = "/logout";
     /**
      * Endpoints still reachable while the user's password is expired. They are the minimum the new UI
      * needs to render the mandatory password-change screen: the session payload carrying the
@@ -50,7 +51,7 @@ public class Constants {
      * the password is updated.
      */
     public static final List<String> PASSWORD_EXPIRED_ALLOWED_PATHS = Collections.unmodifiableList(Arrays.asList(
-            SESSION_PATH, LABELS_PATH, LANGUAGE_PATH, PREFERENCES_PATH));
+            SESSION_PATH, LABELS_PATH, LANGUAGE_PATH, PREFERENCES_PATH, LOGOUT_PATH));
     /**
      * Stable error code returned when the caller's password is expired. The new UI matches it exactly
      * to tell this rejection apart from a generic session failure, so it must not be turned into prose.

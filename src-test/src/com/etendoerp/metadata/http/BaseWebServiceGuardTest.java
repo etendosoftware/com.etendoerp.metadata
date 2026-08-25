@@ -158,6 +158,21 @@ class BaseWebServiceGuardTest {
   }
 
   /**
+   * Verifies that /logout stays reachable with an expired password — otherwise an account whose
+   * password was force-expired could never revoke its own leaked token.
+   *
+   * @throws Exception if the service dispatch fails
+   */
+  @Test
+  void testLogoutPathIsAllowedWhileExpired() throws Exception {
+    given(Constants.LOGOUT_PATH, true);
+
+    service.doGet("", request, response);
+
+    assertTrue(service.wasProcessed());
+  }
+
+  /**
    * Verifies that every bootstrap endpoint of the allowlist stays reachable with an expired password,
    * so the mandatory change screen can render translated content.
    *
