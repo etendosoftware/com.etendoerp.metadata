@@ -21,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import javax.servlet.http.HttpServletRequest;
@@ -67,6 +68,7 @@ class BaseWebServiceGuardTest {
 
   private MockedStatic<OBContext> obContextStatic;
   private MockedStatic<PasswordExpirationUtils> expirationStatic;
+  private MockedStatic<com.etendoerp.metadata.auth.TokenRevocationStore> revocationStatic;
   private TestWebService service;
 
   /**
@@ -91,15 +93,19 @@ class BaseWebServiceGuardTest {
     service = new TestWebService();
     obContextStatic = mockStatic(OBContext.class);
     expirationStatic = mockStatic(PasswordExpirationUtils.class);
+    revocationStatic = mockStatic(com.etendoerp.metadata.auth.TokenRevocationStore.class);
 
     obContextStatic.when(OBContext::getOBContext).thenReturn(obContext);
     when(obContext.getUser()).thenReturn(user);
+    revocationStatic.when(() -> com.etendoerp.metadata.auth.TokenRevocationStore.isRevoked(org.mockito.ArgumentMatchers.any()))
+        .thenReturn(false);
   }
 
   @AfterEach
   void tearDown() {
     obContextStatic.close();
     expirationStatic.close();
+    revocationStatic.close();
   }
 
   /**
@@ -260,6 +266,51 @@ class BaseWebServiceGuardTest {
     service.doPut("", request, response);
     service.doDelete("", request, response);
     service.doPatch("", request, response);
+
+    assertTrue(service.wasProcessed());
+  }
+
+  /**
+   * Verifies that a request whose jti is revoked never reaches processing, and that the response
+   * is set to 401 directly (not thrown as an exception the caller has to catch) - see the design
+   * spec for why a thrown UnauthorizedException from this call site would not actually produce a
+   * 401 in production.
+   */
+  @Test
+  void testRevokedTokenBlocksProcessingAndWrites401() throws Exception {
+    given(BLOCKED_PATH, false);
+    when(request.getHeader("Authorization")).thenReturn("Bearer revoked-token");
+    com.auth0.jwt.interfaces.DecodedJWT decoded = org.mockito.Mockito.mock(com.auth0.jwt.interfaces.DecodedJWT.class);
+    com.auth0.jwt.interfaces.Claim jtiClaim = org.mockito.Mockito.mock(com.auth0.jwt.interfaces.Claim.class);
+    when(jtiClaim.asString()).thenReturn("revoked-jti");
+    when(decoded.getClaim("jti")).thenReturn(jtiClaim);
+
+    try (MockedStatic<com.etendoerp.metadata.auth.Utils> authUtilsStatic =
+             mockStatic(com.etendoerp.metadata.auth.Utils.class)) {
+      authUtilsStatic.when(() -> com.etendoerp.metadata.auth.Utils.decodeBearerToken(request)).thenReturn(decoded);
+      revocationStatic.when(() -> com.etendoerp.metadata.auth.TokenRevocationStore.isRevoked("revoked-jti"))
+          .thenReturn(true);
+
+      java.io.StringWriter body = new java.io.StringWriter();
+      when(response.getWriter()).thenReturn(new java.io.PrintWriter(body));
+
+      service.doGet("", request, response);
+
+      verify(response).setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+    }
+    assertFalse(service.wasProcessed());
+  }
+
+  /**
+   * Verifies that a non-revoked token is unaffected and reaches processing as normal.
+   */
+  @Test
+  void testNonRevokedTokenReachesProcessing() throws Exception {
+    given(BLOCKED_PATH, false);
+    revocationStatic.when(() -> com.etendoerp.metadata.auth.TokenRevocationStore.isRevoked(org.mockito.ArgumentMatchers.any()))
+        .thenReturn(false);
+
+    service.doGet("", request, response);
 
     assertTrue(service.wasProcessed());
   }
