@@ -21,6 +21,7 @@ import java.util.Date;
 import org.hibernate.exception.ConstraintViolationException;
 import org.hibernate.query.Query;
 import org.openbravo.base.provider.OBProvider;
+import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
 
 import com.etendoerp.metadata.data.RevokedToken;
@@ -31,6 +32,11 @@ import com.etendoerp.metadata.data.RevokedToken;
  * Isolated from {@code LogoutService} (which writes) and {@code BaseWebService} (which reads)
  * so both depend on two plain static methods instead of duplicating Hibernate query code —
  * mirrors how {@code PasswordExpirationUtils} already isolates the password-expiry check.
+ * <p>
+ * This is a system-level security table, not business data scoped to a caller's role — every
+ * access runs in admin mode (same pattern as {@code LoginService}/{@code auth.Utils#generateToken})
+ * so a role without an explicit table grant (the common case, since this table has no window)
+ * can still be checked and written to.
  */
 public class TokenRevocationStore {
 
@@ -50,9 +56,14 @@ public class TokenRevocationStore {
         if (jti == null || jti.isEmpty()) {
             return false;
         }
-        Query<Long> query = OBDal.getInstance().getSession().createQuery(COUNT_BY_JTI_HQL, Long.class);
-        query.setParameter("jti", jti);
-        return query.uniqueResult() > 0;
+        try {
+            OBContext.setAdminMode(true);
+            Query<Long> query = OBDal.getInstance().getSession().createQuery(COUNT_BY_JTI_HQL, Long.class);
+            query.setParameter("jti", jti);
+            return query.uniqueResult() > 0;
+        } finally {
+            OBContext.restorePreviousMode();
+        }
     }
 
     /**
@@ -63,24 +74,30 @@ public class TokenRevocationStore {
      * @param expiresAt the token's original expiration, or {@code null} if it never expires
      */
     public static void revoke(String jti, Date expiresAt) {
-        OBDal.getInstance().getSession().createQuery(DELETE_EXPIRED_HQL)
-                .setParameter("now", new Date())
-                .executeUpdate();
-
-        if (isRevoked(jti)) {
-            return;
-        }
-
         try {
-            RevokedToken revoked = OBProvider.getInstance().get(RevokedToken.class);
-            revoked.setJti(jti);
-            revoked.setExpiresAt(expiresAt);
-            OBDal.getInstance().save(revoked);
-            OBDal.getInstance().flush();
-        } catch (ConstraintViolationException concurrentDoubleLogout) {
-            // Another request revoked the same jti between the isRevoked() check above and this
-            // insert's flush. The DB's unique constraint is the real safety net for that race —
-            // either way, the jti ends up revoked, so there's nothing left to do here.
+            OBContext.setAdminMode(true);
+
+            OBDal.getInstance().getSession().createQuery(DELETE_EXPIRED_HQL)
+                    .setParameter("now", new Date())
+                    .executeUpdate();
+
+            if (isRevoked(jti)) {
+                return;
+            }
+
+            try {
+                RevokedToken revoked = OBProvider.getInstance().get(RevokedToken.class);
+                revoked.setJti(jti);
+                revoked.setExpiresAt(expiresAt);
+                OBDal.getInstance().save(revoked);
+                OBDal.getInstance().flush();
+            } catch (ConstraintViolationException concurrentDoubleLogout) {
+                // Another request revoked the same jti between the isRevoked() check above and
+                // this insert's flush. The DB's unique constraint is the real safety net for that
+                // race — either way, the jti ends up revoked, so there's nothing left to do here.
+            }
+        } finally {
+            OBContext.restorePreviousMode();
         }
     }
 }

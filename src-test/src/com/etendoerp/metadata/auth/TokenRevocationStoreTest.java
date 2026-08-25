@@ -40,6 +40,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.openbravo.base.provider.OBProvider;
+import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
 
 import com.etendoerp.metadata.data.RevokedToken;
@@ -56,11 +57,13 @@ class TokenRevocationStoreTest {
 
     private MockedStatic<OBDal> dalStatic;
     private MockedStatic<OBProvider> providerStatic;
+    private MockedStatic<OBContext> contextStatic;
 
     @BeforeEach
     void setUp() {
         dalStatic = mockStatic(OBDal.class);
         providerStatic = mockStatic(OBProvider.class);
+        contextStatic = mockStatic(OBContext.class);
         dalStatic.when(OBDal::getInstance).thenReturn(obDal);
         providerStatic.when(OBProvider::getInstance).thenReturn(obProvider);
         when(obDal.getSession()).thenReturn(session);
@@ -70,6 +73,7 @@ class TokenRevocationStoreTest {
     void tearDown() {
         dalStatic.close();
         providerStatic.close();
+        contextStatic.close();
     }
 
     @SuppressWarnings("unchecked")
