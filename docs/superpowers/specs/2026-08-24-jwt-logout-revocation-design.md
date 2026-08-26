@@ -1,8 +1,46 @@
 # JWT Logout Revocation Design
 
-**Date:** 2026-08-24
+**Date:** 2026-08-24 (revised 2026-08-26)
 **Feature:** Checklist 11.1 — logout must invalidate the JWT
 **Status:** Approved
+
+---
+
+## Revision (2026-08-26): keyed by token hash, not `jti`
+
+The original design (below) keyed revocation by the JWT's `jti` claim. Live testing from the
+frontend side found this doesn't work for real users: this app's actual login flow is classic
+`POST /sws/login` (`app/api/auth/login/route.ts`, kept specifically because it also syncs the
+classic `JSESSIONID` that legacy features — attachments, notes, printing — depend on), and
+`com.smf.securewebservices.utils.SecureWebServicesUtils.generateToken` (the code behind
+`/sws/login`) mints tokens with **no `jti` claim at all**. Only `/meta/login` — a documented
+fallback used solely when the org has no warehouses, not the normal path — sets `jti`. So for
+the overwhelming majority of real logins, the revocation table was structurally empty of
+anything to match against: the feature worked exactly as designed, and still didn't close the
+checklist's own scenario 1 for real traffic.
+
+**Fix, entirely within this module, no core changes needed:** key revocation by
+`SHA-256(raw token string)` instead of the `jti` claim. Every JWT has its full raw string
+available regardless of which claims it carries, so this works identically for tokens from
+`/sws/login`, `/meta/login`, or any future issuer. Two different logins for the same user
+produce different tokens (different `iat` at minimum) and therefore different hashes, so
+per-session revocation semantics are preserved exactly as before.
+
+This *removes* the "tokens without a `jti` can't be revoked" limitation documented below
+entirely — there is no longer any class of token this mechanism can't revoke (within this
+module's own traffic; the "doesn't protect other `/sws/*` beans" limitation is unchanged, see
+below). It also simplifies `BaseWebService`'s check: it no longer needs to decode/verify the
+JWT at all for this purpose (that already happened upstream in `SecureWebServiceServlet`) — it
+just extracts the raw bearer string and hashes it.
+
+Concretely, every mention of `jti` below as *what gets stored/queried* is superseded by "the
+raw token's SHA-256 hash" — the `ETMETA_REVOKED_TOKEN` table's key column is renamed `JTI` →
+`TOKEN_HASH`, `TokenRevocationStore.isRevoked`/`revoke` take a raw token string (and hash it
+internally) instead of a `jti` string, and neither `LogoutService` nor `BaseWebService` extract
+a `jti` claim anymore. The rest of the design — the table's audit columns, the opportunistic
+expiry cleanup, the fail-closed DB-error behavior, the direct-401-write mechanism in
+`dispatch()`, the `PASSWORD_EXPIRED_ALLOWED_PATHS` exemption, why login itself is unaffected —
+is unchanged and still accurate as written.
 
 ---
 
@@ -44,22 +82,19 @@ traffic dispatched through this module's services. That covers 100% of what the 
 accepted, documented limitation, not a bug: closing that would require changing
 `com.smf.securewebservices`, which is out of scope (this module can only touch its own code).
 
-**Sharper edge of the same limitation, found during implementation:** classic `/sws/login`
-(`com.smf.securewebservices.utils.SecureWebServicesUtils.generateToken`) mints tokens with no
-`jti` claim at all — only tokens minted by this module's own `LoginService` and
-`ChangeProfileService` (both call `com.etendoerp.metadata.auth.Utils.generateToken`, which
-always sets `jti`) can be revoked. `LogoutService` treats a missing/blank `jti` as a no-op
-(clean 200, nothing to revoke) rather than an error — consistent with the limitation above,
-since such a token was minted outside this module's reach in the first place.
+~~**Sharper edge of the same limitation, found during implementation:** classic `/sws/login`
+mints tokens with no `jti` claim, so only tokens minted by this module's own `LoginService`
+could be revoked.~~ **Superseded by the 2026-08-26 revision above** — keying by token hash
+instead of `jti` closes this entirely; every token, regardless of issuer, can be revoked.
 
 ---
 
 ## Decision
 
-Add a per-`jti` revocation blacklist owned entirely by `com.etendoerp.metadata`:
+Add a per-token-hash revocation blacklist owned entirely by `com.etendoerp.metadata`:
 
-- A new AD table, `ETMETA_REVOKED_TOKEN`, storing revoked `jti` claims with their original
-  expiration, so revoked-but-expired rows can be purged instead of growing forever.
+- A new AD table, `ETMETA_REVOKED_TOKEN`, storing a SHA-256 hash of each revoked token with its
+  original expiration, so revoked-but-expired rows can be purged instead of growing forever.
 - A new `LogoutService` that writes to it.
 - A new check in `BaseWebService.dispatch()`, that reads from it before every request is
   processed and, on a hit, **writes the 401 response directly** rather than throwing (see
@@ -88,7 +123,7 @@ isn't revoked.
 |----------------|---------------|---------------------------------------------------------------|
 | (PK)           | UUID          | standard Etendo PK                                            |
 | `ad_client_id`, `ad_org_id`, `isactive`, `created`, `createdby`, `updated`, `updatedby` | — | standard Etendo audit/security columns |
-| `jti`          | VARCHAR(100)  | `jti` claim, enforced unique via a DB constraint                |
+| `token_hash`   | VARCHAR(100)  | hex-encoded SHA-256 of the full raw token string, enforced unique via a DB constraint (renamed from `jti` in the 2026-08-26 revision — same physical column, same size, new meaning) |
 | `expires_at`   | TIMESTAMP, nullable | copy of the token's `exp` claim; `null` if the token was minted with no expiration (`SWSConfig.getExpirationTime() == 0`) — such rows are never purged |
 
 The Java entity (e.g. `RevokedToken`) is generated at build time from the AD table
@@ -102,16 +137,27 @@ fallback documented for this project applies.
 
 ## Components
 
-### Shared helper: bearer token extraction
+### Shared helpers: bearer token extraction (`auth.Utils`)
 
-Authorization-header `Bearer `-stripping is currently duplicated inline in two places
-(`HttpServletRequestWrapper`, `SSOService`). A third place, `WidgetDataService`, reads the raw
-`Authorization` header but forwards it verbatim (including the `Bearer ` prefix) rather than
-parsing it, so it isn't the same duplication and doesn't need touching. Rather than add a third
-inline copy of the actual parsing, add one static helper — e.g.
-`Utils.getBearerToken(HttpServletRequest)` in `com.etendoerp.metadata.auth.Utils` — and use it
-from both new call sites below. All three existing call sites are left untouched (out of scope
-for this change).
+Two entry points, sharing one private extraction routine that strips the `"Bearer "` prefix off
+the `Authorization` header:
+
+- `decodeBearerToken(HttpServletRequest)` — existing, decodes+verifies via `decodeToken`,
+  returns `DecodedJWT` or `null`. Still used by `LogoutService` for the `exp` claim.
+- `extractBearerToken(HttpServletRequest)` — new, returns the raw token string (or `null`), no
+  decoding/verification. This is what gets hashed for revocation lookups — no need to
+  re-verify a signature `SecureWebServiceServlet` already checked upstream.
+
+(Authorization-header parsing is separately duplicated inline in `HttpServletRequestWrapper` and
+`SSOService`, and forwarded verbatim by `WidgetDataService` — none of those three are touched,
+same as before.)
+
+### `TokenRevocationStore`
+
+Public API changes from `isRevoked(String jti)`/`revoke(String jti, Date expiresAt)` to
+`isRevoked(String rawToken)`/`revoke(String rawToken, Date expiresAt)`. Hashing
+(`MessageDigest.getInstance("SHA-256")`, JDK stdlib, no new dependency) happens inside the
+store — callers never see or handle the hash themselves, only the raw token string.
 
 ### `LogoutService`
 
@@ -121,19 +167,22 @@ path under `Constants.LOGOUT_PATH = "/logout"` (full path from the frontend:
 
 `process()`:
 
-1. Extract + decode the bearer token (shared helper + existing `auth.Utils.decodeToken`) to get
-   `jti` and the `exp` claim.
+1. Extract the raw bearer token (`extractBearerToken`) and decode it (`decodeBearerToken`, for
+   `exp`); if either is missing, 401.
 2. Opportunistic cleanup: `DELETE FROM ETMETA_REVOKED_TOKEN WHERE expires_at IS NOT NULL AND
    expires_at < now()`. This keeps the table bounded without a scheduled/cron process.
-3. Find-or-create by `jti`: if a row already exists (double logout / already revoked), do
-   nothing; otherwise insert `(jti, expires_at)`. The DB unique constraint on `jti` is the real
-   safety net for concurrent double-logout (two near-simultaneous requests with the same
-   token) racing past the find check — a resulting unique-violation on insert is treated as
-   "already revoked" (caught, no-op), not as a 500.
+3. Find-or-create by the raw token's hash: if a row already exists (double logout / already
+   revoked), do nothing; otherwise insert `(token_hash, expires_at)`. The DB unique constraint
+   is the real safety net for concurrent double-logout (two near-simultaneous requests with the
+   same token) racing past the find check — a resulting unique-violation on insert is treated
+   as "already revoked" (caught, no-op), not as a 500.
 4. Return 200 with no body.
 
 No request body is expected or read — the `Authorization` header is the only input, matching
 the frontend contract (fire-and-forget from the UI, no strict response contract from the BFF).
+
+There is no longer a "missing/blank `jti`" no-op case — every successfully-decoded token has a
+raw string to hash, so this branch (and its test) from the pre-revision design is removed.
 
 ### Revocation check in `BaseWebService.dispatch()`
 
@@ -152,13 +201,10 @@ Uses the existing `Utils.writeJsonErrorResponse(response, statusCode, errorMessa
 the lower-level `writeJsonResponse`), so the body matches the `{"success":false,"error":...,
 "status":...}` shape the frontend already gets from every other error in this module.
 
-1. Extract + decode the bearer token (shared helper). `auth.Utils.decodeToken` can throw
-   `OBException` on a malformed token (it doesn't return `null`) — `isRevoked` must catch that
-   and treat it as not-revoked, same as an absent token (defensive only: every real caller of
-   `dispatch()` already carries a token that `SecureWebServiceServlet` validated as
-   well-formed, so this path is not expected to trigger in practice, but must not surface as a
-   500 if it somehow does).
-2. Query `ETMETA_REVOKED_TOKEN` for the `jti`.
+1. Extract the raw bearer token via `auth.Utils.extractBearerToken` — no decode/verify needed
+   here at all (that already happened upstream in `SecureWebServiceServlet`); an absent header
+   just means "nothing to check", not an error.
+2. Query `ETMETA_REVOKED_TOKEN` for the token's hash via `TokenRevocationStore.isRevoked`.
 3. If the lookup itself throws (DB error), let it propagate out of `dispatch()` uncaught — this
    is the fail-closed behavior. (Where that lands — 500 via `SecureWebServiceServlet`'s generic
    `Throwable` handler — is a pre-existing gap, see below; not something this change needs to
@@ -228,16 +274,19 @@ for.
 
 ## Data Flow
 
-1. **Login** — unchanged. JWT already carries a `jti` claim (`auth/Utils.java:378`).
+1. **Login** — unchanged, via either `/sws/login` (classic, no `jti`) or `/meta/login`
+   (fallback, sets `jti`) — irrelevant now, since revocation no longer depends on `jti`.
 2. **Logout** — UI clears local state optimistically, then calls `POST /api/auth/logout` (BFF)
    with the existing `Authorization` header, tolerating any response. The BFF now also calls
    `POST {ETENDO_CLASSIC_URL}/sws/com.etendoerp.metadata.meta/logout` with the same header,
    best-effort (this call is outside this module's scope — frontend work).
 3. That request passes `SecureWebServiceServlet`'s existing signature/expiry check (unchanged,
-   external), reaches `LogoutService`, and the `jti` is inserted into `ETMETA_REVOKED_TOKEN`.
+   external), reaches `LogoutService`, and the raw token's SHA-256 hash is inserted into
+   `ETMETA_REVOKED_TOKEN`.
 4. **Any later request with the same JWT** — passes `SecureWebServiceServlet`'s check (the
    token is still cryptographically valid and unexpired) but `BaseWebService.dispatch()` finds
-   the `jti` revoked and writes a 401 directly, before any business logic runs.
+   its hash revoked and writes a 401 directly, before any business logic runs. This now holds
+   regardless of which login path issued the token.
 
 ---
 
@@ -254,11 +303,15 @@ Maps directly to the checklist:
    (`contexts/user.tsx` clears state before calling logout and swallows the result). Backend
    side: assert a `LogoutService` failure (e.g. simulated DB error) surfaces as a clean 500
    through existing exception handling rather than corrupting request state.
-3. **Non-revoked token keeps working** — dispatch a request without ever inserting its `jti`
+3. **Non-revoked token keeps working** — dispatch a request without ever inserting its hash
    into `ETMETA_REVOKED_TOKEN`; assert it proceeds normally.
 4. **Password-expired account can still log out** — set up a request whose user has an expired
    password and whose path is `LOGOUT_PATH`; assert it is NOT rejected by
    `rejectIfPasswordExpired` (i.e. reaches `LogoutService.process()`).
+5. **A token from either login path can be revoked** — the whole point of this revision: assert
+   revocation works identically for a token that has a `jti` claim and one that doesn't
+   (`decoded.getClaim("jti")` returning a null-backed `Claim`), since the mechanism no longer
+   inspects that claim at all.
 
 These become a JUnit test (OBDal + mocked `HttpServletRequest`) alongside `LogoutService` and
 `BaseWebService`. Note: this module's Gradle test harness does not currently run its ~140
