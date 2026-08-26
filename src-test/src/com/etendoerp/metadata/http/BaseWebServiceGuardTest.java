@@ -271,24 +271,21 @@ class BaseWebServiceGuardTest {
   }
 
   /**
-   * Verifies that a request whose jti is revoked never reaches processing, and that the response
-   * is set to 401 directly (not thrown as an exception the caller has to catch) - see the design
-   * spec for why a thrown UnauthorizedException from this call site would not actually produce a
-   * 401 in production.
+   * Verifies that a request whose token hash is revoked never reaches processing, and that the
+   * response is set to 401 directly (not thrown as an exception the caller has to catch) - see
+   * the design spec for why a thrown UnauthorizedException from this call site would not
+   * actually produce a 401 in production.
    */
   @Test
   void testRevokedTokenBlocksProcessingAndWrites401() throws Exception {
     given(BLOCKED_PATH, false);
     when(request.getHeader("Authorization")).thenReturn("Bearer revoked-token");
-    com.auth0.jwt.interfaces.DecodedJWT decoded = org.mockito.Mockito.mock(com.auth0.jwt.interfaces.DecodedJWT.class);
-    com.auth0.jwt.interfaces.Claim jtiClaim = org.mockito.Mockito.mock(com.auth0.jwt.interfaces.Claim.class);
-    when(jtiClaim.asString()).thenReturn("revoked-jti");
-    when(decoded.getClaim("jti")).thenReturn(jtiClaim);
 
     try (MockedStatic<com.etendoerp.metadata.auth.Utils> authUtilsStatic =
              mockStatic(com.etendoerp.metadata.auth.Utils.class)) {
-      authUtilsStatic.when(() -> com.etendoerp.metadata.auth.Utils.decodeBearerToken(request)).thenReturn(decoded);
-      revocationStatic.when(() -> com.etendoerp.metadata.auth.TokenRevocationStore.isRevoked("revoked-jti"))
+      authUtilsStatic.when(() -> com.etendoerp.metadata.auth.Utils.extractBearerToken(request))
+          .thenReturn("revoked-token");
+      revocationStatic.when(() -> com.etendoerp.metadata.auth.TokenRevocationStore.isRevoked("revoked-token"))
           .thenReturn(true);
 
       java.io.StringWriter body = new java.io.StringWriter();
