@@ -21,7 +21,6 @@ import com.etendoerp.metadata.utils.RecentDocumentsQueries;
 import com.etendoerp.metadata.widgets.WidgetDataContext;
 import com.etendoerp.metadata.widgets.WidgetDataResolver;
 import org.codehaus.jettison.json.JSONObject;
-import org.openbravo.dal.service.OBDal;
 
 /** Returns the current user's recently viewed records from ETMETA_RECENT_DOCUMENT. */
 public class RecentDocsResolver implements WidgetDataResolver {
@@ -30,13 +29,7 @@ public class RecentDocsResolver implements WidgetDataResolver {
 
     @Override
     public boolean isAvailable() {
-        try {
-            OBDal.getInstance().getSession()
-                .createQuery("select 1 from etmeta_Recent_Document rd where 1=0", Integer.class);
-            return true;
-        } catch (Exception e) {
-            return false;
-        }
+        return probeEntityAvailable("etmeta_Recent_Document");
     }
 
     @Override

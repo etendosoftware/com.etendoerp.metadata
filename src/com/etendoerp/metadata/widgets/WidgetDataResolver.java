@@ -18,6 +18,7 @@
 package com.etendoerp.metadata.widgets;
 
 import org.codehaus.jettison.json.JSONObject;
+import org.openbravo.dal.service.OBDal;
 
 /**
  * Contract for all widget data resolvers.
@@ -34,6 +35,24 @@ public interface WidgetDataResolver {
      */
     default boolean isAvailable() {
         return true;
+    }
+
+    /**
+     * Convenience for {@link #isAvailable()} overrides backed by an optional Hibernate entity:
+     * attempts to prepare a trivial (never-executed) HQL query against the entity and returns
+     * whether that succeeds, i.e. whether the entity's mapping is present in this deployment.
+     *
+     * @param probeEntityName the HQL entity name to check for, e.g. {@code "etmeta_User_Favorite"}
+     * @return true if a query can be prepared against the entity, false otherwise
+     */
+    default boolean probeEntityAvailable(String probeEntityName) {
+        try {
+            OBDal.getInstance().getSession()
+                    .createQuery("select 1 from " + probeEntityName + " x where 1=0", Integer.class);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     /**

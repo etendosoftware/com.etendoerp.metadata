@@ -34,11 +34,11 @@
         <onCreateDefault/>
       </column>
       <column name="AD_USER_ID" primaryKey="false" required="true" type="VARCHAR" size="32" autoIncrement="false">
-        <default/>
+        <default><![CDATA[0]]></default>
         <onCreateDefault/>
       </column>
       <column name="AD_ROLE_ID" primaryKey="false" required="true" type="VARCHAR" size="32" autoIncrement="false">
-        <default/>
+        <default><![CDATA[0]]></default>
         <onCreateDefault/>
       </column>
       <column name="AD_WINDOW_ID" primaryKey="false" required="true" type="VARCHAR" size="32" autoIncrement="false">
@@ -50,11 +50,11 @@
         <onCreateDefault/>
       </column>
       <column name="RECORD_ID" primaryKey="false" required="true" type="VARCHAR" size="32" autoIncrement="false">
-        <default/>
+        <default><![CDATA[-]]></default>
         <onCreateDefault/>
       </column>
       <column name="IDENTIFIER" primaryKey="false" required="true" type="VARCHAR" size="255" autoIncrement="false">
-        <default/>
+        <default><![CDATA[-]]></default>
         <onCreateDefault/>
       </column>
       <column name="TABLEVEL" primaryKey="false" required="true" type="DECIMAL" size="10,0" autoIncrement="false">
