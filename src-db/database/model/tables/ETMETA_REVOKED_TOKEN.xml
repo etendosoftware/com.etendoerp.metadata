@@ -33,7 +33,7 @@
         <default><![CDATA[0]]></default>
         <onCreateDefault/>
       </column>
-      <column name="JTI" primaryKey="false" required="true" type="VARCHAR" size="100" autoIncrement="false">
+      <column name="TOKEN_HASH" primaryKey="false" required="true" type="VARCHAR" size="100" autoIncrement="false">
         <default/>
         <onCreateDefault/>
       </column>
@@ -41,8 +41,8 @@
         <default/>
         <onCreateDefault/>
       </column>
-      <unique name="ETMETA_REVOKED_TOKEN_JTI_UQ">
-        <unique-column name="JTI"/>
+      <unique name="ETMETA_REVOKED_TOKEN_HASH_UQ">
+        <unique-column name="TOKEN_HASH"/>
       </unique>
       <check name="ETMETA_RVK_TOKEN_ISACTIVE_CHK"><![CDATA[ISACTIVE IN ('Y', 'N')]]></check>
     </table>
