@@ -16,10 +16,14 @@
  */
 package com.etendoerp.metadata.auth;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Date;
 
 import org.hibernate.exception.ConstraintViolationException;
 import org.hibernate.query.Query;
+import org.openbravo.base.exception.OBException;
 import org.openbravo.base.provider.OBProvider;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
@@ -27,7 +31,9 @@ import org.openbravo.dal.service.OBDal;
 import com.etendoerp.metadata.data.RevokedToken;
 
 /**
- * Per-{@code jti} JWT revocation blacklist backed by {@code ETMETA_REVOKED_TOKEN}.
+ * Revocation blacklist backed by {@code ETMETA_REVOKED_TOKEN}, keyed by a SHA-256 hash of the
+ * full raw token rather than a {@code jti} claim - not every token issuer sets one (classic
+ * {@code /sws/login} doesn't), but every token has a raw string regardless.
  * <p>
  * Isolated from {@code LogoutService} (which writes) and {@code BaseWebService} (which reads)
  * so both depend on two plain static methods instead of duplicating Hibernate query code —
@@ -40,26 +46,28 @@ import com.etendoerp.metadata.data.RevokedToken;
  */
 public class TokenRevocationStore {
 
-    private static final String COUNT_BY_JTI_HQL =
-            "select count(r) from ETMETA_Revoked_Token r where r.jti = :jti";
+    private static final String COUNT_BY_HASH_HQL =
+            "select count(r) from ETMETA_Revoked_Token r where r.tokenHash = :tokenHash";
 
     private static final String DELETE_EXPIRED_HQL =
             "delete from ETMETA_Revoked_Token r where r.expiresAt is not null and r.expiresAt < :now";
 
+    private static final String SHA_256 = "SHA-256";
+
     private TokenRevocationStore() { }
 
     /**
-     * @param jti the token's {@code jti} claim
-     * @return {@code true} if this jti has been revoked; {@code false} for a blank/null jti too
+     * @param rawToken the full raw token string
+     * @return {@code true} if this token has been revoked; {@code false} for a blank/null token too
      */
-    public static boolean isRevoked(String jti) {
-        if (jti == null || jti.isEmpty()) {
+    public static boolean isRevoked(String rawToken) {
+        if (rawToken == null || rawToken.isEmpty()) {
             return false;
         }
         try {
             OBContext.setAdminMode(true);
-            Query<Long> query = OBDal.getInstance().getSession().createQuery(COUNT_BY_JTI_HQL, Long.class);
-            query.setParameter("jti", jti);
+            Query<Long> query = OBDal.getInstance().getSession().createQuery(COUNT_BY_HASH_HQL, Long.class);
+            query.setParameter("tokenHash", hash(rawToken));
             return query.uniqueResult() > 0;
         } finally {
             OBContext.restorePreviousMode();
@@ -67,13 +75,13 @@ public class TokenRevocationStore {
     }
 
     /**
-     * Revokes a jti (idempotent) and opportunistically purges expired entries so the table stays
-     * bounded without a scheduled cleanup process.
+     * Revokes a token (idempotent) and opportunistically purges expired entries so the table
+     * stays bounded without a scheduled cleanup process.
      *
-     * @param jti       the token's {@code jti} claim
+     * @param rawToken  the full raw token string
      * @param expiresAt the token's original expiration, or {@code null} if it never expires
      */
-    public static void revoke(String jti, Date expiresAt) {
+    public static void revoke(String rawToken, Date expiresAt) {
         try {
             OBContext.setAdminMode(true);
 
@@ -81,23 +89,43 @@ public class TokenRevocationStore {
                     .setParameter("now", new Date())
                     .executeUpdate();
 
-            if (isRevoked(jti)) {
+            if (isRevoked(rawToken)) {
                 return;
             }
 
             try {
                 RevokedToken revoked = OBProvider.getInstance().get(RevokedToken.class);
-                revoked.setJti(jti);
+                revoked.setTokenHash(hash(rawToken));
                 revoked.setExpiresAt(expiresAt);
                 OBDal.getInstance().save(revoked);
                 OBDal.getInstance().flush();
             } catch (ConstraintViolationException concurrentDoubleLogout) {
-                // Another request revoked the same jti between the isRevoked() check above and
+                // Another request revoked the same token between the isRevoked() check above and
                 // this insert's flush. The DB's unique constraint is the real safety net for that
-                // race — either way, the jti ends up revoked, so there's nothing left to do here.
+                // race — either way, the token ends up revoked, so there's nothing left to do here.
             }
         } finally {
             OBContext.restorePreviousMode();
+        }
+    }
+
+    /**
+     * @param rawToken the full raw token string, never {@code null} (callers already guard that)
+     * @return the hex-encoded SHA-256 digest of {@code rawToken}
+     */
+    private static String hash(String rawToken) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance(SHA_256);
+            byte[] bytes = digest.digest(rawToken.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder(bytes.length * 2);
+            for (byte b : bytes) {
+                hex.append(String.format("%02x", b));
+            }
+            return hex.toString();
+        } catch (NoSuchAlgorithmException e) {
+            // SHA-256 is a guaranteed JDK algorithm (JLS MessageDigest spec) - this can't
+            // actually happen, but the checked exception has to go somewhere.
+            throw new OBException(e);
         }
     }
 }

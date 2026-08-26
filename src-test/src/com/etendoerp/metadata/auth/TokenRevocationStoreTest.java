@@ -16,6 +16,7 @@
  */
 package com.etendoerp.metadata.auth;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -34,6 +35,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -49,7 +51,8 @@ import com.etendoerp.metadata.data.RevokedToken;
 @MockitoSettings(strictness = Strictness.LENIENT)
 class TokenRevocationStoreTest {
 
-    private static final String JTI = "session-123";
+    private static final String TOKEN_A = "header.payload-a.signature-a";
+    private static final String TOKEN_B = "header.payload-b.signature-b";
 
     @Mock private OBDal obDal;
     @Mock private OBProvider obProvider;
@@ -95,23 +98,54 @@ class TokenRevocationStoreTest {
     }
 
     @Test
-    void isRevokedReturnsFalseForBlankJti() {
+    void isRevokedReturnsFalseForBlankToken() {
         assertFalse(TokenRevocationStore.isRevoked(""));
         assertFalse(TokenRevocationStore.isRevoked(null));
     }
 
     @Test
-    void isRevokedReturnsTrueWhenRowExists() {
+    void isRevokedReturnsTrueWhenHashRowExists() {
         stubCountQuery(1L);
 
-        assertTrue(TokenRevocationStore.isRevoked(JTI));
+        assertTrue(TokenRevocationStore.isRevoked(TOKEN_A));
     }
 
     @Test
     void isRevokedReturnsFalseWhenNoRow() {
         stubCountQuery(0L);
 
-        assertFalse(TokenRevocationStore.isRevoked(JTI));
+        assertFalse(TokenRevocationStore.isRevoked(TOKEN_A));
+    }
+
+    @Test
+    void isRevokedHashesConsistently() {
+        // Same token -> same hash -> same query parameter, every call.
+        @SuppressWarnings("unchecked")
+        Query<Long> query = mock(Query.class);
+        when(session.createQuery(anyString(), eq(Long.class))).thenReturn(query);
+        ArgumentCaptor<String> hashCaptor = ArgumentCaptor.forClass(String.class);
+        when(query.setParameter(anyString(), hashCaptor.capture())).thenReturn(query);
+        when(query.uniqueResult()).thenReturn(0L);
+
+        TokenRevocationStore.isRevoked(TOKEN_A);
+        TokenRevocationStore.isRevoked(TOKEN_A);
+
+        assertEquals(hashCaptor.getAllValues().get(0), hashCaptor.getAllValues().get(1));
+    }
+
+    @Test
+    void differentTokensHashDifferently() {
+        @SuppressWarnings("unchecked")
+        Query<Long> query = mock(Query.class);
+        when(session.createQuery(anyString(), eq(Long.class))).thenReturn(query);
+        ArgumentCaptor<String> hashCaptor = ArgumentCaptor.forClass(String.class);
+        when(query.setParameter(anyString(), hashCaptor.capture())).thenReturn(query);
+        when(query.uniqueResult()).thenReturn(0L);
+
+        TokenRevocationStore.isRevoked(TOKEN_A);
+        TokenRevocationStore.isRevoked(TOKEN_B);
+
+        assertFalse(hashCaptor.getAllValues().get(0).equals(hashCaptor.getAllValues().get(1)));
     }
 
     @Test
@@ -121,9 +155,9 @@ class TokenRevocationStoreTest {
         RevokedToken entity = mock(RevokedToken.class);
         when(obProvider.get(RevokedToken.class)).thenReturn(entity);
 
-        TokenRevocationStore.revoke(JTI, new Date());
+        TokenRevocationStore.revoke(TOKEN_A, new Date());
 
-        org.mockito.Mockito.verify(entity).setJti(JTI);
+        org.mockito.Mockito.verify(entity).setTokenHash(org.mockito.ArgumentMatchers.anyString());
         org.mockito.Mockito.verify(obDal).save(entity);
         org.mockito.Mockito.verify(obDal).flush();
     }
@@ -133,7 +167,7 @@ class TokenRevocationStoreTest {
         stubDeleteQuery();
         stubCountQuery(1L);
 
-        TokenRevocationStore.revoke(JTI, new Date());
+        TokenRevocationStore.revoke(TOKEN_A, new Date());
 
         org.mockito.Mockito.verify(obProvider, org.mockito.Mockito.never()).get(RevokedToken.class);
     }
@@ -144,10 +178,10 @@ class TokenRevocationStoreTest {
         stubCountQuery(0L);
         RevokedToken entity = mock(RevokedToken.class);
         when(obProvider.get(RevokedToken.class)).thenReturn(entity);
-        org.mockito.Mockito.doThrow(new ConstraintViolationException("dup", null, "etmeta_revoked_token_jti_uq"))
+        org.mockito.Mockito.doThrow(new ConstraintViolationException("dup", null, "etmeta_revoked_token_hash_uq"))
                 .when(obDal).flush();
 
-        TokenRevocationStore.revoke(JTI, new Date());
+        TokenRevocationStore.revoke(TOKEN_A, new Date());
         // no exception propagated = pass
     }
 }
