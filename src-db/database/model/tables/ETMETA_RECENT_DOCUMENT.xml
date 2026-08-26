@@ -42,11 +42,11 @@
         <onCreateDefault/>
       </column>
       <column name="AD_WINDOW_ID" primaryKey="false" required="true" type="VARCHAR" size="32" autoIncrement="false">
-        <default/>
+        <default><![CDATA[100]]></default>
         <onCreateDefault/>
       </column>
       <column name="AD_TAB_ID" primaryKey="false" required="true" type="VARCHAR" size="32" autoIncrement="false">
-        <default/>
+        <default><![CDATA[100]]></default>
         <onCreateDefault/>
       </column>
       <column name="RECORD_ID" primaryKey="false" required="true" type="VARCHAR" size="32" autoIncrement="false">
