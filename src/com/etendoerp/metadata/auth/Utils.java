@@ -265,12 +265,8 @@ public class Utils {
    * @return the decoded token, or {@code null}
    */
   public static DecodedJWT decodeBearerToken(HttpServletRequest request) {
-    String authHeader = request.getHeader("Authorization");
-    if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-      return null;
-    }
-    String token = authHeader.substring(7).trim();
-    if (token.isEmpty()) {
+    String token = extractRawToken(request);
+    if (token == null) {
       return null;
     }
     try {
@@ -278,6 +274,38 @@ public class Utils {
     } catch (OBException e) {
       return null;
     }
+  }
+
+  /**
+   * Extracts the raw {@code Authorization: Bearer <token>} header value off a request, with no
+   * decoding or signature verification attempted. Returns {@code null} if the header is
+   * missing, isn't a Bearer header, or the token is blank.
+   * <p>
+   * Use this (not {@link #decodeBearerToken}) when only the raw token string is needed — e.g.
+   * hashing it for {@code TokenRevocationStore} — and re-verifying a signature already checked
+   * upstream by {@code SecureWebServiceServlet} would be wasted work.
+   *
+   * @param request the HTTP request
+   * @return the raw token, or {@code null}
+   */
+  public static String extractBearerToken(HttpServletRequest request) {
+    return extractRawToken(request);
+  }
+
+  /**
+   * Parses the {@code Authorization: Bearer <token>} header off a request.
+   *
+   * @param request the HTTP request
+   * @return the raw token, or {@code null} if the header is missing, isn't a Bearer header, or
+   *         the token is blank
+   */
+  private static String extractRawToken(HttpServletRequest request) {
+    String authHeader = request.getHeader("Authorization");
+    if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+      return null;
+    }
+    String token = authHeader.substring(7).trim();
+    return token.isEmpty() ? null : token;
   }
 
   /**

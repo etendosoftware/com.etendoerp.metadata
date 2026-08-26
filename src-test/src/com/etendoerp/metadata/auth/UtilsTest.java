@@ -410,4 +410,48 @@ public class UtilsTest extends OBBaseTest {
             assertEquals(null, Utils.decodeBearerToken(request));
         }
     }
+
+    /**
+     * Missing Authorization header must return null.
+     */
+    @Test
+    public void testExtractBearerTokenReturnsNullWhenHeaderMissing() {
+        javax.servlet.http.HttpServletRequest request = mock(javax.servlet.http.HttpServletRequest.class);
+        when(request.getHeader("Authorization")).thenReturn(null);
+
+        assertEquals(null, Utils.extractBearerToken(request));
+    }
+
+    /**
+     * A header without the "Bearer " prefix must return null.
+     */
+    @Test
+    public void testExtractBearerTokenReturnsNullWhenNotBearer() {
+        javax.servlet.http.HttpServletRequest request = mock(javax.servlet.http.HttpServletRequest.class);
+        when(request.getHeader("Authorization")).thenReturn("Basic abc123");
+
+        assertEquals(null, Utils.extractBearerToken(request));
+    }
+
+    /**
+     * A "Bearer " prefix with nothing after it must return null.
+     */
+    @Test
+    public void testExtractBearerTokenReturnsNullWhenTokenBlank() {
+        javax.servlet.http.HttpServletRequest request = mock(javax.servlet.http.HttpServletRequest.class);
+        when(request.getHeader("Authorization")).thenReturn("Bearer    ");
+
+        assertEquals(null, Utils.extractBearerToken(request));
+    }
+
+    /**
+     * A well-formed header returns the raw token, untouched (no decode/verify attempted).
+     */
+    @Test
+    public void testExtractBearerTokenReturnsRawToken() {
+        javax.servlet.http.HttpServletRequest request = mock(javax.servlet.http.HttpServletRequest.class);
+        when(request.getHeader("Authorization")).thenReturn("Bearer some.raw.token");
+
+        assertEquals("some.raw.token", Utils.extractBearerToken(request));
+    }
 }
