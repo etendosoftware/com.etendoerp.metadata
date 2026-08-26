@@ -29,7 +29,7 @@
 <!--0C89003195AF4CA293D0D0210D7F893C-->  <ISACTIVE><![CDATA[Y]]></ISACTIVE>
 <!--0C89003195AF4CA293D0D0210D7F893C-->  <NAME><![CDATA[ETMETA_Revoked_Token]]></NAME>
 <!--0C89003195AF4CA293D0D0210D7F893C-->  <DESCRIPTION><![CDATA[Revoked JWT tokens]]></DESCRIPTION>
-<!--0C89003195AF4CA293D0D0210D7F893C-->  <HELP><![CDATA[Blacklist of revoked JWT jti claims, checked on every request so a logged-out token stops working immediately instead of remaining valid until it expires.]]></HELP>
+<!--0C89003195AF4CA293D0D0210D7F893C-->  <HELP><![CDATA[Blacklist of revoked JWT tokens (keyed by a SHA-256 hash of the full raw token), checked on every request so a logged-out token stops working immediately instead of remaining valid until it expires.]]></HELP>
 <!--0C89003195AF4CA293D0D0210D7F893C-->  <TABLENAME><![CDATA[etmeta_revoked_token]]></TABLENAME>
 <!--0C89003195AF4CA293D0D0210D7F893C-->  <CLASSNAME><![CDATA[RevokedToken]]></CLASSNAME>
 <!--0C89003195AF4CA293D0D0210D7F893C-->  <ISVIEW><![CDATA[N]]></ISVIEW>
