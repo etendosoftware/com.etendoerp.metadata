@@ -46,6 +46,8 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class RecentDocsResolverTest {
+    private static final String ITEMS_KEY = "items";
+
     @Mock OBDal     obDal;
     @Mock Session   session;
     @Mock OBContext obContext;
@@ -75,9 +77,9 @@ class RecentDocsResolverTest {
             when(obDal.getSession()).thenReturn(session);
 
             JSONObject result = new RecentDocsResolver().resolve(ctx);
-            assertTrue(result.has("items"));
-            assertEquals(1, result.getJSONArray("items").length());
-            assertEquals("record-1", result.getJSONArray("items").getJSONObject(0).getString("recordId"));
+            assertTrue(result.has(ITEMS_KEY));
+            assertEquals(1, result.getJSONArray(ITEMS_KEY).length());
+            assertEquals("record-1", result.getJSONArray(ITEMS_KEY).getJSONObject(0).getString("recordId"));
         }
     }
 }

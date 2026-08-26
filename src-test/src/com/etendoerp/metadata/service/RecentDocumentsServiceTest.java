@@ -66,8 +66,9 @@ class RecentDocumentsServiceTest extends AbstractMockedContextTest {
     private static final String WINDOW_ID = "window-001";
     private static final String TAB_ID = "tab-001";
     private static final String RECORD_ID = "record-001";
+    private static final String IDENTIFIER_VALUE = "SO-001";
     private static final String TRACK_BODY = "{\"windowId\":\"" + WINDOW_ID + "\",\"tabId\":\"" + TAB_ID
-            + "\",\"recordId\":\"" + RECORD_ID + "\",\"identifier\":\"SO-001\",\"tabLevel\":0}";
+            + "\",\"recordId\":\"" + RECORD_ID + "\",\"identifier\":\"" + IDENTIFIER_VALUE + "\",\"tabLevel\":0}";
 
     @Mock OBProvider obProvider;
 
@@ -151,7 +152,7 @@ class RecentDocumentsServiceTest extends AbstractMockedContextTest {
             when(session.createQuery(any(String.class), eq(Object[].class))).thenReturn(listQuery);
             when(listQuery.setParameter(anyString(), anyString())).thenReturn(listQuery);
             when(listQuery.setMaxResults(anyInt())).thenReturn(listQuery);
-            Object[] row = { RECORD_ID, "SO-001", WINDOW_ID, "Sales Order", TAB_ID, 0L, new Date(1000L) };
+            Object[] row = { RECORD_ID, IDENTIFIER_VALUE, WINDOW_ID, "Sales Order", TAB_ID, 0L, new Date(1000L) };
             when(listQuery.list()).thenReturn(Collections.singletonList(row));
 
             RecentDocumentsService svc = new RecentDocumentsService(request, response);
@@ -159,7 +160,7 @@ class RecentDocumentsServiceTest extends AbstractMockedContextTest {
 
             String output = responseCapture.toString();
             assertTrue(output.contains(RECORD_ID));
-            assertTrue(output.contains("SO-001"));
+            assertTrue(output.contains(IDENTIFIER_VALUE));
             assertTrue(output.contains(WINDOW_ID));
             assertTrue(output.contains("Sales Order"));
         });
@@ -185,7 +186,7 @@ class RecentDocumentsServiceTest extends AbstractMockedContextTest {
             svc.process();
 
             verify(mockDoc).setRecordID(RECORD_ID);
-            verify(mockDoc).setIdentifier("SO-001");
+            verify(mockDoc).setIdentifier(IDENTIFIER_VALUE);
             verify(mockDoc).setTabLevel(0L);
             verify(session).saveOrUpdate(mockDoc);
             verify(obDal, times(1)).flush();
@@ -209,7 +210,7 @@ class RecentDocumentsServiceTest extends AbstractMockedContextTest {
             svc.process();
 
             verify(existing, never()).setRecordID(anyString());
-            verify(existing).setIdentifier("SO-001");
+            verify(existing).setIdentifier(IDENTIFIER_VALUE);
             verify(existing).setTabLevel(0L);
             verify(session).saveOrUpdate(existing);
             verify(obProvider, never()).get(RecentDocument.class);

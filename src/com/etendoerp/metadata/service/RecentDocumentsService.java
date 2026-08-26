@@ -20,6 +20,7 @@ package com.etendoerp.metadata.service;
 import com.etendoerp.metadata.data.RecentDocument;
 import com.etendoerp.metadata.exceptions.InternalServerException;
 import com.etendoerp.metadata.exceptions.NotFoundException;
+import com.etendoerp.metadata.utils.RecentDocumentsQueries;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONObject;
 import org.hibernate.query.Query;
@@ -48,8 +49,6 @@ import java.util.List;
  */
 public class RecentDocumentsService extends MetadataService {
 
-    private static final int MAX_RECENT_DOCUMENTS = 10;
-
     private static final String USER_ID = "userId";
     private static final String ROLE_ID = "roleId";
     private static final String WINDOW_ID = "windowId";
@@ -57,14 +56,6 @@ public class RecentDocumentsService extends MetadataService {
     private static final String RECORD_ID = "recordId";
     private static final String IDENTIFIER = "identifier";
     private static final String TAB_LEVEL = "tabLevel";
-
-    private static final String LIST_HQL =
-        "select rd.recordID, rd.identifier, rd.window.id, rd.window.name, rd.tab.id, rd.tabLevel, rd.viewedAt " +
-        "from etmeta_Recent_Document rd " +
-        "where rd.userContact.id = :userId and rd.role.id = :roleId and rd.active = true " +
-        "and exists (select 1 from ADWindowAccess wa where wa.window.id = rd.window.id " +
-        "and wa.role.id = :roleId and wa.active = true) " +
-        "order by rd.viewedAt desc";
 
     private static final String FIND_EXISTING_HQL =
         "from etmeta_Recent_Document rd " +
@@ -115,22 +106,16 @@ public class RecentDocumentsService extends MetadataService {
     }
 
     private JSONObject list(String userId, String roleId) throws Exception {
-        Query<Object[]> q = OBDal.getInstance().getSession().createQuery(LIST_HQL, Object[].class);
+        Query<Object[]> q = OBDal.getInstance().getSession()
+                .createQuery(RecentDocumentsQueries.LIST_HQL, Object[].class);
         q.setParameter(USER_ID, userId);
         q.setParameter(ROLE_ID, roleId);
-        q.setMaxResults(MAX_RECENT_DOCUMENTS);
+        q.setMaxResults(RecentDocumentsQueries.MAX_RECENT_DOCUMENTS);
         List<Object[]> rows = q.list();
 
         JSONArray items = new JSONArray();
         for (Object[] row : rows) {
-            items.put(new JSONObject()
-                    .put(RECORD_ID, row[0])
-                    .put(IDENTIFIER, row[1])
-                    .put(WINDOW_ID, row[2])
-                    .put("windowTitle", row[3])
-                    .put(TAB_ID, row[4])
-                    .put(TAB_LEVEL, row[5])
-                    .put("viewedAt", ((Date) row[6]).getTime()));
+            items.put(RecentDocumentsQueries.toItemJson(row));
         }
         return new JSONObject().put("items", items);
     }
@@ -186,11 +171,11 @@ public class RecentDocumentsService extends MetadataService {
         idsQ.setParameter(ROLE_ID, roleId);
         List<String> ids = idsQ.list();
 
-        if (ids.size() <= MAX_RECENT_DOCUMENTS) {
+        if (ids.size() <= RecentDocumentsQueries.MAX_RECENT_DOCUMENTS) {
             return;
         }
 
-        List<String> idsToDelete = ids.subList(MAX_RECENT_DOCUMENTS, ids.size());
+        List<String> idsToDelete = ids.subList(RecentDocumentsQueries.MAX_RECENT_DOCUMENTS, ids.size());
         OBDal.getInstance().getSession()
                 .createQuery(DELETE_BY_IDS_HQL)
                 .setParameterList("ids", idsToDelete)
