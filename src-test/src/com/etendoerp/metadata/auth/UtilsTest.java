@@ -65,6 +65,9 @@ import com.smf.securewebservices.utils.SecureWebServicesUtils;
 @RunWith(MockitoJUnitRunner.Silent.class)
 public class UtilsTest extends OBBaseTest {
 
+    private static final String AUTHORIZATION_HEADER = "Authorization";
+    private static final String TEST_TOKEN = "test-token";
+
     @Mock
     private AuthData authData;
 
@@ -284,9 +287,9 @@ public class UtilsTest extends OBBaseTest {
     public void testDecodeToken() {
         try (MockedStatic<SecureWebServicesUtils> swsUtilsMock = mockStatic(SecureWebServicesUtils.class)) {
             DecodedJWT decodedJWT = mock(DecodedJWT.class);
-            swsUtilsMock.when(() -> SecureWebServicesUtils.decodeToken("test-token")).thenReturn(decodedJWT);
+            swsUtilsMock.when(() -> SecureWebServicesUtils.decodeToken(TEST_TOKEN)).thenReturn(decodedJWT);
 
-            DecodedJWT result = Utils.decodeToken("test-token");
+            DecodedJWT result = Utils.decodeToken(TEST_TOKEN);
             assertEquals(decodedJWT, result);
         }
     }
@@ -354,7 +357,7 @@ public class UtilsTest extends OBBaseTest {
     @Test
     public void testDecodeBearerTokenReturnsNullWhenHeaderMissing() {
         javax.servlet.http.HttpServletRequest request = mock(javax.servlet.http.HttpServletRequest.class);
-        when(request.getHeader("Authorization")).thenReturn(null);
+        when(request.getHeader(AUTHORIZATION_HEADER)).thenReturn(null);
 
         assertEquals(null, Utils.decodeBearerToken(request));
     }
@@ -365,7 +368,7 @@ public class UtilsTest extends OBBaseTest {
     @Test
     public void testDecodeBearerTokenReturnsNullWhenNotBearer() {
         javax.servlet.http.HttpServletRequest request = mock(javax.servlet.http.HttpServletRequest.class);
-        when(request.getHeader("Authorization")).thenReturn("Basic abc123");
+        when(request.getHeader(AUTHORIZATION_HEADER)).thenReturn("Basic abc123");
 
         assertEquals(null, Utils.decodeBearerToken(request));
     }
@@ -376,7 +379,7 @@ public class UtilsTest extends OBBaseTest {
     @Test
     public void testDecodeBearerTokenReturnsNullWhenTokenBlank() {
         javax.servlet.http.HttpServletRequest request = mock(javax.servlet.http.HttpServletRequest.class);
-        when(request.getHeader("Authorization")).thenReturn("Bearer    ");
+        when(request.getHeader(AUTHORIZATION_HEADER)).thenReturn("Bearer    ");
 
         assertEquals(null, Utils.decodeBearerToken(request));
     }
@@ -388,9 +391,9 @@ public class UtilsTest extends OBBaseTest {
     public void testDecodeBearerTokenDelegatesToDecodeToken() {
         try (MockedStatic<SecureWebServicesUtils> swsUtilsMock = mockStatic(SecureWebServicesUtils.class)) {
             javax.servlet.http.HttpServletRequest request = mock(javax.servlet.http.HttpServletRequest.class);
-            when(request.getHeader("Authorization")).thenReturn("Bearer test-token");
+            when(request.getHeader(AUTHORIZATION_HEADER)).thenReturn("Bearer test-token");
             DecodedJWT decodedJWT = mock(DecodedJWT.class);
-            swsUtilsMock.when(() -> SecureWebServicesUtils.decodeToken("test-token")).thenReturn(decodedJWT);
+            swsUtilsMock.when(() -> SecureWebServicesUtils.decodeToken(TEST_TOKEN)).thenReturn(decodedJWT);
 
             assertEquals(decodedJWT, Utils.decodeBearerToken(request));
         }
@@ -403,7 +406,7 @@ public class UtilsTest extends OBBaseTest {
     public void testDecodeBearerTokenReturnsNullWhenDecodeThrows() {
         try (MockedStatic<SecureWebServicesUtils> swsUtilsMock = mockStatic(SecureWebServicesUtils.class)) {
             javax.servlet.http.HttpServletRequest request = mock(javax.servlet.http.HttpServletRequest.class);
-            when(request.getHeader("Authorization")).thenReturn("Bearer garbage");
+            when(request.getHeader(AUTHORIZATION_HEADER)).thenReturn("Bearer garbage");
             swsUtilsMock.when(() -> SecureWebServicesUtils.decodeToken("garbage"))
                     .thenThrow(new RuntimeException("bad token"));
 
@@ -417,7 +420,7 @@ public class UtilsTest extends OBBaseTest {
     @Test
     public void testExtractBearerTokenReturnsNullWhenHeaderMissing() {
         javax.servlet.http.HttpServletRequest request = mock(javax.servlet.http.HttpServletRequest.class);
-        when(request.getHeader("Authorization")).thenReturn(null);
+        when(request.getHeader(AUTHORIZATION_HEADER)).thenReturn(null);
 
         assertEquals(null, Utils.extractBearerToken(request));
     }
@@ -428,7 +431,7 @@ public class UtilsTest extends OBBaseTest {
     @Test
     public void testExtractBearerTokenReturnsNullWhenNotBearer() {
         javax.servlet.http.HttpServletRequest request = mock(javax.servlet.http.HttpServletRequest.class);
-        when(request.getHeader("Authorization")).thenReturn("Basic abc123");
+        when(request.getHeader(AUTHORIZATION_HEADER)).thenReturn("Basic abc123");
 
         assertEquals(null, Utils.extractBearerToken(request));
     }
@@ -439,7 +442,7 @@ public class UtilsTest extends OBBaseTest {
     @Test
     public void testExtractBearerTokenReturnsNullWhenTokenBlank() {
         javax.servlet.http.HttpServletRequest request = mock(javax.servlet.http.HttpServletRequest.class);
-        when(request.getHeader("Authorization")).thenReturn("Bearer    ");
+        when(request.getHeader(AUTHORIZATION_HEADER)).thenReturn("Bearer    ");
 
         assertEquals(null, Utils.extractBearerToken(request));
     }
@@ -450,7 +453,7 @@ public class UtilsTest extends OBBaseTest {
     @Test
     public void testExtractBearerTokenReturnsRawToken() {
         javax.servlet.http.HttpServletRequest request = mock(javax.servlet.http.HttpServletRequest.class);
-        when(request.getHeader("Authorization")).thenReturn("Bearer some.raw.token");
+        when(request.getHeader(AUTHORIZATION_HEADER)).thenReturn("Bearer some.raw.token");
 
         assertEquals("some.raw.token", Utils.extractBearerToken(request));
     }

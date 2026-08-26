@@ -57,6 +57,8 @@ public class TokenRevocationStore {
     private TokenRevocationStore() { }
 
     /**
+     * Checks whether a token has been revoked, by looking up the hash of its raw string.
+     *
      * @param rawToken the full raw token string
      * @return {@code true} if this token has been revoked; {@code false} for a blank/null token too
      */
