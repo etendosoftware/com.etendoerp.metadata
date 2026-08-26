@@ -66,18 +66,62 @@ public class ForwarderServlet extends BaseWebService {
         org.openbravo.service.datasource.DataSourceServlet dataSourceServlet =
                 WeldUtils.getInstanceFromStaticBeanManager(org.openbravo.service.datasource.DataSourceServlet.class);
         String method = request.getMethod();
+        String operationType = request.getParameter("_operationType");
 
         HttpServletRequest enrichedRequest = ("POST".equalsIgnoreCase(method) || "PUT".equalsIgnoreCase(method) || "GET".equalsIgnoreCase(method))
                 ? tryEnrichRequest(request, path)
                 : request;
-        if ("POST".equalsIgnoreCase(method)) {
+
+        boolean isPost = "POST".equalsIgnoreCase(method);
+        boolean isPut = "PUT".equalsIgnoreCase(method);
+        boolean isSaveOperation = isPut || (isPost && ("add".equals(operationType) || "update".equals(operationType)));
+
+        if (isSaveOperation) {
+            forwardSaveWithConflictDetection(dataSourceServlet, isPost, enrichedRequest, response, method, path);
+        } else if (isPost) {
             dataSourceServlet.doPost(enrichedRequest, response);
         } else if ("DELETE".equalsIgnoreCase(method)) {
             dataSourceServlet.doDelete(request, response);
-        } else if ("PUT".equalsIgnoreCase(method)) {
-            dataSourceServlet.doPut(enrichedRequest, response);
         } else {
             dataSourceServlet.doGet(enrichedRequest, response);
+        }
+    }
+
+    /**
+     * Forwards an {@code add}/{@code update} request to the core {@code DataSourceServlet},
+     * buffering its response so it can be inspected before reaching the real client.
+     *
+     * <p>The core resolves optimistic-lock (stale object) conflicts internally and always
+     * writes them as a generic HTTP 200 body, indistinguishable from any other save error.
+     * This method detects that specific case and rewrites it as a distinct, structured
+     * HTTP 409 response; every other outcome (success or any other error) is replayed to the
+     * real response unchanged.</p>
+     *
+     * @param dataSourceServlet the core servlet to forward to
+     * @param isPost            {@code true} for POST (add/update), {@code false} for PUT (update)
+     * @param request           the (possibly enriched) request to forward
+     * @param realResponse      the real response ultimately sent to the client
+     * @param method            the HTTP method, used only for logging
+     * @param path              the request path, used only for logging
+     */
+    private void forwardSaveWithConflictDetection(org.openbravo.service.datasource.DataSourceServlet dataSourceServlet,
+            boolean isPost, HttpServletRequest request, HttpServletResponse realResponse, String method, String path)
+            throws IOException, ServletException {
+        BufferedResponseWrapper buffered = new BufferedResponseWrapper(realResponse);
+        if (isPost) {
+            dataSourceServlet.doPost(request, buffered);
+        } else {
+            dataSourceServlet.doPut(request, buffered);
+        }
+
+        String body = buffered.getCapturedBodyAsString();
+        String marker = StaleObjectConflictDetector.resolveStaleMarker(body);
+        if (marker != null) {
+            String correlationId = StaleObjectConflictDetector.newCorrelationId();
+            log4j.warn("[meta] Stale object conflict on forwarded save (cid={}): {} {}", correlationId, method, path);
+            StaleObjectConflictDetector.writeConflictResponse(realResponse, correlationId, marker);
+        } else {
+            buffered.flushToRealResponse();
         }
     }
 

@@ -23,6 +23,7 @@ import org.hibernate.Session;
 import org.hibernate.query.Query;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -37,17 +38,21 @@ import java.util.Collections;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class DashboardLayoutResolverTest {
 
     private static final String USER_123 = "user123";
+    private static final String LAYER_SYSTEM = "SYSTEM";
+    private static final String SYS_ID = "sys-id";
 
     @Mock OBContext mockContext;
     @Mock OBDal mockOBDal;
@@ -97,7 +102,7 @@ class DashboardLayoutResolverTest {
 
     @Test
     void resolveUserLayerOverridesSystem() throws Exception {
-        Object[] systemRow = { "sys-instance-id", "wc1", "SYSTEM", null, 0, 0, 2, 1, true, 10, null };
+        Object[] systemRow = { "sys-instance-id", "wc1", LAYER_SYSTEM, null, 0, 0, 2, 1, true, 10, null };
         Object[] userRow   = { "usr-instance-id", "wc1", "USER",   USER_123, 1, 0, 2, 1, true, 10, null };
 
         runResolveTest(Arrays.asList(systemRow, userRow), resolver -> {
@@ -112,12 +117,43 @@ class DashboardLayoutResolverTest {
 
     @Test
     void resolveSystemRowUsedWhenNoOverride() throws Exception {
-        Object[] systemRow = { "sys-id", "wc1", "SYSTEM", null, 0, 0, 2, 1, true, 10, null };
+        Object[] systemRow = { SYS_ID, "wc1", LAYER_SYSTEM, null, 0, 0, 2, 1, true, 10, null };
 
         runResolveTest(Collections.singletonList(systemRow), resolver -> {
             JSONArray result = resolver.resolve();
             assertEquals(1, result.length());
-            assertEquals("sys-id", result.getJSONObject(0).getString("instanceId"));
+            assertEquals(SYS_ID, result.getJSONObject(0).getString("instanceId"));
         });
+    }
+
+    @Test
+    void resolveQueryIncludesRoleAccessFilter() throws Exception {
+        runResolveTest(Collections.emptyList(), DashboardLayoutResolver::resolve);
+
+        ArgumentCaptor<String> hqlCaptor = ArgumentCaptor.forClass(String.class);
+        verify(mockSession).createQuery(hqlCaptor.capture(), eq(Object[].class));
+        String hql = hqlCaptor.getValue();
+        assertTrue(hql.contains("etmeta_Widget_Class_Access"),
+                "layout HQL must join the access-control table so restricted types can be omitted");
+        assertTrue(hql.contains("dw.widgetClass"),
+                "layout HQL must correlate the access check on dw.widgetClass");
+    }
+
+    @Test
+    void resolveDefaultVisibleWhenNoAccessRows() throws Exception {
+        // A widget class with zero ETMETA_WIDGET_CLASS_ACCESS rows must stay visible
+        // regardless of the current role — the opt-out safe default.
+        Object[] unrestrictedRow = { SYS_ID, "wc-open", LAYER_SYSTEM, null, 0, 0, 2, 1, true, 10, null };
+
+        runResolveTest(Collections.singletonList(unrestrictedRow), resolver -> {
+            JSONArray result = resolver.resolve();
+            assertEquals(1, result.length());
+            assertEquals("wc-open", result.getJSONObject(0).getString("widgetClassId"));
+        });
+
+        ArgumentCaptor<String> hqlCaptor = ArgumentCaptor.forClass(String.class);
+        verify(mockSession).createQuery(hqlCaptor.capture(), eq(Object[].class));
+        assertTrue(hqlCaptor.getValue().contains("not exists"),
+                "the safe default (no access rows -> visible to every role) must be encoded in the layout HQL");
     }
 }
