@@ -129,9 +129,12 @@ isn't revoked.
 The Java entity (e.g. `RevokedToken`) is generated at build time from the AD table
 definition, same as `SavedView`, `UserFavorite`, etc. — not hand-written.
 
-Creating this table goes through the module's existing AD/webhook tooling
-(`/etendo:alter-db`); if webhooks aren't available in the working environment, the SQL
-fallback documented for this project applies.
+The table itself and its `JTI` column already exist on this branch (created for the original
+jti-based design). This revision's DB work is a **rename**, not a fresh creation: `JTI` →
+`TOKEN_HASH` on the existing table, via the same manual-SQL + `AD_COLUMN`/`AD_ELEMENT` update +
+entity-regeneration path used to create the table originally (webhooks were unavailable in this
+environment; the module's `/etendo:alter-db` tooling has no automated column-rename operation
+either way — see its own docs, "Modify column" is manual SQL).
 
 ---
 
