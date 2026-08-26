@@ -98,8 +98,8 @@ Expected: FAIL to compile — `Utils.extractBearerToken` doesn't exist yet.
 
 - [ ] **Step 3: Implement it**
 
-Replace the current `decodeBearerToken` method in `src/com/etendoerp/metadata/auth/Utils.java`
-with:
+Replace the current `decodeBearerToken` method in `src/com/etendoerp/metadata/auth/Utils.java`,
+and add two new methods alongside it (`extractBearerToken`, `extractRawToken`):
 
 ```java
   /**
