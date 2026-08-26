@@ -38,7 +38,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
-import com.auth0.jwt.interfaces.Claim;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.etendoerp.metadata.auth.TokenRevocationStore;
 import com.etendoerp.metadata.auth.Utils;
@@ -48,6 +47,8 @@ import com.etendoerp.metadata.exceptions.UnauthorizedException;
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class LogoutServiceTest {
+
+    private static final String RAW_TOKEN = "header.payload.signature";
 
     @Mock private HttpServletRequest request;
     @Mock private HttpServletResponse response;
@@ -88,64 +89,36 @@ class LogoutServiceTest {
     }
 
     @Test
-    void validTokenRevokesJtiAndReturns200() throws Exception {
+    void validTokenRevokesRawTokenAndReturns200() throws Exception {
         when(request.getMethod()).thenReturn("POST");
         DecodedJWT decoded = mock(DecodedJWT.class);
-        Claim jtiClaim = mock(Claim.class);
-        when(jtiClaim.asString()).thenReturn("session-123");
-        when(decoded.getClaim("jti")).thenReturn(jtiClaim);
         Date expiresAt = new Date();
         when(decoded.getExpiresAt()).thenReturn(expiresAt);
         authUtilsStatic.when(() -> Utils.decodeBearerToken(request)).thenReturn(decoded);
+        authUtilsStatic.when(() -> Utils.extractBearerToken(request)).thenReturn(RAW_TOKEN);
 
         LogoutService service = new LogoutService(request, response);
         service.process();
 
-        revocationStoreStatic.verify(() -> TokenRevocationStore.revoke("session-123", expiresAt));
-        verify(response).setStatus(HttpServletResponse.SC_OK);
-    }
-
-    /**
-     * A token minted outside this module (e.g. classic /sws/login, which doesn't set a jti
-     * claim) must not crash logout or attempt to revoke a null/blank jti - it's simply out of
-     * this mechanism's reach, same as any other WebService bean outside this module.
-     */
-    @Test
-    void missingJtiClaimDoesNotRevokeOrCrash() throws Exception {
-        when(request.getMethod()).thenReturn("POST");
-        DecodedJWT decoded = mock(DecodedJWT.class);
-        Claim jtiClaim = mock(Claim.class);
-        when(jtiClaim.asString()).thenReturn(null);
-        when(decoded.getClaim("jti")).thenReturn(jtiClaim);
-        authUtilsStatic.when(() -> Utils.decodeBearerToken(request)).thenReturn(decoded);
-
-        LogoutService service = new LogoutService(request, response);
-        service.process();
-
-        revocationStoreStatic.verify(() -> TokenRevocationStore.revoke(
-                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()), never());
+        revocationStoreStatic.verify(() -> TokenRevocationStore.revoke(RAW_TOKEN, expiresAt));
         verify(response).setStatus(HttpServletResponse.SC_OK);
     }
 
     /**
      * A DB failure inside {@code TokenRevocationStore.revoke} must propagate out of
-     * {@code process()} uncaught, not be swallowed - {@code dispatch()}'s revocation guard
-     * doesn't apply to LogoutService's own request, so this surfaces through the normal
-     * exception-to-500 mapping in {@code MetadataServlet.handleException}, matching the design
-     * spec's "client state cleared even if revocation fails" scenario: the failure is real and
-     * visible (a 500), not silently absorbed into a false 200.
+     * {@code process()} uncaught, not be swallowed - matches the design spec's "client state
+     * cleared even if revocation fails" scenario: the failure is real and visible (a 500), not
+     * silently absorbed into a false 200.
      */
     @Test
     void revocationFailurePropagatesUncaught() {
         when(request.getMethod()).thenReturn("POST");
         DecodedJWT decoded = mock(DecodedJWT.class);
-        Claim jtiClaim = mock(Claim.class);
-        when(jtiClaim.asString()).thenReturn("session-123");
-        when(decoded.getClaim("jti")).thenReturn(jtiClaim);
         Date expiresAt = new Date();
         when(decoded.getExpiresAt()).thenReturn(expiresAt);
         authUtilsStatic.when(() -> Utils.decodeBearerToken(request)).thenReturn(decoded);
-        revocationStoreStatic.when(() -> TokenRevocationStore.revoke("session-123", expiresAt))
+        authUtilsStatic.when(() -> Utils.extractBearerToken(request)).thenReturn(RAW_TOKEN);
+        revocationStoreStatic.when(() -> TokenRevocationStore.revoke(RAW_TOKEN, expiresAt))
                 .thenThrow(new RuntimeException("DB unavailable"));
 
         LogoutService service = new LogoutService(request, response);

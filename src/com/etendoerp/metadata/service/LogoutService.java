@@ -29,8 +29,11 @@ import com.etendoerp.metadata.exceptions.MethodNotAllowedException;
 import com.etendoerp.metadata.exceptions.UnauthorizedException;
 
 /**
- * Serves {@code POST /sws/com.etendoerp.metadata.meta/logout} - revokes the caller's JWT by its
- * {@code jti} claim so it stops working immediately instead of remaining valid until it expires.
+ * Serves {@code POST /sws/com.etendoerp.metadata.meta/logout} - revokes the caller's JWT by the
+ * SHA-256 hash of its full raw string, so it stops working immediately instead of remaining
+ * valid until it expires. Hashing the whole token (rather than reading a {@code jti} claim)
+ * means this works regardless of which login path issued the token — not every issuer sets
+ * {@code jti} (classic {@code /sws/login} doesn't).
  * <p>
  * No request body is read; the {@code Authorization} header is the only input, and the caller
  * (the frontend's BFF logout route) treats the response as best-effort and doesn't depend on its
@@ -61,15 +64,8 @@ public class LogoutService extends MetadataService {
             throw new UnauthorizedException("Valid Authorization: Bearer <token> header required");
         }
 
-        // Tokens minted outside this module (classic /sws/login, via
-        // SecureWebServicesUtils.generateToken) carry no jti claim and therefore can't be
-        // revoked by this mechanism - same accepted limitation as any other WebService bean
-        // outside com.etendoerp.metadata. Every token this module itself issues (LoginService,
-        // ChangeProfileService) always sets jti, so this only skips tokens already out of scope.
-        String jti = decoded.getClaim("jti").asString();
-        if (jti != null && !jti.isEmpty()) {
-            TokenRevocationStore.revoke(jti, decoded.getExpiresAt());
-        }
+        String rawToken = Utils.extractBearerToken(getRequest());
+        TokenRevocationStore.revoke(rawToken, decoded.getExpiresAt());
 
         getResponse().setStatus(HttpServletResponse.SC_OK);
     }
