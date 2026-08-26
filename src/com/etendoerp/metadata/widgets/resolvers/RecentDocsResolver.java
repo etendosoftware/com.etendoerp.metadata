@@ -20,12 +20,8 @@ package com.etendoerp.metadata.widgets.resolvers;
 import com.etendoerp.metadata.utils.RecentDocumentsQueries;
 import com.etendoerp.metadata.widgets.WidgetDataContext;
 import com.etendoerp.metadata.widgets.WidgetDataResolver;
-import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONObject;
-import org.hibernate.query.Query;
 import org.openbravo.dal.service.OBDal;
-
-import java.util.List;
 
 /** Returns the current user's recently viewed records from ETMETA_RECENT_DOCUMENT. */
 public class RecentDocsResolver implements WidgetDataResolver {
@@ -47,18 +43,6 @@ public class RecentDocsResolver implements WidgetDataResolver {
     public JSONObject resolve(WidgetDataContext ctx) throws Exception {
         String userId = ctx.getObContext().getUser().getId();
         String roleId = ctx.getObContext().getRole().getId();
-
-        Query<Object[]> q = OBDal.getInstance().getSession()
-                .createQuery(RecentDocumentsQueries.LIST_HQL, Object[].class);
-        q.setParameter("userId", userId);
-        q.setParameter("roleId", roleId);
-        q.setMaxResults(RecentDocumentsQueries.MAX_RECENT_DOCUMENTS);
-        List<Object[]> rows = q.list();
-
-        JSONArray items = new JSONArray();
-        for (Object[] row : rows) {
-            items.put(RecentDocumentsQueries.toItemJson(row));
-        }
-        return new JSONObject().put("items", items);
+        return new JSONObject().put("items", RecentDocumentsQueries.fetchItems(userId, roleId));
     }
 }

@@ -21,7 +21,6 @@ import com.etendoerp.metadata.data.RecentDocument;
 import com.etendoerp.metadata.exceptions.InternalServerException;
 import com.etendoerp.metadata.exceptions.NotFoundException;
 import com.etendoerp.metadata.utils.RecentDocumentsQueries;
-import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONObject;
 import org.hibernate.query.Query;
 import org.openbravo.base.provider.OBProvider;
@@ -106,18 +105,7 @@ public class RecentDocumentsService extends MetadataService {
     }
 
     private JSONObject list(String userId, String roleId) throws Exception {
-        Query<Object[]> q = OBDal.getInstance().getSession()
-                .createQuery(RecentDocumentsQueries.LIST_HQL, Object[].class);
-        q.setParameter(USER_ID, userId);
-        q.setParameter(ROLE_ID, roleId);
-        q.setMaxResults(RecentDocumentsQueries.MAX_RECENT_DOCUMENTS);
-        List<Object[]> rows = q.list();
-
-        JSONArray items = new JSONArray();
-        for (Object[] row : rows) {
-            items.put(RecentDocumentsQueries.toItemJson(row));
-        }
-        return new JSONObject().put("items", items);
+        return new JSONObject().put("items", RecentDocumentsQueries.fetchItems(userId, roleId));
     }
 
     private JSONObject track(String userId, String roleId, JSONObject body) throws Exception {

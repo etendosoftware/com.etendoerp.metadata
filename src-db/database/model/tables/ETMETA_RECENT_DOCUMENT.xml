@@ -58,11 +58,11 @@
         <onCreateDefault/>
       </column>
       <column name="TABLEVEL" primaryKey="false" required="true" type="DECIMAL" size="10,0" autoIncrement="false">
-        <default/>
+        <default><![CDATA[0]]></default>
         <onCreateDefault/>
       </column>
       <column name="VIEWEDAT" primaryKey="false" required="true" type="TIMESTAMP" size="7" autoIncrement="false">
-        <default/>
+        <default><![CDATA[SYSDATE]]></default>
         <onCreateDefault/>
       </column>
       <foreign-key foreignTable="AD_CLIENT" name="ETMETA_RECENT_DOC_CLIENT_FK">
