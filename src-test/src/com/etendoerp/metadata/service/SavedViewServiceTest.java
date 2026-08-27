@@ -48,6 +48,7 @@ import org.openbravo.base.provider.OBProvider;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBCriteria;
 import org.openbravo.dal.service.OBDal;
+import org.openbravo.model.ad.access.Role;
 import org.openbravo.model.ad.access.User;
 import org.openbravo.model.ad.system.Client;
 import org.openbravo.model.ad.ui.Tab;
@@ -57,6 +58,7 @@ import com.etendoerp.metadata.data.SavedView;
 import com.etendoerp.metadata.exceptions.InternalServerException;
 import com.etendoerp.metadata.exceptions.MethodNotAllowedException;
 import com.etendoerp.metadata.exceptions.NotFoundException;
+import com.etendoerp.metadata.exceptions.UnauthorizedException;
 
 /**
  * Unit tests for {@link SavedViewService}.
@@ -73,6 +75,8 @@ public class SavedViewServiceTest {
     private static final String USER_ID = "user-001";
     private static final String CLIENT_ID = "client-001";
     private static final String ORG_ID = "org-001";
+    private static final String ROLE_ID = "role-001";
+    private static final String SYSTEM_ID = "0";
     private static final String SAVED_VIEW_BASE_PATH = "/saved-views";
     private static final String PATH_WITH_ID = "/saved-views/" + VIEW_ID;
     private static final String PATH_WITH_META_PREFIX = "/com.etendoerp.metadata.meta/saved-views/" + VIEW_ID;
@@ -90,6 +94,7 @@ public class SavedViewServiceTest {
     @Mock private User mockUser;
     @Mock private Client mockClient;
     @Mock private Organization mockOrg;
+    @Mock private Role mockRole;
     @Mock private OBCriteria<SavedView> mockCriteria;
 
     private MockedStatic<OBDal> obDalMock;
@@ -108,7 +113,9 @@ public class SavedViewServiceTest {
     @Before
     public void setUp() throws IOException {
         responseWriter = new StringWriter();
-        when(mockResponse.getWriter()).thenReturn(new PrintWriter(responseWriter));
+        // A fresh PrintWriter per call: write() closes it via try-with-resources, and some
+        // tests invoke process() more than once against the same mocked response.
+        when(mockResponse.getWriter()).thenAnswer(inv -> new PrintWriter(responseWriter));
 
         obDalMock = mockStatic(OBDal.class);
         obContextMock = mockStatic(OBContext.class);
@@ -134,11 +141,16 @@ public class SavedViewServiceTest {
         when(mockOBContext.getUser()).thenReturn(mockUser);
         when(mockOBContext.getCurrentClient()).thenReturn(mockClient);
         when(mockOBContext.getCurrentOrganization()).thenReturn(mockOrg);
+        when(mockOBContext.getRole()).thenReturn(mockRole);
+        // "O" (Organization-level only) models a regular, non-administrator business role.
+        when(mockOBContext.getUserLevel()).thenReturn("O");
         when(mockClient.getId()).thenReturn(CLIENT_ID);
         when(mockOrg.getId()).thenReturn(ORG_ID);
+        when(mockRole.getId()).thenReturn(ROLE_ID);
         when(mockOBDal.get(Client.class, CLIENT_ID)).thenReturn(mockClient);
         when(mockOBDal.get(Organization.class, ORG_ID)).thenReturn(mockOrg);
         when(mockOBDal.get(User.class, USER_ID)).thenReturn(mockUser);
+        when(mockOBDal.get(Role.class, ROLE_ID)).thenReturn(mockRole);
 
         when(mockRequest.getPathInfo()).thenReturn(PATH_WITH_ID);
         service = new SavedViewService(mockRequest, mockResponse);
@@ -473,6 +485,256 @@ public class SavedViewServiceTest {
         verify(mockOBDal).remove(mockView);
         verify(mockOBDal).flush();
         assertTrue("Response should contain status field", responseWriter.toString().contains("status"));
+    }
+
+    // --- Scoped default resolution (USER > ROLE > ORGANIZATION > CLIENT > SYSTEM) ---
+
+    /**
+     * Scenario: Role default view applied to user without own view.
+     * The user-scope query returns nothing, so resolution must fall through
+     * to the role-scope query and return its result.
+     *
+     * @throws IOException if an I/O error occurs during processing
+     */
+    @Test
+    public void testResolveEffectiveDefault_RoleAppliedWhenNoUserView() throws IOException {
+        when(mockRequest.getMethod()).thenReturn(GET);
+        when(mockRequest.getPathInfo()).thenReturn(SAVED_VIEW_BASE_PATH);
+        when(mockRequest.getParameter("tab")).thenReturn(TAB_ID);
+        when(mockRequest.getParameter(ISDEFAULT_PARAM)).thenReturn("true");
+        when(mockOBDal.createCriteria(SavedView.class)).thenReturn(mockCriteria);
+        when(mockCriteria.list()).thenReturn(Collections.emptyList(), Collections.singletonList(mockView));
+
+        service.process();
+
+        assertTrue(RESPONSE_CONTAINS_VIEW_ID, responseWriter.toString().contains(VIEW_ID));
+        verify(mockCriteria, times(2)).list();
+    }
+
+    /**
+     * Scenario: User view prevails over role view.
+     * The user-scope query already returns a match, so resolution must stop
+     * there without ever querying role/org/client/system scope.
+     *
+     * @throws IOException if an I/O error occurs during processing
+     */
+    @Test
+    public void testResolveEffectiveDefault_UserPrevailsOverRole() throws IOException {
+        when(mockRequest.getMethod()).thenReturn(GET);
+        when(mockRequest.getPathInfo()).thenReturn(SAVED_VIEW_BASE_PATH);
+        when(mockRequest.getParameter("tab")).thenReturn(TAB_ID);
+        when(mockRequest.getParameter(ISDEFAULT_PARAM)).thenReturn("true");
+        when(mockOBDal.createCriteria(SavedView.class)).thenReturn(mockCriteria);
+        when(mockCriteria.list()).thenReturn(Collections.singletonList(mockView));
+
+        service.process();
+
+        assertTrue(RESPONSE_CONTAINS_VIEW_ID, responseWriter.toString().contains(VIEW_ID));
+        verify(mockCriteria, times(1)).list();
+    }
+
+    /**
+     * Scenario: Role view prevails over system view.
+     * With no user view either, resolution reaches the role-scope query on its
+     * second attempt and must stop there, never reaching org/client/system.
+     *
+     * @throws IOException if an I/O error occurs during processing
+     */
+    @Test
+    public void testResolveEffectiveDefault_RolePrevailsOverSystem() throws IOException {
+        when(mockRequest.getMethod()).thenReturn(GET);
+        when(mockRequest.getPathInfo()).thenReturn(SAVED_VIEW_BASE_PATH);
+        when(mockRequest.getParameter("tab")).thenReturn(TAB_ID);
+        when(mockRequest.getParameter(ISDEFAULT_PARAM)).thenReturn("true");
+        when(mockOBDal.createCriteria(SavedView.class)).thenReturn(mockCriteria);
+        when(mockCriteria.list()).thenReturn(Collections.emptyList(), Collections.singletonList(mockView));
+
+        service.process();
+
+        assertTrue(RESPONSE_CONTAINS_VIEW_ID, responseWriter.toString().contains(VIEW_ID));
+        verify(mockCriteria, times(2)).list();
+    }
+
+    /**
+     * Scenario: no view at any scope resolves to an empty (not missing) response,
+     * falling through all five precedence levels.
+     *
+     * @throws IOException if an I/O error occurs during processing
+     */
+    @Test
+    public void testResolveEffectiveDefault_NoViewAtAnyScopeReturnsEmptyList() throws IOException {
+        when(mockRequest.getMethod()).thenReturn(GET);
+        when(mockRequest.getPathInfo()).thenReturn(SAVED_VIEW_BASE_PATH);
+        when(mockRequest.getParameter("tab")).thenReturn(TAB_ID);
+        when(mockRequest.getParameter(ISDEFAULT_PARAM)).thenReturn("true");
+        when(mockOBDal.createCriteria(SavedView.class)).thenReturn(mockCriteria);
+        when(mockCriteria.list()).thenReturn(Collections.emptyList());
+
+        service.process();
+
+        assertTrue("Response should contain totalRows: 0", responseWriter.toString().contains("\"totalRows\":0"));
+        verify(mockCriteria, times(5)).list();
+    }
+
+    /**
+     * Scenario: deleting the user's own default view falls back to the role/system view.
+     * First the user's own view is deleted; a subsequent default lookup then finds
+     * nothing at user scope and falls back to the role-scope view.
+     *
+     * @throws IOException if an I/O error occurs during processing
+     */
+    @Test
+    public void testDeletingOwnDefaultFallsBackToRoleView() throws IOException {
+        when(mockRequest.getMethod()).thenReturn(DELETE);
+        when(mockRequest.getPathInfo()).thenReturn(PATH_WITH_ID);
+        when(mockOBDal.get(SavedView.class, VIEW_ID)).thenReturn(mockView);
+
+        service.process();
+
+        verify(mockOBDal).remove(mockView);
+
+        when(mockRequest.getMethod()).thenReturn(GET);
+        when(mockRequest.getPathInfo()).thenReturn(SAVED_VIEW_BASE_PATH);
+        when(mockRequest.getParameter("tab")).thenReturn(TAB_ID);
+        when(mockRequest.getParameter(ISDEFAULT_PARAM)).thenReturn("true");
+        when(mockOBDal.createCriteria(SavedView.class)).thenReturn(mockCriteria);
+        when(mockCriteria.list()).thenReturn(Collections.emptyList(), Collections.singletonList(mockView));
+
+        service.process();
+
+        assertTrue(RESPONSE_CONTAINS_VIEW_ID, responseWriter.toString().contains(VIEW_ID));
+    }
+
+    // --- Scope write authorization ---
+
+    /**
+     * Verifies that a regular (Organization-level only) role cannot create a ROLE-scoped
+     * shared view.
+     *
+     * @throws IOException if an I/O error occurs during processing
+     */
+    @Test(expected = UnauthorizedException.class)
+    public void testHandlePostRoleScopeRejectedForRegularUser() throws IOException {
+        when(mockRequest.getMethod()).thenReturn(POST);
+        when(mockRequest.getPathInfo()).thenReturn(SAVED_VIEW_BASE_PATH);
+        when(mockRequest.getReader()).thenReturn(new BufferedReader(
+            new StringReader("{\"name\":\"" + VIEW_NAME + "\",\"scope\":\"ROLE\"}")));
+
+        service.process();
+    }
+
+    /**
+     * Verifies that a Client Administrator role (userLevel contains "C") can create a
+     * ROLE-scoped shared view, and that it is persisted with user=null, role=&lt;role&gt;.
+     *
+     * @throws IOException if an I/O error occurs during processing
+     */
+    @Test
+    public void testHandlePostRoleScopeAllowedForClientAdmin() throws IOException {
+        when(mockOBContext.getUserLevel()).thenReturn("CO");
+        when(mockRequest.getMethod()).thenReturn(POST);
+        when(mockRequest.getPathInfo()).thenReturn(SAVED_VIEW_BASE_PATH);
+        when(mockRequest.getReader()).thenReturn(new BufferedReader(
+            new StringReader("{\"name\":\"" + VIEW_NAME + "\",\"scope\":\"ROLE\",\"tab\":\"" + TAB_ID + "\"}")));
+        when(mockOBProvider.get(SavedView.class)).thenReturn(mockView);
+        when(mockOBDal.get(Tab.class, TAB_ID)).thenReturn(mockTab);
+
+        service.process();
+
+        verify(mockView).setRole(mockRole);
+        verify(mockView).setUser(null);
+        verify(mockOBDal).save(mockView);
+    }
+
+    /**
+     * Verifies that a System Administrator role (userLevel contains "S") can create a
+     * SYSTEM-scoped shared view.
+     *
+     * @throws IOException if an I/O error occurs during processing
+     */
+    @Test
+    public void testHandlePostSystemScopeAllowedForSystemAdmin() throws IOException {
+        when(mockOBContext.getUserLevel()).thenReturn("SCO");
+        when(mockRequest.getMethod()).thenReturn(POST);
+        when(mockRequest.getPathInfo()).thenReturn(SAVED_VIEW_BASE_PATH);
+        when(mockRequest.getReader()).thenReturn(new BufferedReader(
+            new StringReader("{\"name\":\"" + VIEW_NAME + "\",\"scope\":\"SYSTEM\",\"tab\":\"" + TAB_ID + "\"}")));
+        when(mockOBProvider.get(SavedView.class)).thenReturn(mockView);
+        when(mockOBDal.get(Tab.class, TAB_ID)).thenReturn(mockTab);
+        when(mockOBDal.get(Client.class, SYSTEM_ID)).thenReturn(mockClient);
+        when(mockOBDal.get(Organization.class, SYSTEM_ID)).thenReturn(mockOrg);
+
+        service.process();
+
+        verify(mockOBDal).save(mockView);
+    }
+
+    /**
+     * Verifies that a Client Administrator role (missing "S") cannot create a
+     * SYSTEM-scoped shared view.
+     *
+     * @throws IOException if an I/O error occurs during processing
+     */
+    @Test(expected = UnauthorizedException.class)
+    public void testHandlePostSystemScopeRejectedForClientAdmin() throws IOException {
+        when(mockOBContext.getUserLevel()).thenReturn("CO");
+        when(mockRequest.getMethod()).thenReturn(POST);
+        when(mockRequest.getPathInfo()).thenReturn(SAVED_VIEW_BASE_PATH);
+        when(mockRequest.getReader()).thenReturn(new BufferedReader(
+            new StringReader("{\"name\":\"" + VIEW_NAME + "\",\"scope\":\"SYSTEM\"}")));
+
+        service.process();
+    }
+
+    /**
+     * Verifies that a non-owner, non-administrator user cannot edit a ROLE-scoped shared view.
+     *
+     * @throws IOException if an I/O error occurs during processing
+     */
+    @Test(expected = UnauthorizedException.class)
+    public void testHandlePutSharedRoleViewRejectedForNonOwnerRegularUser() throws IOException {
+        when(mockView.getUser()).thenReturn(null);
+        when(mockView.getRole()).thenReturn(mockRole);
+        when(mockRequest.getMethod()).thenReturn(PUT);
+        when(mockOBDal.get(SavedView.class, VIEW_ID)).thenReturn(mockView);
+        when(mockRequest.getReader()).thenReturn(new BufferedReader(new StringReader("{\"name\":\"X\"}")));
+
+        service.process();
+    }
+
+    /**
+     * Verifies that a Client Administrator (non-owner) can edit a ROLE-scoped shared view.
+     *
+     * @throws IOException if an I/O error occurs during processing
+     */
+    @Test
+    public void testHandlePutSharedRoleViewAllowedForClientAdmin() throws IOException {
+        when(mockView.getUser()).thenReturn(null);
+        when(mockView.getRole()).thenReturn(mockRole);
+        when(mockOBContext.getUserLevel()).thenReturn("CO");
+        when(mockRequest.getMethod()).thenReturn(PUT);
+        when(mockOBDal.get(SavedView.class, VIEW_ID)).thenReturn(mockView);
+        when(mockRequest.getReader()).thenReturn(new BufferedReader(new StringReader("{\"name\":\"Updated\"}")));
+
+        service.process();
+
+        verify(mockOBDal).save(mockView);
+        verify(mockOBDal).flush();
+    }
+
+    /**
+     * Verifies that a non-owner, non-administrator user cannot delete a ROLE-scoped shared view.
+     *
+     * @throws IOException if an I/O error occurs during processing
+     */
+    @Test(expected = UnauthorizedException.class)
+    public void testHandleDeleteSharedRoleViewRejectedForNonOwnerRegularUser() throws IOException {
+        when(mockView.getUser()).thenReturn(null);
+        when(mockView.getRole()).thenReturn(mockRole);
+        when(mockRequest.getMethod()).thenReturn(DELETE);
+        when(mockOBDal.get(SavedView.class, VIEW_ID)).thenReturn(mockView);
+
+        service.process();
     }
 
     // --- Unsupported method ---
