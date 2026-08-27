@@ -37,6 +37,7 @@ import org.openbravo.model.ad.ui.Tab;
 import org.openbravo.model.common.enterprise.Organization;
 
 import com.etendoerp.metadata.data.SavedView;
+import com.etendoerp.metadata.exceptions.NotFoundException;
 import com.etendoerp.metadata.exceptions.UnauthorizedException;
 
 /**
@@ -55,6 +56,39 @@ public class SavedViewServiceScopeTest extends AbstractSavedViewServiceTest {
     private void givenSharedRoleView() {
         when(mockView.getUser()).thenReturn(null);
         when(mockView.getRole()).thenReturn(mockRole);
+    }
+
+    /** Stubs {@code mockView} as owned by neither a user nor a role (org/client/system scope). */
+    private void givenNoOwnerNoRole() {
+        when(mockView.getUser()).thenReturn(null);
+        when(mockView.getRole()).thenReturn(null);
+    }
+
+    /** Stubs a POST request whose body is {@code bodyJson}. */
+    private void givenPostRequest(String bodyJson) throws IOException {
+        when(mockRequest.getMethod()).thenReturn(POST);
+        when(mockRequest.getPathInfo()).thenReturn(SAVED_VIEW_BASE_PATH);
+        when(mockRequest.getReader()).thenReturn(new BufferedReader(new StringReader(bodyJson)));
+    }
+
+    /** Stubs a GET-by-id request resolving {@link #mockView} for {@link #VIEW_ID}. */
+    private void givenGetByIdRequest() {
+        when(mockRequest.getMethod()).thenReturn(GET);
+        when(mockOBDal.get(SavedView.class, VIEW_ID)).thenReturn(mockView);
+    }
+
+    /** Stubs {@code mockView}'s organization to a fresh mock reporting the given id. */
+    private void givenViewOrganizationId(String id) {
+        Organization org = mock(Organization.class);
+        when(org.getId()).thenReturn(id);
+        when(mockView.getOrganization()).thenReturn(org);
+    }
+
+    /** Stubs {@code mockView}'s client to a fresh mock reporting the given id. */
+    private void givenViewClientId(String id) {
+        Client client = mock(Client.class);
+        when(client.getId()).thenReturn(id);
+        when(mockView.getClient()).thenReturn(client);
     }
 
     // --- Scoped default resolution (USER > ROLE > ORGANIZATION > CLIENT > SYSTEM) ---
@@ -164,10 +198,7 @@ public class SavedViewServiceScopeTest extends AbstractSavedViewServiceTest {
      */
     @Test(expected = UnauthorizedException.class)
     public void testHandlePostRoleScopeRejectedForRegularUser() throws IOException {
-        when(mockRequest.getMethod()).thenReturn(POST);
-        when(mockRequest.getPathInfo()).thenReturn(SAVED_VIEW_BASE_PATH);
-        when(mockRequest.getReader()).thenReturn(new BufferedReader(
-            new StringReader(JSON_NAME_PREFIX + VIEW_NAME + "\",\"scope\":\"ROLE\"}")));
+        givenPostRequest(JSON_NAME_PREFIX + VIEW_NAME + "\",\"scope\":\"ROLE\"}");
 
         service.process();
     }
@@ -181,10 +212,7 @@ public class SavedViewServiceScopeTest extends AbstractSavedViewServiceTest {
     @Test
     public void testHandlePostRoleScopeAllowedForClientAdmin() throws IOException {
         when(mockOBContext.getUserLevel()).thenReturn("CO");
-        when(mockRequest.getMethod()).thenReturn(POST);
-        when(mockRequest.getPathInfo()).thenReturn(SAVED_VIEW_BASE_PATH);
-        when(mockRequest.getReader()).thenReturn(new BufferedReader(
-            new StringReader(JSON_NAME_PREFIX + VIEW_NAME + "\",\"scope\":\"ROLE\",\"tab\":\"" + TAB_ID + "\"}")));
+        givenPostRequest(JSON_NAME_PREFIX + VIEW_NAME + "\",\"scope\":\"ROLE\",\"tab\":\"" + TAB_ID + "\"}");
         when(mockOBProvider.get(SavedView.class)).thenReturn(mockView);
         when(mockOBDal.get(Tab.class, TAB_ID)).thenReturn(mockTab);
 
@@ -204,10 +232,7 @@ public class SavedViewServiceScopeTest extends AbstractSavedViewServiceTest {
     @Test
     public void testHandlePostSystemScopeAllowedForSystemAdmin() throws IOException {
         when(mockOBContext.getUserLevel()).thenReturn("SCO");
-        when(mockRequest.getMethod()).thenReturn(POST);
-        when(mockRequest.getPathInfo()).thenReturn(SAVED_VIEW_BASE_PATH);
-        when(mockRequest.getReader()).thenReturn(new BufferedReader(
-            new StringReader(JSON_NAME_PREFIX + VIEW_NAME + "\",\"scope\":\"SYSTEM\",\"tab\":\"" + TAB_ID + "\"}")));
+        givenPostRequest(JSON_NAME_PREFIX + VIEW_NAME + "\",\"scope\":\"SYSTEM\",\"tab\":\"" + TAB_ID + "\"}");
         when(mockOBProvider.get(SavedView.class)).thenReturn(mockView);
         when(mockOBDal.get(Tab.class, TAB_ID)).thenReturn(mockTab);
         when(mockOBDal.get(Client.class, SYSTEM_ID)).thenReturn(mockClient);
@@ -227,10 +252,7 @@ public class SavedViewServiceScopeTest extends AbstractSavedViewServiceTest {
     @Test(expected = UnauthorizedException.class)
     public void testHandlePostSystemScopeRejectedForClientAdmin() throws IOException {
         when(mockOBContext.getUserLevel()).thenReturn("CO");
-        when(mockRequest.getMethod()).thenReturn(POST);
-        when(mockRequest.getPathInfo()).thenReturn(SAVED_VIEW_BASE_PATH);
-        when(mockRequest.getReader()).thenReturn(new BufferedReader(
-            new StringReader(JSON_NAME_PREFIX + VIEW_NAME + "\",\"scope\":\"SYSTEM\"}")));
+        givenPostRequest(JSON_NAME_PREFIX + VIEW_NAME + "\",\"scope\":\"SYSTEM\"}");
 
         service.process();
     }
@@ -279,6 +301,151 @@ public class SavedViewServiceScopeTest extends AbstractSavedViewServiceTest {
         givenSharedRoleView();
         when(mockRequest.getMethod()).thenReturn(DELETE);
         when(mockOBDal.get(SavedView.class, VIEW_ID)).thenReturn(mockView);
+
+        service.process();
+    }
+
+    /**
+     * Verifies that a Client Administrator role can create an ORGANIZATION-scoped shared view.
+     *
+     * @throws IOException if an I/O error occurs during processing
+     */
+    @Test
+    public void testHandlePostOrganizationScopeAllowedForClientAdmin() throws IOException {
+        when(mockOBContext.getUserLevel()).thenReturn("CO");
+        givenPostRequest(JSON_NAME_PREFIX + VIEW_NAME + "\",\"scope\":\"ORGANIZATION\",\"tab\":\"" + TAB_ID + "\"}");
+        when(mockOBProvider.get(SavedView.class)).thenReturn(mockView);
+        when(mockOBDal.get(Tab.class, TAB_ID)).thenReturn(mockTab);
+
+        service.process();
+
+        verify(mockView).setOrganization(mockOrg);
+        verify(mockView).setUser(null);
+        verify(mockOBDal).save(mockView);
+    }
+
+    /**
+     * Verifies that a Client Administrator role can create a CLIENT-scoped shared view.
+     *
+     * @throws IOException if an I/O error occurs during processing
+     */
+    @Test
+    public void testHandlePostClientScopeAllowedForClientAdmin() throws IOException {
+        when(mockOBContext.getUserLevel()).thenReturn("CO");
+        givenPostRequest(JSON_NAME_PREFIX + VIEW_NAME + "\",\"scope\":\"CLIENT\",\"tab\":\"" + TAB_ID + "\"}");
+        when(mockOBProvider.get(SavedView.class)).thenReturn(mockView);
+        when(mockOBDal.get(Tab.class, TAB_ID)).thenReturn(mockTab);
+        when(mockOBDal.get(Organization.class, SYSTEM_ID)).thenReturn(mockOrg);
+
+        service.process();
+
+        verify(mockView).setClient(mockClient);
+        verify(mockView).setUser(null);
+        verify(mockOBDal).save(mockView);
+    }
+
+    /**
+     * Verifies that setting isdefault=true on a new view atomically clears any other
+     * active default sharing the same (tab, scope target) — here, the same user.
+     *
+     * @throws IOException if an I/O error occurs during processing
+     */
+    @Test
+    public void testHandlePostSetsDefaultClearsSiblingUserDefault() throws IOException {
+        SavedView mockSibling = mock(SavedView.class);
+        when(mockView.isDefault()).thenReturn(true);
+        givenPostRequest(JSON_NAME_PREFIX + VIEW_NAME + "\",\"tab\":\"" + TAB_ID + "\",\"isdefault\":true}");
+        when(mockOBProvider.get(SavedView.class)).thenReturn(mockView);
+        when(mockOBDal.get(Tab.class, TAB_ID)).thenReturn(mockTab);
+        when(mockOBDal.createCriteria(SavedView.class)).thenReturn(mockCriteria);
+        when(mockCriteria.list()).thenReturn(Collections.singletonList(mockSibling));
+
+        service.process();
+
+        verify(mockSibling).setDefault(false);
+        verify(mockOBDal).save(mockSibling);
+        verify(mockOBDal).save(mockView);
+    }
+
+    /**
+     * Verifies that GET by id is visible for a ROLE-scoped view matching the current role.
+     *
+     * @throws IOException if an I/O error occurs during processing
+     */
+    @Test
+    public void testHandleGetByIdVisibleForMatchingRole() throws IOException {
+        givenSharedRoleView();
+        givenGetByIdRequest();
+
+        service.process();
+
+        assertTrue(RESPONSE_CONTAINS_VIEW_ID, responseWriter.toString().contains(VIEW_ID));
+    }
+
+    /**
+     * Verifies that GET by id is visible for an ORGANIZATION-scoped view matching the
+     * current organization.
+     *
+     * @throws IOException if an I/O error occurs during processing
+     */
+    @Test
+    public void testHandleGetByIdVisibleForMatchingOrganization() throws IOException {
+        givenNoOwnerNoRole();
+        when(mockView.getOrganization()).thenReturn(mockOrg);
+        givenGetByIdRequest();
+
+        service.process();
+
+        assertTrue(RESPONSE_CONTAINS_VIEW_ID, responseWriter.toString().contains(VIEW_ID));
+    }
+
+    /**
+     * Verifies that GET by id is visible for a CLIENT-scoped view (organization "*") matching
+     * the current client.
+     *
+     * @throws IOException if an I/O error occurs during processing
+     */
+    @Test
+    public void testHandleGetByIdVisibleForMatchingClientWhenOrgIsSystem() throws IOException {
+        givenNoOwnerNoRole();
+        givenViewOrganizationId(SYSTEM_ID);
+        when(mockView.getClient()).thenReturn(mockClient);
+        givenGetByIdRequest();
+
+        service.process();
+
+        assertTrue(RESPONSE_CONTAINS_VIEW_ID, responseWriter.toString().contains(VIEW_ID));
+    }
+
+    /**
+     * Verifies that GET by id is visible for a SYSTEM-scoped view (client and organization
+     * both "*"/System) regardless of the current client/organization.
+     *
+     * @throws IOException if an I/O error occurs during processing
+     */
+    @Test
+    public void testHandleGetByIdVisibleForSystemScope() throws IOException {
+        givenNoOwnerNoRole();
+        givenViewOrganizationId(SYSTEM_ID);
+        givenViewClientId(SYSTEM_ID);
+        givenGetByIdRequest();
+
+        service.process();
+
+        assertTrue(RESPONSE_CONTAINS_VIEW_ID, responseWriter.toString().contains(VIEW_ID));
+    }
+
+    /**
+     * Verifies that GET by id hides a shared view scoped to a different organization,
+     * masking its existence as a 404 rather than a 403.
+     *
+     * @throws IOException if an I/O error occurs during processing
+     */
+    @Test(expected = NotFoundException.class)
+    public void testHandleGetByIdNotVisibleForOtherOrganizationThrowsNotFound() throws IOException {
+        givenNoOwnerNoRole();
+        givenViewOrganizationId("other-org-999");
+        givenGetByIdRequest();
 
         service.process();
     }
