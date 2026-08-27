@@ -19,25 +19,67 @@ package com.etendoerp.metadata.widgets.resolvers;
 
 import com.etendoerp.metadata.widgets.WidgetDataContext;
 import org.codehaus.jettison.json.JSONObject;
+import org.hibernate.Session;
+import org.hibernate.query.Query;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.openbravo.dal.core.OBContext;
+import org.openbravo.dal.service.OBDal;
+import org.openbravo.model.ad.access.Role;
+import org.openbravo.model.ad.access.User;
+
+import java.util.Collections;
+import java.util.Date;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class RecentDocsResolverTest {
+    private static final String ITEMS_KEY = "items";
 
-    @Test
-    void getTypeReturnsRecentDocs() {
-        assertEquals("RECENT_DOCS", new RecentDocsResolver().getType());
-    }
+    @Mock OBDal     obDal;
+    @Mock Session   session;
+    @Mock OBContext obContext;
+    @Mock User      mockUser;
+    @Mock Role      mockRole;
 
+    @SuppressWarnings("unchecked")
     @Test
-    void resolveReturnsLocalStorageSource() throws Exception {
+    void resolveReturnsItemsArray() throws Exception {
+        when(obContext.getUser()).thenReturn(mockUser);
+        when(mockUser.getId()).thenReturn("userId1");
+        when(obContext.getRole()).thenReturn(mockRole);
+        when(mockRole.getId()).thenReturn("roleId1");
+
+        Object[] row = { "record-1", "SO-001", "window-1", "Sales Order", "tab-1", 0L, new Date(1000L) };
+        Query<Object[]> query = mock(Query.class);
+        when(query.setParameter(anyString(), any())).thenReturn(query);
+        when(query.setMaxResults(anyInt())).thenReturn(query);
+        when(query.list()).thenReturn(Collections.singletonList(row));
+        when(session.createQuery(anyString(), eq(Object[].class))).thenReturn(query);
+
         WidgetDataContext ctx = mock(WidgetDataContext.class);
-        JSONObject result = new RecentDocsResolver().resolve(ctx);
-        assertEquals("localStorage", result.getString("source"));
+        when(ctx.getObContext()).thenReturn(obContext);
+
+        try (MockedStatic<OBDal> dalStatic = mockStatic(OBDal.class)) {
+            dalStatic.when(OBDal::getInstance).thenReturn(obDal);
+            when(obDal.getSession()).thenReturn(session);
+
+            JSONObject result = new RecentDocsResolver().resolve(ctx);
+            assertTrue(result.has(ITEMS_KEY));
+            assertEquals(1, result.getJSONArray(ITEMS_KEY).length());
+            assertEquals("record-1", result.getJSONArray(ITEMS_KEY).getJSONObject(0).getString("recordId"));
+        }
     }
 }

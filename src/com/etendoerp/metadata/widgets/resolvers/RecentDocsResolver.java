@@ -17,25 +17,25 @@
 
 package com.etendoerp.metadata.widgets.resolvers;
 
+import com.etendoerp.metadata.utils.RecentDocumentsQueries;
 import com.etendoerp.metadata.widgets.WidgetDataContext;
 import com.etendoerp.metadata.widgets.WidgetDataResolver;
 import org.codehaus.jettison.json.JSONObject;
 
-/**
- * Returns recently accessed documents.
- *
- * NOTE: Data currently lives in browser localStorage (tracked by the frontend navigation layer).
- * The resolver signals this to the frontend via source="localStorage" so it can read local data
- * instead of expecting items from the backend.
- *
- * FUTURE: Migrate to Option A — create POST /meta/navigation/track endpoint, store in
- * ETMETA_NAV_LOG, and query here. See docs/adr/widget-navigation-data-source.md.
- */
+/** Returns the current user's recently viewed records from ETMETA_RECENT_DOCUMENT. */
 public class RecentDocsResolver implements WidgetDataResolver {
+
     @Override public String getType() { return "RECENT_DOCS"; }
 
     @Override
+    public boolean isAvailable() {
+        return probeEntityAvailable("etmeta_Recent_Document");
+    }
+
+    @Override
     public JSONObject resolve(WidgetDataContext ctx) throws Exception {
-        return new JSONObject().put("source", "localStorage");
+        String userId = ctx.getObContext().getUser().getId();
+        String roleId = ctx.getObContext().getRole().getId();
+        return new JSONObject().put("items", RecentDocumentsQueries.fetchItems(userId, roleId));
     }
 }
