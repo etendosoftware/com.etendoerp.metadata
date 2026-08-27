@@ -31,13 +31,7 @@ public class FavoritesResolver implements WidgetDataResolver {
 
     @Override
     public boolean isAvailable() {
-        try {
-            OBDal.getInstance().getSession()
-                .createQuery("select 1 from etmeta_User_Favorite f where 1=0", Integer.class);
-            return true;
-        } catch (Exception e) {
-            return false;
-        }
+        return probeEntityAvailable("etmeta_User_Favorite");
     }
 
     private static final String HQL =
