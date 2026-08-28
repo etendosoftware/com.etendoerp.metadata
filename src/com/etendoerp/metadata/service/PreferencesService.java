@@ -27,6 +27,7 @@ import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.erpCommon.businessUtility.Preferences;
 import org.openbravo.model.ad.domain.Preference;
+import org.openbravo.model.ad.ui.Window;
 
 /**
  * Service that returns all resolved preferences for the current user session.
@@ -74,23 +75,41 @@ public class PreferencesService extends MetadataService {
         }
     }
 
-    private void processPreference(Preference pref, JSONObject preferences, List<String> handledIds) 
+    /**
+     * Publishes a single preference into the result map.
+     *
+     * @param pref the preference to publish
+     * @param preferences the map being built, keyed as described in {@link #buildPreferenceKey}
+     * @param handledIds keys already published, so the first row wins on duplicates
+     * @throws Exception if the value cannot be written to the JSON map
+     */
+    private void processPreference(Preference pref, JSONObject preferences, List<String> handledIds)
             throws Exception {
         String key = getPreferenceKey(pref);
         if (key == null) {
             return;
         }
 
-        String value = pref.getSearchKey();
+        // Classic emits a single key per preference: a window-specific row is published ONLY under
+        // KEY_<windowId>, never under the bare KEY, so a global lookup can never be satisfied by a
+        // window-scoped row. See PropertiesComponent#59-75.
+        addPreferenceIfNotExists(buildPreferenceKey(key, pref.getWindow()), pref.getSearchKey(),
+                preferences, handledIds);
+    }
 
-        // If the preference is window-specific, add a window-scoped entry
-        if (pref.getWindow() != null) {
-            String windowKey = key + "_" + pref.getWindow().getId();
-            addPreferenceIfNotExists(windowKey, value, preferences, handledIds);
+    /**
+     * Builds the single key a preference is published under, mirroring classic PropertiesComponent:
+     * {@code KEY_<windowId>} for a window-specific preference, the bare {@code KEY} otherwise.
+     *
+     * @param key the preference property or attribute name
+     * @param window the preference's window, or {@code null} when the preference is global
+     * @return the key to publish the preference value under
+     */
+    static String buildPreferenceKey(String key, Window window) {
+        if (window == null) {
+            return key;
         }
-
-        // Add the global entry (non-window-scoped), skip duplicates
-        addPreferenceIfNotExists(key, value, preferences, handledIds);
+        return key + "_" + window.getId();
     }
 
     private String getPreferenceKey(Preference pref) {
