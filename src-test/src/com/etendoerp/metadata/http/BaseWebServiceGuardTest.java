@@ -21,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import javax.servlet.http.HttpServletRequest;
@@ -67,6 +68,7 @@ class BaseWebServiceGuardTest {
 
   private MockedStatic<OBContext> obContextStatic;
   private MockedStatic<PasswordExpirationUtils> expirationStatic;
+  private MockedStatic<com.etendoerp.metadata.auth.TokenRevocationStore> revocationStatic;
   private TestWebService service;
 
   /**
@@ -91,15 +93,19 @@ class BaseWebServiceGuardTest {
     service = new TestWebService();
     obContextStatic = mockStatic(OBContext.class);
     expirationStatic = mockStatic(PasswordExpirationUtils.class);
+    revocationStatic = mockStatic(com.etendoerp.metadata.auth.TokenRevocationStore.class);
 
     obContextStatic.when(OBContext::getOBContext).thenReturn(obContext);
     when(obContext.getUser()).thenReturn(user);
+    revocationStatic.when(() -> com.etendoerp.metadata.auth.TokenRevocationStore.isRevoked(org.mockito.ArgumentMatchers.any()))
+        .thenReturn(false);
   }
 
   @AfterEach
   void tearDown() {
     obContextStatic.close();
     expirationStatic.close();
+    revocationStatic.close();
   }
 
   /**
@@ -151,6 +157,21 @@ class BaseWebServiceGuardTest {
   @Test
   void testSessionPathIsAllowedWhileExpired() throws Exception {
     given(Constants.SESSION_PATH, true);
+
+    service.doGet("", request, response);
+
+    assertTrue(service.wasProcessed());
+  }
+
+  /**
+   * Verifies that /logout stays reachable with an expired password — otherwise an account whose
+   * password was force-expired could never revoke its own leaked token.
+   *
+   * @throws Exception if the service dispatch fails
+   */
+  @Test
+  void testLogoutPathIsAllowedWhileExpired() throws Exception {
+    given(Constants.LOGOUT_PATH, true);
 
     service.doGet("", request, response);
 
@@ -245,6 +266,48 @@ class BaseWebServiceGuardTest {
     service.doPut("", request, response);
     service.doDelete("", request, response);
     service.doPatch("", request, response);
+
+    assertTrue(service.wasProcessed());
+  }
+
+  /**
+   * Verifies that a request whose token hash is revoked never reaches processing, and that the
+   * response is set to 401 directly (not thrown as an exception the caller has to catch) - see
+   * the design spec for why a thrown UnauthorizedException from this call site would not
+   * actually produce a 401 in production.
+   */
+  @Test
+  void testRevokedTokenBlocksProcessingAndWrites401() throws Exception {
+    given(BLOCKED_PATH, false);
+    when(request.getHeader("Authorization")).thenReturn("Bearer revoked-token");
+
+    try (MockedStatic<com.etendoerp.metadata.auth.Utils> authUtilsStatic =
+             mockStatic(com.etendoerp.metadata.auth.Utils.class)) {
+      authUtilsStatic.when(() -> com.etendoerp.metadata.auth.Utils.extractBearerToken(request))
+          .thenReturn("revoked-token");
+      revocationStatic.when(() -> com.etendoerp.metadata.auth.TokenRevocationStore.isRevoked("revoked-token"))
+          .thenReturn(true);
+
+      java.io.StringWriter body = new java.io.StringWriter();
+      when(response.getWriter()).thenReturn(new java.io.PrintWriter(body));
+
+      service.doGet("", request, response);
+
+      verify(response).setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+    }
+    assertFalse(service.wasProcessed());
+  }
+
+  /**
+   * Verifies that a non-revoked token is unaffected and reaches processing as normal.
+   */
+  @Test
+  void testNonRevokedTokenReachesProcessing() throws Exception {
+    given(BLOCKED_PATH, false);
+    revocationStatic.when(() -> com.etendoerp.metadata.auth.TokenRevocationStore.isRevoked(org.mockito.ArgumentMatchers.any()))
+        .thenReturn(false);
+
+    service.doGet("", request, response);
 
     assertTrue(service.wasProcessed());
   }
