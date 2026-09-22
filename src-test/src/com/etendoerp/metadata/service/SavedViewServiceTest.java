@@ -27,31 +27,16 @@ import static org.mockito.Mockito.*;
 
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.io.StringReader;
-import java.io.StringWriter;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Collections;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
-import org.junit.After;
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.mockito.Mock;
-import org.mockito.MockedStatic;
 import org.mockito.junit.MockitoJUnitRunner;
-import org.openbravo.base.provider.OBProvider;
 import org.openbravo.dal.core.OBContext;
-import org.openbravo.dal.service.OBCriteria;
-import org.openbravo.dal.service.OBDal;
-import org.openbravo.model.ad.access.User;
-import org.openbravo.model.ad.system.Client;
 import org.openbravo.model.ad.ui.Tab;
-import org.openbravo.model.common.enterprise.Organization;
 
 import com.etendoerp.metadata.data.SavedView;
 import com.etendoerp.metadata.exceptions.InternalServerException;
@@ -62,98 +47,14 @@ import com.etendoerp.metadata.exceptions.NotFoundException;
  * Unit tests for {@link SavedViewService}.
  * Covers all CRUD HTTP methods (GET, POST, PUT, DELETE), ID extraction from path,
  * request body parsing, JSON response generation, and admin-mode lifecycle.
+ * Scoped default resolution and scope write authorization are covered in
+ * {@link SavedViewServiceScopeTest}.
  */
 @RunWith(MockitoJUnitRunner.Silent.class)
-@SuppressWarnings("unchecked")
-public class SavedViewServiceTest {
+public class SavedViewServiceTest extends AbstractSavedViewServiceTest {
 
-    private static final String VIEW_ID = "view-abc-123";
-    private static final String VIEW_NAME = "My Saved View";
-    private static final String TAB_ID = "tab-xyz-456";
-    private static final String USER_ID = "user-001";
-    private static final String CLIENT_ID = "client-001";
-    private static final String ORG_ID = "org-001";
-    private static final String SAVED_VIEW_BASE_PATH = "/saved-views";
-    private static final String PATH_WITH_ID = "/saved-views/" + VIEW_ID;
     private static final String PATH_WITH_META_PREFIX = "/com.etendoerp.metadata.meta/saved-views/" + VIEW_ID;
-    private static final String RESPONSE_CONTAINS_VIEW_ID = "Response should contain view ID";
-    private static final String ISDEFAULT_PARAM = "isdefault";
     private static final String A_STATUS = "status='A'";
-
-    @Mock private HttpServletRequest mockRequest;
-    @Mock private HttpServletResponse mockResponse;
-    @Mock private OBDal mockOBDal;
-    @Mock private OBContext mockOBContext;
-    @Mock private OBProvider mockOBProvider;
-    @Mock private SavedView mockView;
-    @Mock private Tab mockTab;
-    @Mock private User mockUser;
-    @Mock private Client mockClient;
-    @Mock private Organization mockOrg;
-    @Mock private OBCriteria<SavedView> mockCriteria;
-
-    private MockedStatic<OBDal> obDalMock;
-    private MockedStatic<OBContext> obContextMock;
-    private MockedStatic<OBProvider> obProviderMock;
-
-    private StringWriter responseWriter;
-    private SavedViewService service;
-
-    /**
-     * Initialises static mocks, common stub chains, and the service under test
-     * before each test method.
-     *
-     * @throws IOException if the response writer cannot be configured
-     */
-    @Before
-    public void setUp() throws IOException {
-        responseWriter = new StringWriter();
-        when(mockResponse.getWriter()).thenReturn(new PrintWriter(responseWriter));
-
-        obDalMock = mockStatic(OBDal.class);
-        obContextMock = mockStatic(OBContext.class);
-        obProviderMock = mockStatic(OBProvider.class);
-
-        obDalMock.when(OBDal::getInstance).thenReturn(mockOBDal);
-        obContextMock.when(OBContext::getOBContext).thenReturn(mockOBContext);
-        obProviderMock.when(OBProvider::getInstance).thenReturn(mockOBProvider);
-        obContextMock.when(() -> OBContext.setAdminMode(anyBoolean())).thenAnswer(inv -> null);
-        obContextMock.when(OBContext::restorePreviousMode).thenAnswer(inv -> null);
-
-        when(mockView.getId()).thenReturn(VIEW_ID);
-        when(mockView.getName()).thenReturn(VIEW_NAME);
-        when(mockView.getTab()).thenReturn(mockTab);
-        when(mockTab.getId()).thenReturn(TAB_ID);
-        when(mockView.getUser()).thenReturn(mockUser);
-        when(mockUser.getId()).thenReturn(USER_ID);
-        when(mockView.isDefault()).thenReturn(false);
-        when(mockView.isActive()).thenReturn(true);
-        when(mockView.getFilterclause()).thenReturn(null);
-        when(mockView.getGridconfiguration()).thenReturn(null);
-
-        when(mockOBContext.getUser()).thenReturn(mockUser);
-        when(mockOBContext.getCurrentClient()).thenReturn(mockClient);
-        when(mockOBContext.getCurrentOrganization()).thenReturn(mockOrg);
-        when(mockClient.getId()).thenReturn(CLIENT_ID);
-        when(mockOrg.getId()).thenReturn(ORG_ID);
-        when(mockOBDal.get(Client.class, CLIENT_ID)).thenReturn(mockClient);
-        when(mockOBDal.get(Organization.class, ORG_ID)).thenReturn(mockOrg);
-        when(mockOBDal.get(User.class, USER_ID)).thenReturn(mockUser);
-
-        when(mockRequest.getPathInfo()).thenReturn(PATH_WITH_ID);
-        service = new SavedViewService(mockRequest, mockResponse);
-    }
-
-    /**
-     * Closes all static mocks and clears thread-local state after each test.
-     */
-    @After
-    public void tearDown() {
-        if (obDalMock != null) obDalMock.close();
-        if (obContextMock != null) obContextMock.close();
-        if (obProviderMock != null) obProviderMock.close();
-        MetadataService.clear();
-    }
 
     // --- Constructor ---
 
