@@ -72,6 +72,12 @@ public class TabBuilder extends Builder {
   /** Key under which the authoritative link-to-parent property is published. */
   private static final String PARENT_PROPERTY = "parentProperty";
 
+  /**
+   * Key telling whether the tab's table is Fully Audited. Classic only offers the Audit Trail
+   * toolbar button on such tabs (see OBViewTab.getIconButtons).
+   */
+  private static final String TABLE_FULLY_AUDITED = "tableFullyAudited";
+
   private final Tab tab;
   private final TabAccess tabAccess;
   private final boolean isWindowReadOnly;
@@ -166,6 +172,7 @@ public class TabBuilder extends Builder {
       }
 
       json.put("obuiappCanAdd", Boolean.TRUE.equals(tab.isObuiappCanAdd()));
+      json.put(TABLE_FULLY_AUDITED, Boolean.TRUE.equals(tab.getTable().isFullyAudited()));
 
       return json;
     } catch (JSONException e) {
