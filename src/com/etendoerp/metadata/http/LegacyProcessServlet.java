@@ -331,6 +331,11 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
     /** Dojo DataGrid info-selector data commands; their responses are XML, not HTML. */
     private static final String COMMAND_STRUCTURE = "STRUCTURE";
     private static final String COMMAND_DATA = "DATA";
+    /**
+     * Separator of the suffixed DataGrid commands a single servlet uses for several grids
+     * (e.g. {@code AuditTrailPopup}: {@code STRUCTURE_HISTORY}, {@code DATA_DELETED}).
+     */
+    private static final String GRID_COMMAND_SUFFIX_SEPARATOR = "_";
     private static final String XML_UTF8_CONTENT_TYPE = "text/xml; charset=UTF-8";
 
     /**
@@ -994,15 +999,35 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
      * Tells whether the current request is a Dojo DataGrid data request
      * ({@code Command=STRUCTURE} or {@code Command=DATA}) whose response is XML.
      *
-     * @return {@code true} when the {@code Command} parameter is STRUCTURE or DATA
+     * @return {@code true} when the {@code Command} parameter is a DataGrid command
      */
     private static boolean isXmlDataCommand() {
         HttpServletRequest req = RequestContext.get().getRequest();
         if (req == null) {
             return false;
         }
-        String command = req.getParameter(COMMAND_PARAM);
-        return COMMAND_STRUCTURE.equals(command) || COMMAND_DATA.equals(command);
+        return isDataGridCommand(req.getParameter(COMMAND_PARAM));
+    }
+
+    /**
+     * Tells whether a {@code Command} is a Dojo DataGrid structure/data request: the plain
+     * {@code STRUCTURE}/{@code DATA} commands or their suffixed variants
+     * ({@code STRUCTURE_<grid>}/{@code DATA_<grid>}). The response Content-Type cannot be taken
+     * from the legacy servlet because headers set inside a {@code RequestDispatcher.include()}
+     * are ignored by the container.
+     *
+     * @param command the {@code Command} request parameter, may be {@code null}
+     * @return {@code true} when the command answers with DataGrid XML
+     */
+    static boolean isDataGridCommand(String command) {
+        if (command == null) {
+            return false;
+        }
+        return isGridCommandOf(command, COMMAND_STRUCTURE) || isGridCommandOf(command, COMMAND_DATA);
+    }
+
+    private static boolean isGridCommandOf(String command, String gridCommand) {
+        return command.equals(gridCommand) || command.startsWith(gridCommand + GRID_COMMAND_SUFFIX_SEPARATOR);
     }
 
     /**
