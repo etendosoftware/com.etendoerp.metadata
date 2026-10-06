@@ -64,6 +64,9 @@ public class Constants {
     public static final String CUSTOM_QUERY_DS = "F8DD408F2F3A414188668836F84C21AF";
     public static final String TABLE_DATASOURCE = "ComboTableDatasourceService";
     public static final String TREE_DATASOURCE = "90034CAE96E847D78FBEF6D38CB1930D";
+    public static final String LINK_TO_PARENT_DATASOURCE = "610BEAE5E223447DBE6FF672B703F72F";
+    public static final String AD_TREE_STRUCTURE = "ADTree";
+    public static final String LINK_TO_PARENT_STRUCTURE = "LinkToParent";
     public static final String DATASOURCE_PROPERTY = "datasourceName";
     public static final String SELECTOR_DEFINITION_PROPERTY = "_selectorDefinitionId";
     /**

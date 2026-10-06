@@ -44,9 +44,11 @@ import org.openbravo.model.ad.datamodel.Table;
 import org.openbravo.model.ad.system.Language;
 import org.openbravo.model.ad.ui.Tab;
 import org.openbravo.model.ad.utility.TableTree;
+import org.openbravo.service.datasource.DataSource;
 import org.openbravo.dal.security.EntityAccessChecker;
 import com.etendoerp.metadata.data.TabProcessor;
 import com.etendoerp.metadata.exceptions.InternalServerException;
+import com.etendoerp.metadata.utils.Constants;
 
 /**
  * Unit tests for TabBuilder
@@ -93,6 +95,9 @@ class TabBuilderTest extends TabBuilderTestBase {
     private static final String TREE_STRUCTURE_KEY = "treeStructure";
     private static final String HQL_WHERE_KEY = "hqlWhereClauseForRootNodes";
     private static final String HAS_TREE_SHOULD_BE_TRUE = "hasTree should be true";
+    private static final String TABLE_ID_KEY = "tableId";
+    private static final String TREE_DATASOURCE_ID_KEY = "treeDatasourceId";
+    private static final String TREE_ID = "tree-001";
 
     /**
      * Tests that audit fields are automatically added to the fields JSON
@@ -729,34 +734,92 @@ class TabBuilderTest extends TabBuilderTestBase {
     }
 
     /**
+     * Creates a mocked {@link TableTree} with the given id and tree structure.
+     *
+     * @param treeStructure
+     *     the tree structure returned by the mock, may be null
+     * @return the mocked table tree
+     */
+    private static TableTree mockTableTree(String treeStructure) {
+        TableTree tableTree = mock(TableTree.class);
+        when(tableTree.getId()).thenReturn(TREE_ID);
+        when(tableTree.getTreeStructure()).thenReturn(treeStructure);
+        return tableTree;
+    }
+
+    /**
+     * Stubs the tree configuration of the tab under test.
+     *
+     * @param ctx
+     *     the test context holding the mocked tab
+     * @param tableTree
+     *     the table tree configured in the tab
+     * @param readOnlyTree
+     *     value returned by {@link Tab#isReadOnlyTree()}
+     * @param hqlWhere
+     *     value returned by {@link Tab#getHQLWhereClauseForRootNodes()}
+     */
+    private static void stubTreeTab(TestContext ctx, TableTree tableTree, boolean readOnlyTree, String hqlWhere) {
+        when(ctx.tab.getTableTree()).thenReturn(tableTree);
+        when(ctx.tab.isReadOnlyTree()).thenReturn(readOnlyTree);
+        when(ctx.tab.isShowTreeNodeIcons()).thenReturn(!readOnlyTree);
+        when(ctx.tab.getHQLWhereClauseForRootNodes()).thenReturn(hqlWhere);
+    }
+
+    /**
+     * Builds the JSON of a tab configured with the given table tree and asserts the emitted
+     * tree datasource id.
+     *
+     * @param tableTree
+     *     the table tree configured in the tab
+     * @param expectedDatasourceId
+     *     the expected {@code treeDatasourceId}, or null when it must be absent
+     * @throws Exception
+     *     when mock setup or JSON building fails
+     */
+    private void assertTreeDatasourceId(TableTree tableTree, String expectedDatasourceId) throws Exception {
+        TestContext ctx = setupTestContext();
+        setupBasicMocks(ctx.context, ctx.language, ctx.tab, ctx.table, ctx.kernelUtils, List.of());
+        lenient().when(ctx.table.getId()).thenReturn("table-003");
+        stubTreeTab(ctx, tableTree, false, null);
+
+        executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), result -> {
+            try {
+                assertTrue(result.getBoolean(HAS_TREE_KEY), HAS_TREE_SHOULD_BE_TRUE);
+                assertEquals(expectedDatasourceId, result.optString(TREE_DATASOURCE_ID_KEY, null),
+                        "treeDatasourceId should match the table tree structure");
+            } catch (JSONException e) {
+                fail(JSON_EXCEPTION + ": " + e.getMessage());
+            }
+        });
+    }
+
+    /**
      * Tests that hasTree and all tree-related properties are included in the JSON
-     * when the tab has isTreeIncluded = true and a full TableTree configuration.
+     * when the tab has a full TableTree configuration (ADTree structure).
+     *
+     * @throws Exception when mock setup fails
      */
     @Test
-    void toJSONIncludesFullTreePropertiesWhenHasTreeIsTrue() throws Exception {
+    void toJSONIncludesFullTreePropertiesWhenTableTreeIsConfigured() throws Exception {
         TestContext ctx = setupTestContext();
-        TableTree mockTableTree = mock(TableTree.class);
-        String treeId = "tree-001";
-        String treeStructure = "LP";
+        TableTree mockTableTree = mockTableTree(Constants.AD_TREE_STRUCTURE);
         String hqlWhere = "it.parent is null";
         String tableId = "table-001";
 
         setupBasicMocks(ctx.context, ctx.language, ctx.tab, ctx.table, ctx.kernelUtils, List.of());
         when(ctx.table.getId()).thenReturn(tableId);
-        when(ctx.tab.isTreeIncluded()).thenReturn(true);
-        when(ctx.tab.getTableTree()).thenReturn(mockTableTree);
-        when(ctx.tab.isReadOnlyTree()).thenReturn(false);
-        when(ctx.tab.isShowTreeNodeIcons()).thenReturn(true);
-        when(ctx.tab.getHQLWhereClauseForRootNodes()).thenReturn(hqlWhere);
-        when(mockTableTree.getId()).thenReturn(treeId);
-        when(mockTableTree.getTreeStructure()).thenReturn(treeStructure);
+        stubTreeTab(ctx, mockTableTree, false, hqlWhere);
 
         executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), result -> {
             try {
                 assertTrue(result.getBoolean(HAS_TREE_KEY), HAS_TREE_SHOULD_BE_TRUE);
-                assertEquals(tableId, result.getString("tableId"), "tableId should be set");
-                assertEquals(treeId, result.getString(TABLE_TREE_ID_KEY), "tableTreeId should be set");
-                assertEquals(treeStructure, result.getString(TREE_STRUCTURE_KEY), "treeStructure should be set");
+                assertEquals(tableId, result.getString(TABLE_ID_KEY), "tableId should be set");
+                assertEquals(TREE_ID, result.getString(TABLE_TREE_ID_KEY), "tableTreeId should be set");
+                assertEquals(Constants.AD_TREE_STRUCTURE, result.getString(TREE_STRUCTURE_KEY),
+                        "treeStructure should be set");
+                assertEquals(Constants.TREE_DATASOURCE, result.getString(TREE_DATASOURCE_ID_KEY),
+                        "treeDatasourceId should be the ADTree datasource");
                 assertFalse(result.getBoolean("isReadOnlyTree"), "isReadOnlyTree should be false");
                 assertTrue(result.getBoolean("showTreeNodeIcons"), "showTreeNodeIcons should be true");
                 assertEquals(hqlWhere, result.getString(HQL_WHERE_KEY),
@@ -765,6 +828,141 @@ class TabBuilderTest extends TabBuilderTestBase {
                 fail(JSON_EXCEPTION + ": " + e.getMessage());
             }
         });
+    }
+
+    /**
+     * Tests that tree properties are emitted for a tab with a table tree even when the
+     * AD_Tab.HasTree flag is not set, matching the Classic UI criterion (OBViewTab.isTree).
+     *
+     * @throws Exception when mock setup fails
+     */
+    @Test
+    void toJSONIncludesTreePropertiesRegardlessOfHasTreeFlag() throws Exception {
+        TestContext ctx = setupTestContext();
+        setupBasicMocks(ctx.context, ctx.language, ctx.tab, ctx.table, ctx.kernelUtils, List.of());
+        lenient().when(ctx.table.getId()).thenReturn("table-004");
+        stubTreeTab(ctx, mockTableTree(Constants.AD_TREE_STRUCTURE), true, null);
+
+        executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), result -> {
+            try {
+                assertTrue(result.getBoolean(HAS_TREE_KEY), HAS_TREE_SHOULD_BE_TRUE);
+                assertEquals(TREE_ID, result.getString(TABLE_TREE_ID_KEY), "tableTreeId should be set");
+                assertTrue(result.getBoolean("isReadOnlyTree"), "isReadOnlyTree should be true");
+            } catch (JSONException e) {
+                fail(JSON_EXCEPTION + ": " + e.getMessage());
+            }
+        });
+        verify(ctx.tab, never()).isTreeIncluded();
+    }
+
+    /**
+     * Tests that tree properties are omitted when the tab has no table tree.
+     *
+     * @throws Exception when mock setup fails
+     */
+    @Test
+    void toJSONOmitsTreePropertiesWhenTableTreeIsNull() throws Exception {
+        TestContext ctx = setupTestContext();
+        setupBasicMocks(ctx.context, ctx.language, ctx.tab, ctx.table, ctx.kernelUtils, List.of());
+        when(ctx.tab.getTableTree()).thenReturn(null);
+
+        executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(),
+                TabBuilderTest::assertNoTreeProperties);
+    }
+
+    /**
+     * Tests that a tab flagged with HasTree = 'Y' but without a table tree does not offer
+     * tree mode, as in the Classic UI.
+     *
+     * @throws Exception when mock setup fails
+     */
+    @Test
+    void toJSONOmitsTreePropertiesWhenHasTreeFlagIsSetWithoutTableTree() throws Exception {
+        TestContext ctx = setupTestContext();
+        setupBasicMocks(ctx.context, ctx.language, ctx.tab, ctx.table, ctx.kernelUtils, List.of());
+        lenient().when(ctx.tab.isTreeIncluded()).thenReturn(true);
+        when(ctx.tab.getTableTree()).thenReturn(null);
+
+        executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(),
+                TabBuilderTest::assertNoTreeProperties);
+    }
+
+    /**
+     * Asserts that none of the tree-related properties are present in the tab JSON.
+     *
+     * @param result
+     *     the tab JSON built by TabBuilder
+     */
+    private static void assertNoTreeProperties(JSONObject result) {
+        assertFalse(result.has(HAS_TREE_KEY), "hasTree should be absent");
+        assertFalse(result.has(TABLE_TREE_ID_KEY), "tableTreeId should be absent");
+        assertFalse(result.has(TREE_STRUCTURE_KEY), "treeStructure should be absent");
+        assertFalse(result.has(TREE_DATASOURCE_ID_KEY), "treeDatasourceId should be absent");
+    }
+
+    /**
+     * Tests that treeStructure, treeDatasourceId and hqlWhereClauseForRootNodes are omitted when
+     * the table tree has neither structure nor datasource and the HQL clause is blank.
+     *
+     * @throws Exception when mock setup fails
+     */
+    @Test
+    void toJSONHandlesTreeWithNullTreeStructure() throws Exception {
+        TestContext ctx = setupTestContext();
+        setupBasicMocks(ctx.context, ctx.language, ctx.tab, ctx.table, ctx.kernelUtils, List.of());
+        lenient().when(ctx.table.getId()).thenReturn("table-003");
+        stubTreeTab(ctx, mockTableTree(null), false, "");
+
+        executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), result -> {
+            try {
+                assertTrue(result.getBoolean(HAS_TREE_KEY), HAS_TREE_SHOULD_BE_TRUE);
+                assertEquals(TREE_ID, result.getString(TABLE_TREE_ID_KEY), "tableTreeId should be set");
+                assertFalse(result.has(TREE_STRUCTURE_KEY), "treeStructure should be absent when null");
+                assertFalse(result.has(TREE_DATASOURCE_ID_KEY),
+                        "treeDatasourceId should be absent when the tree has no datasource");
+                assertFalse(result.has(HQL_WHERE_KEY),
+                        "hqlWhereClauseForRootNodes should be absent when blank");
+            } catch (JSONException e) {
+                fail(JSON_EXCEPTION + ": " + e.getMessage());
+            }
+        });
+    }
+
+    /**
+     * Tests that a LinkToParent table tree emits the LinkToParent tree datasource.
+     *
+     * @throws Exception when mock setup fails
+     */
+    @Test
+    void toJSONEmitsLinkToParentDatasourceForLinkToParentTree() throws Exception {
+        assertTreeDatasourceId(mockTableTree(Constants.LINK_TO_PARENT_STRUCTURE),
+                Constants.LINK_TO_PARENT_DATASOURCE);
+    }
+
+    /**
+     * Tests that a custom table tree emits the datasource configured in the table tree.
+     *
+     * @throws Exception when mock setup fails
+     */
+    @Test
+    void toJSONEmitsConfiguredDatasourceForCustomTree() throws Exception {
+        String customDatasourceId = "custom-datasource-001";
+        TableTree tableTree = mockTableTree("Custom");
+        DataSource datasource = mock(DataSource.class);
+        when(datasource.getId()).thenReturn(customDatasourceId);
+        when(tableTree.getDatasource()).thenReturn(datasource);
+
+        assertTreeDatasourceId(tableTree, customDatasourceId);
+    }
+
+    /**
+     * Tests that a custom table tree without a configured datasource omits treeDatasourceId.
+     *
+     * @throws Exception when mock setup fails
+     */
+    @Test
+    void toJSONOmitsDatasourceForCustomTreeWithoutDatasource() throws Exception {
+        assertTreeDatasourceId(mockTableTree("Custom"), null);
     }
 
     /**
@@ -793,52 +991,6 @@ class TabBuilderTest extends TabBuilderTestBase {
     }
 
     /**
-     * Tests that tree properties are omitted when isTreeIncluded is false.
-     */
-    @Test
-    void toJSONOmitsTreePropertiesWhenHasTreeIsFalse() throws Exception {
-        TestContext ctx = setupTestContext();
-        setupBasicMocks(ctx.context, ctx.language, ctx.tab, ctx.table, ctx.kernelUtils, List.of());
-        when(ctx.tab.isTreeIncluded()).thenReturn(false);
-
-        executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), result -> {
-            assertFalse(result.has(HAS_TREE_KEY), "hasTree should be absent");
-            assertFalse(result.has(TABLE_TREE_ID_KEY), "tableTreeId should be absent");
-            assertFalse(result.has(TREE_STRUCTURE_KEY), "treeStructure should be absent");
-        });
-    }
-
-    /**
-     * Tests that hasTree is set but tree sub-fields are absent when tableTree is null.
-     */
-    @Test
-    void toJSONHandlesTreeWithNullTableTree() throws Exception {
-        TestContext ctx = setupTestContext();
-        String tableId = "table-002";
-
-        setupBasicMocks(ctx.context, ctx.language, ctx.tab, ctx.table, ctx.kernelUtils, List.of());
-        when(ctx.table.getId()).thenReturn(tableId);
-        when(ctx.tab.isTreeIncluded()).thenReturn(true);
-        when(ctx.tab.getTableTree()).thenReturn(null);
-        when(ctx.tab.isReadOnlyTree()).thenReturn(true);
-        when(ctx.tab.isShowTreeNodeIcons()).thenReturn(false);
-        when(ctx.tab.getHQLWhereClauseForRootNodes()).thenReturn(null);
-
-        executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), result -> {
-            try {
-                assertTrue(result.getBoolean(HAS_TREE_KEY), HAS_TREE_SHOULD_BE_TRUE);
-                assertEquals(tableId, result.getString("tableId"), "tableId should be set");
-                assertFalse(result.has(TABLE_TREE_ID_KEY), "tableTreeId should be absent when tableTree is null");
-                assertFalse(result.has(TREE_STRUCTURE_KEY), "treeStructure should be absent when tableTree is null");
-                assertFalse(result.has(HQL_WHERE_KEY),
-                        "hqlWhereClauseForRootNodes should be absent when null");
-            } catch (JSONException e) {
-                fail(JSON_EXCEPTION + ": " + e.getMessage());
-            }
-        });
-    }
-
-    /**
      * Tests that {@code obuiappCanAdd} is emitted as {@code false} when
      * {@link Tab#isObuiappCanAdd()} returns {@code Boolean.FALSE}.
      *
@@ -855,38 +1007,6 @@ class TabBuilderTest extends TabBuilderTestBase {
                 assertTrue(result.has(OBUIAPP_CAN_ADD_KEY), OBUIAPP_CAN_ADD_MISSING);
                 assertFalse(result.getBoolean(OBUIAPP_CAN_ADD_KEY),
                         "obuiappCanAdd should be false when Tab.isObuiappCanAdd() returns FALSE");
-            } catch (JSONException e) {
-                fail(JSON_EXCEPTION + ": " + e.getMessage());
-            }
-        });
-    }
-
-    /**
-     * Tests that treeStructure is omitted when tableTree exists but getTreeStructure() returns null.
-     */
-    @Test
-    void toJSONHandlesTreeWithNullTreeStructure() throws Exception {
-        TestContext ctx = setupTestContext();
-        TableTree mockTableTree = mock(TableTree.class);
-        String treeId = "tree-003";
-
-        setupBasicMocks(ctx.context, ctx.language, ctx.tab, ctx.table, ctx.kernelUtils, List.of());
-        lenient().when(ctx.table.getId()).thenReturn("table-003");
-        when(ctx.tab.isTreeIncluded()).thenReturn(true);
-        when(ctx.tab.getTableTree()).thenReturn(mockTableTree);
-        when(ctx.tab.isReadOnlyTree()).thenReturn(false);
-        when(ctx.tab.isShowTreeNodeIcons()).thenReturn(false);
-        when(ctx.tab.getHQLWhereClauseForRootNodes()).thenReturn("");
-        when(mockTableTree.getId()).thenReturn(treeId);
-        when(mockTableTree.getTreeStructure()).thenReturn(null);
-
-        executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), result -> {
-            try {
-                assertTrue(result.getBoolean(HAS_TREE_KEY), HAS_TREE_SHOULD_BE_TRUE);
-                assertEquals(treeId, result.getString(TABLE_TREE_ID_KEY), "tableTreeId should be set");
-                assertFalse(result.has(TREE_STRUCTURE_KEY), "treeStructure should be absent when null");
-                assertFalse(result.has(HQL_WHERE_KEY),
-                        "hqlWhereClauseForRootNodes should be absent when blank");
             } catch (JSONException e) {
                 fail(JSON_EXCEPTION + ": " + e.getMessage());
             }

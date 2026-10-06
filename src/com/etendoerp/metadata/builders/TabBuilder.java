@@ -155,8 +155,11 @@ public class TabBuilder extends Builder {
         json.put(PARENT_PROPERTY, resolveParentProperty());
       }
 
-      if (Boolean.TRUE.equals(tab.isTreeIncluded())) {
-        addTreeProperties(json);
+      // Same criterion as Classic (OBViewTab.isTree): a tab offers tree mode when it has a table
+      // tree configured. The AD_Tab.HasTree flag is not used by Classic.
+      TableTree tableTree = tab.getTableTree();
+      if (tableTree != null) {
+        addTreeProperties(json, tableTree);
       }
 
       boolean isTabReadOnly = isWindowReadOnly || (tabAccess != null && !tabAccess.isEditableField());
@@ -174,17 +177,18 @@ public class TabBuilder extends Builder {
     }
   }
 
-  private void addTreeProperties(JSONObject json) throws JSONException {
+  private void addTreeProperties(JSONObject json, TableTree tableTree) throws JSONException {
     json.put("hasTree", true);
     if (tab.getTable() != null) {
       json.put("tableId", tab.getTable().getId());
     }
-    TableTree tableTree = tab.getTableTree();
-    if (tableTree != null) {
-      json.put("tableTreeId", tableTree.getId());
-      if (tableTree.getTreeStructure() != null) {
-        json.put("treeStructure", tableTree.getTreeStructure());
-      }
+    json.put("tableTreeId", tableTree.getId());
+    if (tableTree.getTreeStructure() != null) {
+      json.put("treeStructure", tableTree.getTreeStructure());
+    }
+    String treeDatasourceId = resolveTreeDatasourceId(tableTree);
+    if (treeDatasourceId != null) {
+      json.put("treeDatasourceId", treeDatasourceId);
     }
     json.put("isReadOnlyTree", Boolean.TRUE.equals(tab.isReadOnlyTree()));
     json.put("showTreeNodeIcons", Boolean.TRUE.equals(tab.isShowTreeNodeIcons()));
@@ -192,6 +196,29 @@ public class TabBuilder extends Builder {
     if (hqlWhere != null && !hqlWhere.isEmpty()) {
       json.put("hqlWhereClauseForRootNodes", hqlWhere);
     }
+  }
+
+  /**
+   * Resolves the datasource that serves the tree nodes, mirroring Classic's
+   * OBTreeGridComponent: the generic ADTree and LinkToParent structures have their own
+   * datasources, any other structure uses the datasource configured in the table tree.
+   *
+   * @param tableTree
+   *     the table tree configured in the tab
+   * @return the datasource id, or null when the table tree has no datasource
+   */
+  private String resolveTreeDatasourceId(TableTree tableTree) {
+    String treeStructure = tableTree.getTreeStructure();
+    if (Constants.AD_TREE_STRUCTURE.equals(treeStructure)) {
+      return Constants.TREE_DATASOURCE;
+    }
+    if (Constants.LINK_TO_PARENT_STRUCTURE.equals(treeStructure)) {
+      return Constants.LINK_TO_PARENT_DATASOURCE;
+    }
+    if (tableTree.getDatasource() != null) {
+      return tableTree.getDatasource().getId();
+    }
+    return null;
   }
 
   private Tab getParentTab() {
