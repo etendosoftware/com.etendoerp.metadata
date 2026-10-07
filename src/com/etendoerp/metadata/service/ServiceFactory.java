@@ -66,6 +66,7 @@ public final class ServiceFactory {
         EXACT_MATCH_SERVICES.put(LOGIN_PATH, LoginService::new);
         EXACT_MATCH_SERVICES.put(LOGOUT_PATH, LogoutService::new);
         EXACT_MATCH_SERVICES.put(RECENT_DOCUMENTS_PATH, RecentDocumentsService::new);
+        EXACT_MATCH_SERVICES.put(RECENT_ITEMS_PATH, RecentItemsService::new);
 
         // Prefix match services (order matters for overlapping prefixes)
         PREFIX_MATCH_SERVICES.put(WINDOW_PATH, WindowService::new);

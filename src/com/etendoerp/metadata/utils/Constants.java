@@ -133,6 +133,7 @@ public class Constants {
     public static final String WIDGET_CLASSES_PATH = "/widget/classes";
     public static final String FAVORITES_PATH = "/favorites";
     public static final String RECENT_DOCUMENTS_PATH = "/recent-documents";
+    public static final String RECENT_ITEMS_PATH = "/recent-items";
     public static final String CHANGE_PROFILE_PATH = "/change-profile";
     public static final String LOGIN_PATH = "/login";
 
