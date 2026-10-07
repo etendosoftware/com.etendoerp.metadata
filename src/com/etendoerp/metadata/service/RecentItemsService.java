@@ -25,11 +25,13 @@ import org.apache.logging.log4j.Logger;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
+import org.openbravo.base.structure.BaseOBObject;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.database.SessionInfo;
 import org.openbravo.erpCommon.businessUtility.Preferences;
 import org.openbravo.erpCommon.utility.PropertyException;
+import org.openbravo.model.ad.domain.Preference;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -44,13 +46,15 @@ import java.io.IOException;
  * Persists the recently opened menu entries of the new UI as an AD_Preference, mirroring how the
  * classic UI stores its recent lists (StorePropertyActionHandler): one list property row per
  * client + organization + role + user. The list is ordered newest first and trimmed to the
- * UINAVBA_RecentListSize preference (default 3), so the oldest entries are discarded.
+ * size returned by readListSize (default 5, like the classic workspace lists), so the oldest entries are
+ * discarded.
  */
 public class RecentItemsService extends MetadataService {
 
     static final String RECENT_ITEMS_PROPERTY = "ETMETA_RecentItemsList";
     static final String RECENT_LIST_SIZE_PROPERTY = "UINAVBA_RecentListSize";
-    static final int DEFAULT_RECENT_LIST_SIZE = 3;
+    static final int DEFAULT_RECENT_LIST_SIZE = 5;
+    private static final String SYSTEM_ID = "0";
     static final String ITEMS = "items";
     static final String SIZE = "size";
 
@@ -71,7 +75,9 @@ public class RecentItemsService extends MetadataService {
         String method = getRequest().getMethod();
 
         try {
-            OBContext.setAdminMode(true);
+            // Without org/client access check, as the classic StorePropertyActionHandler: preferences are
+            // owned by System (client 0), which is not writable by regular roles.
+            OBContext.setAdminMode();
             if ("GET".equalsIgnoreCase(method)) {
                 write(list());
             } else if ("POST".equalsIgnoreCase(method)) {
@@ -105,20 +111,56 @@ public class RecentItemsService extends MetadataService {
     }
 
     /**
-     * Reads the configured size of the recent list, falling back to the classic default when the
-     * preference is missing, conflicting or not a positive integer (as ob-recent-utilities.js does).
+     * Reads the size of the recent list. Like the classic workspace recent lists, it defaults to
+     * DEFAULT_RECENT_LIST_SIZE: the System-level UINAVBA_RecentListSize row shipped by core (value 3)
+     * is ignored, so only a value explicitly configured for a client, organization, role or user
+     * applies. Missing, invalid or non-positive values also fall back to the default.
      */
     static int readListSize() {
-        try {
-            String value = readPreference(RECENT_LIST_SIZE_PROPERTY);
-            int size = value == null ? 0 : Integer.parseInt(value.trim());
-            if (size > 0) {
-                return size;
-            }
-        } catch (PropertyException | NumberFormatException e) {
-            log.debug("Using default recent list size: {}", e.getMessage());
+        Preference preference = findListSizePreference();
+        if (preference == null || isSystemLevel(preference)) {
+            return DEFAULT_RECENT_LIST_SIZE;
         }
-        return DEFAULT_RECENT_LIST_SIZE;
+        return parseListSize(preference.getSearchKey());
+    }
+
+    /** Returns the highest-priority global UINAVBA_RecentListSize preference of the current context. */
+    private static Preference findListSizePreference() {
+        OBContext context = OBContext.getOBContext();
+        return Preferences.getAllPreferences(context.getCurrentClient().getId(),
+                        context.getCurrentOrganization().getId(), context.getUser().getId(), context.getRole().getId())
+                .stream()
+                .filter(RecentItemsService::isGlobalListSizePreference)
+                .findFirst()
+                .orElse(null);
+    }
+
+    private static boolean isGlobalListSizePreference(Preference preference) {
+        return preference.isPropertyList() && RECENT_LIST_SIZE_PROPERTY.equals(preference.getProperty())
+                && preference.getWindow() == null;
+    }
+
+    /** True when the preference is not scoped to any client, organization, role or user. */
+    static boolean isSystemLevel(Preference preference) {
+        return isUnsetOrSystem(preference.getVisibleAtClient()) && isUnsetOrSystem(preference.getVisibleAtOrganization())
+                && preference.getVisibleAtRole() == null && preference.getUserContact() == null;
+    }
+
+    private static boolean isUnsetOrSystem(BaseOBObject visibleAt) {
+        return visibleAt == null || SYSTEM_ID.equals(visibleAt.getId());
+    }
+
+    static int parseListSize(String value) {
+        if (value == null) {
+            return DEFAULT_RECENT_LIST_SIZE;
+        }
+        try {
+            int size = Integer.parseInt(value.trim());
+            return size > 0 ? size : DEFAULT_RECENT_LIST_SIZE;
+        } catch (NumberFormatException e) {
+            log.debug("Invalid recent list size '{}', using the default", value);
+            return DEFAULT_RECENT_LIST_SIZE;
+        }
     }
 
     /** Reads the stored recent items, returning an empty list when none (or an invalid one) exists. */
