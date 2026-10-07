@@ -138,6 +138,14 @@ class ServiceFactoryTest {
     assertInstanceOf(PreferencesService.class, service);
   }
 
+  /** The /recent-items path is routed to {@link RecentItemsService}. No checked exceptions are thrown. */
+  @Test
+  void getServiceReturnsRecentItemsService() {
+    MetadataService service = ServiceFactory.getService(mockRequestWithPath("/com.etendoerp.metadata.meta/recent-items"), mockResponse);
+    assertNotNull(service, SERVICE_NOT_NULL);
+    assertInstanceOf(RecentItemsService.class, service);
+  }
+
   @Test
   void getServiceReturnsEmailSendService() {
     MetadataService service = ServiceFactory.getService(mockRequestWithPath("/com.etendoerp.metadata.meta/email/send"), mockResponse);
