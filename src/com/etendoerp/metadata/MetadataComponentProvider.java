@@ -40,6 +40,10 @@ public class MetadataComponentProvider extends BaseComponentProvider {
 
     public static final String METADATA_COMPONENT_TYPE = "SMF_OKR_Metadata";
 
+    private static final String JS_PATH = "web/com.etendoerp.metadata/js/";
+    static final String UI_FLAGS_JS = JS_PATH + "okr-ui-flags.js";
+    static final String ALERT_COUNT_BRIDGE_JS = JS_PATH + "alert-count-bridge.js";
+
     /**
      * Retrieves a specific component.
      * <p>
@@ -66,8 +70,10 @@ public class MetadataComponentProvider extends BaseComponentProvider {
     /**
      * Retrieves the list of global component resources.
      * <p>
-     * Registers the {@code okr-ui-flags.js} file as a static resource.
-     * This resource is included in the new UI mode (OB3) but not in Classic mode.
+     * Registers the {@code okr-ui-flags.js} file (kiosk mode flags) and the
+     * {@code alert-count-bridge.js} file (notifies the new UI of pending alert count
+     * changes) as static resources.
+     * These resources are included in the new UI mode (OB3) but not in Classic mode.
      * </p>
      *
      * @return A list of {@link ComponentResource} containing the registered
@@ -77,9 +83,8 @@ public class MetadataComponentProvider extends BaseComponentProvider {
     public List<ComponentResource> getGlobalComponentResources() {
         final List<ComponentResource> resources = new ArrayList<>();
 
-        resources.add(createStaticResource(
-                "web/com.etendoerp.metadata/js/okr-ui-flags.js",
-                false));
+        resources.add(createStaticResource(UI_FLAGS_JS, false));
+        resources.add(createStaticResource(ALERT_COUNT_BRIDGE_JS, false));
 
         return resources;
     }
