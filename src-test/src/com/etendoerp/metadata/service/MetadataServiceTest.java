@@ -30,6 +30,9 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 
+import com.etendoerp.metadata.cache.HttpCacheSupport;
+import com.etendoerp.metadata.utils.Constants;
+
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
 
@@ -164,6 +167,97 @@ public class MetadataServiceTest {
         } catch (Exception e) {
             fail("Unexpected exception: " + e.getMessage());
         }
+    }
+
+    /**
+     * Tests writeWithETag answers a GET with the body plus ETag and Cache-Control headers.
+     *
+     * @throws Exception if the JSON cannot be built or written
+     */
+    @Test
+    public void testWriteWithETagSendsBodyAndETagOnGet() throws Exception {
+        StringWriter stringWriter = new StringWriter();
+        when(mockRequest.getMethod()).thenReturn("GET");
+        when(mockResponse.getWriter()).thenReturn(new PrintWriter(stringWriter));
+
+        TestMetadataService service = new TestMetadataService(mockRequest, mockResponse);
+        JSONObject testJson = new JSONObject();
+        testJson.put("test", "value");
+
+        service.writeWithETag(testJson);
+
+        String expectedETag = HttpCacheSupport.computeBodyETag(testJson.toString());
+        verify(mockResponse).setHeader(Constants.ETAG_HEADER, expectedETag);
+        verify(mockResponse).setHeader(Constants.CACHE_CONTROL_HEADER, Constants.CACHE_CONTROL_PRIVATE_NO_CACHE);
+        verify(mockResponse, never()).setStatus(HttpServletResponse.SC_NOT_MODIFIED);
+        assertEquals("Body should be written", testJson.toString(), stringWriter.toString());
+    }
+
+    /**
+     * Tests writeWithETag answers 304 without a body when If-None-Match matches the body ETag.
+     *
+     * @throws Exception if the JSON cannot be built or written
+     */
+    @Test
+    public void testWriteWithETagAnswersNotModifiedWhenETagMatches() throws Exception {
+        JSONObject testJson = new JSONObject();
+        testJson.put("test", "value");
+        String etag = HttpCacheSupport.computeBodyETag(testJson.toString());
+        when(mockRequest.getMethod()).thenReturn("GET");
+        when(mockRequest.getHeader(Constants.IF_NONE_MATCH_HEADER)).thenReturn(etag);
+
+        TestMetadataService service = new TestMetadataService(mockRequest, mockResponse);
+
+        service.writeWithETag(testJson);
+
+        verify(mockResponse).setStatus(HttpServletResponse.SC_NOT_MODIFIED);
+        // Committed, so the SWS servlet cannot turn the 304 into an empty 200 afterwards
+        verify(mockResponse).flushBuffer();
+        verify(mockResponse).setHeader(Constants.ETAG_HEADER, etag);
+        verify(mockResponse, never()).getWriter();
+    }
+
+    /**
+     * Tests writeWithETag sends the new body when the client's ETag is outdated.
+     *
+     * @throws Exception if the JSON cannot be built or written
+     */
+    @Test
+    public void testWriteWithETagSendsBodyWhenETagDiffers() throws Exception {
+        StringWriter stringWriter = new StringWriter();
+        when(mockRequest.getMethod()).thenReturn("GET");
+        when(mockRequest.getHeader(Constants.IF_NONE_MATCH_HEADER)).thenReturn("\"outdated\"");
+        when(mockResponse.getWriter()).thenReturn(new PrintWriter(stringWriter));
+
+        TestMetadataService service = new TestMetadataService(mockRequest, mockResponse);
+        JSONObject testJson = new JSONObject();
+        testJson.put("test", "value");
+
+        service.writeWithETag(testJson);
+
+        verify(mockResponse, never()).setStatus(HttpServletResponse.SC_NOT_MODIFIED);
+        assertEquals("Body should be written", testJson.toString(), stringWriter.toString());
+    }
+
+    /**
+     * Tests writeWithETag writes POST responses as usual, without caching headers.
+     *
+     * @throws Exception if the JSON cannot be built or written
+     */
+    @Test
+    public void testWriteWithETagSkipsCachingOnPost() throws Exception {
+        StringWriter stringWriter = new StringWriter();
+        when(mockRequest.getMethod()).thenReturn("POST");
+        when(mockResponse.getWriter()).thenReturn(new PrintWriter(stringWriter));
+
+        TestMetadataService service = new TestMetadataService(mockRequest, mockResponse);
+        JSONObject testJson = new JSONObject();
+        testJson.put("test", "value");
+
+        service.writeWithETag(testJson);
+
+        verify(mockResponse, never()).setHeader(eq(Constants.ETAG_HEADER), anyString());
+        assertEquals("Body should be written", testJson.toString(), stringWriter.toString());
     }
 
     /**
