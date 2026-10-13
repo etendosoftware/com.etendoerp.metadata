@@ -124,6 +124,16 @@ class ServiceFactoryTest {
     assertInstanceOf(SavedViewService.class, service);
   }
 
+  /**
+   * Verifies that the grid configuration path is routed to {@link GridConfigurationService}.
+   */
+  @Test
+  void getServiceReturnsGridConfigurationService() {
+    MetadataService service = ServiceFactory.getService(mockRequestWithPath("/com.etendoerp.metadata.meta/grid-configuration"), mockResponse);
+    assertNotNull(service, SERVICE_NOT_NULL);
+    assertInstanceOf(GridConfigurationService.class, service);
+  }
+
   @Test
   void getServiceReturnsProcessMetadataService() {
     MetadataService service = ServiceFactory.getService(mockRequestWithPath("/com.etendoerp.metadata.meta/process/123"), mockResponse);

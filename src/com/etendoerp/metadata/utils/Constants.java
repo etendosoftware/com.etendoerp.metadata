@@ -122,6 +122,7 @@ public class Constants {
     public static final String EMAIL_ATTACHMENTS_PATH = "/email/attachments";
     public static final String TOOLBAR_PATH = "/toolbar";
     public static final String SAVED_VIEW_PATH = "/saved-views";
+    public static final String GRID_CONFIGURATION_PATH = "/grid-configuration";
     public static final String REPORT_AND_PROCESS_PATH = "/report-and-process/";
     public static final String PROCESS_PATH = "/process/";
     public static final String PROCESS_EXECUTION_PATH = "/process-execution";
