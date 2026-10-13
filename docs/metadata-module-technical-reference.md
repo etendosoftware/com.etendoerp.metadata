@@ -53,6 +53,7 @@ If no match is found, legacy paths are checked and forwarded to the Classic serv
 | `/email/send` | `EmailSendService` | Exact | POST |
 | `/email/config` | `EmailConfigService` | Exact | GET |
 | `/email/attachments` | `EmailAttachmentService` | Exact | GET |
+| `/grid-configuration` | `GridConfigurationService` | Exact | GET, PUT |
 | `/window/{id}` | `WindowService` | Prefix | GET |
 | `/tab/{id}` | `TabService` | Prefix | GET |
 | `/language{/code}` | `LanguageService` | Prefix | GET |
@@ -313,6 +314,15 @@ This module defines three AD windows:
 - CRUD for saved views (filter/sort/column configurations per tab)
 - Stored in `ETMETA_SAVEDVIEW`
 - Supports default view per user
+- `GRIDCONFIGURATION` is an opaque JSON string for the server; the new UI also stores column widths, pinning and the window layout in it (see the client docs, `docs/features/saved-views/README.md`)
+
+### Grid Configuration (`GridConfigurationService`)
+- Durable, per-user grid column configuration of the new UI (visibility, order, width, pinning), the equivalent of classic `OBUIAPP_GridConfiguration`
+- Stored as one `AD_Preference` per user and window, attribute `ETMETA_GridConfiguration` (a property of its own: the classic value is a SmartClient view state with a different format). Visible at the current client and user, with no organization or role, so it follows the user across roles
+- The value is a map keyed by tab id; the tab configuration is opaque to the server
+- `GET ?windowId=` returns `{windowId, configuration}` (`configuration` is `{}` when nothing is stored)
+- `PUT {windowId, tabId, configuration}` replaces the configuration of one tab and keeps the other tabs of the window; `configuration: null` removes the tab, and the preference is deleted once the map is empty
+- Errors: unknown window → 404; missing `windowId`/`tabId`/`configuration`, a tab of another window, a non-object configuration or an invalid body → 422
 
 ### Favorites (`FavoritesService`)
 - Add/remove/list bookmarked records
