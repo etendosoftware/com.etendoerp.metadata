@@ -432,7 +432,8 @@ public class GridConfigurationServiceTest {
     }
 
     /**
-     * Verifies that the request runs in admin mode and restores the previous mode afterwards.
+     * Verifies that the request runs in admin mode without client/org access check (the preference is
+     * stored in client 0) and restores the previous mode afterwards.
      *
      * @throws IOException if an I/O error occurs during processing
      */
@@ -442,7 +443,7 @@ public class GridConfigurationServiceTest {
 
         service.process();
 
-        obContextMock.verify(() -> OBContext.setAdminMode(true));
+        obContextMock.verify(OBContext::setAdminMode);
         obContextMock.verify(OBContext::restorePreviousMode);
     }
 }

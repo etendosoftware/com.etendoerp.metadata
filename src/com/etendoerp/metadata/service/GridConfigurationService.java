@@ -71,7 +71,10 @@ public class GridConfigurationService extends MetadataService {
 
     @Override
     public void process() throws IOException {
-        OBContext.setAdminMode(true);
+        // Like classic StorePropertyActionHandler: no client/org access check, because
+        // Preferences.setPreferenceValue always creates the AD_Preference in client/org 0. Access is
+        // still scoped to the current user's own preference.
+        OBContext.setAdminMode();
         try {
             switch (getRequest().getMethod()) {
                 case "GET":

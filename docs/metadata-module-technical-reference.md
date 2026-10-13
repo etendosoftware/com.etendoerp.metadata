@@ -320,6 +320,7 @@ This module defines three AD windows:
 - Durable, per-user grid column configuration of the new UI (visibility, order, width, pinning), the equivalent of classic `OBUIAPP_GridConfiguration`
 - Stored as one `AD_Preference` per user and window, attribute `ETMETA_GridConfiguration` (a property of its own: the classic value is a SmartClient view state with a different format). Visible at the current client and user, with no organization or role, so it follows the user across roles
 - The value is a map keyed by tab id; the tab configuration is opaque to the server
+- Runs in admin mode **without** client/org access check (`OBContext.setAdminMode()`), like classic `StorePropertyActionHandler`: `Preferences.setPreferenceValue` always creates the record in client/org `0`, which the checked admin mode rejects on flush
 - `GET ?windowId=` returns `{windowId, configuration}` (`configuration` is `{}` when nothing is stored)
 - `PUT {windowId, tabId, configuration}` replaces the configuration of one tab and keeps the other tabs of the window; `configuration: null` removes the tab, and the preference is deleted once the map is empty
 - Errors: unknown window → 404; missing `windowId`/`tabId`/`configuration`, a tab of another window, a non-object configuration or an invalid body → 422
