@@ -30,6 +30,9 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.codehaus.jettison.json.JSONObject;
 
+import com.etendoerp.metadata.cache.HttpCacheSupport;
+import com.etendoerp.metadata.utils.Constants;
+
 /** Base class for all metadata endpoint services. */
 public abstract class MetadataService {
     private static final ThreadLocal<HttpServletRequest> requestThreadLocal = new ThreadLocal<>();
@@ -62,12 +65,51 @@ public abstract class MetadataService {
     }
 
     protected void write(JSONObject data) throws IOException {
+        write(data.toString());
+    }
+
+    /**
+     * Writes the response with an ETag computed from the body. On GET/HEAD requests whose
+     * {@code If-None-Match} matches, answers {@code 304 Not Modified} without a body, so the client
+     * reuses its cached copy. Other methods are written as usual, without caching headers.
+     *
+     * @param data the response payload
+     * @throws IOException if writing to the response stream fails
+     */
+    protected void writeWithETag(JSONObject data) throws IOException {
+        String body = data.toString();
+        HttpServletRequest request = getRequest();
+
+        if (!HttpCacheSupport.isConditionalMethod(request)) {
+            write(body);
+
+            return;
+        }
+
+        String etag = HttpCacheSupport.computeBodyETag(body);
+
+        if (etag != null) {
+            HttpServletResponse response = getResponse();
+            response.setHeader(Constants.CACHE_CONTROL_HEADER, Constants.CACHE_CONTROL_PRIVATE_NO_CACHE);
+            response.setHeader(Constants.ETAG_HEADER, etag);
+
+            if (HttpCacheSupport.matches(request.getHeader(Constants.IF_NONE_MATCH_HEADER), etag)) {
+                HttpCacheSupport.sendNotModified(response);
+
+                return;
+            }
+        }
+
+        write(body);
+    }
+
+    private void write(String body) throws IOException {
         HttpServletResponse response = getResponse();
         response.setContentType(ContentType.APPLICATION_JSON.getMimeType());
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
 
         try (Writer writer = response.getWriter()) {
-            writer.write(data.toString());
+            writer.write(body);
         } catch (IOException e) {
             logger.warn(e.getMessage(), e);
 

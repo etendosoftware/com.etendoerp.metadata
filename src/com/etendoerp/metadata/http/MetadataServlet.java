@@ -69,7 +69,7 @@ public class MetadataServlet extends BaseWebService {
                     res.setHeader(Constants.ETAG_HEADER, etag);
 
                     if (HttpCacheSupport.matches(req.getHeader(Constants.IF_NONE_MATCH_HEADER), etag)) {
-                        res.setStatus(HttpServletResponse.SC_NOT_MODIFIED);
+                        HttpCacheSupport.sendNotModified(res);
 
                         return;
                     }

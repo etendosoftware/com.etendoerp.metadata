@@ -115,6 +115,7 @@ public class Constants {
     public static final String CACHE_CONTROL_HEADER = "Cache-Control";
     public static final String IF_NONE_MATCH_HEADER = "If-None-Match";
     public static final String CACHE_CONTROL_PRIVATE_MUST_REVALIDATE = "private, must-revalidate";
+    public static final String CACHE_CONTROL_PRIVATE_NO_CACHE = "private, no-cache";
     public static final String LOCATION_PATH = "/location/";
     public static final String EMAIL_PATH = "/email";
     public static final String EMAIL_SEND_PATH = "/email/send";

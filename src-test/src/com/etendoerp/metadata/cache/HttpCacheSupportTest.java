@@ -178,6 +178,39 @@ class HttpCacheSupportTest extends AbstractMockedContextTest {
     }
 
     @Test
+    void isConditionalMethodTrueOnlyForGetAndHead() {
+        assertTrue(HttpCacheSupport.isConditionalMethod(mockRequest(Constants.GET)));
+        assertTrue(HttpCacheSupport.isConditionalMethod(mockRequest(Constants.HEAD)));
+        assertFalse(HttpCacheSupport.isConditionalMethod(mockRequest(Constants.POST)));
+        assertFalse(HttpCacheSupport.isConditionalMethod(mockRequest(null)));
+    }
+
+    @Test
+    void computeBodyETagIsQuotedStableAndChangesWithTheBody() {
+        String etag = HttpCacheSupport.computeBodyETag("{\"a\":1}");
+
+        assertNotNull(etag);
+        assertTrue(etag.startsWith("\"") && etag.endsWith("\""));
+        assertEquals(etag, HttpCacheSupport.computeBodyETag("{\"a\":1}"));
+        assertNotEquals(etag, HttpCacheSupport.computeBodyETag("{\"a\":2}"));
+    }
+
+    @Test
+    void computeBodyETagIgnoresSerializationTimestamps() {
+        String first = "{\"id\":\"1\",\"recordTime\":1791483634710,\"tabs\":[{\"recordTime\":1791483634715}]}";
+        String second = "{\"id\":\"1\",\"recordTime\":1791483634954,\"tabs\":[{\"recordTime\":1791483634955}]}";
+        String changed = "{\"id\":\"2\",\"recordTime\":1791483634954,\"tabs\":[{\"recordTime\":1791483634955}]}";
+
+        assertEquals(HttpCacheSupport.computeBodyETag(first), HttpCacheSupport.computeBodyETag(second));
+        assertNotEquals(HttpCacheSupport.computeBodyETag(first), HttpCacheSupport.computeBodyETag(changed));
+    }
+
+    @Test
+    void computeBodyETagNullForNullBody() {
+        assertNull(HttpCacheSupport.computeBodyETag(null));
+    }
+
+    @Test
     void matchesReturnsTrueForWildcard() {
         assertTrue(HttpCacheSupport.matches("*", QUOTED_ETAG));
     }
