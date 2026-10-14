@@ -42,6 +42,9 @@ import static org.mockito.Mockito.*;
 @RunWith(MockitoJUnitRunner.class)
 public class MetadataServiceTest {
 
+    private static final String TEST_VALUE = "value";
+    private static final String BODY_WRITTEN_MSG = "Body should be written";
+
     @Mock
     private HttpServletRequest mockRequest;
 
@@ -126,7 +129,7 @@ public class MetadataServiceTest {
         
         try {
             JSONObject testJson = new JSONObject();
-            testJson.put("test", "value");
+            testJson.put("test", TEST_VALUE);
             
             service.write(testJson);
             
@@ -139,7 +142,7 @@ public class MetadataServiceTest {
             String output = stringWriter.toString();
             assertNotNull("Output should not be null", output);
             assertTrue("Output should contain test data", output.contains("test"));
-            assertTrue("Output should contain value", output.contains("value"));
+            assertTrue("Output should contain value", output.contains(TEST_VALUE));
             
         } catch (Exception e) {
             fail("Should not throw exception: " + e.getMessage());
@@ -182,7 +185,7 @@ public class MetadataServiceTest {
 
         TestMetadataService service = new TestMetadataService(mockRequest, mockResponse);
         JSONObject testJson = new JSONObject();
-        testJson.put("test", "value");
+        testJson.put("test", TEST_VALUE);
 
         service.writeWithETag(testJson);
 
@@ -190,7 +193,7 @@ public class MetadataServiceTest {
         verify(mockResponse).setHeader(Constants.ETAG_HEADER, expectedETag);
         verify(mockResponse).setHeader(Constants.CACHE_CONTROL_HEADER, Constants.CACHE_CONTROL_PRIVATE_NO_CACHE);
         verify(mockResponse, never()).setStatus(HttpServletResponse.SC_NOT_MODIFIED);
-        assertEquals("Body should be written", testJson.toString(), stringWriter.toString());
+        assertEquals(BODY_WRITTEN_MSG, testJson.toString(), stringWriter.toString());
     }
 
     /**
@@ -201,7 +204,7 @@ public class MetadataServiceTest {
     @Test
     public void testWriteWithETagAnswersNotModifiedWhenETagMatches() throws Exception {
         JSONObject testJson = new JSONObject();
-        testJson.put("test", "value");
+        testJson.put("test", TEST_VALUE);
         String etag = HttpCacheSupport.computeBodyETag(testJson.toString());
         when(mockRequest.getMethod()).thenReturn("GET");
         when(mockRequest.getHeader(Constants.IF_NONE_MATCH_HEADER)).thenReturn(etag);
@@ -231,12 +234,12 @@ public class MetadataServiceTest {
 
         TestMetadataService service = new TestMetadataService(mockRequest, mockResponse);
         JSONObject testJson = new JSONObject();
-        testJson.put("test", "value");
+        testJson.put("test", TEST_VALUE);
 
         service.writeWithETag(testJson);
 
         verify(mockResponse, never()).setStatus(HttpServletResponse.SC_NOT_MODIFIED);
-        assertEquals("Body should be written", testJson.toString(), stringWriter.toString());
+        assertEquals(BODY_WRITTEN_MSG, testJson.toString(), stringWriter.toString());
     }
 
     /**
@@ -252,12 +255,12 @@ public class MetadataServiceTest {
 
         TestMetadataService service = new TestMetadataService(mockRequest, mockResponse);
         JSONObject testJson = new JSONObject();
-        testJson.put("test", "value");
+        testJson.put("test", TEST_VALUE);
 
         service.writeWithETag(testJson);
 
         verify(mockResponse, never()).setHeader(eq(Constants.ETAG_HEADER), anyString());
-        assertEquals("Body should be written", testJson.toString(), stringWriter.toString());
+        assertEquals(BODY_WRITTEN_MSG, testJson.toString(), stringWriter.toString());
     }
 
     /**
