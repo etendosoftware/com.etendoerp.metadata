@@ -82,7 +82,7 @@ public class MetadataServletTest extends WeldBaseTest {
     servlet.doGet("", req, res);
 
     verify(res).setHeader(eq(Constants.ETAG_HEADER), anyString());
-    verify(res).setHeader(Constants.CACHE_CONTROL_HEADER, Constants.CACHE_CONTROL_PRIVATE_MUST_REVALIDATE);
+    verify(res).setHeader(Constants.CACHE_CONTROL_HEADER, Constants.CACHE_CONTROL_PRIVATE_NO_CACHE);
   }
 
   @Test
@@ -111,13 +111,10 @@ public class MetadataServletTest extends WeldBaseTest {
   }
 
   /**
-   * Verifies the ETag is a deterministic function of the current menu/role/language state:
-   * two independent, unmatched (no {@code If-None-Match}) requests with no data change in
-   * between produce the same ETag and both complete as 200. The complementary "ETag changes
-   * when the underlying data changes" behavior is covered deterministically at the unit level
-   * in {@code HttpCacheSupportTest#computeETagForMenuChangesWhenMaxUpdatedChanges}, since
-   * mutating real AD_Menu system-dictionary rows here would require bypassing multiple layers
-   * of DAL write-access security and risks leaving the test transaction unusable.
+   * Verifies the menu body ETag is deterministic: two independent, unmatched (no
+   * {@code If-None-Match}) requests with no data change in between produce the same ETag and
+   * both complete as 200. "ETag changes when the body changes" is covered at the unit level
+   * in {@code HttpCacheSupportTest} and {@code MetadataServiceTest}.
    */
   @Test
   public void menuEtagIsStableAcrossRepeatedUnchangedCalls() throws Exception {

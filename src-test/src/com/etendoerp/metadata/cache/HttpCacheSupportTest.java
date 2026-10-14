@@ -60,16 +60,21 @@ class HttpCacheSupportTest extends AbstractMockedContextTest {
 
     @Test
     void isCacheableTrueForAllowlistedGetEndpoints() {
-        assertTrue(HttpCacheSupport.isCacheable(mockRequest(Constants.GET), Constants.MENU_PATH));
         assertTrue(HttpCacheSupport.isCacheable(mockRequest(Constants.GET), Constants.SESSION_PATH));
         assertTrue(HttpCacheSupport.isCacheable(mockRequest(Constants.GET), Constants.LABELS_PATH));
-        assertTrue(HttpCacheSupport.isCacheable(mockRequest(Constants.HEAD), Constants.MENU_PATH));
+        assertTrue(HttpCacheSupport.isCacheable(mockRequest(Constants.HEAD), Constants.SESSION_PATH));
     }
 
     @Test
     void isCacheableFalseForNonGetMethods() {
-        assertFalse(HttpCacheSupport.isCacheable(mockRequest(Constants.POST), Constants.MENU_PATH));
+        assertFalse(HttpCacheSupport.isCacheable(mockRequest(Constants.POST), Constants.LABELS_PATH));
         assertFalse(HttpCacheSupport.isCacheable(mockRequest(Constants.PUT), Constants.SESSION_PATH));
+    }
+
+    @Test
+    void isCacheableFalseForMenuWhichUsesABodyETag() {
+        assertFalse(HttpCacheSupport.isCacheable(mockRequest(Constants.GET), Constants.MENU_PATH));
+        assertNull(HttpCacheSupport.computeETag(Constants.MENU_PATH));
     }
 
     @Test
@@ -77,54 +82,6 @@ class HttpCacheSupportTest extends AbstractMockedContextTest {
         assertFalse(HttpCacheSupport.isCacheable(mockRequest(Constants.GET), Constants.TAB_PATH + "123"));
         assertFalse(HttpCacheSupport.isCacheable(mockRequest(Constants.GET), Constants.PROCESS_EXECUTION_PATH));
         assertFalse(HttpCacheSupport.isCacheable(mockRequest(Constants.GET), "/unknown"));
-    }
-
-    @Test
-    void computeETagForMenuIsPresentAndStable() throws Exception {
-        when(role.getId()).thenReturn(ROLE_ID);
-        when(language.getId()).thenReturn(LANGUAGE_ID);
-        when(obContext.getRole()).thenReturn(role);
-        when(obContext.getLanguage()).thenReturn(language);
-        when(session.createQuery(anyString(), eq(Date.class))).thenReturn(query);
-        when(query.uniqueResult()).thenReturn(new Date(1000L));
-
-        String[] etags = new String[2];
-
-        runWithMockedContext(() -> etags[0] = HttpCacheSupport.computeETag(Constants.MENU_PATH));
-        runWithMockedContext(() -> etags[1] = HttpCacheSupport.computeETag(Constants.MENU_PATH));
-
-        assertNotNull(etags[0]);
-        assertTrue(etags[0].startsWith("\"") && etags[0].endsWith("\""));
-        assertEquals(etags[0], etags[1]);
-    }
-
-    @Test
-    void computeETagForMenuChangesWhenMaxUpdatedChanges() throws Exception {
-        when(role.getId()).thenReturn(ROLE_ID);
-        when(language.getId()).thenReturn(LANGUAGE_ID);
-        when(obContext.getRole()).thenReturn(role);
-        when(obContext.getLanguage()).thenReturn(language);
-        when(session.createQuery(anyString(), eq(Date.class))).thenReturn(query);
-
-        String[] etags = new String[2];
-
-        when(query.uniqueResult()).thenReturn(new Date(1000L));
-        runWithMockedContext(() -> etags[0] = HttpCacheSupport.computeETag(Constants.MENU_PATH));
-
-        when(query.uniqueResult()).thenReturn(new Date(2000L));
-        runWithMockedContext(() -> etags[1] = HttpCacheSupport.computeETag(Constants.MENU_PATH));
-
-        assertNotEquals(etags[0], etags[1]);
-    }
-
-    @Test
-    void computeETagForMenuNullWhenRoleMissing() throws Exception {
-        when(obContext.getRole()).thenReturn(null);
-
-        String[] etag = new String[1];
-        runWithMockedContext(() -> etag[0] = HttpCacheSupport.computeETag(Constants.MENU_PATH));
-
-        assertNull(etag[0]);
     }
 
     @Test
