@@ -193,6 +193,35 @@ class HttpCacheSupportTest extends AbstractMockedContextTest {
         assertFalse(HttpCacheSupport.matches("", QUOTED_ETAG));
     }
 
+    @Test
+    void matchesAcceptsWeakValidators() {
+        assertTrue(HttpCacheSupport.matches("W/" + QUOTED_ETAG, QUOTED_ETAG));
+        assertTrue(HttpCacheSupport.matches("\"zzz\", W/" + QUOTED_ETAG, QUOTED_ETAG));
+    }
+
+    @Test
+    void matchesReturnsFalseWithoutAnETag() {
+        assertFalse(HttpCacheSupport.matches(QUOTED_ETAG, null));
+    }
+
+    @Test
+    void computeETagNullForPathsWithoutAFingerprint() throws Exception {
+        String[] etag = { "unset" };
+        runWithMockedContext(() -> etag[0] = HttpCacheSupport.computeETag(Constants.MENU_PATH));
+
+        assertNull(etag[0]);
+    }
+
+    @Test
+    void computeETagNullWhenTheFingerprintFails() throws Exception {
+        when(obContext.getUser()).thenThrow(new IllegalStateException("no context"));
+
+        String[] etag = { "unset" };
+        runWithMockedContext(() -> etag[0] = HttpCacheSupport.computeETag(Constants.SESSION_PATH));
+
+        assertNull(etag[0]);
+    }
+
     private HttpServletRequest mockRequest(String method) {
         HttpServletRequest req = org.mockito.Mockito.mock(HttpServletRequest.class);
         when(req.getMethod()).thenReturn(method);
