@@ -49,6 +49,9 @@ public abstract class AbstractMockedContextTest {
     /** Captures the text written to {@code response.getWriter()}. */
     protected StringWriter responseCapture;
 
+    /** The {@link OBContext} static mock, available while {@link #runWithMockedContext} runs. */
+    protected MockedStatic<OBContext> contextStatic;
+
     @BeforeEach
     protected void setUpResponseWriter() throws Exception {
         responseCapture = new StringWriter();
@@ -63,6 +66,7 @@ public abstract class AbstractMockedContextTest {
     protected void runWithMockedContext(ThrowingRunnable action) throws Exception {
         try (MockedStatic<OBContext> ctxMock = mockStatic(OBContext.class);
              MockedStatic<OBDal> dalMock = mockStatic(OBDal.class)) {
+            contextStatic = ctxMock;
             ctxMock.when(OBContext::getOBContext).thenReturn(obContext);
             ctxMock.when(() -> OBContext.setAdminMode(anyBoolean())).thenAnswer(inv -> null);
             ctxMock.when(OBContext::restorePreviousMode).thenAnswer(inv -> null);
