@@ -67,6 +67,7 @@ public final class ServiceFactory {
         EXACT_MATCH_SERVICES.put(LOGOUT_PATH, LogoutService::new);
         EXACT_MATCH_SERVICES.put(RECENT_DOCUMENTS_PATH, RecentDocumentsService::new);
         EXACT_MATCH_SERVICES.put(RECENT_ITEMS_PATH, RecentItemsService::new);
+        EXACT_MATCH_SERVICES.put(PROCESS_MONITOR_PATH, ProcessMonitorService::new);
 
         // Prefix match services (order matters for overlapping prefixes)
         PREFIX_MATCH_SERVICES.put(WINDOW_PATH, WindowService::new);
@@ -77,6 +78,7 @@ public final class ServiceFactory {
         PREFIX_MATCH_SERVICES.put(SAVED_VIEW_PATH, SavedViewService::new);
         PREFIX_MATCH_SERVICES.put(REPORT_AND_PROCESS_PATH, ReportAndProcessService::new);
         PREFIX_MATCH_SERVICES.put(PROCESS_EXECUTION_PATH, ProcessExecutionService::new);
+        PREFIX_MATCH_SERVICES.put(PROCESS_MONITOR_DETAIL_PATH, ProcessMonitorService::new);
         PREFIX_MATCH_SERVICES.put(PROCESS_PATH, ProcessMetadataService::new);
         PREFIX_MATCH_SERVICES.put(DASHBOARD_PATH, DashboardService::new);
         PREFIX_MATCH_SERVICES.put(FAVORITES_PATH, FavoritesService::new);

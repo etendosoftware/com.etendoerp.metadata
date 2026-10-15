@@ -146,6 +146,15 @@ class ServiceFactoryTest {
     assertInstanceOf(RecentItemsService.class, service);
   }
 
+  /** Both the list and the detail process-monitor paths are routed to {@link ProcessMonitorService}. */
+  @Test
+  void getServiceReturnsProcessMonitorService() {
+    assertInstanceOf(ProcessMonitorService.class,
+        ServiceFactory.getService(mockRequestWithPath("/com.etendoerp.metadata.meta/process-monitor"), mockResponse));
+    assertInstanceOf(ProcessMonitorService.class,
+        ServiceFactory.getService(mockRequestWithPath("/com.etendoerp.metadata.meta/process-monitor/ABC"), mockResponse));
+  }
+
   @Test
   void getServiceReturnsEmailSendService() {
     MetadataService service = ServiceFactory.getService(mockRequestWithPath("/com.etendoerp.metadata.meta/email/send"), mockResponse);
