@@ -64,7 +64,7 @@ public class WindowService extends MetadataService {
 
         try {
             OBContext.setAdminMode(true);
-            write(new WindowBuilder(windowId).toJSON());
+            writeWithETag(new WindowBuilder(windowId).toJSON());
         } finally {
             OBContext.restorePreviousMode();
         }
