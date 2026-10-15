@@ -31,6 +31,9 @@ import org.openbravo.client.kernel.BaseComponentProvider.ComponentResource;
  */
 class MetadataComponentProviderTest {
 
+    private static final String UI_FLAGS_JS = "web/com.etendoerp.metadata/js/okr-ui-flags.js";
+    private static final String ALERT_COUNT_BRIDGE_JS = "web/com.etendoerp.metadata/js/alert-count-bridge.js";
+
     /**
      * Test getComponent method.
      * Expects IllegalArgumentException as the method is not supported.
@@ -45,7 +48,8 @@ class MetadataComponentProviderTest {
 
     /**
      * Test getGlobalComponentResources method.
-     * Verifies that the returned list contains the expected resource.
+     * Verifies that the kiosk mode flags script and the alert count bridge script are
+     * registered, in that order, as static resources valid only for the new UI (OB3).
      */
     @Test
     void testGetGlobalComponentResources() {
@@ -53,23 +57,26 @@ class MetadataComponentProviderTest {
         List<ComponentResource> resources = provider.getGlobalComponentResources();
 
         assertNotNull(resources);
-        assertEquals(1, resources.size());
+        assertEquals(2, resources.size());
+        assertOb3StaticResource(resources.get(0), UI_FLAGS_JS);
+        assertOb3StaticResource(resources.get(1), ALERT_COUNT_BRIDGE_JS);
+    }
 
-        ComponentResource resource = resources.get(0);
-        assertEquals("web/com.etendoerp.metadata/js/okr-ui-flags.js", resource.getPath());
+    /**
+     * Asserts that a resource is a static resource with the given path, included in the
+     * new UI mode (OB3) but not in Classic mode ({@code createStaticResource(path, false)}).
+     *
+     * @param resource
+     *     the resource to check
+     * @param expectedPath
+     *     the expected resource path
+     */
+    private static void assertOb3StaticResource(ComponentResource resource, String expectedPath) {
+        assertEquals(expectedPath, resource.getPath());
         assertEquals(ComponentResource.ComponentResourceType.Static, resource.getType());
 
-        // Verify valid apps based on createStaticResource(path, false)
-        // createStaticResource(path, false) calls createStaticResource(path, false,
-        // true) implicitly?
-        // No, createStaticResource(path, false) calls createComponentResource and adds
-        // APP_OB3.
-        // And if includeAlsoInClassicMode is false, it does NOT add APP_CLASSIC.
-
-        // Let's verify the valid apps list
         List<String> validApps = resource.getValidForAppList();
         assertNotNull(validApps);
-        assertEquals(1, validApps.size());
-        assertEquals(ComponentResource.APP_OB3, validApps.get(0));
+        assertEquals(Collections.singletonList(ComponentResource.APP_OB3), validApps);
     }
 }
