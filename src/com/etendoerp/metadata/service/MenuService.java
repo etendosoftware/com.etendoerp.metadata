@@ -44,7 +44,7 @@ public class MenuService extends MetadataService {
     public void process() throws IOException {
         try {
             OBContext.setAdminMode(true);
-            write(new MenuBuilder().toJSON());
+            writeWithETag(new MenuBuilder().toJSON());
         } catch (JSONException e) {
             throw new InternalServerException(e.getMessage());
         } finally {
