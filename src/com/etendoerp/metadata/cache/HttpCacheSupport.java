@@ -17,13 +17,16 @@
 
 package com.etendoerp.metadata.cache;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Date;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -59,6 +62,9 @@ public final class HttpCacheSupport {
             Constants.SESSION_PATH, Constants.MENU_PATH, Constants.LABELS_PATH);
 
     private static final Set<String> CACHEABLE_METHODS = Set.of(Constants.GET, Constants.HEAD);
+
+    private static final Pattern RECORD_TIME_PATTERN = Pattern.compile("\"recordTime\":\\d+");
+    private static final String RECORD_TIME_PLACEHOLDER = "\"recordTime\":0";
 
     private static final String MENU_MAX_UPDATED_HQL =
             "select max(m." + Constants.UPDATED + ") from ADMenu m where m.module.enabled = true";
@@ -112,6 +118,53 @@ public final class HttpCacheSupport {
 
             return null;
         }
+    }
+
+    /**
+     * Determines whether the given request method may be answered with a conditional
+     * {@code 304 Not Modified} response (GET or HEAD).
+     *
+     * @param req the incoming HTTP request
+     * @return true if the method is GET or HEAD
+     */
+    public static boolean isConditionalMethod(HttpServletRequest req) {
+        String method = req.getMethod();
+
+        return method != null && CACHEABLE_METHODS.contains(method);
+    }
+
+    /**
+     * Computes an ETag from a full response body. Used by endpoints whose output depends on more
+     * than the Application Dictionary (e.g. {@code /meta/window} embeds combo values read from
+     * business data), so no cheap fingerprint can tell whether the response changed. The body is
+     * still built on every request; the gain is not sending it again when the client has it.
+     * <p>
+     * {@code recordTime} is left out of the hash: {@code DataToJsonConverter} stamps every entity
+     * with the serialization time, so it would change the ETag on every request although nothing
+     * else changed. The UI does not read it.
+     *
+     * @param body the serialized response body
+     * @return a quoted ETag value, or {@code null}
+     */
+    public static String computeBodyETag(String body) {
+        if (body == null) {
+            return null;
+        }
+
+        return sha256Hex(RECORD_TIME_PATTERN.matcher(body).replaceAll(RECORD_TIME_PLACEHOLDER));
+    }
+
+    /**
+     * Answers {@code 304 Not Modified} and commits the response. Committing matters: the SWS
+     * servlet ({@code BaseWebServiceServlet.doService}) sets status 200 after every service, which
+     * would turn an uncommitted, bodiless 304 into an empty 200.
+     *
+     * @param response the HTTP response
+     * @throws IOException if the response cannot be committed
+     */
+    public static void sendNotModified(HttpServletResponse response) throws IOException {
+        response.setStatus(HttpServletResponse.SC_NOT_MODIFIED);
+        response.flushBuffer();
     }
 
     /**

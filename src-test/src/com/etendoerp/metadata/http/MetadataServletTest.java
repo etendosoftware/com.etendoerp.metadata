@@ -106,6 +106,7 @@ public class MetadataServletTest extends WeldBaseTest {
     new MetadataServlet().doGet("", req2, res2);
 
     verify(res2).setStatus(HttpServletResponse.SC_NOT_MODIFIED);
+    verify(res2).flushBuffer();
     verify(res2, never()).getWriter();
   }
 

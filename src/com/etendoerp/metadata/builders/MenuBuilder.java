@@ -51,6 +51,7 @@ public class MenuBuilder extends Builder {
 
     private static final String MENU_CACHE = "MENU_METADATA";
     private static final String CACHE_KEY_SEPARATOR = "_";
+    private static final String OPEN_LINK_IN_BROWSER = "openLinkInBrowser";
     private static final String DEFAULT_MAPPINGS_HQL = "select mim from ADModelImplementationMapping mim "
         + "where mim.default = true and mim.modelObject.process is not null";
     private static final CachedConcurrentMap<String, JSONObject> menuCache = new CachedConcurrentMap<>(MENU_CACHE);
@@ -218,6 +219,7 @@ public class MenuBuilder extends Builder {
         json.put("description", menu.get(Menu.PROPERTY_DESCRIPTION, language, id));
         json.put("url", menu.getURL());
         json.put("action", menu.getAction());
+        json.put(OPEN_LINK_IN_BROWSER, Boolean.TRUE.equals(menu.isOpenlinkinbrowser()));
     }
 
     /**
