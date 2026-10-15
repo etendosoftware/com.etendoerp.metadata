@@ -34,8 +34,10 @@ import javax.servlet.http.HttpServletResponse;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
+import org.hibernate.criterion.Criterion;
 import org.hibernate.criterion.Order;
 import org.hibernate.criterion.Restrictions;
+import org.openbravo.base.exception.OBSecurityException;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBCriteria;
 import org.openbravo.dal.service.OBDal;
@@ -66,11 +68,24 @@ import com.etendoerp.metadata.utils.Constants;
  *
  * Polling is cheap through {@code since}: only executions updated after the cursor are returned.
  * Access is restricted to roles with access to the Process Monitor or Process Request windows.
+ *
+ * <p>Polling contract: the first load (no {@code since}) returns the newest rows first and
+ * {@code hasMore} there only says the limit was hit; older rows cannot be paged. Delta calls are
+ * ordered by (updated, id) ascending and compared strictly ({@code updated > since}), so the client
+ * should re-read with {@code since = cursor - 2000} ms and upsert by execution id to tolerate late commits.
+ *
+ * <p>Known limitations (documented, no behaviour): there is no index on AD_PROCESS_RUN.UPDATED, so
+ * polling relies on the table staying moderately sized (follow-up); the full {@code log} is returned
+ * unbounded to any run in the role's readable orgs, as the Classic window does; {@code errorMessage}
+ * equals {@code log} for FAILED runs; {@code background=false} means "include all processes".
  */
 public class ProcessMonitorService extends MetadataService {
 
     static final String PROCESS_MONITOR_WINDOW_ID = "EF3E837705944F4DBF398D683D36ACE0";
     static final String PROCESS_REQUEST_WINDOW_ID = "48E7EDE7D1104A59B46FC7449D9FB267";
+    /** Status codes with their own MonitorStatus; any other code (or null) is reported as OTHER. */
+    static final List<String> KNOWN_CODES = List.of(org.openbravo.scheduling.Process.PROCESSING,
+            org.openbravo.scheduling.Process.SUCCESS, org.openbravo.scheduling.Process.ERROR);
     static final int DEFAULT_LIMIT = 50;
     static final int MAX_LIMIT = 200;
 
@@ -134,6 +149,9 @@ public class ProcessMonitorService extends MetadataService {
         } catch (ForbiddenException | NotFoundException | MethodNotAllowedException
                 | UnprocessableContentException e) {
             throw e;
+        } catch (OBSecurityException e) {
+            // Entity access (AD_Table_Access) denied for the role
+            throw new ForbiddenException(e.getMessage());
         } catch (Exception e) {
             throw new InternalServerException(e.getMessage(), e);
         }
@@ -195,8 +213,10 @@ public class ProcessMonitorService extends MetadataService {
         }
         // Initial load: newest first. Delta polling: oldest first, so the cursor never skips rows.
         criteria.addOrder(delta ? Order.asc(ProcessRun.PROPERTY_UPDATED) : Order.desc(ProcessRun.PROPERTY_UPDATED));
+        // Deterministic tiebreaker for rows sharing the same updated timestamp
+        criteria.addOrder(delta ? Order.asc(ProcessRun.PROPERTY_ID) : Order.desc(ProcessRun.PROPERTY_ID));
         criteria.setMaxResults(limit + 1);
-        List<ProcessRun> runs = new ArrayList<>(criteria.list());
+        List<ProcessRun> runs = criteria.list();
 
         boolean hasMore = runs.size() > limit;
         if (hasMore) {
@@ -245,14 +265,12 @@ public class ProcessMonitorService extends MetadataService {
         for (MonitorStatus status : statuses) {
             codes.addAll(status.codes());
         }
-        List<String> known = new ArrayList<>();
-        for (MonitorStatus status : EnumSet.complementOf(EnumSet.of(MonitorStatus.OTHER))) {
-            known.addAll(status.codes());
-        }
         if (statuses.contains(MonitorStatus.OTHER)) {
-            // anything not RUNNING/COMPLETED/FAILED, or those explicitly requested
-            criteria.add(Restrictions.or(Restrictions.in(ProcessRun.PROPERTY_STATUS, codes),
-                    Restrictions.not(Restrictions.in(ProcessRun.PROPERTY_STATUS, known))));
+            // OTHER = null status, or any code that is not RUNNING/COMPLETED/FAILED. NOT IN never matches NULL.
+            Criterion other = Restrictions.or(Restrictions.isNull(ProcessRun.PROPERTY_STATUS),
+                    Restrictions.not(Restrictions.in(ProcessRun.PROPERTY_STATUS, KNOWN_CODES)));
+            criteria.add(codes.isEmpty() ? other
+                    : Restrictions.or(Restrictions.in(ProcessRun.PROPERTY_STATUS, codes), other));
         } else {
             criteria.add(Restrictions.in(ProcessRun.PROPERTY_STATUS, codes));
         }
@@ -265,17 +283,20 @@ public class ProcessMonitorService extends MetadataService {
     }
 
     private JSONObject detail(String runId) throws JSONException {
-        ProcessRun run = OBDal.getReadOnlyInstance().get(ProcessRun.class, runId);
+        // Criteria (not OBDal.get) so the readable client/org filters apply: out-of-scope runs are 404
+        OBCriteria<ProcessRun> criteria = OBDal.getReadOnlyInstance().createCriteria(ProcessRun.class);
+        criteria.add(Restrictions.eq(ProcessRun.PROPERTY_ID, runId));
+        ProcessRun run = (ProcessRun) criteria.uniqueResult();
         if (run == null) {
             throw new NotFoundException("Process execution not found: " + runId);
         }
         long now = System.currentTimeMillis();
         JSONObject json = toSummary(run, now);
         String log = run.getLog();
-        json.put("log", log == null ? JSONObject.NULL : log);
+        json.put("log", nullable(log));
         json.put("errorMessage", MonitorStatus.fromCode(run.getStatus()) == MonitorStatus.FAILED && log != null
                 ? log : JSONObject.NULL);
-        json.put("report", run.getReport() == null ? JSONObject.NULL : run.getReport());
+        json.put("report", nullable(run.getReport()));
         ProcessRequest request = run.getProcessRequest();
         if (request != null) {
             json.put("request", new JSONObject()
@@ -286,8 +307,8 @@ public class ProcessMonitorService extends MetadataService {
                     .put("channel", nullable(request.getChannel()))
                     .put("nextExecution", iso(request.getNextExecution()))
                     .put("previousExecution", iso(request.getPreviousExecution()))
-                    .put("user", request.getUserContact() == null ? JSONObject.NULL
-                            : request.getUserContact().getName()));
+                    .put("user", nullable(request.getUserContact() == null ? null
+                            : request.getUserContact().getName())));
         }
         return json;
     }
@@ -298,14 +319,14 @@ public class ProcessMonitorService extends MetadataService {
         ProcessRequest request = run.getProcessRequest();
         Process process = request != null ? request.getProcess() : null;
         long end = run.getEndTime() != null ? run.getEndTime().getTime() : now;
-        Object durationMs = run.getStartTime() != null ? (Object) Math.max(0L, end - run.getStartTime().getTime())
-                : JSONObject.NULL;
+        Object durationMs = nullable(
+                run.getStartTime() != null ? Long.valueOf(Math.max(0L, end - run.getStartTime().getTime())) : null);
 
         return new JSONObject()
                 .put("id", run.getId())
-                .put("processRequestId", request == null ? JSONObject.NULL : request.getId())
-                .put("processId", process == null ? JSONObject.NULL : process.getId())
-                .put("processName", process == null ? JSONObject.NULL : nullable(process.getName()))
+                .put("processRequestId", nullable(request == null ? null : request.getId()))
+                .put("processId", nullable(process == null ? null : process.getId()))
+                .put("processName", nullable(process == null ? null : process.getName()))
                 .put("background", process != null && Boolean.TRUE.equals(process.isBackground()))
                 .put("status", status.name())
                 .put("statusCode", nullable(run.getStatus()))
@@ -315,7 +336,7 @@ public class ProcessMonitorService extends MetadataService {
                 .put("durationMs", durationMs)
                 .put("duration", nullable(run.getDuration()))
                 .put("updated", iso(run.getUpdated()))
-                .put("updatedMs", run.getUpdated() == null ? JSONObject.NULL : (Object) run.getUpdated().getTime());
+                .put("updatedMs", nullable(run.getUpdated() == null ? null : Long.valueOf(run.getUpdated().getTime())));
     }
 
     private static Object nullable(Object value) {
