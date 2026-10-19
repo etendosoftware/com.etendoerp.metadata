@@ -77,6 +77,13 @@ class ProcessMonitorServiceTest extends AbstractMockedContextTest {
 
     private static final String RUN_ID = "RUN1";
     private static final long UPDATED = 1_700_000_000_000L;
+    private static final String PATH = "/process-monitor";
+    private static final String PATH_RUN = PATH + "/" + RUN_ID;
+    private static final String STATUS = "status";
+    private static final String BACKGROUND = "background";
+    private static final String SINCE = "since";
+    private static final String EXECUTIONS = "executions";
+    private static final String BOOM = "java.lang.IllegalStateException: boom";
 
     @Mock private Role role;
 
@@ -126,9 +133,9 @@ class ProcessMonitorServiceTest extends AbstractMockedContextTest {
     @Test
     void extractsRunId() {
         assertNull(ProcessMonitorService.extractRunId(null));
-        assertNull(ProcessMonitorService.extractRunId("/process-monitor"));
-        assertEquals(RUN_ID, ProcessMonitorService.extractRunId("/process-monitor/RUN1"));
-        assertEquals(RUN_ID, ProcessMonitorService.extractRunId("/process-monitor/RUN1/"));
+        assertNull(ProcessMonitorService.extractRunId(PATH));
+        assertEquals(RUN_ID, ProcessMonitorService.extractRunId(PATH_RUN));
+        assertEquals(RUN_ID, ProcessMonitorService.extractRunId(PATH_RUN + "/"));
     }
 
     @Test
@@ -148,7 +155,7 @@ class ProcessMonitorServiceTest extends AbstractMockedContextTest {
 
     @Test
     void listsExecutionsWithCursor() throws Exception {
-        when(request.getPathInfo()).thenReturn("/process-monitor");
+        when(request.getPathInfo()).thenReturn(PATH);
         runWithMockedContext(() -> {
             stubCriteria(WindowAccess.class, List.of(mock(WindowAccess.class)));
             stubCriteria(ProcessRun.class, Arrays.asList(run("A", "ERR", UPDATED + 5), run("B", "PRC", UPDATED)));
@@ -156,11 +163,11 @@ class ProcessMonitorServiceTest extends AbstractMockedContextTest {
             new ProcessMonitorService(request, response).process();
 
             JSONObject body = new JSONObject(responseCapture.toString());
-            JSONArray executions = body.getJSONArray("executions");
+            JSONArray executions = body.getJSONArray(EXECUTIONS);
             assertEquals(2, executions.length());
-            assertEquals("FAILED", executions.getJSONObject(0).getString("status"));
+            assertEquals("FAILED", executions.getJSONObject(0).getString(STATUS));
             assertTrue(executions.getJSONObject(0).getBoolean("finished"));
-            assertEquals("RUNNING", executions.getJSONObject(1).getString("status"));
+            assertEquals("RUNNING", executions.getJSONObject(1).getString(STATUS));
             assertFalse(executions.getJSONObject(1).getBoolean("finished"));
             assertEquals("Alert Check Process", executions.getJSONObject(0).getString("processName"));
             assertEquals(UPDATED + 5, body.getLong("cursor"));
@@ -170,8 +177,8 @@ class ProcessMonitorServiceTest extends AbstractMockedContextTest {
 
     @Test
     void keepsCursorWhenNothingChanged() throws Exception {
-        when(request.getPathInfo()).thenReturn("/process-monitor");
-        when(request.getParameter("since")).thenReturn(String.valueOf(UPDATED));
+        when(request.getPathInfo()).thenReturn(PATH);
+        when(request.getParameter(SINCE)).thenReturn(String.valueOf(UPDATED));
         runWithMockedContext(() -> {
             stubCriteria(WindowAccess.class, List.of(mock(WindowAccess.class)));
             stubCriteria(ProcessRun.class, Collections.emptyList());
@@ -179,14 +186,14 @@ class ProcessMonitorServiceTest extends AbstractMockedContextTest {
             new ProcessMonitorService(request, response).process();
 
             JSONObject body = new JSONObject(responseCapture.toString());
-            assertEquals(0, body.getJSONArray("executions").length());
+            assertEquals(0, body.getJSONArray(EXECUTIONS).length());
             assertEquals(UPDATED, body.getLong("cursor"));
         });
     }
 
     @Test
     void flagsHasMoreWhenLimitExceeded() throws Exception {
-        when(request.getPathInfo()).thenReturn("/process-monitor");
+        when(request.getPathInfo()).thenReturn(PATH);
         when(request.getParameter("limit")).thenReturn("1");
         runWithMockedContext(() -> {
             stubCriteria(WindowAccess.class, List.of(mock(WindowAccess.class)));
@@ -195,27 +202,27 @@ class ProcessMonitorServiceTest extends AbstractMockedContextTest {
             new ProcessMonitorService(request, response).process();
 
             JSONObject body = new JSONObject(responseCapture.toString());
-            assertEquals(1, body.getJSONArray("executions").length());
+            assertEquals(1, body.getJSONArray(EXECUTIONS).length());
             assertTrue(body.getBoolean("hasMore"));
         });
     }
 
     @Test
     void detailExposesLogAsErrorMessageForFailedRuns() throws Exception {
-        when(request.getPathInfo()).thenReturn("/process-monitor/RUN1");
+        when(request.getPathInfo()).thenReturn(PATH_RUN);
         runWithMockedContext(() -> {
             stubCriteria(WindowAccess.class, List.of(mock(WindowAccess.class)));
             ProcessRun run = run(RUN_ID, "ERR", UPDATED);
-            when(run.getLog()).thenReturn("java.lang.IllegalStateException: boom");
+            when(run.getLog()).thenReturn(BOOM);
             OBCriteria<ProcessRun> c = stubCriteria(ProcessRun.class, Collections.emptyList());
             when(c.uniqueResult()).thenReturn(run);
 
             new ProcessMonitorService(request, response).process();
 
             JSONObject body = new JSONObject(responseCapture.toString());
-            assertEquals("FAILED", body.getString("status"));
-            assertEquals("java.lang.IllegalStateException: boom", body.getString("errorMessage"));
-            assertEquals("java.lang.IllegalStateException: boom", body.getString("log"));
+            assertEquals("FAILED", body.getString(STATUS));
+            assertEquals(BOOM, body.getString("errorMessage"));
+            assertEquals(BOOM, body.getString("log"));
         });
     }
 
@@ -264,7 +271,7 @@ class ProcessMonitorServiceTest extends AbstractMockedContextTest {
 
     @Test
     void listAppliesBackgroundFilterOrderAndLimit() throws Exception {
-        when(request.getPathInfo()).thenReturn("/process-monitor");
+        when(request.getPathInfo()).thenReturn(PATH);
         runWithMockedContext(() -> {
             OBCriteria<ProcessRun> c = runList(Collections.emptyList(), 7);
             List<String> added = addedRestrictions(c);
@@ -281,8 +288,8 @@ class ProcessMonitorServiceTest extends AbstractMockedContextTest {
 
     @Test
     void deltaUsesStrictSinceAndAscendingOrder() throws Exception {
-        when(request.getPathInfo()).thenReturn("/process-monitor");
-        when(request.getParameter("since")).thenReturn("1000");
+        when(request.getPathInfo()).thenReturn(PATH);
+        when(request.getParameter(SINCE)).thenReturn("1000");
         when(request.getParameter("limit")).thenReturn("5");
         runWithMockedContext(() -> {
             OBCriteria<ProcessRun> c = runList(Collections.emptyList(), 0);
@@ -297,20 +304,20 @@ class ProcessMonitorServiceTest extends AbstractMockedContextTest {
 
     @Test
     void backgroundFalseSkipsBackgroundFilterAndProcessIdFilters() throws Exception {
-        when(request.getPathInfo()).thenReturn("/process-monitor");
-        when(request.getParameter("background")).thenReturn("false");
+        when(request.getPathInfo()).thenReturn(PATH);
+        when(request.getParameter(BACKGROUND)).thenReturn("false");
         when(request.getParameter("processId")).thenReturn("PID9");
         runWithMockedContext(() -> {
             List<String> added = addedRestrictions(runList(Collections.emptyList(), 0));
-            assertFalse(anyContains(added, "background"), added.toString());
+            assertFalse(anyContains(added, BACKGROUND), added.toString());
             assertTrue(anyContains(added, "p.id=PID9"), added.toString());
         });
     }
 
     @Test
     void backgroundFalseWithoutProcessIdHasNoJoin() throws Exception {
-        when(request.getPathInfo()).thenReturn("/process-monitor");
-        when(request.getParameter("background")).thenReturn("false");
+        when(request.getPathInfo()).thenReturn(PATH);
+        when(request.getParameter(BACKGROUND)).thenReturn("false");
         runWithMockedContext(() -> {
             OBCriteria<ProcessRun> c = runList(Collections.emptyList(), 0);
             verify(c, never()).createAlias(anyString(), anyString());
@@ -319,8 +326,8 @@ class ProcessMonitorServiceTest extends AbstractMockedContextTest {
 
     @Test
     void statusFilterRestrictsCodes() throws Exception {
-        when(request.getPathInfo()).thenReturn("/process-monitor");
-        when(request.getParameter("status")).thenReturn("failed");
+        when(request.getPathInfo()).thenReturn(PATH);
+        when(request.getParameter(STATUS)).thenReturn("failed");
         runWithMockedContext(() -> {
             List<String> added = addedRestrictions(runList(Collections.emptyList(), 0));
             assertTrue(anyContains(added, "status in (ERR)"), added.toString());
@@ -329,8 +336,8 @@ class ProcessMonitorServiceTest extends AbstractMockedContextTest {
 
     @Test
     void otherAloneDoesNotEmitEmptyInAndMatchesNull() throws Exception {
-        when(request.getPathInfo()).thenReturn("/process-monitor");
-        when(request.getParameter("status")).thenReturn("OTHER");
+        when(request.getPathInfo()).thenReturn(PATH);
+        when(request.getParameter(STATUS)).thenReturn("OTHER");
         runWithMockedContext(() -> {
             List<String> added = addedRestrictions(runList(Collections.emptyList(), 0));
             assertFalse(anyContains(added, "in ()"), added.toString());
@@ -341,8 +348,8 @@ class ProcessMonitorServiceTest extends AbstractMockedContextTest {
 
     @Test
     void otherCombinedWithRunningKeepsBoth() throws Exception {
-        when(request.getPathInfo()).thenReturn("/process-monitor");
-        when(request.getParameter("status")).thenReturn("RUNNING,OTHER");
+        when(request.getPathInfo()).thenReturn(PATH);
+        when(request.getParameter(STATUS)).thenReturn("RUNNING,OTHER");
         runWithMockedContext(() -> {
             List<String> added = addedRestrictions(runList(Collections.emptyList(), 0));
             assertTrue(anyContains(added, "status in (PRC)"), added.toString());
@@ -352,8 +359,8 @@ class ProcessMonitorServiceTest extends AbstractMockedContextTest {
 
     @Test
     void invalidSinceThroughProcessIsUnprocessable() throws Exception {
-        when(request.getPathInfo()).thenReturn("/process-monitor");
-        when(request.getParameter("since")).thenReturn("yesterday");
+        when(request.getPathInfo()).thenReturn(PATH);
+        when(request.getParameter(SINCE)).thenReturn("yesterday");
         runWithMockedContext(() -> {
             stubCriteria(WindowAccess.class, List.of(mock(WindowAccess.class)));
             assertThrows(UnprocessableContentException.class,
@@ -370,7 +377,7 @@ class ProcessMonitorServiceTest extends AbstractMockedContextTest {
 
     @Test
     void entityAccessDeniedIsForbidden() throws Exception {
-        when(request.getPathInfo()).thenReturn("/process-monitor");
+        when(request.getPathInfo()).thenReturn(PATH);
         runWithMockedContext(() -> {
             OBCriteria<WindowAccess> c = stubCriteria(WindowAccess.class, List.of(mock(WindowAccess.class)));
             OBCriteria<ProcessRun> runs = stubCriteria(ProcessRun.class, Collections.emptyList());
@@ -389,13 +396,13 @@ class ProcessMonitorServiceTest extends AbstractMockedContextTest {
             stubCriteria(WindowAccess.class, List.of(mock(WindowAccess.class)));
             stubCriteria(ProcessRun.class, Collections.emptyList());
             new ProcessMonitorService(request, response).process();
-            assertTrue(new JSONObject(responseCapture.toString()).has("executions"));
+            assertTrue(new JSONObject(responseCapture.toString()).has(EXECUTIONS));
         });
     }
 
     @Test
     void nullProcessRequestAndCompletedDetail() throws Exception {
-        when(request.getPathInfo()).thenReturn("/process-monitor/RUN1");
+        when(request.getPathInfo()).thenReturn(PATH_RUN);
         runWithMockedContext(() -> {
             stubCriteria(WindowAccess.class, List.of(mock(WindowAccess.class)));
             ProcessRun run = run(RUN_ID, "SUC", UPDATED);
@@ -407,7 +414,7 @@ class ProcessMonitorServiceTest extends AbstractMockedContextTest {
             new ProcessMonitorService(request, response).process();
 
             JSONObject body = new JSONObject(responseCapture.toString());
-            assertEquals("COMPLETED", body.getString("status"));
+            assertEquals("COMPLETED", body.getString(STATUS));
             assertTrue(body.isNull("errorMessage"));
             assertTrue(body.isNull("processId"));
             assertFalse(body.has("request"));

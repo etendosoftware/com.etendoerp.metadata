@@ -232,7 +232,12 @@ public class ProcessMonitorService extends MetadataService {
             }
         }
         // The cursor is the newest update seen. With no rows it stays unchanged (delta) or is the server time (first load).
-        long cursor = delta ? Math.max(since.getTime(), newest) : (runs.isEmpty() ? serverTime : newest);
+        long cursor;
+        if (delta) {
+            cursor = Math.max(since.getTime(), newest);
+        } else {
+            cursor = runs.isEmpty() ? serverTime : newest;
+        }
 
         return new JSONObject()
                 .put(EXECUTIONS, executions)
