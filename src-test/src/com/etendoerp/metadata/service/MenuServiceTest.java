@@ -17,7 +17,10 @@
 package com.etendoerp.metadata.service;
 
 import static org.junit.Assert.*;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -28,6 +31,9 @@ import javax.servlet.http.HttpServletResponse;
 import org.codehaus.jettison.json.JSONObject;
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.ArgumentCaptor;
+
+import com.etendoerp.metadata.utils.Constants;
 import org.openbravo.dal.core.OBContext;
 
 /**
@@ -156,5 +162,29 @@ public class MenuServiceTest extends BaseMetadataServiceTest {
             assertNotNull("Exception message should be provided", e.getMessage());
         }
         assertTrue("IOException should be properly handled", exceptionThrown);
+    }
+
+    /**
+     * A GET answers with the body ETag, and a later GET that sends it back gets 304 without a body,
+     * so the UI revalidates the menu on every load instead of downloading it again.
+     */
+    @Test
+    public void testMenuAnswers304WhenTheETagMatches() throws IOException {
+        menuService.process();
+
+        ArgumentCaptor<String> etag = ArgumentCaptor.forClass(String.class);
+        verify(mockResponse).setHeader(eq(Constants.ETAG_HEADER), etag.capture());
+        verify(mockResponse).setHeader(Constants.CACHE_CONTROL_HEADER, Constants.CACHE_CONTROL_PRIVATE_NO_CACHE);
+
+        HttpServletRequest revalidation = mock(HttpServletRequest.class);
+        HttpServletResponse notModified = mock(HttpServletResponse.class);
+        when(revalidation.getMethod()).thenReturn(Constants.GET);
+        when(revalidation.getHeader(Constants.IF_NONE_MATCH_HEADER)).thenReturn(etag.getValue());
+
+        new MenuService(revalidation, notModified).process();
+
+        verify(notModified).setStatus(HttpServletResponse.SC_NOT_MODIFIED);
+        verify(notModified).flushBuffer();
+        verify(notModified, never()).getWriter();
     }
 }

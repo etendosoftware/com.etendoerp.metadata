@@ -41,7 +41,7 @@ import com.etendoerp.metadata.utils.Constants;
 
 /**
  * Computes lightweight, DB-metadata-driven ETags for the "metadata-definition" endpoints
- * ({@code /meta/menu}, {@code /meta/session}, {@code /meta/labels}) and resolves conditional
+ * ({@code /meta/session}, {@code /meta/labels}) and resolves conditional
  * GET requests ({@code If-None-Match}) so that unchanged responses can be answered with a
  * {@code 304 Not Modified} without running the expensive service/builder logic.
  * <p>
@@ -52,22 +52,23 @@ import com.etendoerp.metadata.utils.Constants;
  * {@code /meta/labels} has no single existing "module version" concept that is cheaply
  * queryable per-request; {@code max(AD_Module.updated)} across enabled modules is used as
  * the practical equivalent, since any module install/update touches that column.
+ * <p>
+ * {@code /meta/menu}, {@code /meta/window} and {@code /meta/tab} use a body ETag instead
+ * ({@link #computeBodyETag}): an AD fingerprint misses role access changes and business data
+ * embedded in the window JSON.
  *
  * @author Futit Services S.L.
  */
 public final class HttpCacheSupport {
     private static final Logger logger = LogManager.getLogger(HttpCacheSupport.class);
 
-    private static final Set<String> CACHEABLE_PATHS = Set.of(
-            Constants.SESSION_PATH, Constants.MENU_PATH, Constants.LABELS_PATH);
+    private static final Set<String> CACHEABLE_PATHS = Set.of(Constants.SESSION_PATH, Constants.LABELS_PATH);
 
     private static final Set<String> CACHEABLE_METHODS = Set.of(Constants.GET, Constants.HEAD);
 
     private static final Pattern RECORD_TIME_PATTERN = Pattern.compile("\"recordTime\":\\d+");
     private static final String RECORD_TIME_PLACEHOLDER = "\"recordTime\":0";
 
-    private static final String MENU_MAX_UPDATED_HQL =
-            "select max(m." + Constants.UPDATED + ") from ADMenu m where m.module.enabled = true";
     private static final String ROLE_MAX_UPDATED_HQL =
             "select max(r." + Constants.UPDATED + ") from ADRole r where r.id = :roleId";
     private static final String MODULE_MAX_UPDATED_HQL =
@@ -102,9 +103,7 @@ public final class HttpCacheSupport {
         try {
             String fingerprint;
 
-            if (Constants.MENU_PATH.equals(normalizedPath)) {
-                fingerprint = fingerprintMenu();
-            } else if (Constants.SESSION_PATH.equals(normalizedPath)) {
+            if (Constants.SESSION_PATH.equals(normalizedPath)) {
                 fingerprint = fingerprintSession();
             } else if (Constants.LABELS_PATH.equals(normalizedPath)) {
                 fingerprint = fingerprintLabels();
@@ -199,20 +198,6 @@ public final class HttpCacheSupport {
         }
 
         return false;
-    }
-
-    private static String fingerprintMenu() {
-        OBContext context = OBContext.getOBContext();
-        Role role = context != null ? context.getRole() : null;
-        Language language = context != null ? context.getLanguage() : null;
-
-        if (role == null || language == null) {
-            return null;
-        }
-
-        Date maxUpdated = executeMaxUpdated(MENU_MAX_UPDATED_HQL);
-
-        return role.getId() + "|" + language.getId() + "|" + timestampOf(maxUpdated);
     }
 
     private static String fingerprintSession() {
