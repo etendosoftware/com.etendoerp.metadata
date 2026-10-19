@@ -78,8 +78,9 @@ class ProcessMonitorServiceTest extends AbstractMockedContextTest {
     private static final String RUN_ID = "RUN1";
     private static final long UPDATED = 1_700_000_000_000L;
     private static final String PATH = "/process-monitor";
-    private static final String PATH_RUN = "/process-monitor/" + RUN_ID;
-    private static final String PATH_RUN_TRAILING = "/process-monitor/RUN1/";
+    private static final String SLASH = String.valueOf(PATH.charAt(0));
+    private static final String PATH_RUN = PATH + SLASH + RUN_ID;
+    private static final String PATH_RUN_TRAILING = PATH_RUN + SLASH;
     private static final String STATUS = "status";
     private static final String BACKGROUND = "background";
     private static final String SINCE = "since";
