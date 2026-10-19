@@ -23,10 +23,12 @@ import javax.servlet.http.HttpServletResponse;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.service.web.WebService;
 
+import com.etendoerp.metadata.auth.TokenRevocationStore;
 import com.etendoerp.metadata.exceptions.UnauthorizedException;
 import com.etendoerp.metadata.service.ServiceFactory;
 import com.etendoerp.metadata.utils.Constants;
 import com.etendoerp.metadata.utils.PasswordExpirationUtils;
+import com.etendoerp.metadata.utils.Utils;
 
 /**
  * Abstract base class that provides common HTTP method implementations
@@ -36,9 +38,17 @@ import com.etendoerp.metadata.utils.PasswordExpirationUtils;
  * <p>This class eliminates code duplication across different servlet implementations
  * by providing a single point of delegation for all HTTP verbs.</p>
  *
- * <p>Every verb goes through {@link #dispatch(HttpServletRequest, HttpServletResponse)}, which
- * rejects the request when the caller's password has expired. This mirrors Etendo Classic, where a
+ * <p>Every verb goes through {@link #dispatch(HttpServletRequest, HttpServletResponse)}, which first
+ * rejects the request outright if the caller's token was revoked (e.g. via {@code /logout}), then
+ * rejects it when the caller's password has expired. This mirrors Etendo Classic, where a
  * user with an expired password never gets a usable session until the password is updated.</p>
+ *
+ * <p><b>Revocation only covers this module.</b> The check queries {@link TokenRevocationStore},
+ * which only ever contains hashes of tokens revoked via this module's own {@code /logout}. A
+ * token accepted here but never revoked through this module's own {@code /logout} — because the
+ * client simply hasn't logged out yet, or logged out via a path outside this module — is
+ * unaffected either way; other {@code /sws/*} services outside this module never consult this
+ * table at all, so a revoked token still works against them.</p>
  */
 public abstract class BaseWebService implements WebService {
 
@@ -107,15 +117,39 @@ public abstract class BaseWebService implements WebService {
     }
 
     /**
-     * Applies the expired-password guard and then runs the actual request processing.
+     * Applies the revoked-token guard, then the expired-password guard, and finally runs the
+     * actual request processing.
      *
      * @param request  the HTTP request
      * @param response the HTTP response
      * @throws Exception if the password is expired or the request processing fails
      */
     private void dispatch(HttpServletRequest request, HttpServletResponse response) throws Exception {
+        if (isTokenRevoked(request)) {
+            Utils.writeJsonErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "Token has been revoked");
+            return;
+        }
         rejectIfPasswordExpired(request);
         process(request, response);
+    }
+
+    /**
+     * Checks the caller's raw token hash against {@link TokenRevocationStore}. Deliberately does
+     * <b>not</b> throw {@code UnauthorizedException} on a hit - an exception thrown from here
+     * (before {@link #process}) never reaches this module's own exception-to-status mapping (see
+     * the design spec, "Why not throw UnauthorizedException") - the caller must write the 401
+     * response itself and return without calling {@link #process}.
+     * <p>
+     * No JWT decode/verify happens here - that already happened upstream in
+     * {@code SecureWebServiceServlet} before this request ever reached this class. Only the raw
+     * token string is needed, to hash and look up.
+     *
+     * @param request the HTTP request
+     * @return {@code true} if the request's token is revoked
+     */
+    private boolean isTokenRevoked(HttpServletRequest request) {
+        String rawToken = com.etendoerp.metadata.auth.Utils.extractBearerToken(request);
+        return TokenRevocationStore.isRevoked(rawToken);
     }
 
     /**

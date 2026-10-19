@@ -42,6 +42,7 @@ public class Constants {
     public static final String MESSAGE_PATH = "/message";
     public static final String LABELS_PATH = "/labels";
     public static final String PREFERENCES_PATH = "/preferences";
+    public static final String LOGOUT_PATH = "/logout";
     /**
      * Endpoints still reachable while the user's password is expired. They are the minimum the new UI
      * needs to render the mandatory password-change screen: the session payload carrying the
@@ -50,7 +51,7 @@ public class Constants {
      * the password is updated.
      */
     public static final List<String> PASSWORD_EXPIRED_ALLOWED_PATHS = Collections.unmodifiableList(Arrays.asList(
-            SESSION_PATH, LABELS_PATH, LANGUAGE_PATH, PREFERENCES_PATH));
+            SESSION_PATH, LABELS_PATH, LANGUAGE_PATH, PREFERENCES_PATH, LOGOUT_PATH));
     /**
      * Stable error code returned when the caller's password is expired. The new UI matches it exactly
      * to tell this rejection apart from a generic session failure, so it must not be turned into prose.
@@ -63,6 +64,9 @@ public class Constants {
     public static final String CUSTOM_QUERY_DS = "F8DD408F2F3A414188668836F84C21AF";
     public static final String TABLE_DATASOURCE = "ComboTableDatasourceService";
     public static final String TREE_DATASOURCE = "90034CAE96E847D78FBEF6D38CB1930D";
+    public static final String LINK_TO_PARENT_DATASOURCE = "610BEAE5E223447DBE6FF672B703F72F";
+    public static final String AD_TREE_STRUCTURE = "ADTree";
+    public static final String LINK_TO_PARENT_STRUCTURE = "LinkToParent";
     public static final String DATASOURCE_PROPERTY = "datasourceName";
     public static final String SELECTOR_DEFINITION_PROPERTY = "_selectorDefinitionId";
     /**
@@ -114,6 +118,7 @@ public class Constants {
     public static final String CACHE_CONTROL_HEADER = "Cache-Control";
     public static final String IF_NONE_MATCH_HEADER = "If-None-Match";
     public static final String CACHE_CONTROL_PRIVATE_MUST_REVALIDATE = "private, must-revalidate";
+    public static final String CACHE_CONTROL_PRIVATE_NO_CACHE = "private, no-cache";
     public static final String LOCATION_PATH = "/location/";
     public static final String EMAIL_PATH = "/email";
     public static final String EMAIL_SEND_PATH = "/email/send";
@@ -132,6 +137,7 @@ public class Constants {
     public static final String WIDGET_CLASSES_PATH = "/widget/classes";
     public static final String FAVORITES_PATH = "/favorites";
     public static final String RECENT_DOCUMENTS_PATH = "/recent-documents";
+    public static final String RECENT_ITEMS_PATH = "/recent-items";
     public static final String CHANGE_PROFILE_PATH = "/change-profile";
     public static final String LOGIN_PATH = "/login";
 

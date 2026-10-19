@@ -60,16 +60,21 @@ class HttpCacheSupportTest extends AbstractMockedContextTest {
 
     @Test
     void isCacheableTrueForAllowlistedGetEndpoints() {
-        assertTrue(HttpCacheSupport.isCacheable(mockRequest(Constants.GET), Constants.MENU_PATH));
         assertTrue(HttpCacheSupport.isCacheable(mockRequest(Constants.GET), Constants.SESSION_PATH));
         assertTrue(HttpCacheSupport.isCacheable(mockRequest(Constants.GET), Constants.LABELS_PATH));
-        assertTrue(HttpCacheSupport.isCacheable(mockRequest(Constants.HEAD), Constants.MENU_PATH));
+        assertTrue(HttpCacheSupport.isCacheable(mockRequest(Constants.HEAD), Constants.SESSION_PATH));
     }
 
     @Test
     void isCacheableFalseForNonGetMethods() {
-        assertFalse(HttpCacheSupport.isCacheable(mockRequest(Constants.POST), Constants.MENU_PATH));
+        assertFalse(HttpCacheSupport.isCacheable(mockRequest(Constants.POST), Constants.LABELS_PATH));
         assertFalse(HttpCacheSupport.isCacheable(mockRequest(Constants.PUT), Constants.SESSION_PATH));
+    }
+
+    @Test
+    void isCacheableFalseForMenuWhichUsesABodyETag() {
+        assertFalse(HttpCacheSupport.isCacheable(mockRequest(Constants.GET), Constants.MENU_PATH));
+        assertNull(HttpCacheSupport.computeETag(Constants.MENU_PATH));
     }
 
     @Test
@@ -77,54 +82,6 @@ class HttpCacheSupportTest extends AbstractMockedContextTest {
         assertFalse(HttpCacheSupport.isCacheable(mockRequest(Constants.GET), Constants.TAB_PATH + "123"));
         assertFalse(HttpCacheSupport.isCacheable(mockRequest(Constants.GET), Constants.PROCESS_EXECUTION_PATH));
         assertFalse(HttpCacheSupport.isCacheable(mockRequest(Constants.GET), "/unknown"));
-    }
-
-    @Test
-    void computeETagForMenuIsPresentAndStable() throws Exception {
-        when(role.getId()).thenReturn(ROLE_ID);
-        when(language.getId()).thenReturn(LANGUAGE_ID);
-        when(obContext.getRole()).thenReturn(role);
-        when(obContext.getLanguage()).thenReturn(language);
-        when(session.createQuery(anyString(), eq(Date.class))).thenReturn(query);
-        when(query.uniqueResult()).thenReturn(new Date(1000L));
-
-        String[] etags = new String[2];
-
-        runWithMockedContext(() -> etags[0] = HttpCacheSupport.computeETag(Constants.MENU_PATH));
-        runWithMockedContext(() -> etags[1] = HttpCacheSupport.computeETag(Constants.MENU_PATH));
-
-        assertNotNull(etags[0]);
-        assertTrue(etags[0].startsWith("\"") && etags[0].endsWith("\""));
-        assertEquals(etags[0], etags[1]);
-    }
-
-    @Test
-    void computeETagForMenuChangesWhenMaxUpdatedChanges() throws Exception {
-        when(role.getId()).thenReturn(ROLE_ID);
-        when(language.getId()).thenReturn(LANGUAGE_ID);
-        when(obContext.getRole()).thenReturn(role);
-        when(obContext.getLanguage()).thenReturn(language);
-        when(session.createQuery(anyString(), eq(Date.class))).thenReturn(query);
-
-        String[] etags = new String[2];
-
-        when(query.uniqueResult()).thenReturn(new Date(1000L));
-        runWithMockedContext(() -> etags[0] = HttpCacheSupport.computeETag(Constants.MENU_PATH));
-
-        when(query.uniqueResult()).thenReturn(new Date(2000L));
-        runWithMockedContext(() -> etags[1] = HttpCacheSupport.computeETag(Constants.MENU_PATH));
-
-        assertNotEquals(etags[0], etags[1]);
-    }
-
-    @Test
-    void computeETagForMenuNullWhenRoleMissing() throws Exception {
-        when(obContext.getRole()).thenReturn(null);
-
-        String[] etag = new String[1];
-        runWithMockedContext(() -> etag[0] = HttpCacheSupport.computeETag(Constants.MENU_PATH));
-
-        assertNull(etag[0]);
     }
 
     @Test
@@ -178,6 +135,39 @@ class HttpCacheSupportTest extends AbstractMockedContextTest {
     }
 
     @Test
+    void isConditionalMethodTrueOnlyForGetAndHead() {
+        assertTrue(HttpCacheSupport.isConditionalMethod(mockRequest(Constants.GET)));
+        assertTrue(HttpCacheSupport.isConditionalMethod(mockRequest(Constants.HEAD)));
+        assertFalse(HttpCacheSupport.isConditionalMethod(mockRequest(Constants.POST)));
+        assertFalse(HttpCacheSupport.isConditionalMethod(mockRequest(null)));
+    }
+
+    @Test
+    void computeBodyETagIsQuotedStableAndChangesWithTheBody() {
+        String etag = HttpCacheSupport.computeBodyETag("{\"a\":1}");
+
+        assertNotNull(etag);
+        assertTrue(etag.startsWith("\"") && etag.endsWith("\""));
+        assertEquals(etag, HttpCacheSupport.computeBodyETag("{\"a\":1}"));
+        assertNotEquals(etag, HttpCacheSupport.computeBodyETag("{\"a\":2}"));
+    }
+
+    @Test
+    void computeBodyETagIgnoresSerializationTimestamps() {
+        String first = "{\"id\":\"1\",\"recordTime\":1791483634710,\"tabs\":[{\"recordTime\":1791483634715}]}";
+        String second = "{\"id\":\"1\",\"recordTime\":1791483634954,\"tabs\":[{\"recordTime\":1791483634955}]}";
+        String changed = "{\"id\":\"2\",\"recordTime\":1791483634954,\"tabs\":[{\"recordTime\":1791483634955}]}";
+
+        assertEquals(HttpCacheSupport.computeBodyETag(first), HttpCacheSupport.computeBodyETag(second));
+        assertNotEquals(HttpCacheSupport.computeBodyETag(first), HttpCacheSupport.computeBodyETag(changed));
+    }
+
+    @Test
+    void computeBodyETagNullForNullBody() {
+        assertNull(HttpCacheSupport.computeBodyETag(null));
+    }
+
+    @Test
     void matchesReturnsTrueForWildcard() {
         assertTrue(HttpCacheSupport.matches("*", QUOTED_ETAG));
     }
@@ -201,6 +191,35 @@ class HttpCacheSupportTest extends AbstractMockedContextTest {
     void matchesReturnsFalseForNullOrBlankHeader() {
         assertFalse(HttpCacheSupport.matches(null, QUOTED_ETAG));
         assertFalse(HttpCacheSupport.matches("", QUOTED_ETAG));
+    }
+
+    @Test
+    void matchesAcceptsWeakValidators() {
+        assertTrue(HttpCacheSupport.matches("W/" + QUOTED_ETAG, QUOTED_ETAG));
+        assertTrue(HttpCacheSupport.matches("\"zzz\", W/" + QUOTED_ETAG, QUOTED_ETAG));
+    }
+
+    @Test
+    void matchesReturnsFalseWithoutAnETag() {
+        assertFalse(HttpCacheSupport.matches(QUOTED_ETAG, null));
+    }
+
+    @Test
+    void computeETagNullForPathsWithoutAFingerprint() throws Exception {
+        String[] etag = { "unset" };
+        runWithMockedContext(() -> etag[0] = HttpCacheSupport.computeETag(Constants.MENU_PATH));
+
+        assertNull(etag[0]);
+    }
+
+    @Test
+    void computeETagNullWhenTheFingerprintFails() throws Exception {
+        when(obContext.getUser()).thenThrow(new IllegalStateException("no context"));
+
+        String[] etag = { "unset" };
+        runWithMockedContext(() -> etag[0] = HttpCacheSupport.computeETag(Constants.SESSION_PATH));
+
+        assertNull(etag[0]);
     }
 
     private HttpServletRequest mockRequest(String method) {

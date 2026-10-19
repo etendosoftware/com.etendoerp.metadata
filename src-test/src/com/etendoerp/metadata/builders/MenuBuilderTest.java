@@ -130,6 +130,8 @@ class MenuBuilderTest {
   private static final String PICK_AND_EXECUTE = "OBUIAPP_PickAndExecute";
   private static final String FORM_ICON = "form-icon";
   private static final String FORM_ID = "formId";
+  private static final String EXTERNAL_MENU_ID = "EXTERNAL_MENU_ID";
+  private static final String OPEN_LINK_IN_BROWSER = "openLinkInBrowser";
 
   @FunctionalInterface
   private interface MenuBuilderConsumer {
@@ -706,6 +708,33 @@ class MenuBuilderTest {
       assertEquals(menuUrl, basicMenu.getString("url"));
       assertEquals(menuAction, basicMenu.getString("action"));
     });
+  }
+
+  /**
+   * Tests that addBasicMenuInfo always emits {@code openLinkInBrowser} as a real boolean: the
+   * flag value when it is set, and {@code false} when the DAL property is null.
+   *
+   * @param flag     The value returned by {@code Menu.isOpenlinkinbrowser()} (null when unset).
+   * @param expected The expected boolean emitted in the JSON.
+   * @throws JSONException if there is an error during JSON construction
+   */
+  @ParameterizedTest
+  @CsvSource(nullValues = "NULL", value = {
+      "true, true",
+      "false, false",
+      "NULL, false"
+  })
+  void testAddBasicMenuInfoEmitsOpenLinkInBrowser(Boolean flag, boolean expected) throws JSONException {
+    MenuOption childOption = mock(MenuOption.class);
+    Menu childMenu = mock(Menu.class);
+
+    when(rootMenuOption.getChildren()).thenReturn(List.of(childOption));
+    when(childOption.getMenu()).thenReturn(childMenu);
+    when(childOption.getType()).thenReturn(MenuManager.MenuEntryType.External);
+    when(childMenu.getId()).thenReturn(EXTERNAL_MENU_ID);
+    when(childMenu.isOpenlinkinbrowser()).thenReturn(flag);
+
+    withFirstMenuEntry(entry -> assertEquals(expected, entry.getBoolean(OPEN_LINK_IN_BROWSER)));
   }
 
   /**
