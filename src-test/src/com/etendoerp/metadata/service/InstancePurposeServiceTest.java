@@ -75,6 +75,7 @@ public class InstancePurposeServiceTest {
     private static final String REQUIRED_KEY = "required";
     private static final String OPTIONS_KEY = "options";
     private static final String DEVELOPMENT = "D";
+    private static final String DEVELOPMENT_BODY = "{\"purpose\":\"D\"}";
 
     @Mock private HttpServletRequest mockRequest;
     @Mock private HttpServletResponse mockResponse;
@@ -235,7 +236,7 @@ public class InstancePurposeServiceTest {
      */
     @Test
     public void testPostSavesPurpose() throws Exception {
-        givenPost("{\"purpose\":\"D\"}");
+        givenPost(DEVELOPMENT_BODY);
         when(mockSystemInfo.getInstancePurpose()).thenReturn(DEVELOPMENT);
 
         service.process();
@@ -272,7 +273,7 @@ public class InstancePurposeServiceTest {
     @Test(expected = ForbiddenException.class)
     public void testPostRejectedForRegularRole() throws IOException {
         when(mockOBContext.getUserLevel()).thenReturn(REGULAR_LEVEL);
-        givenPost("{\"purpose\":\"D\"}");
+        givenPost(DEVELOPMENT_BODY);
 
         service.process();
     }
@@ -320,7 +321,7 @@ public class InstancePurposeServiceTest {
      */
     @Test(expected = NotFoundException.class)
     public void testPostWithoutSystemInformationRowThrowsNotFound() throws IOException {
-        givenPost("{\"purpose\":\"D\"}");
+        givenPost(DEVELOPMENT_BODY);
         when(mockOBDal.get(SystemInformation.class, SYSTEM_ID)).thenReturn(null);
 
         service.process();
