@@ -47,6 +47,8 @@ import static org.mockito.Mockito.when;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -97,6 +99,12 @@ class SessionBuilderTest {
   private static final String KEY_PR_APP_L = "$Element_PR_APP_L";
   private static final String ORG1_ID = "org1-id";
   private static final String ORG2_ID = "org2-id";
+  private static final String CLIENT1_ID = "client1-id";
+  private static final String CLIENT2_ID = "client2-id";
+  private static final String WAREHOUSE1_ID = "warehouse1-id";
+  private static final String WAREHOUSE2_ID = "warehouse2-id";
+  private static final String ORG_IDS_PARAM = "orgIds";
+  private static final String CLIENT_ID_PARAM = "clientId";
   private static final String PASSWORD_EXPIRED = "passwordExpired";
   private static final String CURRENT_LANGUAGE = "currentLanguage";
 
@@ -795,6 +803,96 @@ class SessionBuilderTest {
       assertNotNull(result);
       assertTrue(result.isNull(CURRENT_LANGUAGE));
     }
+  }
+
+  /**
+   * Builds the session JSON with the context and the JSON utilities mocked, the arrangement the
+   * multi-client warehouse tests share.
+   *
+   * @return the session JSON
+   * @throws JSONException if building the JSON fails
+   */
+  private JSONObject buildSessionJson() throws JSONException {
+    try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
+         MockedStatic<Utils> utilsStatic = mockStatic(Utils.class)) {
+
+      obContextStatic.when(OBContext::getOBContext).thenReturn(obContext);
+      utilsStatic.when(() -> Utils.getJsonObject(any())).thenReturn(new JSONObject());
+
+      return new SessionBuilder().toJSON();
+    }
+  }
+
+  /**
+   * Collects the warehouse ids of every organization of one role of the session JSON.
+   *
+   * @param session the session JSON
+   * @param roleIndex position of the role in the {@code roles} array
+   * @return the ids of the warehouses offered by any organization of the role
+   * @throws JSONException if the JSON lacks the expected structure
+   */
+  private Set<String> warehouseIdsOfRole(JSONObject session, int roleIndex) throws JSONException {
+    Set<String> ids = new HashSet<>();
+    JSONArray orgs = session.getJSONArray(ROLES).getJSONObject(roleIndex).getJSONArray(ORGANIZATIONS);
+    for (int j = 0; j < orgs.length(); j++) {
+      JSONArray warehouses = orgs.getJSONObject(j).getJSONArray(WAREHOUSES);
+      for (int k = 0; k < warehouses.length(); k++) {
+        ids.add(warehouses.getJSONObject(k).getString("id"));
+      }
+    }
+    return ids;
+  }
+
+  /**
+   * Regression test (ETP-5832): a user with roles of several clients (e.g. a sample-data client
+   * and the System client) gets the warehouses of each client queried with that client's own
+   * organizations. Querying only the client of the first role left the other clients' roles
+   * without their warehouses.
+   *
+   * @throws JSONException if JSON operations fail during building
+   */
+  @Test
+  void testWarehousesAreFetchedPerClientOfEachRole() throws JSONException {
+    buildSessionJson();
+
+    verify(warehousesQuery).setParameter(CLIENT_ID_PARAM, CLIENT1_ID);
+    verify(warehousesQuery).setParameter(CLIENT_ID_PARAM, CLIENT2_ID);
+    verify(warehousesQuery).setParameter(ORG_IDS_PARAM, Collections.singleton(ORG1_ID));
+    verify(warehousesQuery).setParameter(ORG_IDS_PARAM, Collections.singleton(ORG2_ID));
+  }
+
+  /**
+   * Regression test (ETP-5832): a role is offered only the warehouses of its own client, even when
+   * its organization tree overlaps another client's warehouse organization (as the {@code *}
+   * organization contains every other one).
+   *
+   * @throws JSONException if JSON operations fail during assertions or building
+   */
+  @Test
+  void testRoleNeverGetsTheWarehousesOfAnotherClient() throws JSONException {
+    when(warehousesQuery.list()).thenReturn(List.of(warehouse1), List.of(warehouse2));
+    when(osp.getChildTree(ORG2_ID, true)).thenReturn(Set.of(ORG1_ID, ORG2_ID));
+
+    JSONObject session = buildSessionJson();
+
+    assertEquals(Set.of(WAREHOUSE1_ID), warehouseIdsOfRole(session, 0));
+    assertEquals(Set.of(WAREHOUSE2_ID), warehouseIdsOfRole(session, 1));
+  }
+
+  /**
+   * Verifies that the roles of the same client share a single warehouse query with the
+   * organizations of all of them, so the per-client fetch does not bring back one query per role.
+   *
+   * @throws JSONException if JSON operations fail during building
+   */
+  @Test
+  void testRolesOfTheSameClientShareOneWarehouseQuery() throws JSONException {
+    when(role2.getClient()).thenReturn(client1);
+
+    buildSessionJson();
+
+    verify(session, times(1)).createQuery(anyString(), eq(Warehouse.class));
+    verify(warehousesQuery).setParameter(ORG_IDS_PARAM, Set.of(ORG1_ID, ORG2_ID));
   }
 
   /**
