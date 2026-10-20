@@ -1,0 +1,34 @@
+/*
+ *************************************************************************
+ * The contents of this file are subject to the Etendo License
+ * (the "License"), you may not use this file except in compliance with
+ * the License.
+ * You may obtain a copy of the License at
+ * https://github.com/etendosoftware/etendo_core/blob/main/legal/Etendo_license.txt
+ * Software distributed under the License is distributed on an
+ * "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
+ * implied. See the License for the specific language governing rights
+ * and limitations under the License.
+ * All portions are Copyright © 2021-2026 FUTIT SERVICES, S.L
+ * All Rights Reserved.
+ * Contributor(s): Futit Services S.L.
+ *************************************************************************
+ */
+
+package com.etendoerp.metadata.exceptions;
+
+/**
+ * Exception indicating that the authenticated user is not allowed to access the resource (HTTP 403).
+ */
+public class ForbiddenException extends RuntimeException {
+    private static final String DEFAULT_MESSAGE = "Forbidden";
+
+    public ForbiddenException(String message) {
+        super(message.isEmpty() ? DEFAULT_MESSAGE : message);
+    }
+
+    /** Creates a new ForbiddenException with the default message. */
+    public ForbiddenException() {
+        super(DEFAULT_MESSAGE);
+    }
+}

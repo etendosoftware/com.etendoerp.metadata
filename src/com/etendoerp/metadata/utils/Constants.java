@@ -130,6 +130,8 @@ public class Constants {
     public static final String REPORT_AND_PROCESS_PATH = "/report-and-process/";
     public static final String PROCESS_PATH = "/process/";
     public static final String PROCESS_EXECUTION_PATH = "/process-execution";
+    public static final String PROCESS_MONITOR_PATH = "/process-monitor";
+    public static final String PROCESS_MONITOR_DETAIL_PATH = PROCESS_MONITOR_PATH + "/";
     public static final String LOCALE_KEY = "Locale";
     public static final String DEFAULT_LOCALE = "en_US";
     public static final String PUBLIC_JS_PATH = "/web/js/";
