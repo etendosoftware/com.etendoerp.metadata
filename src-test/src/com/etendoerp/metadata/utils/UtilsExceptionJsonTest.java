@@ -43,6 +43,7 @@ class UtilsExceptionJsonTest {
   @Test
   void getHttpStatusForWithDifferentExceptionsReturnsCorrectStatusCodes() {
     assertEquals(HttpStatus.SC_UNAUTHORIZED, Utils.getHttpStatusFor(new AuthenticationException("auth error")));
+    assertEquals(HttpStatus.SC_FORBIDDEN, Utils.getHttpStatusFor(new com.etendoerp.metadata.exceptions.ForbiddenException()));
     assertEquals(HttpStatus.SC_INTERNAL_SERVER_ERROR, Utils.getHttpStatusFor(new OBException("ob error"))); // OBException is not mapped, defaults to 500
     assertEquals(HttpStatus.SC_INTERNAL_SERVER_ERROR, Utils.getHttpStatusFor(new RuntimeException("runtime error")));
     assertEquals(HttpStatus.SC_INTERNAL_SERVER_ERROR, Utils.getHttpStatusFor(new Exception("general error")));
