@@ -84,6 +84,8 @@ class DashboardServiceCoverageTest {
     private static final String HQL_PARAMS_JSON = "dw.parametersJSON = :params";
     private static final String HQL_ID = "dw.id = :id";
     private static final String HQL_COL_ROW = "dw.columnPosition, dw.rowPosition";
+    private static final String IS_VISIBLE = "isVisible";
+    private static final String IS_COLLAPSED = "isCollapsed";
 
     @Mock HttpServletRequest request;
     @Mock HttpServletResponse response;
@@ -218,7 +220,7 @@ class DashboardServiceCoverageTest {
         JSONArray widgetsArr = new JSONArray();
         JSONObject widget = new JSONObject().put(INSTANCE_ID, instanceId);
         if (includePositions) {
-            widget.put("col", 0).put("row", 0).put(WIDTH, 2).put(HEIGHT, 1).put("isVisible", true);
+            widget.put("col", 0).put("row", 0).put(WIDTH, 2).put(HEIGHT, 1).put(IS_VISIBLE, true);
         }
         widgetsArr.put(widget);
         body.put(WIDGETS, widgetsArr);
@@ -336,7 +338,7 @@ class DashboardServiceCoverageTest {
                 .put(INSTANCE_ID, "w1")
                 .put("col", 1).put("row", 2)
                 .put(WIDTH, 3).put(HEIGHT, 4)
-                .put("isVisible", true));
+                .put(IS_VISIBLE, true));
         body.put(WIDGETS, widgetsArr);
         setRequestBody(body.toString());
         when(role.isClientAdmin()).thenReturn(true);
@@ -363,8 +365,8 @@ class DashboardServiceCoverageTest {
                 .put(INSTANCE_ID, "w1")
                 .put("col", 0).put("row", 0)
                 .put(WIDTH, 2).put(HEIGHT, 3)
-                .put("isVisible", true)
-                .put("isCollapsed", true));
+                .put(IS_VISIBLE, true)
+                .put(IS_COLLAPSED, true));
         body.put(WIDGETS, widgetsArr);
         setRequestBody(body.toString());
         when(role.isClientAdmin()).thenReturn(true);
