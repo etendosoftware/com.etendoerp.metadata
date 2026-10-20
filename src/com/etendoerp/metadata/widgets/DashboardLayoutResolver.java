@@ -51,11 +51,12 @@ public class DashboardLayoutResolver {
     private static final int IDX_VISIBLE    = 8;
     private static final int IDX_SEQNO      = 9;
     private static final int IDX_PARAMS     = 10;
+    private static final int IDX_COLLAPSED  = 11;
 
     private static final String HQL =
         "select dw.id, dw.widgetClass.id, dw.layer, dw.user.id, " +
         "dw.columnPosition, dw.rowPosition, dw.width, dw.height, dw.visible, " +
-        "dw.sequence, dw.parametersJSON " +
+        "dw.sequence, dw.parametersJSON, dw.collapsed " +
         "from etmeta_Dashboard_Widget dw " +
         "where dw.active = true " +
         "  and (dw.layer = 'SYSTEM' " +
@@ -122,6 +123,7 @@ public class DashboardLayoutResolver {
                         .put("width",  row[IDX_WIDTH])
                         .put("height", row[IDX_HEIGHT]))
                 .put("seqno", row[IDX_SEQNO])
+                .put("collapsed", Boolean.TRUE.equals(row[IDX_COLLAPSED]))
                 .put("parameters", row[IDX_PARAMS] != null ? new JSONObject((String) row[IDX_PARAMS]) : new JSONObject());
     }
 }
