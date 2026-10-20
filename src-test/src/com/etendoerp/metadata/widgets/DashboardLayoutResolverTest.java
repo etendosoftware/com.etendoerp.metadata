@@ -102,8 +102,8 @@ class DashboardLayoutResolverTest {
 
     @Test
     void resolveUserLayerOverridesSystem() throws Exception {
-        Object[] systemRow = { "sys-instance-id", "wc1", LAYER_SYSTEM, null, 0, 0, 2, 1, true, 10, null };
-        Object[] userRow   = { "usr-instance-id", "wc1", "USER",   USER_123, 1, 0, 2, 1, true, 10, null };
+        Object[] systemRow = { "sys-instance-id", "wc1", LAYER_SYSTEM, null, 0, 0, 2, 1, true, 10, null, false };
+        Object[] userRow   = { "usr-instance-id", "wc1", "USER",   USER_123, 1, 0, 2, 1, true, 10, null, false };
 
         runResolveTest(Arrays.asList(systemRow, userRow), resolver -> {
             JSONArray result = resolver.resolve();
@@ -116,8 +116,22 @@ class DashboardLayoutResolverTest {
     }
 
     @Test
+    void resolveExposesCollapsedState() throws Exception {
+        Object[] collapsedRow = { SYS_ID, "wc1", LAYER_SYSTEM, null, 0, 0, 2, 3, true, 10, null, true };
+        Object[] expandedRow  = { "other-id", "wc2", LAYER_SYSTEM, null, 2, 0, 2, 3, true, 20, null, false };
+
+        runResolveTest(Arrays.asList(collapsedRow, expandedRow), resolver -> {
+            JSONArray result = resolver.resolve();
+            assertTrue(result.getJSONObject(0).getBoolean("collapsed"));
+            assertEquals(false, result.getJSONObject(1).getBoolean("collapsed"));
+            // The stored height is kept while collapsed so expanding restores it
+            assertEquals(3, result.getJSONObject(0).getJSONObject("position").getInt("height"));
+        });
+    }
+
+    @Test
     void resolveSystemRowUsedWhenNoOverride() throws Exception {
-        Object[] systemRow = { SYS_ID, "wc1", LAYER_SYSTEM, null, 0, 0, 2, 1, true, 10, null };
+        Object[] systemRow = { SYS_ID, "wc1", LAYER_SYSTEM, null, 0, 0, 2, 1, true, 10, null, false };
 
         runResolveTest(Collections.singletonList(systemRow), resolver -> {
             JSONArray result = resolver.resolve();
@@ -143,7 +157,7 @@ class DashboardLayoutResolverTest {
     void resolveDefaultVisibleWhenNoAccessRows() throws Exception {
         // A widget class with zero ETMETA_WIDGET_CLASS_ACCESS rows must stay visible
         // regardless of the current role — the opt-out safe default.
-        Object[] unrestrictedRow = { SYS_ID, "wc-open", LAYER_SYSTEM, null, 0, 0, 2, 1, true, 10, null };
+        Object[] unrestrictedRow = { SYS_ID, "wc-open", LAYER_SYSTEM, null, 0, 0, 2, 1, true, 10, null, false };
 
         runResolveTest(Collections.singletonList(unrestrictedRow), resolver -> {
             JSONArray result = resolver.resolve();

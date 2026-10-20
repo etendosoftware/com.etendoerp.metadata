@@ -27,6 +27,7 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.BufferedReader;
@@ -347,6 +348,35 @@ class DashboardServiceCoverageTest {
             when(updateQ.executeUpdate()).thenReturn(1);
 
             processAndAssertContains(sw, "ok");
+        });
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    void putLayoutPersistsCollapsedState() throws Exception {
+        StringWriter sw = prepareWriter();
+        setupRequest("PUT", PATH_LAYOUT);
+
+        JSONObject body = new JSONObject();
+        JSONArray widgetsArr = new JSONArray();
+        widgetsArr.put(new JSONObject()
+                .put(INSTANCE_ID, "w1")
+                .put("col", 0).put("row", 0)
+                .put(WIDTH, 2).put(HEIGHT, 3)
+                .put("isVisible", true)
+                .put("isCollapsed", true));
+        body.put(WIDGETS, widgetsArr);
+        setRequestBody(body.toString());
+        when(role.isClientAdmin()).thenReturn(true);
+
+        withMockedContext(() -> {
+            Query<Object> updateQ = mock(Query.class);
+            doReturn(updateQ).when(session).createQuery((String) argThat(s -> s != null && ((String) s).contains("dw.collapsed = :collapsed")));
+            when(updateQ.setParameter(anyString(), any())).thenReturn(updateQ);
+            when(updateQ.executeUpdate()).thenReturn(1);
+
+            processAndAssertContains(sw, "ok");
+            verify(updateQ).setParameter("collapsed", true);
         });
     }
 
