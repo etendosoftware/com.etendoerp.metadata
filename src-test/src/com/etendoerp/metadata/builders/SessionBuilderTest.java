@@ -332,7 +332,8 @@ class SessionBuilderTest {
 
       // The role tree must come from a single batched query, not per-role lazy navigation
       verify(session, times(1)).createQuery(anyString(), eq(UserRoles.class));
-      verify(session, times(1)).createQuery(anyString(), eq(Warehouse.class));
+      // Warehouses are batched per client: the two roles belong to two different clients
+      verify(session, times(2)).createQuery(anyString(), eq(Warehouse.class));
     }
   }
 
