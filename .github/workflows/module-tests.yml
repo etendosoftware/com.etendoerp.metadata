@@ -79,7 +79,7 @@ jobs:
         run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
 
       - name: Checkout module
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: module-src
           fetch-depth: 0
@@ -131,7 +131,7 @@ jobs:
           echo "tomcat-url=$tomcat" >> "$GITHUB_OUTPUT"
 
       - name: Set up JDK ${{ steps.stack.outputs.java-version }}
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: ${{ steps.stack.outputs.java-version }}
@@ -147,7 +147,7 @@ jobs:
           echo "CATALINA_BASE=$tomcat_dir" >> "$GITHUB_ENV"
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       - name: Write build summary
         env:
@@ -244,7 +244,7 @@ jobs:
 
       - name: SonarQube analysis
         if: inputs.run-sonar && steps.jacoco.outputs.report != '' && steps.module.outputs.sonar-sources != ''
-        uses: SonarSource/sonarqube-scan-action@v5
+        uses: SonarSource/sonarqube-scan-action@v8
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
@@ -271,7 +271,7 @@ jobs:
 
       - name: Upload test reports
         if: always() && steps.tests.outcome != 'skipped'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: module-test-reports
           if-no-files-found: ignore
@@ -295,5 +295,8 @@ jobs:
           failed=0
           [ "${{ steps.verify.outcome }}" = failure ] && echo "::error::Failed Code and Schema Verification" && failed=1
           [ "${{ steps.tests.outcome }}" = failure ] && echo "::error::Failed Tests" && failed=1
-          [ "${{ steps.coverage.outcome }}" = failure ] && echo "::error::Coverage Decreased" && failed=1
+          if [ "${{ steps.coverage.outcome }}" = failure ]; then
+            [ "${{ steps.coverage.outputs.decreased }}" = true ] && echo "::error::Coverage Decreased" || echo "::error::Coverage comparison failed, check the step log"
+            failed=1
+          fi
           exit $failed

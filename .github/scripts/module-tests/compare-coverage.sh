@@ -15,7 +15,15 @@ TIMEOUT_SECONDS="${TIMEOUT_SECONDS:-900}"
 SUMMARY="${GITHUB_STEP_SUMMARY:-/dev/null}"
 
 sonar_get() {
-  curl -sf -u "${SONAR_TOKEN}:" "$@"
+  local body http_code
+  body="$(curl -s -w '\n%{http_code}' -u "${SONAR_TOKEN}:" "$@")"
+  http_code="${body##*$'\n'}"
+  body="${body%$'\n'*}"
+  if [[ "$http_code" != 2* ]]; then
+    echo "::error::Sonar API call failed with HTTP ${http_code}: $* ${body}" >&2
+    return 1
+  fi
+  echo "$body"
 }
 
 project_key="$(grep '^projectKey=' "$REPORT_TASK" | cut -d= -f2-)"
@@ -63,6 +71,7 @@ fi
 if awk -v c="$current" -v b="$base" 'BEGIN { exit !(c < b) }'; then
   echo "::error::Coverage (${current}%) is lower than ${BASE_BRANCH} branch (${base}%)"
   echo "🚨 \`${BRANCH}\`: ${current}% < \`${BASE_BRANCH}\`: ${base}%" >> "$SUMMARY"
+  echo "decreased=true" >> "${GITHUB_OUTPUT:-/dev/null}"
   exit 1
 fi
 echo "✅ \`${BRANCH}\`: ${current}% ≥ \`${BASE_BRANCH}\`: ${base}%" >> "$SUMMARY"
