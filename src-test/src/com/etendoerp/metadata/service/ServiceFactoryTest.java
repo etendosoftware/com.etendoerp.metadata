@@ -118,6 +118,13 @@ class ServiceFactoryTest {
   }
 
   @Test
+  void getServiceReturnsInstancePurposeService() {
+    MetadataService service = ServiceFactory.getService(mockRequestWithPath("/com.etendoerp.metadata.meta/instance-purpose"), mockResponse);
+    assertNotNull(service, SERVICE_NOT_NULL);
+    assertInstanceOf(InstancePurposeService.class, service);
+  }
+
+  @Test
   void getServiceReturnsSavedViewServiceForBasePathWithoutId() {
     MetadataService service = ServiceFactory.getService(mockRequestWithPath("/com.etendoerp.metadata.meta/saved-views"), mockResponse);
     assertNotNull(service, SERVICE_NOT_NULL);
