@@ -826,14 +826,14 @@ class SessionBuilderTest {
   /**
    * Collects the warehouse ids of every organization of one role of the session JSON.
    *
-   * @param session the session JSON
+   * @param sessionJson the session JSON
    * @param roleIndex position of the role in the {@code roles} array
    * @return the ids of the warehouses offered by any organization of the role
    * @throws JSONException if the JSON lacks the expected structure
    */
-  private Set<String> warehouseIdsOfRole(JSONObject session, int roleIndex) throws JSONException {
+  private Set<String> warehouseIdsOfRole(JSONObject sessionJson, int roleIndex) throws JSONException {
     Set<String> ids = new HashSet<>();
-    JSONArray orgs = session.getJSONArray(ROLES).getJSONObject(roleIndex).getJSONArray(ORGANIZATIONS);
+    JSONArray orgs = sessionJson.getJSONArray(ROLES).getJSONObject(roleIndex).getJSONArray(ORGANIZATIONS);
     for (int j = 0; j < orgs.length(); j++) {
       JSONArray warehouses = orgs.getJSONObject(j).getJSONArray(WAREHOUSES);
       for (int k = 0; k < warehouses.length(); k++) {
@@ -873,10 +873,10 @@ class SessionBuilderTest {
     when(warehousesQuery.list()).thenReturn(List.of(warehouse1), List.of(warehouse2));
     when(osp.getChildTree(ORG2_ID, true)).thenReturn(Set.of(ORG1_ID, ORG2_ID));
 
-    JSONObject session = buildSessionJson();
+    JSONObject sessionJson = buildSessionJson();
 
-    assertEquals(Set.of(WAREHOUSE1_ID), warehouseIdsOfRole(session, 0));
-    assertEquals(Set.of(WAREHOUSE2_ID), warehouseIdsOfRole(session, 1));
+    assertEquals(Set.of(WAREHOUSE1_ID), warehouseIdsOfRole(sessionJson, 0));
+    assertEquals(Set.of(WAREHOUSE2_ID), warehouseIdsOfRole(sessionJson, 1));
   }
 
   /**
