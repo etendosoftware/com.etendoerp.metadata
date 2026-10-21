@@ -51,6 +51,8 @@ public class DashboardService extends MetadataService {
     private static final String HEIGHT = "height";
     private static final String IS_VISIBLE = "isVisible";
     private static final String VISIBLE = "visible";
+    private static final String IS_COLLAPSED = "isCollapsed";
+    private static final String COLLAPSED = "collapsed";
     private static final String USER_ID = "userId";
     private static final String ROLE_ID = "roleId";
     private static final String CLASS_ID = "classId";
@@ -152,7 +154,7 @@ public class DashboardService extends MetadataService {
         String updateHql =
             "update etmeta_Dashboard_Widget dw set " +
             "dw.columnPosition = :col, dw.rowPosition = :row, " +
-            "dw.width = :width, dw.height = :height, dw.visible = :visible " +
+            "dw.width = :width, dw.height = :height, dw.visible = :visible, dw.collapsed = :collapsed " +
             "where dw.id = :id " +
             (isAdmin ? "" : "and dw.user.id = :userId and dw.role.id = :roleId");
 
@@ -162,6 +164,7 @@ public class DashboardService extends MetadataService {
         q.setParameter(WIDTH,   java.math.BigDecimal.valueOf(w.optDouble(WIDTH, 2)));
         q.setParameter(HEIGHT,  java.math.BigDecimal.valueOf(w.optDouble(HEIGHT, 1)));
         q.setParameter(VISIBLE, w.optBoolean(IS_VISIBLE, true));
+        q.setParameter(COLLAPSED, w.optBoolean(IS_COLLAPSED, false));
         q.setParameter("id",      instanceId);
         if (!isAdmin) {
             q.setParameter(USER_ID, userId);
@@ -200,7 +203,7 @@ public class DashboardService extends MetadataService {
             .createQuery(
                 "update etmeta_Dashboard_Widget dw set " +
                 "dw.columnPosition = :col, dw.rowPosition = :row, " +
-                "dw.width = :width, dw.height = :height, dw.visible = :visible " +
+                "dw.width = :width, dw.height = :height, dw.visible = :visible, dw.collapsed = :collapsed " +
                 "where dw.widgetClass.id = :classId and dw.layer = 'USER' " +
                 "and dw.user.id = :userId and dw.role.id = :roleId")
             .setParameter("col",     java.math.BigDecimal.valueOf(w.optDouble("col", 0)))
@@ -208,6 +211,7 @@ public class DashboardService extends MetadataService {
             .setParameter(WIDTH,   java.math.BigDecimal.valueOf(w.optDouble(WIDTH, 2)))
             .setParameter(HEIGHT,  java.math.BigDecimal.valueOf(w.optDouble(HEIGHT, 1)))
             .setParameter(VISIBLE, w.optBoolean(IS_VISIBLE, true))
+            .setParameter(COLLAPSED, w.optBoolean(IS_COLLAPSED, false))
             .setParameter(CLASS_ID, classId)
             .setParameter(USER_ID,  userId)
             .setParameter(ROLE_ID,  roleId)
@@ -218,13 +222,14 @@ public class DashboardService extends MetadataService {
         // No USER override yet — insert one
         String newId = UUID.randomUUID().toString().replace("-", "");
         String isVisible = w.optBoolean(IS_VISIBLE, true) ? "Y" : "N";
+        String isCollapsed = w.optBoolean(IS_COLLAPSED, false) ? "Y" : "N";
         String insertSql =
             "INSERT INTO etmeta_dashboard_widget " +
             "(etmeta_dashboard_widget_id, etmeta_widget_class_id, layer, ad_client_id, ad_org_id, " +
-            " ad_user_id, ad_role_id, col_position, row_position, width, height, isvisible, seqno, " +
+            " ad_user_id, ad_role_id, col_position, row_position, width, height, isvisible, iscollapsed, seqno, " +
             " parameters_json, isactive, created, createdby, updated, updatedby) " +
             "VALUES (:id, :classId, 'USER', :clientId, '0', " +
-            " :userId, :roleId, :col, :row, :width, :height, :visible, :seqno, " +
+            " :userId, :roleId, :col, :row, :width, :height, :visible, :collapsed, :seqno, " +
             " :params, 'Y', NOW(), :uid, NOW(), :uid)";
 
         org.hibernate.query.NativeQuery<?> ins =
@@ -239,6 +244,7 @@ public class DashboardService extends MetadataService {
         ins.setParameter(WIDTH,    w.optDouble(WIDTH, 2));
         ins.setParameter(HEIGHT,   w.optDouble(HEIGHT, 1));
         ins.setParameter(VISIBLE,  isVisible);
+        ins.setParameter(COLLAPSED, isCollapsed);
         ins.setParameter(SEQNO,    seqno != null ? seqno.intValue() : 10);
         ins.setParameter(PARAMS,   params);
         ins.setParameter("uid",      userId);
