@@ -42,6 +42,9 @@ on:
         required: false
       SONAR_HOST_URL:
         required: false
+      SONAR_READ_TOKEN:
+        description: Sonar token with Browse permission, used to read coverage (analysis tokens cannot)
+        required: false
       JIRA_ACCESS_TOKEN:
         description: base64("email:api-token"), used to find the epic of feature branches
         required: false
@@ -264,6 +267,7 @@ jobs:
         continue-on-error: true
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_READ_TOKEN: ${{ secrets.SONAR_READ_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
           COVERAGE_BASE: ${{ steps.branches.outputs.coverage-base }}
         run: |

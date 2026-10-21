@@ -4,7 +4,7 @@
 # instead of polling analyses by commit, it waits for the Compute Engine task of this scan.
 #
 # Usage: compare-coverage.sh <report-task-file> <branch> <base-branch>
-# Env: SONAR_HOST_URL, SONAR_TOKEN
+# Env: SONAR_HOST_URL, SONAR_TOKEN, SONAR_READ_TOKEN (optional, needs Browse permission to read measures)
 set -euo pipefail
 
 REPORT_TASK="${1:?report-task.txt path is required}"
@@ -13,12 +13,16 @@ BASE_BRANCH="${3:?base branch is required}"
 SONAR_HOST_URL="${SONAR_HOST_URL%/}"
 TIMEOUT_SECONDS="${TIMEOUT_SECONDS:-900}"
 SUMMARY="${GITHUB_STEP_SUMMARY:-/dev/null}"
+FORBIDDEN=3
 
 sonar_get() {
-  local body http_code
-  body="$(curl -s -w '\n%{http_code}' -u "${SONAR_TOKEN}:" "$@")"
+  local body http_code token="${SONAR_API_TOKEN:-$SONAR_TOKEN}"
+  body="$(curl -s -w '\n%{http_code}' -u "${token}:" "$@")"
   http_code="${body##*$'\n'}"
   body="${body%$'\n'*}"
+  if [[ "$http_code" == 401 || "$http_code" == 403 ]] && [[ -n "${SKIP_ON_FORBIDDEN:-}" ]]; then
+    return "$FORBIDDEN"
+  fi
   if [[ "$http_code" != 2* ]]; then
     echo "::error::Sonar API call failed with HTTP ${http_code}: $* ${body}" >&2
     return 1
@@ -46,6 +50,11 @@ while :; do
   sleep 15
 done
 
+# Analysis tokens can follow the CE task but cannot read measures: use the read token when available,
+# otherwise only warn so a missing permission does not fail the build
+SONAR_API_TOKEN="${SONAR_READ_TOKEN:-$SONAR_TOKEN}"
+[[ -z "${SONAR_READ_TOKEN:-}" ]] && SKIP_ON_FORBIDDEN=1
+
 coverage_of() {
   sonar_get --get "${SONAR_HOST_URL}/api/measures/component" \
     --data-urlencode "component=${project_key}" \
@@ -53,7 +62,15 @@ coverage_of() {
     --data-urlencode "metricKeys=coverage" | jq -r '.component.measures[0].value // empty'
 }
 
-current="$(coverage_of "$BRANCH")"
+current="$(coverage_of "$BRANCH")" || {
+  rc=$?
+  if (( rc == FORBIDDEN )); then
+    echo "::warning::The Sonar token cannot read measures. Set the SONAR_READ_TOKEN secret (Browse permission). Skipping coverage comparison."
+    echo "⚠️ Coverage comparison skipped: set \`SONAR_READ_TOKEN\` with Browse permission" >> "$SUMMARY"
+    exit 0
+  fi
+  exit "$rc"
+}
 base="$(coverage_of "$BASE_BRANCH" || true)"
 echo "Coverage ${BRANCH}: ${current:-n/a}% | ${BASE_BRANCH}: ${base:-n/a}%"
 
