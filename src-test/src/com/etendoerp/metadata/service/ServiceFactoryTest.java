@@ -118,6 +118,13 @@ class ServiceFactoryTest {
   }
 
   @Test
+  void getServiceReturnsFormPersonalizationService() {
+    MetadataService service = ServiceFactory.getService(mockRequestWithPath("/com.etendoerp.metadata.meta/form-personalization"), mockResponse);
+    assertNotNull(service, SERVICE_NOT_NULL);
+    assertInstanceOf(FormPersonalizationService.class, service);
+  }
+
+  @Test
   void getServiceReturnsInstancePurposeService() {
     MetadataService service = ServiceFactory.getService(mockRequestWithPath("/com.etendoerp.metadata.meta/instance-purpose"), mockResponse);
     assertNotNull(service, SERVICE_NOT_NULL);
