@@ -9,7 +9,8 @@ set -euo pipefail
 
 COMMIT_BRANCH="${1:?commit branch is required}"
 MODULE_DEFAULT_BRANCH="${2:-main}"
-JIRA_BASE_URL="${JIRA_BASE_URL:-https://etendoproject.atlassian.net}"
+# API gateway URL (cloudId of etendoproject.atlassian.net): works with both classic and scoped API tokens
+JIRA_BASE_URL="${JIRA_BASE_URL:-https://api.atlassian.com/ex/jira/b79eca5e-7328-40d8-a6cf-be75e6f159b2}"
 CORE_REPO_URL="${CORE_REPO_URL:-https://github.com/etendosoftware/etendo_core.git}"
 CURRENT_YEAR="${CURRENT_YEAR:-$(date +%y)}"
 
