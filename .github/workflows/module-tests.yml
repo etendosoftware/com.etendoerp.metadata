@@ -1,0 +1,306 @@
+# Reusable "Module Tests" workflow: builds a full Etendo environment with the module,
+# runs code/schema verifications, the module tests with JaCoCo coverage and the Sonar analysis.
+# Port of the Jenkins pipeline postgres/etendo-bundles-tests/JenkinsfileforModuleGithub.
+name: Module Tests (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      postgres-version:
+        type: string
+        default: '16'
+      java-version:
+        type: string
+        default: '17'
+      tomcat-url:
+        type: string
+        default: https://archive.apache.org/dist/tomcat/tomcat-9/v9.0.82/bin/apache-tomcat-9.0.82.tar.gz
+      java-version-backport:
+        type: string
+        default: '17'
+      tomcat-url-backport:
+        type: string
+        default: https://archive.apache.org/dist/tomcat/tomcat-9/v9.0.82/bin/apache-tomcat-9.0.82.tar.gz
+      java-version-prerelease:
+        type: string
+        default: '17'
+      tomcat-url-prerelease:
+        type: string
+        default: https://archive.apache.org/dist/tomcat/tomcat-9/v9.0.82/bin/apache-tomcat-9.0.82.tar.gz
+      run-sonar:
+        type: boolean
+        default: true
+    secrets:
+      ETENDOBOT_TOKEN:
+        description: Token with read:packages for maven.pkg.github.com
+        required: true
+      NEXUS_USER:
+        required: false
+      NEXUS_PASSWORD:
+        required: false
+      SONAR_TOKEN:
+        required: false
+      SONAR_HOST_URL:
+        required: false
+      SONAR_READ_TOKEN:
+        description: Sonar token with Browse permission, used to read coverage (analysis tokens cannot)
+        required: false
+      JIRA_ACCESS_TOKEN:
+        description: base64("email:api-token"), used to find the epic of feature branches
+        required: false
+
+jobs:
+  module-tests:
+    name: Module Tests (Actions)
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    services:
+      postgres:
+        image: postgres:${{ inputs.postgres-version }}
+        env:
+          POSTGRES_PASSWORD: syspass
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      MODULE_NAME: ${{ github.event.repository.name }}
+      COMMIT_BRANCH: ${{ github.ref_name }}
+      CORE_DIR: ${{ github.workspace }}/etendo_core
+      MODULE_DIR: ${{ github.workspace }}/etendo_core/modules/${{ github.event.repository.name }}
+      SCRIPTS_DIR: ${{ github.workspace }}/etendo_core/modules/${{ github.event.repository.name }}/.github/scripts/module-tests
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGPASSWORD: syspass
+      PGDATABASE: etendo
+    steps:
+      - name: Free disk space
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+
+      - name: Checkout module
+        uses: actions/checkout@v7
+        with:
+          path: module-src
+          fetch-depth: 0
+
+      - name: Resolve core branch and stack
+        id: branches
+        env:
+          JIRA_ACCESS_TOKEN: ${{ secrets.JIRA_ACCESS_TOKEN }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: bash module-src/.github/scripts/module-tests/resolve-branches.sh "$COMMIT_BRANCH" "$DEFAULT_BRANCH"
+
+      - name: Clone etendo_core (${{ steps.branches.outputs.core-checkout }})
+        env:
+          CORE_CHECKOUT: ${{ steps.branches.outputs.core-checkout }}
+        run: |
+          git clone --depth 1 --branch "$CORE_CHECKOUT" https://github.com/etendosoftware/etendo_core.git "$CORE_DIR"
+          mkdir -p "$CORE_DIR/modules"
+          mv module-src "$MODULE_DIR"
+
+      - name: Clone extra modules
+        env:
+          EPIC_BRANCH: ${{ steps.branches.outputs.epic-branch }}
+          BACKPORT_BRANCH: ${{ steps.branches.outputs.backport-branch }}
+          PRERELEASE_BRANCH: ${{ steps.branches.outputs.prerelease-branch }}
+          CORE_BRANCH: ${{ steps.branches.outputs.core-branch }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          bash "$SCRIPTS_DIR/clone-extra-modules.sh" "$CORE_DIR" "$MODULE_DIR/jenkinsExtraModules.txt" \
+            "$COMMIT_BRANCH" "$EPIC_BRANCH" "$BACKPORT_BRANCH" "$PRERELEASE_BRANCH" "$CORE_BRANCH" "$DEFAULT_BRANCH" \
+            develop main master
+
+      - name: Resolve stack
+        id: stack
+        env:
+          STACK: ${{ steps.branches.outputs.stack }}
+          JAVA_DEFAULT: ${{ inputs.java-version }}
+          TOMCAT_DEFAULT: ${{ inputs.tomcat-url }}
+          JAVA_BACKPORT: ${{ inputs.java-version-backport }}
+          TOMCAT_BACKPORT: ${{ inputs.tomcat-url-backport }}
+          JAVA_PRERELEASE: ${{ inputs.java-version-prerelease }}
+          TOMCAT_PRERELEASE: ${{ inputs.tomcat-url-prerelease }}
+        run: |
+          case "$STACK" in
+            BACKPORT)   java="$JAVA_BACKPORT";   tomcat="$TOMCAT_BACKPORT" ;;
+            PRERELEASE) java="$JAVA_PRERELEASE"; tomcat="$TOMCAT_PRERELEASE" ;;
+            *)          java="$JAVA_DEFAULT";    tomcat="$TOMCAT_DEFAULT" ;;
+          esac
+          echo "java-version=$java" >> "$GITHUB_OUTPUT"
+          echo "tomcat-url=$tomcat" >> "$GITHUB_OUTPUT"
+
+      - name: Set up JDK ${{ steps.stack.outputs.java-version }}
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: ${{ steps.stack.outputs.java-version }}
+
+      - name: Set up Tomcat
+        env:
+          TOMCAT_URL: ${{ steps.stack.outputs.tomcat-url }}
+        run: |
+          curl -sfL -o "$RUNNER_TEMP/tomcat.tar.gz" "$TOMCAT_URL"
+          tar -xzf "$RUNNER_TEMP/tomcat.tar.gz" -C "$RUNNER_TEMP"
+          tomcat_dir="$RUNNER_TEMP/$(basename "$TOMCAT_URL" .tar.gz)"
+          echo "CATALINA_HOME=$tomcat_dir" >> "$GITHUB_ENV"
+          echo "CATALINA_BASE=$tomcat_dir" >> "$GITHUB_ENV"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Write build summary
+        env:
+          CORE_CHECKOUT: ${{ steps.branches.outputs.core-checkout }}
+          STACK: ${{ steps.branches.outputs.stack }}
+          JAVA_VERSION: ${{ steps.stack.outputs.java-version }}
+          POSTGRES_VERSION: ${{ inputs.postgres-version }}
+        run: |
+          {
+            echo "## Module Tests: \`$MODULE_NAME\` @ \`$COMMIT_BRANCH\`"
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Core branch | \`$CORE_CHECKOUT\` |"
+            echo "| Stack | $STACK |"
+            echo "| Java | $JAVA_VERSION |"
+            echo "| Tomcat | $(basename "$CATALINA_HOME") |"
+            echo "| Postgres | $POSTGRES_VERSION |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Configure gradle.properties
+        working-directory: ${{ env.CORE_DIR }}
+        env:
+          GITHUB_PACKAGES_TOKEN: ${{ secrets.ETENDOBOT_TOKEN }}
+          NEXUS_USER: ${{ secrets.NEXUS_USER }}
+          NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
+        run: |
+          cat > gradle.properties <<EOF
+          context.name=etendo
+          bbdd.sid=etendo
+          bbdd.port=5432
+          bbdd.systemUser=postgres
+          bbdd.systemPassword=syspass
+          bbdd.user=tad
+          bbdd.password=tad
+          nexusUser=${NEXUS_USER}
+          nexusPassword=${NEXUS_PASSWORD}
+          githubUser=etendobot
+          githubToken=${GITHUB_PACKAGES_TOKEN}
+          org.gradle.jvmargs=-Dfile.encoding=UTF-8
+          ETENDO_HOST=http://localhost:8080/etendo
+          org.gradle.daemon=false
+          EOF
+
+      - name: Build environment
+        id: build
+        working-directory: ${{ env.CORE_DIR }}
+        run: |
+          ./gradlew prepareConfig --info
+          ./gradlew setup --info
+          ./gradlew expandModules --info
+          ./gradlew install --info
+          ./gradlew smartbuild --info
+
+      - name: Inspect module
+        id: module
+        run: |
+          echo "has-tests=$([ -d "$MODULE_DIR/src-test" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          sources="src/${MODULE_NAME//.//}"
+          echo "sonar-sources=$([ -d "$MODULE_DIR/$sources" ] && echo "$sources")" >> "$GITHUB_OUTPUT"
+
+      - name: Code and schema verification
+        id: verify
+        continue-on-error: true
+        env:
+          STACK: ${{ steps.branches.outputs.stack }}
+        run: bash "$SCRIPTS_DIR/code-schema-verification.sh" "$MODULE_DIR" "$STACK"
+
+      - name: Run module tests
+        id: tests
+        if: steps.module.outputs.has-tests == 'true' && steps.verify.outcome == 'success'
+        continue-on-error: true
+        working-directory: ${{ env.CORE_DIR }}
+        run: |
+          "$CATALINA_HOME/bin/catalina.sh" start
+          for _ in $(seq 1 36); do
+            curl -s -o /dev/null "http://localhost:8080/etendo/" && break
+            sleep 5
+          done
+          ./gradlew test --tests "${MODULE_NAME}.*" --info
+          ./gradlew jacocoRootReport --info
+
+      - name: Stop Tomcat
+        if: always() && steps.tests.outcome != 'skipped'
+        run: |
+          "$CATALINA_HOME/bin/catalina.sh" stop || true
+          (cd "$CORE_DIR" && ./gradlew --stop) || true
+
+      - name: Check JaCoCo report
+        id: jacoco
+        if: steps.tests.outcome == 'success'
+        run: |
+          report="$CORE_DIR/build/reports/jacoco/jacocoRootReport/jacocoRootReport.xml"
+          echo "report=$([ -f "$report" ] && echo "$report")" >> "$GITHUB_OUTPUT"
+
+      - name: SonarQube analysis
+        if: inputs.run-sonar && steps.jacoco.outputs.report != '' && steps.module.outputs.sonar-sources != ''
+        uses: SonarSource/sonarqube-scan-action@v8
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        with:
+          projectBaseDir: ${{ env.MODULE_DIR }}
+          args: >
+            -Dsonar.sources=${{ steps.module.outputs.sonar-sources }}
+            -Dsonar.branch.name=${{ env.COMMIT_BRANCH }}
+            -Dsonar.projectVersion=${{ github.sha }}
+            -Dsonar.scm.revision=${{ github.sha }}
+            -Dsonar.java.coveragePlugin=jacoco
+            -Dsonar.coverage.jacoco.xmlReportPaths=${{ steps.jacoco.outputs.report }}
+
+      - name: Compare coverage with ${{ steps.branches.outputs.coverage-base }}
+        id: coverage
+        if: inputs.run-sonar && steps.jacoco.outputs.report != '' && steps.module.outputs.sonar-sources != '' && steps.branches.outputs.coverage-base != ''
+        continue-on-error: true
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_READ_TOKEN: ${{ secrets.SONAR_READ_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+          COVERAGE_BASE: ${{ steps.branches.outputs.coverage-base }}
+        run: |
+          bash "$SCRIPTS_DIR/compare-coverage.sh" "$MODULE_DIR/.scannerwork/report-task.txt" "$COMMIT_BRANCH" "$COVERAGE_BASE"
+
+      - name: Upload test reports
+        if: always() && steps.tests.outcome != 'skipped'
+        uses: actions/upload-artifact@v7
+        with:
+          name: module-test-reports
+          if-no-files-found: ignore
+          path: |
+            ${{ env.CORE_DIR }}/build/reports/tests/test
+            ${{ env.CORE_DIR }}/build/spock-reports
+            ${{ env.CORE_DIR }}/build/reports/jacoco/jacocoRootReport
+
+      - name: Result
+        if: always()
+        run: |
+          {
+            echo "### Result"
+            echo "| Step | Outcome |"
+            echo "|---|---|"
+            echo "| Build environment | ${{ steps.build.outcome }} |"
+            echo "| Code and schema verification | ${{ steps.verify.outcome }} |"
+            echo "| Module tests | ${{ steps.module.outputs.has-tests == 'false' && 'no tests' || steps.tests.outcome }} |"
+            echo "| Coverage comparison | ${{ steps.coverage.outcome }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+          failed=0
+          [ "${{ steps.verify.outcome }}" = failure ] && echo "::error::Failed Code and Schema Verification" && failed=1
+          [ "${{ steps.tests.outcome }}" = failure ] && echo "::error::Failed Tests" && failed=1
+          if [ "${{ steps.coverage.outcome }}" = failure ]; then
+            [ "${{ steps.coverage.outputs.decreased }}" = true ] && echo "::error::Coverage Decreased" || echo "::error::Coverage comparison failed, check the step log"
+            failed=1
+          fi
+          exit $failed
