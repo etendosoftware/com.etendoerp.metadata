@@ -336,6 +336,11 @@ This module defines three AD windows:
 
 ### Session (`SessionService` / `SessionBuilder`)
 - Returns authenticated user context: user ID, role, client, org, warehouse, language, etc.
+- `roles[].organizations[].warehouses` lists, for each organization granted to a role, the active warehouses of the
+  role's own client whose organization is that organization or one of its descendants (Classic's
+  `RoleInfo.getOrganizationWarehouses()`). Warehouses and the organization tree are resolved per client: a user with
+  roles in several clients (e.g. a sample-data client and System) is never offered another client's warehouses. One
+  warehouse query per client, cached per user until a role, role-organization or organization-warehouse changes.
 
 ### Menu (`MenuService` / `MenuBuilder`)
 - Returns the full menu tree for the current role

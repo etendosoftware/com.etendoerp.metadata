@@ -151,17 +151,21 @@ public class SessionBuilder extends Builder {
                 .setParameter("userId", cacheKey)
                 .list();
 
-            Set<String> allOrgIds = new LinkedHashSet<>();
-            String clientId = collectOrgIdsAndClient(userRoleList, allOrgIds);
-            List<Warehouse> pooledWarehouses = fetchWarehouses(allOrgIds, clientId);
-            OrganizationStructureProvider osp = clientId != null
-                ? OBContext.getOBContext().getOrganizationStructureProvider(clientId)
-                : null;
+            // A user can hold roles of several clients (e.g. a sample-data client and the System
+            // client): warehouses and the organization tree are resolved per client, so a role
+            // never gets the warehouses of another client's roles.
+            Map<String, Set<String>> orgIdsByClient = collectOrgIdsByClient(userRoleList);
+            Map<String, List<Warehouse>> warehousesByClient = new HashMap<>();
 
             for (UserRoles userRole : userRoleList) {
                 JSONObject json = new JSONObject();
                 Role role = userRole.getRole();
                 Client client = role.getClient();
+                String clientId = client.getId();
+                List<Warehouse> pooledWarehouses = warehousesByClient.computeIfAbsent(clientId,
+                    id -> fetchWarehouses(orgIdsByClient.getOrDefault(id, Collections.emptySet()), id));
+                OrganizationStructureProvider osp = OBContext.getOBContext()
+                    .getOrganizationStructureProvider(clientId);
 
                 // Scoped to this role's own granted organizations only - pooling every role's
                 // orgIds together (as before) let a warehouse granted to a DIFFERENT role leak
@@ -189,9 +193,9 @@ public class SessionBuilder extends Builder {
     }
 
     /**
-     * Fetches the warehouses belonging to any of the given organizations (pooled across every
-     * role the user has, as a single round trip). Callers must still scope eligibility to a
-     * single role's own granted organizations when distributing these via
+     * Fetches the warehouses of one client belonging to any of the given organizations (pooled
+     * across every role the user has in that client, as a single round trip). Callers must still
+     * scope eligibility to a single role's own granted organizations when distributing these via
      * {@link #distributeByDescendantTree(List, Set, OrganizationStructureProvider)} - this method
      * only avoids the N+1 query, it does not decide which role a warehouse belongs to.
      */
@@ -212,21 +216,29 @@ public class SessionBuilder extends Builder {
         }
     }
 
-    private String collectOrgIdsAndClient(List<UserRoles> userRoleList, Set<String> orgIds) {
-        String clientId = null;
+    /**
+     * Groups the organization ids granted to the user's roles by the client of each role, the
+     * scope of {@link #fetchWarehouses(Set, String)}: one query per client instead of per role. A
+     * role whose organizations cannot be read contributes none, without failing the others.
+     *
+     * @param userRoleList the roles of the user
+     * @return the granted organization ids of every client the user has a role in
+     */
+    private Map<String, Set<String>> collectOrgIdsByClient(List<UserRoles> userRoleList) {
+        Map<String, Set<String>> orgIdsByClient = new HashMap<>();
         for (UserRoles userRole : userRoleList) {
             try {
-                if (clientId == null) {
-                    clientId = userRole.getRole().getClient().getId();
-                }
-                for (RoleOrganization roleOrg : userRole.getRole().getADRoleOrganizationList()) {
+                Role role = userRole.getRole();
+                Set<String> orgIds = orgIdsByClient.computeIfAbsent(role.getClient().getId(),
+                    id -> new LinkedHashSet<>());
+                for (RoleOrganization roleOrg : role.getADRoleOrganizationList()) {
                     orgIds.add(roleOrg.getOrganization().getId());
                 }
             } catch (Exception e) {
                 logger.error(e.getMessage(), e);
             }
         }
-        return clientId;
+        return orgIdsByClient;
     }
 
     /**
