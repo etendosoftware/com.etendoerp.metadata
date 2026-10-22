@@ -35,6 +35,7 @@ import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.security.OrganizationStructureProvider;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.erpCommon.utility.DimensionDisplayUtility;
+import org.openbravo.erpCommon.utility.OBLedgerUtils;
 import org.openbravo.model.ad.access.Role;
 import org.openbravo.model.ad.access.RoleOrganization;
 import org.openbravo.model.ad.access.User;
@@ -83,6 +84,19 @@ public class SessionBuilder extends Builder {
             + " order by w.name";
 
     /**
+     * Element types of an accounting schema's active elements, as Classic
+     * {@code AttributeData.selectAcctSchema} reads them at login.
+     */
+    private static final String ACCT_SCHEMA_ELEMENT_TYPES_HQL =
+        "select e.type from FinancialMgmtAcctSchemaElement e"
+            + " where e.accountingSchema.id = :schemaId"
+            + " and e.active = true";
+
+    /** Prefix of the classic accounting dimension session values ({@code $Element_<elementtype>}). */
+    private static final String ELEMENT_SESSION_PREFIX = "$Element_";
+    private static final String YES = "Y";
+
+    /**
      * Clears the cached roles tree for every user. Invoked by
      * {@link com.etendoerp.metadata.cache.SessionCacheInvalidationObserver} when a role,
      * role-organization, or organization-warehouse assignment changes.
@@ -111,7 +125,7 @@ public class SessionBuilder extends Builder {
             json.put("roles", getRoles(user));
             json.put("currentLanguage", getLanguageCode(context));
             json.put("languages", new LanguageBuilder().toJSON());
-            json.put("attributes", buildAcctDimensionSessionAttributes(client));
+            json.put("attributes", buildAcctDimensionSessionAttributes(client, organization, role));
             json.put("passwordExpired", PasswordExpirationUtils.isExpired(user));
 
             return json;
@@ -325,14 +339,21 @@ public class SessionBuilder extends Builder {
      * keys (e.g. {@code $Element_BP_APP_L}); without them, accounting-dimension
      * columns in P&E grids cannot resolve visibility.
      *
+     * It also carries the classic {@code $Element_<elementtype>} values (see
+     * {@link #putClassicAcctDimensionAttributes}).
+     *
      * @param client The current AD Client
+     * @param organization The current organization, whose ledger gives the classic values
+     * @param role The current role, whose organizations are the fallback for that ledger
      * @return JSON map of session attribute name → "Y"/"N" string value
      */
-    private JSONObject buildAcctDimensionSessionAttributes(Client client) throws JSONException {
+    private JSONObject buildAcctDimensionSessionAttributes(Client client, Organization organization, Role role)
+        throws JSONException {
         JSONObject attributes = new JSONObject();
         if (client == null) {
             return attributes;
         }
+        putClassicAcctDimensionAttributes(attributes, organization, role);
         boolean isCentrallyMaintained = client.isAcctdimCentrallyMaintained();
         attributes.put(DimensionDisplayUtility.IsAcctDimCentrally, isCentrallyMaintained ? "Y" : "N");
 
@@ -344,6 +365,66 @@ public class SessionBuilder extends Builder {
         }
 
         return attributes;
+    }
+
+    /**
+     * Adds the classic accounting dimension values {@code $Element_<elementtype>="Y"}, one per
+     * active element of the session's accounting schema, as Classic {@code LoginUtils} does at
+     * login. Display logic of clients that do not maintain dimensions centrally, and of the
+     * dimensions that keep the old behavior (Campaign, Activity, Sales Region, ...), reads them.
+     * A failure only leaves these values out: the rest of the session is still built.
+     *
+     * @param attributes The session attributes to fill
+     * @param organization The current organization
+     * @param role The current role
+     */
+    private void putClassicAcctDimensionAttributes(JSONObject attributes, Organization organization, Role role) {
+        try {
+            OBContext.setAdminMode(true);
+            String acctSchemaId = resolveAcctSchemaId(organization, role);
+            if (acctSchemaId == null) {
+                return;
+            }
+            List<String> elementTypes = OBDal.getInstance()
+                .getSession()
+                .createQuery(ACCT_SCHEMA_ELEMENT_TYPES_HQL, String.class)
+                .setParameter("schemaId", acctSchemaId)
+                .list();
+            for (String elementType : elementTypes) {
+                attributes.put(ELEMENT_SESSION_PREFIX + elementType, YES);
+            }
+        } catch (Exception e) {
+            logger.warn("Could not load the accounting schema elements of the session", e);
+        } finally {
+            OBContext.restorePreviousMode();
+        }
+    }
+
+    /**
+     * The accounting schema (ledger) of the current organization or, when it has none, of the
+     * first organization of the role that has one, as Classic {@code LoginUtils} resolves it.
+     *
+     * @param organization The current organization
+     * @param role The current role
+     * @return The accounting schema id, or {@code null} when no organization has a ledger
+     */
+    private String resolveAcctSchemaId(Organization organization, Role role) {
+        List<String> organizationIds = new ArrayList<>();
+        if (organization != null) {
+            organizationIds.add(organization.getId());
+        }
+        if (role != null) {
+            for (RoleOrganization roleOrganization : role.getADRoleOrganizationList()) {
+                organizationIds.add(roleOrganization.getOrganization().getId());
+            }
+        }
+        for (String organizationId : organizationIds) {
+            String acctSchemaId = OBLedgerUtils.getOrgLedger(organizationId);
+            if (acctSchemaId != null && !acctSchemaId.isEmpty()) {
+                return acctSchemaId;
+            }
+        }
+        return null;
     }
 
     private JSONArray getWarehouses(Organization organization, Map<String, List<Warehouse>> warehousesByOrganization) {

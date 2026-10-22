@@ -341,6 +341,14 @@ This module defines three AD windows:
   `RoleInfo.getOrganizationWarehouses()`). Warehouses and the organization tree are resolved per client: a user with
   roles in several clients (e.g. a sample-data client and System) is never offered another client's warehouses. One
   warehouse query per client, cached per user until a role, role-organization or organization-warehouse changes.
+- `attributes` carries the accounting dimension session values that Classic sets at login (`LoginUtils`), read by
+  display logic such as `@ACCT_DIMENSION_DISPLAY@` (expanded by the server) and `@$Element_MC@`:
+  - `$IsAcctDimCentrally` and, for clients that maintain dimensions centrally, the per document and level keys
+    (`$Element_OO_FAT_H`, …) from `DimensionDisplayUtility.getAccountingDimensionConfiguration`;
+  - the classic `$Element_<elementtype>="Y"` for each active element of the session's accounting schema: the
+    ledger of the current organization, or of the first organization of the role that has one. Clients that do not
+    maintain dimensions centrally, and the dimensions with the old behavior (Campaign, Activity, Sales Region), use
+    them. A failure loading them only leaves them out.
 
 ### Menu (`MenuService` / `MenuBuilder`)
 - Returns the full menu tree for the current role
