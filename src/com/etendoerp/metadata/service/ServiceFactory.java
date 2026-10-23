@@ -70,6 +70,7 @@ public final class ServiceFactory {
         EXACT_MATCH_SERVICES.put(RECENT_ITEMS_PATH, RecentItemsService::new);
         EXACT_MATCH_SERVICES.put(PROCESS_MONITOR_PATH, ProcessMonitorService::new);
         EXACT_MATCH_SERVICES.put(INSTANCE_PURPOSE_PATH, InstancePurposeService::new);
+        EXACT_MATCH_SERVICES.put(FORM_PERSONALIZATION_PATH, FormPersonalizationService::new);
 
         // Prefix match services (order matters for overlapping prefixes)
         PREFIX_MATCH_SERVICES.put(WINDOW_PATH, WindowService::new);

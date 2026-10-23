@@ -1,0 +1,16 @@
+name: Module Tests
+
+on:
+  push:
+    branches:
+      - '**'
+  workflow_dispatch:
+
+concurrency:
+  group: module-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  module-tests:
+    uses: ./.github/workflows/module-tests.yml
+    secrets: inherit
