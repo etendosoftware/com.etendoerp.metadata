@@ -114,9 +114,10 @@ class SessionBuilderTest {
   private static final String ELEMENT_ORGANIZATION = "OO";
   private static final String ELEMENT_BUSINESS_PARTNER = "BP";
   private static final String ELEMENT_CAMPAIGN = "MC";
-  private static final String KEY_ELEMENT_OO = "$Element_" + ELEMENT_ORGANIZATION;
-  private static final String KEY_ELEMENT_BP = "$Element_" + ELEMENT_BUSINESS_PARTNER;
-  private static final String KEY_ELEMENT_MC = "$Element_" + ELEMENT_CAMPAIGN;
+  private static final String ELEMENT_KEY_PREFIX = "$Element_";
+  private static final String KEY_ELEMENT_OO = ELEMENT_KEY_PREFIX + ELEMENT_ORGANIZATION;
+  private static final String KEY_ELEMENT_BP = ELEMENT_KEY_PREFIX + ELEMENT_BUSINESS_PARTNER;
+  private static final String KEY_ELEMENT_MC = ELEMENT_KEY_PREFIX + ELEMENT_CAMPAIGN;
 
   @Mock
   private OBContext obContext;
