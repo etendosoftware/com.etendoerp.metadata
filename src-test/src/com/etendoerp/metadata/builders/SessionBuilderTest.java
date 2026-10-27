@@ -71,6 +71,7 @@ import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.security.OrganizationStructureProvider;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.erpCommon.utility.DimensionDisplayUtility;
+import org.openbravo.erpCommon.utility.OBLedgerUtils;
 import org.openbravo.model.ad.access.Role;
 import org.openbravo.model.ad.access.RoleOrganization;
 import org.openbravo.model.ad.access.User;
@@ -107,6 +108,16 @@ class SessionBuilderTest {
   private static final String CLIENT_ID_PARAM = "clientId";
   private static final String PASSWORD_EXPIRED = "passwordExpired";
   private static final String CURRENT_LANGUAGE = "currentLanguage";
+  private static final String YES = "Y";
+  private static final String NO = "N";
+  private static final String ACCT_SCHEMA_ID = "acct-schema-id";
+  private static final String ELEMENT_ORGANIZATION = "OO";
+  private static final String ELEMENT_BUSINESS_PARTNER = "BP";
+  private static final String ELEMENT_CAMPAIGN = "MC";
+  private static final String ELEMENT_KEY_PREFIX = "$Element_";
+  private static final String KEY_ELEMENT_OO = ELEMENT_KEY_PREFIX + ELEMENT_ORGANIZATION;
+  private static final String KEY_ELEMENT_BP = ELEMENT_KEY_PREFIX + ELEMENT_BUSINESS_PARTNER;
+  private static final String KEY_ELEMENT_MC = ELEMENT_KEY_PREFIX + ELEMENT_CAMPAIGN;
 
   @Mock
   private OBContext obContext;
@@ -185,6 +196,9 @@ class SessionBuilderTest {
 
   @Mock
   private Query<Warehouse> warehousesQuery;
+
+  @Mock
+  private Query<String> elementTypesQuery;
 
   private MockedStatic<OBDal> obDalStatic;
 
@@ -951,5 +965,104 @@ class SessionBuilderTest {
         }
       }
     }
+  }
+
+  /**
+   * Makes the accounting schema element query return the given element types.
+   *
+   * @param elementTypes the active element types of the accounting schema
+   */
+  private void mockAcctSchemaElementTypes(List<String> elementTypes) {
+    when(session.createQuery(anyString(), eq(String.class))).thenReturn(elementTypesQuery);
+    when(elementTypesQuery.setParameter(anyString(), any())).thenReturn(elementTypesQuery);
+    when(elementTypesQuery.list()).thenReturn(elementTypes);
+  }
+
+  /**
+   * Builds the session with the given ledger (accounting schema) per organization id and
+   * returns its {@code attributes}.
+   *
+   * @param ledgerByOrganization the accounting schema id of each organization that has one
+   * @return the session attributes
+   * @throws JSONException if JSON operations fail while building or reading the session
+   */
+  private JSONObject buildAttributesWithLedgers(Map<String, String> ledgerByOrganization) throws JSONException {
+    try (MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
+         MockedStatic<Utils> utilsStatic = mockStatic(Utils.class);
+         MockedStatic<OBLedgerUtils> ledgerStatic = mockStatic(OBLedgerUtils.class)) {
+
+      obContextStatic.when(OBContext::getOBContext).thenReturn(obContext);
+      utilsStatic.when(() -> Utils.getJsonObject(any())).thenReturn(new JSONObject());
+      ledgerStatic.when(() -> OBLedgerUtils.getOrgLedger(anyString()))
+          .thenAnswer(invocation -> ledgerByOrganization.get(invocation.<String>getArgument(0)));
+
+      return new SessionBuilder().toJSON().getJSONObject(ATTRIBUTES);
+    }
+  }
+
+  /**
+   * Verifies that the session carries the classic {@code $Element_<elementtype>="Y"} values for
+   * the active elements of the current organization's accounting schema, as Classic login does.
+   *
+   * @throws JSONException if JSON operations fail during assertions or building
+   */
+  @Test
+  void testToJSONIncludesClassicElementValuesOfTheOrganizationLedger() throws JSONException {
+    mockAcctSchemaElementTypes(Arrays.asList(ELEMENT_ORGANIZATION, ELEMENT_BUSINESS_PARTNER));
+
+    JSONObject attributes = buildAttributesWithLedgers(Map.of(ORG_ID, ACCT_SCHEMA_ID));
+
+    assertEquals(YES, attributes.getString(KEY_ELEMENT_OO));
+    assertEquals(YES, attributes.getString(KEY_ELEMENT_BP));
+    assertEquals(NO, attributes.getString(KEY_ACCT_CENTRALLY));
+    verify(elementTypesQuery).setParameter("schemaId", ACCT_SCHEMA_ID);
+  }
+
+  /**
+   * Verifies that, when the current organization has no ledger, the classic values come from the
+   * ledger of an organization of the role, as Classic login falls back to.
+   *
+   * @throws JSONException if JSON operations fail during assertions or building
+   */
+  @Test
+  void testToJSONResolvesClassicElementValuesFromARoleOrganizationLedger() throws JSONException {
+    mockAcctSchemaElementTypes(Collections.singletonList(ELEMENT_CAMPAIGN));
+
+    JSONObject attributes = buildAttributesWithLedgers(Map.of(ORG1_ID, ACCT_SCHEMA_ID));
+
+    assertEquals(YES, attributes.getString(KEY_ELEMENT_MC));
+    verify(elementTypesQuery).setParameter("schemaId", ACCT_SCHEMA_ID);
+  }
+
+  /**
+   * Verifies that no classic values are added when no organization has a ledger, and that the
+   * accounting schema elements are not queried.
+   *
+   * @throws JSONException if JSON operations fail during assertions or building
+   */
+  @Test
+  void testToJSONOmitsClassicElementValuesWithoutLedger() throws JSONException {
+    JSONObject attributes = buildAttributesWithLedgers(Collections.emptyMap());
+
+    assertFalse(attributes.has(KEY_ELEMENT_OO));
+    assertEquals(NO, attributes.getString(KEY_ACCT_CENTRALLY));
+    verify(session, never()).createQuery(anyString(), eq(String.class));
+  }
+
+  /**
+   * Verifies that a failure loading the accounting schema elements only leaves the classic values
+   * out: the session and its other attributes are still built.
+   *
+   * @throws JSONException if JSON operations fail during assertions or building
+   */
+  @Test
+  void testToJSONKeepsTheSessionWhenAcctSchemaElementsFail() throws JSONException {
+    mockAcctSchemaElementTypes(Collections.emptyList());
+    when(elementTypesQuery.list()).thenThrow(new IllegalStateException(DATABASE_ERROR));
+
+    JSONObject attributes = buildAttributesWithLedgers(Map.of(ORG_ID, ACCT_SCHEMA_ID));
+
+    assertFalse(attributes.has(KEY_ELEMENT_OO));
+    assertEquals(NO, attributes.getString(KEY_ACCT_CENTRALLY));
   }
 }
