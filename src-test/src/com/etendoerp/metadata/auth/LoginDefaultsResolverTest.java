@@ -36,6 +36,7 @@ import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.stubbing.OngoingStubbing;
 import org.openbravo.base.secureApp.DefaultValidationException;
 import org.openbravo.base.secureApp.LoginUtils;
 import org.openbravo.base.secureApp.LoginUtils.RoleDefaults;
@@ -150,13 +151,21 @@ public class LoginDefaultsResolverTest {
         defaults.org = ORG_ID;
         defaults.client = CLIENT_ID;
         defaults.warehouse = warehouseId;
-        loginUtilsMock.when(() -> LoginUtils.getLoginDefaults(eq(USER_ID), eq(""), any(ConnectionProvider.class)))
-            .thenReturn(defaults);
+        whenClassicDefaultsRequested().thenReturn(defaults);
     }
 
     private void stubClassicDefaultsFailure(Exception failure) {
-        loginUtilsMock.when(() -> LoginUtils.getLoginDefaults(eq(USER_ID), eq(""), any(ConnectionProvider.class)))
-            .thenThrow(failure);
+        whenClassicDefaultsRequested().thenThrow(failure);
+    }
+
+    /**
+     * Starts stubbing the Classic defaults request for the user's default role.
+     *
+     * @return the stubbing of {@link LoginUtils#getLoginDefaults}
+     */
+    private OngoingStubbing<RoleDefaults> whenClassicDefaultsRequested() {
+        return loginUtilsMock.when(
+            () -> LoginUtils.getLoginDefaults(eq(USER_ID), eq(""), any(ConnectionProvider.class)));
     }
 
     private <T> T stubEntity(Class<T> entityClass, String id) {
