@@ -55,6 +55,7 @@ import com.auth0.jwt.interfaces.DecodedJWT;
 import com.auth0.jwt.interfaces.RSAKeyProvider;
 import com.etendoerp.etendorx.auth.JwkRSAKeyProvider;
 import com.etendoerp.etendorx.data.ETRXTokenUser;
+import com.etendoerp.metadata.auth.LoginDefaultsResolver;
 import com.etendoerp.metadata.auth.Utils;
 import com.etendoerp.metadata.data.AuthData;
 
@@ -232,9 +233,7 @@ public class SSOService {
             OBDal.getInstance().flush();
 
             User user = tokenUser.getUserForToken();
-            AuthData authData = new AuthData(user, user.getDefaultRole(),
-                user.getDefaultOrganization(), user.getDefaultWarehouse(),
-                user.getDefaultRole() != null ? user.getDefaultRole().getClient() : user.getClient());
+            AuthData authData = LoginDefaultsResolver.resolve(user);
 
             String token = Utils.generateToken(authData, null);
 
