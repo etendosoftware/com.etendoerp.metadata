@@ -17,10 +17,15 @@
 
 package com.etendoerp.metadata.service;
 
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
 import java.io.PrintWriter;
@@ -31,6 +36,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.MockedStatic;
 import org.mockito.junit.MockitoJUnitRunner;
 import org.openbravo.authentication.hashing.PasswordHash;
@@ -40,6 +46,7 @@ import org.openbravo.model.ad.system.Client;
 import org.openbravo.model.common.enterprise.Organization;
 import org.openbravo.model.common.enterprise.Warehouse;
 
+import com.etendoerp.metadata.auth.LoginDefaultsResolver;
 import com.etendoerp.metadata.auth.Utils;
 import com.etendoerp.metadata.data.AuthData;
 import com.etendoerp.metadata.exceptions.MethodNotAllowedException;
@@ -54,22 +61,30 @@ public class LoginServiceTest extends AbstractProfileServiceTest {
     private static final String USERNAME = "test-user";
     private static final String PASSWORD = "test-password"; // NOSONAR - fake value, only used to stub a mocked PasswordHash call
 
+    private static final String CREDENTIALS_BODY = "{\"username\":\"test-user\",\"password\":\"test-password\"}";
+    private static final String FAKE_TOKEN = "fake-jwt-token";
+    private static final String POST_METHOD = "POST";
+    private static final String ROLE_ID = "role-1";
+
     private MockedStatic<PasswordHash> passwordHashMock;
+    private MockedStatic<LoginDefaultsResolver> resolverMock;
 
     /**
-     * Initializes the {@code PasswordHash} static mock, on top of the shared mocks from
+     * Initializes the {@code PasswordHash} and {@link LoginDefaultsResolver} static mocks, on top of the shared mocks from
      * {@link AbstractProfileServiceTest}.
      */
     @Before
     public void setUpPasswordHashMock() {
         passwordHashMock = mockStatic(PasswordHash.class);
+        resolverMock = mockStatic(LoginDefaultsResolver.class);
     }
 
     /**
-     * Releases the static mock opened in {@link #setUpPasswordHashMock()}.
+     * Releases the static mocks opened in {@link #setUpPasswordHashMock()}.
      */
     @After
     public void tearDownPasswordHashMock() {
+        resolverMock.close();
         passwordHashMock.close();
     }
 
@@ -98,7 +113,7 @@ public class LoginServiceTest extends AbstractProfileServiceTest {
      */
     @Test
     public void testProcessMissingCredentialsThrowsUnprocessable() throws Exception {
-        when(mockRequest.getMethod()).thenReturn("POST");
+        when(mockRequest.getMethod()).thenReturn(POST_METHOD);
         setRequestBody("{}");
 
         LoginService service = new LoginService(mockRequest, mockResponse);
@@ -112,7 +127,7 @@ public class LoginServiceTest extends AbstractProfileServiceTest {
      */
     @Test
     public void testProcessInvalidCredentialsThrowsUnauthorized() throws Exception {
-        when(mockRequest.getMethod()).thenReturn("POST");
+        when(mockRequest.getMethod()).thenReturn(POST_METHOD);
         setRequestBody("{\"username\":\"test-user\",\"password\":\"wrong\"}");
 
         passwordHashMock.when(() -> PasswordHash.getUserWithPassword(USERNAME, "wrong"))
@@ -128,57 +143,105 @@ public class LoginServiceTest extends AbstractProfileServiceTest {
     }
 
     /**
-     * When no role is specified in the request, the user's default role should be used.
+     * When no role is specified in the request, the Classic login defaults resolved by
+     * {@link LoginDefaultsResolver} are used to issue the token.
      *
-     * @throws Exception if the request body cannot be read
+     * @throws Exception if the request body cannot be read or the service fails
      */
     @Test
-    public void testProcessHappyPathUsesDefaultRoleWhenNotSpecified() throws Exception {
-        when(mockRequest.getMethod()).thenReturn("POST");
-        setRequestBody("{\"username\":\"test-user\",\"password\":\"test-password\"}");
+    public void testProcessUsesClassicDefaultsWhenRoleNotSpecified() throws Exception {
+        StringWriter stringWriter = stubTokenResponse();
+        User mockUser = stubLoginRequest(CREDENTIALS_BODY);
+        AuthData defaults = stubClassicDefaults(mockUser);
 
-        StringWriter stringWriter = new StringWriter();
-        when(mockResponse.getWriter()).thenReturn(new PrintWriter(stringWriter));
+        new LoginService(mockRequest, mockResponse).process();
 
-        User mockUser = mock(User.class);
-        Role defaultRole = mock(Role.class);
-        when(defaultRole.getId()).thenReturn("default-role-id");
-        when(defaultRole.getClient()).thenReturn(mock(Client.class));
-        when(mockUser.getDefaultRole()).thenReturn(defaultRole);
-
-        passwordHashMock.when(() -> PasswordHash.getUserWithPassword(USERNAME, PASSWORD))
-                .thenReturn(Optional.of(mockUser));
-        when(obDal.get(Role.class, "default-role-id")).thenReturn(defaultRole);
-
-        authUtilsMock.when(() -> Utils.generateToken(org.mockito.ArgumentMatchers.any(AuthData.class),
-                org.mockito.ArgumentMatchers.isNull())).thenReturn("fake-jwt-token");
-
-        LoginService service = new LoginService(mockRequest, mockResponse);
-        service.process();
-
-        String output = stringWriter.toString();
-        assertTrue("Output should contain the generated token", output.contains("fake-jwt-token"));
+        assertSame(defaults, captureTokenAuthData());
+        assertTrue("Output should contain the generated token", stringWriter.toString().contains(FAKE_TOKEN));
     }
 
     /**
-     * When neither the request nor the user provides a role, resolution must fail
-     * with {@link UnprocessableContentException}.
+     * When the user has no valid Classic login defaults, the login must fail with
+     * {@link UnprocessableContentException}.
      *
      * @throws Exception if the request body cannot be read
      */
     @Test
-    public void testProcessNoRoleAvailableThrowsUnprocessable() throws Exception {
-        when(mockRequest.getMethod()).thenReturn("POST");
-        setRequestBody("{\"username\":\"test-user\",\"password\":\"test-password\"}");
-
-        User mockUser = mock(User.class);
-        when(mockUser.getDefaultRole()).thenReturn(null);
-
-        passwordHashMock.when(() -> PasswordHash.getUserWithPassword(USERNAME, PASSWORD))
-                .thenReturn(Optional.of(mockUser));
+    public void testProcessNoValidDefaultsThrowsUnprocessable() throws Exception {
+        User mockUser = stubLoginRequest(CREDENTIALS_BODY);
+        resolverMock.when(() -> LoginDefaultsResolver.resolve(mockUser))
+                .thenThrow(new UnprocessableContentException("No valid login defaults"));
 
         LoginService service = new LoginService(mockRequest, mockResponse);
         assertProcessThrowsUnprocessable(service, "Expected UnprocessableContentException when no role can be resolved");
+    }
+
+    /**
+     * An organization in a role-less request replaces the default organization and drops the default
+     * warehouse, which belongs to the default organization.
+     *
+     * @throws Exception if the request body cannot be read or the service fails
+     */
+    @Test
+    public void testProcessOrganizationInBodyReplacesDefaultOrganization() throws Exception {
+        stubTokenResponse();
+        User mockUser = stubLoginRequest(
+                "{\"username\":\"test-user\",\"password\":\"test-password\",\"organization\":\"org-1\"}");
+        stubClassicDefaults(mockUser);
+        Organization organization = mock(Organization.class);
+        when(obDal.get(Organization.class, "org-1")).thenReturn(organization);
+
+        new LoginService(mockRequest, mockResponse).process();
+
+        AuthData authData = captureTokenAuthData();
+        assertSame(organization, authData.getOrg());
+        assertNull(authData.getWarehouse());
+    }
+
+    /**
+     * A warehouse in a role-less request replaces the default warehouse and keeps the default
+     * organization.
+     *
+     * @throws Exception if the request body cannot be read or the service fails
+     */
+    @Test
+    public void testProcessWarehouseInBodyReplacesDefaultWarehouse() throws Exception {
+        stubTokenResponse();
+        User mockUser = stubLoginRequest(
+                "{\"username\":\"test-user\",\"password\":\"test-password\",\"warehouse\":\"wh-1\"}");
+        AuthData defaults = stubClassicDefaults(mockUser);
+        Organization defaultOrganization = defaults.getOrg();
+        Warehouse warehouse = mock(Warehouse.class);
+        when(obDal.get(Warehouse.class, "wh-1")).thenReturn(warehouse);
+
+        new LoginService(mockRequest, mockResponse).process();
+
+        AuthData authData = captureTokenAuthData();
+        assertSame(defaultOrganization, authData.getOrg());
+        assertSame(warehouse, authData.getWarehouse());
+    }
+
+    /**
+     * A role in the request is used as is, with its own client, and the Classic defaults are not
+     * resolved.
+     *
+     * @throws Exception if the request body cannot be read or the service fails
+     */
+    @Test
+    public void testProcessUsesRequestedRole() throws Exception {
+        stubTokenResponse();
+        stubLoginRequest("{\"username\":\"test-user\",\"password\":\"test-password\",\"role\":\"role-1\"}");
+        Role role = mock(Role.class);
+        Client client = mock(Client.class);
+        when(role.getClient()).thenReturn(client);
+        when(obDal.get(Role.class, ROLE_ID)).thenReturn(role);
+
+        new LoginService(mockRequest, mockResponse).process();
+
+        AuthData authData = captureTokenAuthData();
+        assertSame(role, authData.getRole());
+        assertSame(client, authData.getClient());
+        resolverMock.verify(() -> LoginDefaultsResolver.resolve(any(User.class)), never());
     }
 
     /**
@@ -188,7 +251,7 @@ public class LoginServiceTest extends AbstractProfileServiceTest {
      */
     @Test
     public void testProcessInvalidOrganizationThrowsUnprocessable() throws Exception {
-        when(mockRequest.getMethod()).thenReturn("POST");
+        when(mockRequest.getMethod()).thenReturn(POST_METHOD);
         setRequestBody("{\"username\":\"test-user\",\"password\":\"test-password\",\"role\":\"role-1\",\"organization\":\"missing-org\"}");
 
         User mockUser = mock(User.class);
@@ -197,7 +260,7 @@ public class LoginServiceTest extends AbstractProfileServiceTest {
 
         passwordHashMock.when(() -> PasswordHash.getUserWithPassword(USERNAME, PASSWORD))
                 .thenReturn(Optional.of(mockUser));
-        when(obDal.get(Role.class, "role-1")).thenReturn(role);
+        when(obDal.get(Role.class, ROLE_ID)).thenReturn(role);
         when(obDal.get(Organization.class, "missing-org")).thenReturn(null);
 
         LoginService service = new LoginService(mockRequest, mockResponse);
@@ -212,7 +275,7 @@ public class LoginServiceTest extends AbstractProfileServiceTest {
      */
     @Test
     public void testProcessInvalidWarehouseThrowsUnprocessable() throws Exception {
-        when(mockRequest.getMethod()).thenReturn("POST");
+        when(mockRequest.getMethod()).thenReturn(POST_METHOD);
         setRequestBody("{\"username\":\"test-user\",\"password\":\"test-password\",\"role\":\"role-1\",\"warehouse\":\"missing-wh\"}");
 
         User mockUser = mock(User.class);
@@ -221,11 +284,65 @@ public class LoginServiceTest extends AbstractProfileServiceTest {
 
         passwordHashMock.when(() -> PasswordHash.getUserWithPassword(USERNAME, PASSWORD))
                 .thenReturn(Optional.of(mockUser));
-        when(obDal.get(Role.class, "role-1")).thenReturn(role);
+        when(obDal.get(Role.class, ROLE_ID)).thenReturn(role);
         when(obDal.get(Warehouse.class, "missing-wh")).thenReturn(null);
 
         LoginService service = new LoginService(mockRequest, mockResponse);
         assertProcessThrowsUnprocessable(service,
                 "Expected UnprocessableContentException for an unresolvable warehouse id");
+    }
+
+    /**
+     * Stubs a POST login request with the given body whose credentials authenticate a mocked user.
+     *
+     * @param body the raw JSON body
+     * @return the authenticated user
+     * @throws Exception if stubbing the mocked reader fails
+     */
+    private User stubLoginRequest(String body) throws Exception {
+        when(mockRequest.getMethod()).thenReturn(POST_METHOD);
+        setRequestBody(body);
+        User mockUser = mock(User.class);
+        passwordHashMock.when(() -> PasswordHash.getUserWithPassword(USERNAME, PASSWORD))
+                .thenReturn(Optional.of(mockUser));
+        return mockUser;
+    }
+
+    /**
+     * Stubs the Classic login defaults of the given user with a role, organization, warehouse and
+     * client.
+     *
+     * @param user the authenticated user
+     * @return the stubbed defaults
+     */
+    private AuthData stubClassicDefaults(User user) {
+        AuthData defaults = new AuthData(user, mock(Role.class), mock(Organization.class), mock(Warehouse.class),
+                mock(Client.class));
+        resolverMock.when(() -> LoginDefaultsResolver.resolve(user)).thenReturn(defaults);
+        return defaults;
+    }
+
+    /**
+     * Stubs token generation and the response writer.
+     *
+     * @return the writer receiving the response body
+     * @throws Exception if stubbing the mocked writer fails
+     */
+    private StringWriter stubTokenResponse() throws Exception {
+        StringWriter stringWriter = new StringWriter();
+        when(mockResponse.getWriter()).thenReturn(new PrintWriter(stringWriter));
+        authUtilsMock.when(() -> Utils.generateToken(any(AuthData.class), isNull())).thenReturn(FAKE_TOKEN);
+        return stringWriter;
+    }
+
+    /**
+     * Captures the login context the token was generated with.
+     *
+     * @return the captured login context
+     */
+    private AuthData captureTokenAuthData() {
+        ArgumentCaptor<AuthData> captor = ArgumentCaptor.forClass(AuthData.class);
+        authUtilsMock.verify(() -> Utils.generateToken(captor.capture(), isNull()));
+        return captor.getValue();
     }
 }
