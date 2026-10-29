@@ -54,7 +54,8 @@ import org.openbravo.client.kernel.RequestContext;
 import org.openbravo.erpCommon.utility.OBMessageUtils;
 
 /**
- * Unit tests for the file download support of {@link LegacyProcessServlet}: files answered by
+ * Unit tests for the file download support of {@link LegacyProcessServlet} and
+ * {@link LegacyPopupResponses}: files answered by
  * Classic servlets (e.g. Create Remittance File, Intrastat Generate File) and Classic
  * {@code PopUp_Download} pages (e.g. Reconciliation reports) are short-circuited with a forwarder
  * page that reports success to the new UI and downloads the file intact.
@@ -149,7 +150,7 @@ public class LegacyProcessServletFileDownloadTest {
   private HttpServletRequest downloadRequest(String fileId) {
     HttpServletRequest request = mock(HttpServletRequest.class);
     when(request.getSession(false)).thenReturn(session);
-    when(request.getParameter(LegacyProcessServlet.FILE_ID_PARAM)).thenReturn(fileId);
+    when(request.getParameter(LegacyPopupResponses.FILE_ID_PARAM)).thenReturn(fileId);
     return request;
   }
 
@@ -158,7 +159,7 @@ public class LegacyProcessServletFileDownloadTest {
     return forwarderHtml.substring(start, forwarderHtml.indexOf('"', start));
   }
 
-  private void invokeHandleResponse(HttpServletResponseLegacyWrapper wrapper) throws Exception {
+  private void invokeHandleResponse(HttpServletResponseLegacyWrapper wrapper) throws ReflectiveOperationException {
     Method method = LegacyProcessServlet.class.getDeclaredMethod(HANDLE_RESPONSE, HttpServletResponse.class,
         HttpServletResponseLegacyWrapper.class, String.class, String.class);
     method.setAccessible(true);
@@ -168,10 +169,10 @@ public class LegacyProcessServletFileDownloadTest {
   /**
    * Invokes {@code handleResponse} with {@link RequestContext} returning the given request.
    *
-   * @throws Exception if the reflective call fails
+   * @throws ReflectiveOperationException if the reflective call fails
    */
   private void invokeHandleResponseWithin(HttpServletRequest request, HttpServletResponseLegacyWrapper wrapper)
-      throws Exception {
+      throws ReflectiveOperationException {
     RequestContext requestContext = mock(RequestContext.class);
     when(requestContext.getRequest()).thenReturn(request);
     try (MockedStatic<RequestContext> contextMock = mockStatic(RequestContext.class)) {
@@ -192,10 +193,10 @@ public class LegacyProcessServletFileDownloadTest {
    */
   @Test
   public void isDownloadRequestMatchesDownloadPathOnly() {
-    assertTrue(LegacyProcessServlet.isDownloadRequest("/download"));
-    assertTrue(LegacyProcessServlet.isDownloadRequest("/Download"));
-    assertFalse(LegacyProcessServlet.isDownloadRequest("/remittance/CreateFile.html"));
-    assertFalse(LegacyProcessServlet.isDownloadRequest(null));
+    assertTrue(LegacyPopupResponses.isDownloadRequest("/download"));
+    assertTrue(LegacyPopupResponses.isDownloadRequest("/Download"));
+    assertFalse(LegacyPopupResponses.isDownloadRequest("/remittance/CreateFile.html"));
+    assertFalse(LegacyPopupResponses.isDownloadRequest(null));
   }
 
   /**
@@ -205,7 +206,7 @@ public class LegacyProcessServletFileDownloadTest {
   public void extractDownloadReportUrlReturnsUrlOfDownloadPage() {
     String body = "<body onload=\"onLoadDo('" + DOWNLOAD_REPORT_URL + "');\" id=\"paramHref\">";
 
-    assertEquals(DOWNLOAD_REPORT_URL, LegacyProcessServlet.extractDownloadReportUrl(body));
+    assertEquals(DOWNLOAD_REPORT_URL, LegacyPopupResponses.extractDownloadReportUrl(body));
   }
 
   /**
@@ -213,8 +214,8 @@ public class LegacyProcessServletFileDownloadTest {
    */
   @Test
   public void extractDownloadReportUrlReturnsNullForRegularPages() {
-    assertNull(LegacyProcessServlet.extractDownloadReportUrl("<body onload=\"onLoadDo('xx');\">"));
-    assertNull(LegacyProcessServlet.extractDownloadReportUrl(null));
+    assertNull(LegacyPopupResponses.extractDownloadReportUrl("<body onload=\"onLoadDo('xx');\">"));
+    assertNull(LegacyPopupResponses.extractDownloadReportUrl(null));
   }
 
   /**
@@ -224,7 +225,7 @@ public class LegacyProcessServletFileDownloadTest {
    */
   @Test
   public void writeFileDownloadForwarderReportsSuccessAndNavigatesToFile() throws IOException {
-    servlet.writeFileDownloadForwarder(response, DOWNLOAD_REPORT_URL, BANK_FILE);
+    LegacyPopupResponses.writeFileDownloadForwarder(response, DOWNLOAD_REPORT_URL, BANK_FILE);
 
     String html = written.toString();
     assertSuccessForwarder(html);
@@ -242,7 +243,7 @@ public class LegacyProcessServletFileDownloadTest {
    */
   @Test
   public void writeCapturedFileForwarderStoresFileAndPointsToDownloadEndpoint() throws IOException {
-    servlet.writeCapturedFileForwarder(response, session, fileWrapper(APPLICATION_RTF, ATTACHMENT_BANK_FILE),
+    LegacyPopupResponses.writeCapturedFileForwarder(response, session, fileWrapper(APPLICATION_RTF, ATTACHMENT_BANK_FILE),
         CONTEXT_PATH);
 
     String html = written.toString();
@@ -265,14 +266,14 @@ public class LegacyProcessServletFileDownloadTest {
         ATTACHMENT_BANK_FILE));
     HttpServletRequest request = downloadRequest(id);
 
-    servlet.processDownloadRequest(request, response);
+    LegacyPopupResponses.serveDownload(request, response);
 
     assertArrayEquals(BINARY_CONTENT, streamed.toByteArray());
     verify(response).setContentType(APPLICATION_RTF);
     verify(response).setHeader(CONTENT_DISPOSITION, ATTACHMENT_BANK_FILE);
     verify(response).setContentLength(BINARY_CONTENT.length);
 
-    servlet.processDownloadRequest(request, response);
+    LegacyPopupResponses.serveDownload(request, response);
 
     verify(response).sendError(eq(HttpServletResponse.SC_NOT_FOUND), anyString());
   }
@@ -287,7 +288,7 @@ public class LegacyProcessServletFileDownloadTest {
     String id = LegacyFileDownload.store(session, new LegacyFileDownload(BINARY_CONTENT, null,
         ATTACHMENT_BANK_FILE));
 
-    servlet.processDownloadRequest(downloadRequest(id), response);
+    LegacyPopupResponses.serveDownload(downloadRequest(id), response);
 
     verify(response).setContentType("application/octet-stream");
   }
@@ -299,7 +300,7 @@ public class LegacyProcessServletFileDownloadTest {
    */
   @Test
   public void processDownloadRequestAnswersNotFoundForUnknownFile() throws IOException {
-    servlet.processDownloadRequest(downloadRequest("unknown"), response);
+    LegacyPopupResponses.serveDownload(downloadRequest("unknown"), response);
 
     verify(response).sendError(eq(HttpServletResponse.SC_NOT_FOUND), anyString());
     verify(response, never()).getOutputStream();
@@ -309,10 +310,11 @@ public class LegacyProcessServletFileDownloadTest {
    * Tests that a captured file wins over the redirect the servlet sends after streaming it
    * (Intrastat Generate File), and that binary bytes are kept intact.
    *
-   * @throws Exception if the reflective call fails
+   * @throws ReflectiveOperationException if the reflective call fails
+   * @throws IOException if the captured output cannot be written
    */
   @Test
-  public void handleResponseDeliversFileBeforeRedirect() throws Exception {
+  public void handleResponseDeliversFileBeforeRedirect() throws ReflectiveOperationException, IOException {
     HttpServletResponseLegacyWrapper wrapper = fileWrapper("application/txt", "inline; filename=decl.txt");
     wrapper.sendRedirect("INTR_GenerateFile.html?Command=DEFAULT");
     HttpServletRequest request = mock(HttpServletRequest.class);
@@ -330,10 +332,11 @@ public class LegacyProcessServletFileDownloadTest {
   /**
    * Tests that a Classic PopUp_Download page is replaced by the forwarder to its download URL.
    *
-   * @throws Exception if the reflective call fails
+   * @throws ReflectiveOperationException if the reflective call fails
+   * @throws IOException if the captured output cannot be written
    */
   @Test
-  public void handleResponseForwardsDownloadPage() throws Exception {
+  public void handleResponseForwardsDownloadPage() throws ReflectiveOperationException, IOException {
     HttpServletResponseLegacyWrapper wrapper = new HttpServletResponseLegacyWrapper(mock(HttpServletResponse.class));
     wrapper.getWriter().write("<html><body onload=\"onLoadDo('" + DOWNLOAD_REPORT_URL + "');\"></body></html>");
 
@@ -350,8 +353,8 @@ public class LegacyProcessServletFileDownloadTest {
    */
   @Test
   public void isClosePopupOnOpenDetectsPopUpResponseOnOpening() {
-    assertTrue(LegacyProcessServlet.isClosePopupOnOpen(POPUP_RESPONSE_BODY, COMMAND_DEFAULT));
-    assertTrue(LegacyProcessServlet.isClosePopupOnOpen(
+    assertTrue(LegacyPopupResponses.isClosePopupOnOpen(POPUP_RESPONSE_BODY, COMMAND_DEFAULT));
+    assertTrue(LegacyPopupResponses.isClosePopupOnOpen(
         "<body onload=\"submitThisPage(null);\" id=\"paramHref\">", COMMAND_DEFAULT));
   }
 
@@ -360,20 +363,21 @@ public class LegacyProcessServletFileDownloadTest {
    */
   @Test
   public void isClosePopupOnOpenIgnoresOtherRequestsAndPages() {
-    assertFalse(LegacyProcessServlet.isClosePopupOnOpen(POPUP_RESPONSE_BODY, "IMPORT"));
-    assertFalse(LegacyProcessServlet.isClosePopupOnOpen(POPUP_RESPONSE_BODY, null));
-    assertFalse(LegacyProcessServlet.isClosePopupOnOpen("<body onload=\"init();\"><form></form>", COMMAND_DEFAULT));
-    assertFalse(LegacyProcessServlet.isClosePopupOnOpen(null, COMMAND_DEFAULT));
+    assertFalse(LegacyPopupResponses.isClosePopupOnOpen(POPUP_RESPONSE_BODY, "IMPORT"));
+    assertFalse(LegacyPopupResponses.isClosePopupOnOpen(POPUP_RESPONSE_BODY, null));
+    assertFalse(LegacyPopupResponses.isClosePopupOnOpen("<body onload=\"init();\"><form></form>", COMMAND_DEFAULT));
+    assertFalse(LegacyPopupResponses.isClosePopupOnOpen(null, COMMAND_DEFAULT));
   }
 
   /**
    * Tests that a PopUp_Response answered when opening the popup (e.g. Import Statement without
    * bank file formats) is replaced by a forwarder that asks the new UI to read the tab message.
    *
-   * @throws Exception if the reflective call fails
+   * @throws ReflectiveOperationException if the reflective call fails
+   * @throws IOException if the captured output cannot be written
    */
   @Test
-  public void handleResponseForwardsProcessOrderWhenPopupClosesOnOpen() throws Exception {
+  public void handleResponseForwardsProcessOrderWhenPopupClosesOnOpen() throws ReflectiveOperationException, IOException {
     HttpServletResponseLegacyWrapper wrapper = new HttpServletResponseLegacyWrapper(mock(HttpServletResponse.class));
     wrapper.getWriter().write("<html><body " + POPUP_RESPONSE_BODY.substring("<body ".length()) + "</html>");
     HttpServletRequest request = mock(HttpServletRequest.class);

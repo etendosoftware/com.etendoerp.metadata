@@ -38,7 +38,6 @@ import org.openbravo.client.kernel.RequestContext;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.erpCommon.security.SessionLogin;
-import org.openbravo.erpCommon.utility.OBMessageUtils;
 import org.openbravo.model.ad.access.User;
 import org.openbravo.model.financialmgmt.accounting.coa.AcctSchema;
 
@@ -78,14 +77,14 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
     private static final String JWT_TOKEN = "#JWT_TOKEN";
     private static final String HTML_EXTENSION = ".html";
     private static final String JS_EXTENSION = ".js";
-    private static final String ACTION_JSON_SEPARATOR = "',action:";
-    private static final String HTML_UTF8_CONTENT_TYPE = "text/html; charset=UTF-8";
-    private static final String UTF8_CHARSET = "UTF-8";
+    static final String ACTION_JSON_SEPARATOR = "',action:";
+    static final String HTML_UTF8_CONTENT_TYPE = "text/html; charset=UTF-8";
+    static final String UTF8_CHARSET = "UTF-8";
     private static final String JSON_CONTENT_TYPE_PREFIX = "application/json";
     private static final String TOKEN_PARAM = "token";
     private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String BEARER_PREFIX = "Bearer ";
-    private static final String META_LEGACY_PATH = "/meta/legacy";
+    static final String META_LEGACY_PATH = "/meta/legacy";
     private static final String WEB_PATH = "/web/";
     private static final String SRC_REPLACE_STRING = "src=\"";
     /** Path segment identifying a Classic info-window (search/selector) page. */
@@ -328,7 +327,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
      * like {@code PROCESSDEFAULT} requires a {@code startsWith} check rather than
      * equality.
      */
-    private static final String COMMAND_PARAM = "Command";
+    static final String COMMAND_PARAM = "Command";
     private static final String PROCESS_COMMAND_PREFIX = "PROCESS";
     /** Dojo DataGrid info-selector data commands; their responses are XML, not HTML. */
     private static final String COMMAND_STRUCTURE = "STRUCTURE";
@@ -358,7 +357,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             "class=\"MessageBox(ERROR|SUCCESS|WARNING|INFO)\"", Pattern.CASE_INSENSITIVE);
 
     /** Shared HTML preamble for all postMessage forwarder pages. */
-    private static final String HTML_DOCTYPE_HEAD =
+    static final String HTML_DOCTYPE_HEAD =
             "<!DOCTYPE html>\n<html><head><meta charset=\"" + UTF8_CHARSET + "\"><script>";
 
     /**
@@ -482,65 +481,6 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
                     "window.__etendoMessageSent=true;" +
                     "})();</script></head><body></body></html>";
 
-    /**
-     * Matches the {@code onLoadDo('<url>')} call of Classic {@code PopUp_Download.html} and
-     * {@code PopUp_DownloadAndRefresh.html} (rendered by {@code renderJR} for non-HTML reports).
-     * The captured group is the {@code /utility/DownloadReport.html?report=...} URL of the
-     * generated file. That page relies on the Classic shell ({@code LayoutMDI},
-     * {@code background_target}, {@code closePage}), so the popup is short-circuited with
-     * {@link #FILE_DOWNLOAD_FORWARDER_HTML} pointing at the same URL.
-     */
-    private static final Pattern DOWNLOAD_REPORT_HREF =
-            Pattern.compile("onLoadDo\\(\\s*'([^']*/utility/DownloadReport\\.html\\?[^']*)'\\s*\\)");
-
-    /** Path suffix of the endpoint that serves the files captured from legacy servlets. */
-    private static final String DOWNLOAD_PATH_SUFFIX = "/download";
-    /** Request parameter carrying the identifier returned by {@link LegacyFileDownload#store}. */
-    static final String FILE_ID_PARAM = "fileId";
-    /** AD_Message shown by the new UI once the file download has started. */
-    private static final String SUCCESS_MESSAGE_KEY = "Success";
-    private static final String SUCCESS_MESSAGE_TYPE = "success";
-    private static final String OCTET_STREAM_CONTENT_TYPE = "application/octet-stream";
-
-    /**
-     * Self-contained HTML served when a legacy popup answers with a file. It tells the
-     * parent window that the process succeeded (regular {@code showProcessMessage} action,
-     * so the new UI shows its success message and closes the modal) and then navigates the
-     * iframe to the file URL, which the browser downloads without replacing the page. The
-     * placeholders are the JSON message payload and the JSON-quoted file URL.
-     */
-    private static final String FILE_DOWNLOAD_FORWARDER_HTML =
-            HTML_DOCTYPE_HEAD +
-                    "(function(){if(window.parent){" +
-                    "window.parent.postMessage({type:'" + LegacyMessageProtocol.MESSAGE_TYPE + ACTION_JSON_SEPARATOR
-                    + "'" + LegacyMessageProtocol.ACTION_SHOW_PROCESS_MESSAGE + "',payload:%s},'*');}" +
-                    "window.__etendoMessageSent=true;" +
-                    "window.location.replace(%s);" +
-                    "})();</script></head><body></body></html>";
-
-    /**
-     * Matches the {@code onload="submitThisPage(...)"} body of Classic {@code PopUp_Response.html}
-     * (rendered by {@code printPageClosePopUp}): the page that closes the popup and reloads the tab,
-     * which then shows the message the servlet stored in the session for that tab.
-     */
-    private static final Pattern CLOSE_POPUP_RESPONSE =
-            Pattern.compile("onload=\"submitThisPage\\((?:'[^']*'|null)\\);\"");
-    /** {@code Command} of the request that opens a legacy popup. */
-    private static final String COMMAND_DEFAULT = "DEFAULT";
-
-    /**
-     * Self-contained HTML served when the request that opens a popup is answered with
-     * {@code PopUp_Response}: it sends {@code processOrder} so the new UI reads the tab message
-     * stored in the session, as Classic does when it reloads the tab.
-     */
-    private static final String PROCESS_ORDER_FORWARDER_HTML =
-            HTML_DOCTYPE_HEAD +
-                    "(function(){if(!window.parent)return;" +
-                    "window.parent.postMessage({type:'" + LegacyMessageProtocol.MESSAGE_TYPE + ACTION_JSON_SEPARATOR
-                    + "'" + LegacyMessageProtocol.ACTION_PROCESS_ORDER + "'},'*');" +
-                    "window.__etendoMessageSent=true;" +
-                    "})();</script></head><body></body></html>";
-
     public static final String SET_COOKIE = "Set-Cookie";
     public static final String ERROR_SENDING_ERROR_RESPONSE = "Error sending error response: {}";
 
@@ -613,8 +553,8 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
                 processLegacyRequest(req, res, path);
             } else if (isJavaScriptRequest(path)) {
                 processJavaScriptRequest(req, res, path);
-            } else if (isDownloadRequest(path)) {
-                processDownloadRequest(req, res);
+            } else if (LegacyPopupResponses.isDownloadRequest(path)) {
+                LegacyPopupResponses.serveDownload(req, res);
             } else if (isLegacyFollowupRequest(req)) {
                 processLegacyFollowupRequest(req, res);
             } else if (isRedirectRequest(path)) {
@@ -792,39 +732,6 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
 
     private boolean isLegacyRequest(String path) {
         return path != null && path.toLowerCase().endsWith(HTML_EXTENSION);
-    }
-
-    /**
-     * Tells whether the path targets the endpoint serving files captured from legacy servlets.
-     *
-     * @param path the request path info, may be {@code null}
-     * @return {@code true} when the path ends with {@code /download}
-     */
-    static boolean isDownloadRequest(String path) {
-        return path != null && path.toLowerCase().endsWith(DOWNLOAD_PATH_SUFFIX);
-    }
-
-    /**
-     * Serves a file captured from a legacy servlet (see {@link #writeCapturedFileForwarder}) with
-     * its original Content-Type, Content-Disposition and bytes. Each file is served only once.
-     *
-     * @param req the HttpServletRequest carrying the {@code fileId} parameter
-     * @param res the HttpServletResponse the raw file is written to
-     * @throws IOException if the file cannot be written
-     */
-    void processDownloadRequest(HttpServletRequest req, HttpServletResponse res) throws IOException {
-        LegacyFileDownload file = LegacyFileDownload.take(req.getSession(false), req.getParameter(FILE_ID_PARAM));
-        if (file == null) {
-            sendErrorResponse(res, HttpServletResponse.SC_NOT_FOUND, "File not found or already downloaded");
-            return;
-        }
-        byte[] content = file.getContent();
-        res.setStatus(HttpServletResponse.SC_OK);
-        res.setContentType(StringUtils.defaultIfBlank(file.getContentType(), OCTET_STREAM_CONTENT_TYPE));
-        res.setHeader(HttpServletResponseLegacyWrapper.CONTENT_DISPOSITION_HEADER, file.getContentDisposition());
-        res.setContentLength(content.length);
-        res.getOutputStream().write(content);
-        res.getOutputStream().flush();
     }
 
     private boolean isJavaScriptRequest(String path) {
@@ -1017,7 +924,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         // sendRedirect after streaming its file.
         if (wrapper.isFileResponse()) {
             HttpSession session = RequestContext.get().getRequest().getSession(true);
-            writeCapturedFileForwarder(res, session, wrapper, contextPath);
+            LegacyPopupResponses.writeCapturedFileForwarder(res, session, wrapper, contextPath);
             return;
         }
 
@@ -1029,14 +936,14 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             return;
         }
 
-        String downloadReportUrl = extractDownloadReportUrl(output);
+        String downloadReportUrl = LegacyPopupResponses.extractDownloadReportUrl(output);
         if (downloadReportUrl != null) {
-            writeFileDownloadForwarder(res, downloadReportUrl, "");
+            LegacyPopupResponses.writeFileDownloadForwarder(res, downloadReportUrl, "");
             return;
         }
 
-        if (isClosePopupOnOpen(output, currentCommand())) {
-            writeForwarderHtml(res, PROCESS_ORDER_FORWARDER_HTML);
+        if (LegacyPopupResponses.isClosePopupOnOpen(output, LegacyPopupResponses.currentCommand())) {
+            LegacyPopupResponses.writeProcessOrderForwarder(res);
             return;
         }
 
@@ -1058,92 +965,6 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
 
         res.setContentType(wrapper.getContentType());
         res.setStatus(wrapper.getStatus());
-        res.getWriter().write(html);
-        res.getWriter().flush();
-    }
-
-    /**
-     * Stores the file answered by the legacy servlet in the session and writes the
-     * {@link #FILE_DOWNLOAD_FORWARDER_HTML} page that downloads it through
-     * {@code /meta/legacy/download}.
-     *
-     * @param res         the real response
-     * @param session     the HTTP session the file is stored in
-     * @param wrapper     the wrapper holding the captured file bytes and headers
-     * @param contextPath the servlet context path
-     * @throws IOException if the response writer fails
-     */
-    void writeCapturedFileForwarder(HttpServletResponse res, HttpSession session,
-            HttpServletResponseLegacyWrapper wrapper, String contextPath) throws IOException {
-        LegacyFileDownload file = new LegacyFileDownload(wrapper.getCapturedOutput(),
-                wrapper.getCapturedContentType(), wrapper.getCapturedContentDisposition());
-        String fileId = LegacyFileDownload.store(session, file);
-        String downloadUrl = contextPath + META_LEGACY_PATH + DOWNLOAD_PATH_SUFFIX
-                + "?" + FILE_ID_PARAM + "=" + fileId;
-        writeFileDownloadForwarder(res, downloadUrl, file.getFileName());
-    }
-
-    /**
-     * Returns the {@code DownloadReport.html} URL of a Classic {@code PopUp_Download} page.
-     *
-     * @param body the captured legacy response body, may be {@code null}
-     * @return the download URL, or {@code null} when the body is not a download page
-     */
-    static String extractDownloadReportUrl(String body) {
-        if (body == null) {
-            return null;
-        }
-        Matcher matcher = DOWNLOAD_REPORT_HREF.matcher(body);
-        if (matcher.find()) {
-            return matcher.group(1);
-        }
-        return null;
-    }
-
-    /**
-     * Writes the {@link #FILE_DOWNLOAD_FORWARDER_HTML} page: a success message for the new UI
-     * followed by the navigation to the file URL.
-     *
-     * @param res         the real response
-     * @param downloadUrl the URL that serves the file
-     * @param fileName    the downloaded file name shown in the message, may be empty
-     * @throws IOException if the response writer fails
-     */
-    void writeFileDownloadForwarder(HttpServletResponse res, String downloadUrl, String fileName)
-            throws IOException {
-        String payload = buildForwarderPayload(SUCCESS_MESSAGE_TYPE,
-                OBMessageUtils.messageBD(SUCCESS_MESSAGE_KEY), fileName);
-        writeForwarderHtml(res, String.format(FILE_DOWNLOAD_FORWARDER_HTML, payload, JSONObject.quote(downloadUrl)));
-    }
-
-    /**
-     * Tells whether the request that opens a popup ({@code Command=DEFAULT}) was answered with
-     * Classic {@code PopUp_Response}, e.g. Import Statement warning that no bank file format is
-     * installed. Later submits already sent {@code processOrder} from the injected submit hook, and
-     * multipart submits expose no {@code Command} here, so only the opening request qualifies.
-     *
-     * @param body    the captured legacy response body, may be {@code null}
-     * @param command the {@code Command} request parameter, may be {@code null}
-     * @return {@code true} when the new UI must be told to read the tab message
-     */
-    static boolean isClosePopupOnOpen(String body, String command) {
-        if (!COMMAND_DEFAULT.equals(command) || body == null) {
-            return false;
-        }
-        return CLOSE_POPUP_RESPONSE.matcher(body).find();
-    }
-
-    /**
-     * Writes a self-contained forwarder page as the HTML response.
-     *
-     * @param res  the real response
-     * @param html the forwarder page
-     * @throws IOException if the response writer fails
-     */
-    private void writeForwarderHtml(HttpServletResponse res, String html) throws IOException {
-        res.setContentType(HTML_UTF8_CONTENT_TYPE);
-        res.setCharacterEncoding(UTF8_CHARSET);
-        res.setStatus(HttpServletResponse.SC_OK);
         res.getWriter().write(html);
         res.getWriter().flush();
     }
@@ -1203,20 +1024,11 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
      * @return {@code true} when the {@code Command} parameter is a DataGrid command
      */
     private static boolean isXmlDataCommand() {
-        return isDataGridCommand(currentCommand());
-    }
-
-    /**
-     * Returns the {@code Command} parameter of the request being processed.
-     *
-     * @return the command, or {@code null} when there is no request or no command
-     */
-    private static String currentCommand() {
         HttpServletRequest req = RequestContext.get().getRequest();
         if (req == null) {
-            return null;
+            return false;
         }
-        return req.getParameter(COMMAND_PARAM);
+        return isDataGridCommand(req.getParameter(COMMAND_PARAM));
     }
 
     /**
@@ -1282,7 +1094,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
     private String mapMessageType(String classSuffix) {
         String upper = classSuffix.toUpperCase();
         if (upper.contains("ERROR")) return "error";
-        if (upper.contains("SUCCESS")) return SUCCESS_MESSAGE_TYPE;
+        if (upper.contains("SUCCESS")) return "success";
         if (upper.contains("WARNING")) return "warning";
         return "info";
     }
@@ -1314,7 +1126,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         res.getWriter().flush();
     }
 
-    private String buildForwarderPayload(String type, String title, String text) {
+    static String buildForwarderPayload(String type, String title, String text) {
         try {
             JSONObject payload = new JSONObject();
             payload.put("type", type);

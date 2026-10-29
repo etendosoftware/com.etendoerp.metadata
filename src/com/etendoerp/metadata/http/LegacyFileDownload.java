@@ -34,7 +34,7 @@ public final class LegacyFileDownload implements Serializable {
 
     private static final String SESSION_KEY_PREFIX = "ETMETA_LEGACY_DOWNLOAD_";
     private static final Pattern FILE_NAME_PATTERN =
-            Pattern.compile("filename=\\s*\"?([^\";]+)\"?", Pattern.CASE_INSENSITIVE);
+            Pattern.compile("filename=\\s*+\"?+([^\";]++)", Pattern.CASE_INSENSITIVE);
 
     private final byte[] content;
     private final String contentType;
