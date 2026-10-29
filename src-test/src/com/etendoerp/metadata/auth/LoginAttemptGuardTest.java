@@ -57,6 +57,8 @@ public class LoginAttemptGuardTest {
     private static final String USER_ID = "user-1";
     private static final String INVALID_CREDENTIALS_TEXT = "Invalid user name or password.";
     private static final String LOCKED_USER_TEXT = "user is locked. Ask System Administrator to unlock it.";
+    /** {@code LOCKED_USER_MSG} as stored in {@code AD_Message}: two lines. */
+    private static final String LOCKED_USER_STORED_TEXT = "user is locked. \nAsk System Administrator to unlock it.";
 
     @Mock
     private HttpServletRequest request;
@@ -121,7 +123,7 @@ public class LoginAttemptGuardTest {
 
     /**
      * A locked user is refused with the Classic locked user message even when the password is
-     * right, in the language of the current context.
+     * right, in the language of the current context, with its line break turned into a space.
      */
     @Test
     public void testAuthenticateLockedUserRecordsFailureAndThrowsLockedMessage() {
@@ -131,7 +133,7 @@ public class LoginAttemptGuardTest {
         when(language.getLanguage()).thenReturn("es_ES");
         when(context.getLanguage()).thenReturn(language);
         obContextMock.when(OBContext::getOBContext).thenReturn(context);
-        stubMessage(LoginAttemptGuard.LOCKED_USER_MESSAGE, "es_ES", LOCKED_USER_TEXT);
+        stubMessage(LoginAttemptGuard.LOCKED_USER_MESSAGE, "es_ES", LOCKED_USER_STORED_TEXT);
 
         assertUnauthorized(LOCKED_USER_TEXT);
         registryMock.verify(() -> LoginSessionRegistry.register(request, USERNAME, null,
@@ -152,14 +154,14 @@ public class LoginAttemptGuardTest {
     }
 
     /**
-     * Stubs the translation of a Classic message.
+     * Stubs the unescaped translation of a Classic message.
      *
      * @param key      the message key
      * @param language the language it is requested in
      * @param text     the translated text
      */
     private void stubMessage(String key, String language, String text) {
-        utilityMock.when(() -> Utility.messageBD(any(ConnectionProvider.class), eq(key), eq(language)))
+        utilityMock.when(() -> Utility.messageBD(any(ConnectionProvider.class), eq(key), eq(language), eq(false)))
             .thenReturn(text);
     }
 

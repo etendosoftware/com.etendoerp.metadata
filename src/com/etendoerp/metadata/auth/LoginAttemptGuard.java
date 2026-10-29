@@ -19,6 +19,7 @@ package com.etendoerp.metadata.auth;
 
 import javax.servlet.http.HttpServletRequest;
 
+import org.apache.commons.lang3.StringUtils;
 import org.openbravo.base.secureApp.LoginUtils;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.database.ConnectionProvider;
@@ -70,7 +71,18 @@ public final class LoginAttemptGuard {
 
     LoginSessionRegistry.register(request, username, null, LoginSessionRegistry.FAILED_STATUS);
     String messageKey = resolveFailureMessageKey(connection, username, password);
-    throw new UnauthorizedException(Utility.messageBD(connection, messageKey, resolveLanguage()));
+    throw new UnauthorizedException(readMessage(connection, messageKey));
+  }
+
+  /**
+   * Reads a Classic message as plain text for a JSON answer. The default {@link Utility#messageBD}
+   * escapes line breaks for JavaScript (a literal {@code \n}), and messages such as
+   * {@code LOCKED_USER_MSG} span two lines, so the text is read unescaped and its whitespace is
+   * collapsed into single spaces.
+   */
+  private static String readMessage(ConnectionProvider connection, String messageKey) {
+    String message = Utility.messageBD(connection, messageKey, resolveLanguage(), false);
+    return StringUtils.normalizeSpace(message);
   }
 
   /**
