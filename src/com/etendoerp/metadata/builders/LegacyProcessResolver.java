@@ -109,6 +109,12 @@ public class LegacyProcessResolver {
 
     // --- Classic input naming convention (mirrors columnNameToInpKey on the client) ---
     private static final String INP_PREFIX = "inp";
+    /**
+     * Hidden input Classic sends when it opens a Manual process popup ({@code OBViewTab} →
+     * {@code openProcessPopup}); servlets such as Create Remittance File read the process
+     * description from it.
+     */
+    static final String INP_PROCESS_ID = "inpProcessId";
     private static final String COLUMN_NAME_SEPARATOR = "_";
 
     // Sorts Boolean.TRUE entries first, tolerates null. Useful for picking the "default" row.
@@ -187,7 +193,7 @@ public class LegacyProcessResolver {
                 return Optional.empty();
             }
 
-            Map<String, String> additionalParams = resolveAdditionalParameters(field);
+            Map<String, String> additionalParams = withManualProcessId(field, resolveAdditionalParameters(field));
             return Optional.of(new LegacyProcessParams(url, command, keyColumn, keyColumn, additionalParams));
         } catch (Exception e) {
             logger.warn("Error resolving legacy process params for field {}: {}", field.getId(), e.getMessage());
@@ -590,6 +596,23 @@ public class LegacyProcessResolver {
                     field.getId(), e.getMessage());
             return Collections.emptyMap();
         }
+    }
+
+    /**
+     * Adds the {@link #INP_PROCESS_ID} entry for Manual processes, mirroring the hidden input
+     * Classic submits when it opens their popup. Other buttons are returned unchanged.
+     *
+     * @param field  a non-{@code null} legacy field
+     * @param params the additional parameters resolved from the tab columns
+     * @return the parameters including the process id for Manual processes
+     */
+    static Map<String, String> withManualProcessId(Field field, Map<String, String> params) {
+        if (!hasManualProcess(field)) {
+            return params;
+        }
+        Map<String, String> result = new LinkedHashMap<>(params);
+        result.putIfAbsent(INP_PROCESS_ID, field.getColumn().getProcess().getId());
+        return result;
     }
 
     /**

@@ -94,6 +94,7 @@ class LegacyProcessResolverTest {
     private static final String INP_PROCESSED = "inpprocessed";
     private static final String PROCESSED_LOWER = "processed";
     private static final String EM_APRM_PROCESSED = "EM_APRM_Processed";
+    private static final String PROCESSED_PLACEHOLDER = "$record.processed!yn";
     private static final String ADDITIONAL_PARAMETERS = "additionalParameters";
 
     /**
@@ -377,7 +378,7 @@ class LegacyProcessResolverTest {
         when(prop.isId()).thenReturn(false);
         when(prop.getName()).thenReturn(PROCESSED_LOWER);
         when(prop.getDomainType()).thenReturn(new BooleanDomainType());
-        assertEquals("$record.processed!yn", LegacyProcessResolver.buildPlaceholder(prop));
+        assertEquals(PROCESSED_PLACEHOLDER, LegacyProcessResolver.buildPlaceholder(prop));
     }
 
     @Test
@@ -412,7 +413,7 @@ class LegacyProcessResolverTest {
             Optional<LegacyProcessParams> params = LegacyProcessResolver.resolve(field);
 
             JSONObject additional = extractAdditionalParameters(params);
-            assertEquals("$record.processed!yn", additional.get(INP_PROCESSED));
+            assertEquals(PROCESSED_PLACEHOLDER, additional.get(INP_PROCESSED));
             assertEquals("$record.financialAccount", additional.get("inpfinFinancialAccountId"));
         }
     }
@@ -540,6 +541,59 @@ class LegacyProcessResolverTest {
             JSONObject additional = extractAdditionalParameters(params);
             assertEquals("$record.id", additional.get("inpfinFinaccTransactionId"));
         }
+    }
+
+    // -------------------------------------------------------------------------
+    // withManualProcessId — inpProcessId sent like Classic openProcessPopup
+    // -------------------------------------------------------------------------
+
+    /**
+     * Manual processes get the {@code inpProcessId} Classic submits when opening their popup,
+     * keeping the column-based parameters.
+     */
+    @Test
+    void withManualProcessIdAddsProcessIdForManualProcesses() {
+        Field field = mockFieldWithProcess(
+                mockManualProcess(PROCESS_INVOICE_FQCN, Collections.emptyList()),
+                EM_APRM_PROCESSED, FIN_FINACC_TRANSACTION_ID);
+
+        Map<String, String> result = LegacyProcessResolver.withManualProcessId(field,
+                Map.of(INP_PROCESSED, PROCESSED_PLACEHOLDER));
+
+        assertEquals(PROCESS_ID, result.get(LegacyProcessResolver.INP_PROCESS_ID));
+        assertEquals(PROCESSED_PLACEHOLDER, result.get(INP_PROCESSED));
+    }
+
+    /**
+     * Manual processes still get the {@code inpProcessId} when no column parameter was
+     * resolved (the column-based map is immutable and empty).
+     */
+    @Test
+    void withManualProcessIdAddsProcessIdToEmptyParameters() {
+        Field field = mockFieldWithProcess(
+                mockManualProcess(PROCESS_INVOICE_FQCN, Collections.emptyList()),
+                EM_APRM_PROCESSED, FIN_FINACC_TRANSACTION_ID);
+
+        Map<String, String> result = LegacyProcessResolver.withManualProcessId(field, Collections.emptyMap());
+
+        assertEquals(Map.of(LegacyProcessResolver.INP_PROCESS_ID, PROCESS_ID), result);
+    }
+
+    /**
+     * Non-manual buttons keep their parameters untouched.
+     */
+    @Test
+    void withManualProcessIdKeepsParametersForStandardProcesses() {
+        Process standard = mock(Process.class);
+        when(standard.getUIPattern()).thenReturn("S");
+        when(standard.getId()).thenReturn(PROCESS_ID);
+        Field field = mockFieldWithProcess(standard, EM_APRM_PROCESSED, FIN_FINACC_TRANSACTION_ID);
+        Map<String, String> params = Map.of(INP_PROCESSED, PROCESSED_PLACEHOLDER);
+
+        Map<String, String> result = LegacyProcessResolver.withManualProcessId(field, params);
+
+        assertFalse(result.containsKey(LegacyProcessResolver.INP_PROCESS_ID));
+        assertEquals(params, result);
     }
 
     // -------------------------------------------------------------------------
