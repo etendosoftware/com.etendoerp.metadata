@@ -54,6 +54,7 @@ If no match is found, legacy paths are checked and forwarded to the Classic serv
 | `/email/config` | `EmailConfigService` | Exact | GET |
 | `/email/attachments` | `EmailAttachmentService` | Exact | GET |
 | `/grid-configuration` | `GridConfigurationService` | Exact | GET, PUT |
+| `/login-defaults` | `LoginDefaultsService` | Exact | GET |
 | `/window/{id}` | `WindowService` | Prefix | GET |
 | `/tab/{id}` | `TabService` | Prefix | GET |
 | `/language{/code}` | `LanguageService` | Prefix | GET |
@@ -315,6 +316,17 @@ This module defines three AD windows:
 - Stored in `ETMETA_SAVEDVIEW`
 - Supports default view per user
 - `GRIDCONFIGURATION` is an opaque JSON string for the server; the new UI also stores column widths, pinning and the window layout in it (see the client docs, `docs/features/saved-views/README.md`)
+
+### Login Defaults (`LoginDefaultsService` / `LoginDefaultsResolver`)
+
+`LoginDefaultsResolver` resolves the role, organization, client and warehouse a user logs in with when the
+request names no role, with the Classic rule (`LoginUtils.getLoginDefaults`): the user's valid defaults,
+otherwise the lowest role id, the highest organization id of that role, the role's client and the lowest
+warehouse id. `/sws/login` (`com.smf.securewebservices`) picks the first entry of an unordered role list
+instead. `GET /login-defaults` returns `{ role, organization, warehouse, client, current }` for the
+caller's token (`current`: the token already uses them) so the New UI can switch a fresh login to them;
+`/login` and the SSO callback use the resolver directly. See the client's
+`docs/features/login-logout/README.md`.
 
 ### Grid Configuration (`GridConfigurationService`)
 - Durable, per-user grid column configuration of the new UI (visibility, order, width, pinning), the equivalent of classic `OBUIAPP_GridConfiguration`

@@ -52,7 +52,10 @@ import org.openbravo.erpCommon.utility.SystemInfo;
 import org.openbravo.dal.service.OBCriteria;
 import org.openbravo.dal.service.OBDal;
 
+import com.etendoerp.metadata.auth.LoginDefaultsResolver;
 import com.etendoerp.metadata.auth.Utils;
+import com.etendoerp.metadata.data.AuthData;
+import com.etendoerp.metadata.exceptions.UnprocessableContentException;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -68,6 +71,7 @@ class SSOServiceTest {
     private static final String AUTH0_TYPE = "Auth0";
     private static final String MIDDLEWARE_TYPE = "Middleware";
     private static final String ERROR_KEY = "error";
+    private static final String INTERNAL_ERROR_CODE = "internal_error";
     private static final String INVALID_REQUEST_ERROR = "invalid_request";
     private static final String UNAUTHORIZED_ERROR = "unauthorized";
     private static final String AUTHORIZATION_HEADER = "Authorization";
@@ -479,7 +483,7 @@ class SSOServiceTest {
             OBDal mockDal = mock(OBDal.class);
             obDalStatic.when(OBDal::getInstance).thenReturn(mockDal);
             when(mockDal.createCriteria(any(Class.class))).thenThrow(new RuntimeException("DB error"));
-            assertEquals("internal_error", spyExecuteAndParse().getString(ERROR_KEY));
+            assertEquals(INTERNAL_ERROR_CODE, spyExecuteAndParse().getString(ERROR_KEY));
         }
         // Success path: user found, token generated
         responseWriter = new StringWriter();
@@ -489,31 +493,28 @@ class SSOServiceTest {
         try (MockedStatic<OBPropertiesProvider> providerStatic = mockStatic(OBPropertiesProvider.class);
              MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
              MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class);
-             MockedStatic<Utils> utilsStatic = mockStatic(Utils.class)) {
+             MockedStatic<Utils> utilsStatic = mockStatic(Utils.class);
+             MockedStatic<LoginDefaultsResolver> resolverStatic = mockStatic(LoginDefaultsResolver.class)) {
             mockProperties(providerStatic, propsWithAuthType(MIDDLEWARE_TYPE));
             OBCriteria criteria = mockOBDalCriteria(obDalStatic);
 
             ETRXTokenUser mockTokenUser = mock(ETRXTokenUser.class);
             User mockUser = mock(User.class);
-            Role mockRole = mock(Role.class);
-            Client mockClient = mock(Client.class);
-            when(mockRole.getClient()).thenReturn(mockClient);
-            when(mockUser.getDefaultRole()).thenReturn(mockRole);
-            when(mockUser.getDefaultOrganization()).thenReturn(mock(Organization.class));
-            when(mockUser.getDefaultWarehouse()).thenReturn(mock(Warehouse.class));
-            when(mockUser.getClient()).thenReturn(mockClient);
             when(mockUser.getId()).thenReturn("usr-123");
             when(mockUser.getUsername()).thenReturn("testuser");
             when(mockTokenUser.getUserForToken()).thenReturn(mockUser);
             when(criteria.uniqueResult()).thenReturn(mockTokenUser);
-            utilsStatic.when(() -> Utils.generateToken(any(), any())).thenReturn("jwt-token");
+            AuthData classicDefaults = new AuthData(mockUser, mock(Role.class), mock(Organization.class),
+                mock(Warehouse.class), mock(Client.class));
+            resolverStatic.when(() -> LoginDefaultsResolver.resolve(mockUser)).thenReturn(classicDefaults);
+            utilsStatic.when(() -> Utils.generateToken(classicDefaults, null)).thenReturn("jwt-token");
 
             JSONObject result = spyExecuteAndParse();
             assertEquals("jwt-token", result.getString("token"));
             assertEquals("usr-123", result.getString("userId"));
             assertEquals("testuser", result.getString("username"));
         }
-        // Success with null default role (covers ternary false branch)
+        // The user has no valid Classic login defaults: authentication fails, no token is issued
         responseWriter = new StringWriter();
         when(response.getWriter()).thenReturn(new PrintWriter(responseWriter));
         setupRequest(SSO_CALLBACK_PATH, "POST");
@@ -521,21 +522,20 @@ class SSOServiceTest {
         try (MockedStatic<OBPropertiesProvider> providerStatic = mockStatic(OBPropertiesProvider.class);
              MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
              MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class);
-             MockedStatic<Utils> utilsStatic = mockStatic(Utils.class)) {
+             MockedStatic<Utils> utilsStatic = mockStatic(Utils.class);
+             MockedStatic<LoginDefaultsResolver> resolverStatic = mockStatic(LoginDefaultsResolver.class)) {
             mockProperties(providerStatic, propsWithAuthType(MIDDLEWARE_TYPE));
             OBCriteria criteria = mockOBDalCriteria(obDalStatic);
 
             ETRXTokenUser mockTokenUser = mock(ETRXTokenUser.class);
             User mockUser = mock(User.class);
-            when(mockUser.getDefaultRole()).thenReturn(null);
-            when(mockUser.getClient()).thenReturn(mock(Client.class));
-            when(mockUser.getId()).thenReturn("usr-456");
-            when(mockUser.getUsername()).thenReturn("noroler");
             when(mockTokenUser.getUserForToken()).thenReturn(mockUser);
             when(criteria.uniqueResult()).thenReturn(mockTokenUser);
-            utilsStatic.when(() -> Utils.generateToken(any(), any())).thenReturn("t2");
+            resolverStatic.when(() -> LoginDefaultsResolver.resolve(mockUser))
+                .thenThrow(new UnprocessableContentException("No valid login defaults"));
 
-            assertEquals("t2", spyExecuteAndParse().getString("token"));
+            assertEquals(INTERNAL_ERROR_CODE, spyExecuteAndParse().getString(ERROR_KEY));
+            utilsStatic.verify(() -> Utils.generateToken(any(), any()), never());
         }
     }
 
@@ -572,7 +572,7 @@ class SSOServiceTest {
             OBDal mockDal = mock(OBDal.class);
             obDalStatic.when(OBDal::getInstance).thenReturn(mockDal);
             when(mockDal.get(any(Class.class), anyString())).thenThrow(new RuntimeException("DB error"));
-            assertEquals("internal_error", spyExecuteAndParse().getString(ERROR_KEY));
+            assertEquals(INTERNAL_ERROR_CODE, spyExecuteAndParse().getString(ERROR_KEY));
         }
         // User found, existing link removed, new link created
         responseWriter = new StringWriter();

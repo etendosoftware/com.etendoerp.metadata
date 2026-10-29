@@ -145,6 +145,7 @@ public class Constants {
     public static final String RECENT_ITEMS_PATH = "/recent-items";
     public static final String CHANGE_PROFILE_PATH = "/change-profile";
     public static final String LOGIN_PATH = "/login";
+    public static final String LOGIN_DEFAULTS_PATH = "/login-defaults";
 
     // Audit Fields
     public static final String CREATION_DATE = "creationDate";

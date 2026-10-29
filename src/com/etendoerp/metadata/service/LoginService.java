@@ -29,10 +29,10 @@ import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.access.Role;
 import org.openbravo.model.ad.access.User;
-import org.openbravo.model.ad.system.Client;
 import org.openbravo.model.common.enterprise.Organization;
 import org.openbravo.model.common.enterprise.Warehouse;
 
+import com.etendoerp.metadata.auth.LoginDefaultsResolver;
 import com.etendoerp.metadata.auth.Utils;
 import com.etendoerp.metadata.data.AuthData;
 import com.etendoerp.metadata.exceptions.InternalServerException;
@@ -53,8 +53,9 @@ import com.etendoerp.metadata.exceptions.UnprocessableContentException;
  * fall back on here, so the frontend cannot recover without a login path of its own.
  * <p>
  * Authenticates via {@link PasswordHash#getUserWithPassword}, part of core (not
- * {@code com.smf.securewebservices}), so no pre-existing session or token is required. Role,
- * organization, and warehouse resolution then goes through
+ * {@code com.smf.securewebservices}), so no pre-existing session or token is required. When the
+ * request names no role, the role, organization and warehouse follow the Classic login rule (see
+ * {@link LoginDefaultsResolver}). Role, organization, and warehouse resolution then goes through
  * {@link com.etendoerp.metadata.auth.Utils#generateToken}, which already tolerates an
  * organization with no warehouses (see its {@code "0"} sentinel).
  */
@@ -99,12 +100,7 @@ public class LoginService extends MetadataService {
             }
             User user = authenticatedUser.get();
 
-            Role role = resolveRole(body, user);
-            Organization organization = ProfileRequestUtils.resolveOrganization(body, ORGANIZATION);
-            Warehouse warehouse = ProfileRequestUtils.resolveWarehouse(body, WAREHOUSE);
-            Client client = role.getClient();
-
-            AuthData authData = new AuthData(user, role, organization, warehouse, client);
+            AuthData authData = resolveAuthData(body, user);
             String token = com.etendoerp.metadata.auth.Utils.generateToken(authData, null);
 
             write(new JSONObject().put(TOKEN, token));
@@ -118,20 +114,33 @@ public class LoginService extends MetadataService {
         }
     }
 
-    private Role resolveRole(JSONObject body, User user) {
+    /**
+     * Builds the login context from the request body. Without a role in the body, the role (and
+     * any organization or warehouse the body does not name either) follows the Classic login rule
+     * - see {@link LoginDefaultsResolver}.
+     */
+    private AuthData resolveAuthData(JSONObject body, User user) {
+        Organization organization = ProfileRequestUtils.resolveOrganization(body, ORGANIZATION);
+        Warehouse warehouse = ProfileRequestUtils.resolveWarehouse(body, WAREHOUSE);
         String roleId = ProfileRequestUtils.getStringOrNull(body, ROLE);
-        String id;
+
         if (roleId != null) {
-            id = roleId;
-        } else {
-            Role defaultRole = user.getDefaultRole();
-            id = defaultRole != null ? defaultRole.getId() : null;
+            Role role = resolveRole(roleId);
+            return new AuthData(user, role, organization, warehouse, role.getClient());
         }
 
-        if (id == null) {
-            throw new UnprocessableContentException("No role available for this user");
+        AuthData defaults = LoginDefaultsResolver.resolve(user);
+        if (organization != null) {
+            // The default warehouse belongs to the default organization, so it is dropped too
+            defaults.setOrg(organization);
+            defaults.setWarehouse(warehouse);
+        } else if (warehouse != null) {
+            defaults.setWarehouse(warehouse);
         }
+        return defaults;
+    }
 
+    private Role resolveRole(String id) {
         Role role = OBDal.getInstance().get(Role.class, id);
         if (role == null || role.getClient() == null) {
             throw new UnprocessableContentException("Invalid role: " + id);
