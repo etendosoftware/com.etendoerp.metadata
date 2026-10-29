@@ -91,6 +91,27 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
     private static final String INFO_PATH_SEGMENT = "info/";
     /** Function present only in Classic search/selector popups; gates the selector shim. */
     private static final String VALIDATE_SELECTOR_MARKER = "validateSelector";
+    /** Classic page that stores the records to print in session and opens the print process. */
+    private static final String PRINTER_REPORTS_PAGE = "businessUtility/PrinterReports.html";
+
+    /**
+     * Script injected into the Classic {@code PrinterReports} page, which the new UI opens in its
+     * own browser window to print a tab whose print process is not a PrintController document
+     * (e.g. Business Partner, Remittance, Tax Payment). Outside the Classic MDI layout the page
+     * runs {@code openPDF(url)} on load, which opens a second window that the browser blocks
+     * (no user gesture), and then closes itself with {@code closePage()}. The shim loads the print
+     * process in the same window instead, served directly by Classic (the {@code /meta/legacy/}
+     * prefix is stripped, as the popup URL fix does), and keeps the window open.
+     */
+    private static final String PRINTER_REPORTS_SHIM_SCRIPT = "<script>(function(){" +
+            "window.openPDF=function(url){" +
+            "var target=new URL(url,window.location.href);" +
+            "target.pathname=target.pathname.replace('/meta/legacy/','/');" +
+            "window.location.replace(target.href);" +
+            "return true;" +
+            "};" +
+            "window.closePage=function(){return true;};" +
+            "})();</script>";
 
     private static final String RECEIVE_AND_POST_MESSAGE_SCRIPT = "<script>window.addEventListener(\"message\", (event) => {"
             +
@@ -1902,6 +1923,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
 
         responseString = injectFrameMenuShim(responseString);
         responseString = injectSelectorPopupShim(path, responseString);
+        responseString = injectPrinterReportsShim(path, responseString);
 
         if (responseString.contains(FRAMESET_CLOSE_TAG)) {
             return responseString.replace(HEAD_CLOSE_TAG, RECEIVE_AND_POST_MESSAGE_SCRIPT.concat(HEAD_CLOSE_TAG));
@@ -1974,6 +1996,22 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
      */
     private static boolean isSelectorPopupPage(String path, String responseString) {
         return path != null && path.contains(INFO_PATH_SEGMENT) && responseString.contains(VALIDATE_SELECTOR_MARKER);
+    }
+
+    /**
+     * Injects {@link #PRINTER_REPORTS_SHIM_SCRIPT} into the Classic {@code PrinterReports} page so
+     * the print process opens in the same window. Any other page is returned unchanged.
+     *
+     * @param path           the requested resource path
+     * @param responseString the HTML response after previous injections
+     * @return the HTML with the shim injected before {@code </HEAD>}, or the original HTML when
+     *         the page is not {@code PrinterReports}
+     */
+    private String injectPrinterReportsShim(String path, String responseString) {
+        if (path == null || !path.endsWith(PRINTER_REPORTS_PAGE) || !responseString.contains(HEAD_CLOSE_TAG)) {
+            return responseString;
+        }
+        return responseString.replace(HEAD_CLOSE_TAG, PRINTER_REPORTS_SHIM_SCRIPT.concat(HEAD_CLOSE_TAG));
     }
 
     private String injectCodeAfterFunctionCall(String originalRes, String originalFunctionCall, String newFunctionCall,
