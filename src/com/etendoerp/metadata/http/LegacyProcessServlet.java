@@ -1282,7 +1282,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
     private String mapMessageType(String classSuffix) {
         String upper = classSuffix.toUpperCase();
         if (upper.contains("ERROR")) return "error";
-        if (upper.contains("SUCCESS")) return "success";
+        if (upper.contains("SUCCESS")) return SUCCESS_MESSAGE_TYPE;
         if (upper.contains("WARNING")) return "warning";
         return "info";
     }
