@@ -667,7 +667,8 @@ class MenuBuilderTest {
     when(childMenu.getAction()).thenReturn("F");
     when(childMenu.getSpecialForm()).thenReturn(mockForm);
     when(mockForm.getId()).thenReturn(formId);
-    when(mockForm.getJavaClassName()).thenReturn(javaClassName);
+    // Lenient: when the entry has a default mapping, the class name is never read.
+    lenient().when(mockForm.getJavaClassName()).thenReturn(javaClassName);
 
     withMenuBuilder(builder -> {
       JSONObject result = builder.toJSON();
