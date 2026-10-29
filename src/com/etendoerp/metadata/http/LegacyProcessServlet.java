@@ -518,6 +518,29 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
                     "window.location.replace(%s);" +
                     "})();</script></head><body></body></html>";
 
+    /**
+     * Matches the {@code onload="submitThisPage(...)"} body of Classic {@code PopUp_Response.html}
+     * (rendered by {@code printPageClosePopUp}): the page that closes the popup and reloads the tab,
+     * which then shows the message the servlet stored in the session for that tab.
+     */
+    private static final Pattern CLOSE_POPUP_RESPONSE =
+            Pattern.compile("onload=\"submitThisPage\\((?:'[^']*'|null)\\);\"");
+    /** {@code Command} of the request that opens a legacy popup. */
+    private static final String COMMAND_DEFAULT = "DEFAULT";
+
+    /**
+     * Self-contained HTML served when the request that opens a popup is answered with
+     * {@code PopUp_Response}: it sends {@code processOrder} so the new UI reads the tab message
+     * stored in the session, as Classic does when it reloads the tab.
+     */
+    private static final String PROCESS_ORDER_FORWARDER_HTML =
+            HTML_DOCTYPE_HEAD +
+                    "(function(){if(!window.parent)return;" +
+                    "window.parent.postMessage({type:'" + LegacyMessageProtocol.MESSAGE_TYPE + ACTION_JSON_SEPARATOR
+                    + "'" + LegacyMessageProtocol.ACTION_PROCESS_ORDER + "'},'*');" +
+                    "window.__etendoMessageSent=true;" +
+                    "})();</script></head><body></body></html>";
+
     public static final String SET_COOKIE = "Set-Cookie";
     public static final String ERROR_SENDING_ERROR_RESPONSE = "Error sending error response: {}";
 
@@ -1012,6 +1035,11 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             return;
         }
 
+        if (isClosePopupOnOpen(output, currentCommand())) {
+            writeForwarderHtml(res, PROCESS_ORDER_FORWARDER_HTML);
+            return;
+        }
+
         if (wrapper.isRedirected()) {
             writeRedirect(res, wrapper, contextPath);
             return;
@@ -1085,8 +1113,34 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             throws IOException {
         String payload = buildForwarderPayload(SUCCESS_MESSAGE_TYPE,
                 OBMessageUtils.messageBD(SUCCESS_MESSAGE_KEY), fileName);
-        String html = String.format(FILE_DOWNLOAD_FORWARDER_HTML, payload, JSONObject.quote(downloadUrl));
+        writeForwarderHtml(res, String.format(FILE_DOWNLOAD_FORWARDER_HTML, payload, JSONObject.quote(downloadUrl)));
+    }
 
+    /**
+     * Tells whether the request that opens a popup ({@code Command=DEFAULT}) was answered with
+     * Classic {@code PopUp_Response}, e.g. Import Statement warning that no bank file format is
+     * installed. Later submits already sent {@code processOrder} from the injected submit hook, and
+     * multipart submits expose no {@code Command} here, so only the opening request qualifies.
+     *
+     * @param body    the captured legacy response body, may be {@code null}
+     * @param command the {@code Command} request parameter, may be {@code null}
+     * @return {@code true} when the new UI must be told to read the tab message
+     */
+    static boolean isClosePopupOnOpen(String body, String command) {
+        if (!COMMAND_DEFAULT.equals(command) || body == null) {
+            return false;
+        }
+        return CLOSE_POPUP_RESPONSE.matcher(body).find();
+    }
+
+    /**
+     * Writes a self-contained forwarder page as the HTML response.
+     *
+     * @param res  the real response
+     * @param html the forwarder page
+     * @throws IOException if the response writer fails
+     */
+    private void writeForwarderHtml(HttpServletResponse res, String html) throws IOException {
         res.setContentType(HTML_UTF8_CONTENT_TYPE);
         res.setCharacterEncoding(UTF8_CHARSET);
         res.setStatus(HttpServletResponse.SC_OK);
@@ -1149,11 +1203,20 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
      * @return {@code true} when the {@code Command} parameter is a DataGrid command
      */
     private static boolean isXmlDataCommand() {
+        return isDataGridCommand(currentCommand());
+    }
+
+    /**
+     * Returns the {@code Command} parameter of the request being processed.
+     *
+     * @return the command, or {@code null} when there is no request or no command
+     */
+    private static String currentCommand() {
         HttpServletRequest req = RequestContext.get().getRequest();
         if (req == null) {
-            return false;
+            return null;
         }
-        return isDataGridCommand(req.getParameter(COMMAND_PARAM));
+        return req.getParameter(COMMAND_PARAM);
     }
 
     /**

@@ -74,6 +74,9 @@ public class LegacyProcessServletFileDownloadTest {
   private static final String DOWNLOAD_URL_SNIPPET = "download?fileId=";
   private static final String DOWNLOAD_REPORT_URL = "/etendo/utility/DownloadReport.html?report=Rec-1.pdf";
   private static final String HANDLE_RESPONSE = "handleResponse";
+  private static final String COMMAND_DEFAULT = "DEFAULT";
+  private static final String POPUP_RESPONSE_BODY =
+      "<body onload=\"submitThisPage('/etendo/FinancialAccount/Account_Relation.html');\" id=\"paramHref\">";
   private static final byte[] BINARY_CONTENT = {0, (byte) 0xFF, 0x50, 0x4B, (byte) 0x80};
 
   private LegacyProcessServlet servlet;
@@ -160,6 +163,21 @@ public class LegacyProcessServletFileDownloadTest {
         HttpServletResponseLegacyWrapper.class, String.class, String.class);
     method.setAccessible(true);
     method.invoke(servlet, response, wrapper, "/remittance/CreateFile.html", CONTEXT_PATH);
+  }
+
+  /**
+   * Invokes {@code handleResponse} with {@link RequestContext} returning the given request.
+   *
+   * @throws Exception if the reflective call fails
+   */
+  private void invokeHandleResponseWithin(HttpServletRequest request, HttpServletResponseLegacyWrapper wrapper)
+      throws Exception {
+    RequestContext requestContext = mock(RequestContext.class);
+    when(requestContext.getRequest()).thenReturn(request);
+    try (MockedStatic<RequestContext> contextMock = mockStatic(RequestContext.class)) {
+      contextMock.when(RequestContext::get).thenReturn(requestContext);
+      invokeHandleResponse(wrapper);
+    }
   }
 
   private void assertSuccessForwarder(String html) {
@@ -299,13 +317,8 @@ public class LegacyProcessServletFileDownloadTest {
     wrapper.sendRedirect("INTR_GenerateFile.html?Command=DEFAULT");
     HttpServletRequest request = mock(HttpServletRequest.class);
     when(request.getSession(true)).thenReturn(session);
-    RequestContext requestContext = mock(RequestContext.class);
-    when(requestContext.getRequest()).thenReturn(request);
 
-    try (MockedStatic<RequestContext> contextMock = mockStatic(RequestContext.class)) {
-      contextMock.when(RequestContext::get).thenReturn(requestContext);
-      invokeHandleResponse(wrapper);
-    }
+    invokeHandleResponseWithin(request, wrapper);
 
     String html = written.toString();
     assertSuccessForwarder(html);
@@ -329,6 +342,49 @@ public class LegacyProcessServletFileDownloadTest {
     String html = written.toString();
     assertSuccessForwarder(html);
     assertTrue(html.contains("DownloadReport.html?report=Rec-1.pdf"));
+  }
+
+  /**
+   * Tests that the PopUp_Response answered to the opening request ({@code Command=DEFAULT}) is
+   * detected, with and without a tab URL.
+   */
+  @Test
+  public void isClosePopupOnOpenDetectsPopUpResponseOnOpening() {
+    assertTrue(LegacyProcessServlet.isClosePopupOnOpen(POPUP_RESPONSE_BODY, COMMAND_DEFAULT));
+    assertTrue(LegacyProcessServlet.isClosePopupOnOpen(
+        "<body onload=\"submitThisPage(null);\" id=\"paramHref\">", COMMAND_DEFAULT));
+  }
+
+  /**
+   * Tests that later submits, missing commands (multipart submits) and regular pages are ignored.
+   */
+  @Test
+  public void isClosePopupOnOpenIgnoresOtherRequestsAndPages() {
+    assertFalse(LegacyProcessServlet.isClosePopupOnOpen(POPUP_RESPONSE_BODY, "IMPORT"));
+    assertFalse(LegacyProcessServlet.isClosePopupOnOpen(POPUP_RESPONSE_BODY, null));
+    assertFalse(LegacyProcessServlet.isClosePopupOnOpen("<body onload=\"init();\"><form></form>", COMMAND_DEFAULT));
+    assertFalse(LegacyProcessServlet.isClosePopupOnOpen(null, COMMAND_DEFAULT));
+  }
+
+  /**
+   * Tests that a PopUp_Response answered when opening the popup (e.g. Import Statement without
+   * bank file formats) is replaced by a forwarder that asks the new UI to read the tab message.
+   *
+   * @throws Exception if the reflective call fails
+   */
+  @Test
+  public void handleResponseForwardsProcessOrderWhenPopupClosesOnOpen() throws Exception {
+    HttpServletResponseLegacyWrapper wrapper = new HttpServletResponseLegacyWrapper(mock(HttpServletResponse.class));
+    wrapper.getWriter().write("<html><body " + POPUP_RESPONSE_BODY.substring("<body ".length()) + "</html>");
+    HttpServletRequest request = mock(HttpServletRequest.class);
+    when(request.getParameter("Command")).thenReturn(COMMAND_DEFAULT);
+
+    invokeHandleResponseWithin(request, wrapper);
+
+    String html = written.toString();
+    assertTrue(html.contains("action:'processOrder'"));
+    assertFalse(html.contains("submitThisPage"));
+    verify(response).setContentType(HTML_UTF8_CONTENT_TYPE);
   }
 
   /**
