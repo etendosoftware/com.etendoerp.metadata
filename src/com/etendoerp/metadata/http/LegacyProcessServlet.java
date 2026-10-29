@@ -771,7 +771,13 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         return path != null && path.toLowerCase().endsWith(HTML_EXTENSION);
     }
 
-    private boolean isDownloadRequest(String path) {
+    /**
+     * Tells whether the path targets the endpoint serving files captured from legacy servlets.
+     *
+     * @param path the request path info, may be {@code null}
+     * @return {@code true} when the path ends with {@code /download}
+     */
+    static boolean isDownloadRequest(String path) {
         return path != null && path.toLowerCase().endsWith(DOWNLOAD_PATH_SUFFIX);
     }
 

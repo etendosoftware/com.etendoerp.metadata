@@ -131,6 +131,8 @@ public class LegacyProcessServletFileDownloadTest {
 
   /**
    * Builds a wrapper whose included servlet streamed a binary file with the given headers.
+   *
+   * @throws IOException if the wrapper output stream fails
    */
   private HttpServletResponseLegacyWrapper fileWrapper(String contentType, String disposition)
       throws IOException {
@@ -165,6 +167,17 @@ public class LegacyProcessServletFileDownloadTest {
     assertTrue(html.contains("\"type\":\"success\""));
     assertTrue(html.contains(SUCCESS_TITLE));
     assertTrue(html.contains(LOCATION_REPLACE_SNIPPET));
+  }
+
+  /**
+   * Tests that only paths ending with {@code /download} reach the download endpoint.
+   */
+  @Test
+  public void isDownloadRequestMatchesDownloadPathOnly() {
+    assertTrue(LegacyProcessServlet.isDownloadRequest("/download"));
+    assertTrue(LegacyProcessServlet.isDownloadRequest("/Download"));
+    assertFalse(LegacyProcessServlet.isDownloadRequest("/remittance/CreateFile.html"));
+    assertFalse(LegacyProcessServlet.isDownloadRequest(null));
   }
 
   /**
