@@ -100,6 +100,9 @@ public class LegacyProcessServletTest extends OBBaseTest {
     private static final String MAP_MESSAGE_TYPE = "mapMessageType";
     private static final String WRITE_REQUEST_FAILED_FORWARDER = "writeRequestFailedForwarder";
     private static final String POST_MESSAGE_SCRIPT_KEY = "POST_MESSAGE_SCRIPT";
+    private static final String PRINTER_REPORTS_SHIM_MARKER = "window.openPDF=function";
+    private static final String PRINTER_REPORTS_HTML = "<HTML><HEAD></HEAD><BODY onload=\"printReport('../RptC_Bpartner.html');\">"
+            + "<FORM name=\"frmMain\"></FORM></BODY></HTML>";
     private static final String CREATE_FROM_SESSION_KEY = "CREATEFROM|TABID";
     private static final String RECORD_ID_VALUE = "RECORD_1";
     private static final String OTHER_PATH = "/other/path.html";
@@ -1492,6 +1495,47 @@ public class LegacyProcessServletTest extends OBBaseTest {
                 result.contains("submitThisPage('PROCESS');"));
         assertTrue("closeModal injection on closeThisPage() must be preserved",
                 result.contains("closeThisPage();sendMessage('closeModal');"));
+    }
+
+    // ========== Tests for the PrinterReports shim ==========
+
+    /**
+     * Runs {@code getInjectedContent} on the given path with the sample PrinterReports page.
+     *
+     * @param path the requested resource path
+     * @return the HTML with the injected scripts
+     * @throws ReflectiveOperationException if the reflective invocation of the private method fails
+     */
+    private String injectPrinterReportsContent(String path) throws ReflectiveOperationException {
+        return (String) invokePrivateMethod(legacyProcessServlet, "getInjectedContent",
+                new Class<?>[] { String.class, String.class }, path, PRINTER_REPORTS_HTML);
+    }
+
+    /**
+     * Tests that the Classic {@code PrinterReports} page gets the shim that opens the print
+     * process in the same window and keeps it open.
+     *
+     * @throws Exception if the reflective invocation of the private method fails
+     */
+    @Test
+    public void getInjectedContentShouldInjectPrinterReportsShim() throws Exception {
+        String result = injectPrinterReportsContent("/businessUtility/PrinterReports.html");
+
+        assertTrue("PrinterReports must override openPDF", result.contains(PRINTER_REPORTS_SHIM_MARKER));
+        assertTrue("PrinterReports must keep its window open",
+                result.contains("window.closePage=function(){return true;}"));
+    }
+
+    /**
+     * Tests that pages other than {@code PrinterReports} are not given the print shim.
+     *
+     * @throws Exception if the reflective invocation of the private method fails
+     */
+    @Test
+    public void getInjectedContentShouldNotInjectPrinterReportsShimInOtherPages() throws Exception {
+        String result = injectPrinterReportsContent("/ad_actionButton/ActionButton_Responser.html");
+
+        assertFalse("Only PrinterReports must override openPDF", result.contains(PRINTER_REPORTS_SHIM_MARKER));
     }
 
     // ========== Tests for refresh-Command guard in notifyUnload ==========
