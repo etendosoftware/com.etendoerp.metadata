@@ -55,6 +55,8 @@ If no match is found, legacy paths are checked and forwarded to the Classic serv
 | `/email/attachments` | `EmailAttachmentService` | Exact | GET |
 | `/grid-configuration` | `GridConfigurationService` | Exact | GET, PUT |
 | `/login-defaults` | `LoginDefaultsService` | Exact | GET |
+| `/login-guard` | `LoginGuardService` | Exact (no token, via `UnauthenticatedLoginServlet`) | POST |
+| `/login-session` | `LoginSessionService` | Exact | POST |
 | `/window/{id}` | `WindowService` | Prefix | GET |
 | `/tab/{id}` | `TabService` | Prefix | GET |
 | `/language{/code}` | `LanguageService` | Prefix | GET |
@@ -327,6 +329,29 @@ instead. `GET /login-defaults` returns `{ role, organization, warehouse, client,
 caller's token (`current`: the token already uses them) so the New UI can switch a fresh login to them;
 `/login` and the SSO callback use the resolver directly. See the client's
 `docs/features/login-logout/README.md`.
+
+### Login Attempts and Session Registry (`LoginAttemptGuard` / `LoginSessionRegistry`)
+
+The Classic login protections, applied to the New UI login (`/sws/login` only checks the password):
+
+- `LoginAttemptGuard.authenticate` calls `LoginUtils.getValidUserId`, so `UserLock` delays the answer by
+  the username's failed attempts, refuses a locked user and locks it after the configured attempts
+  (`login.trial.delay.increment`, `login.trial.delay.max`, `login.trial.user.lock` in
+  `Openbravo.properties`). A failed attempt is recorded as `F` in `AD_Session` with the username (what
+  `UserLock` counts) and refused with `UnauthorizedException` (401) carrying the Classic message
+  (`LOCKED_USER_MSG` when the password alone is right, else `IDENTIFICATION_FAILURE_TITLE`).
+- `LoginSessionRegistry` reproduces the `protected` `AuthenticationManager#createDBSession`
+  (`register`, also used by `LegacyProcessServlet`) and closes a session of the caller's user
+  (`close`).
+- `POST /login-guard` (no token, `{ username, password }`): runs the guard; `{}` when accepted. Records
+  nothing on success.
+- `POST /login-session` (token): records an `S` session for the token's user and returns `{ sessionId }`;
+  used after a `/sws/login` login.
+- `POST /login` runs the guard and records the `S` session itself; the SSO callback records it without a
+  lock check, as Classic does. Both return `sessionId` next to the token.
+- `POST /logout` closes the session named by an optional `{ sessionId }` body.
+
+See the client's `docs/features/login-logout/README.md`.
 
 ### Grid Configuration (`GridConfigurationService`)
 - Durable, per-user grid column configuration of the new UI (visibility, order, width, pinning), the equivalent of classic `OBUIAPP_GridConfiguration`
