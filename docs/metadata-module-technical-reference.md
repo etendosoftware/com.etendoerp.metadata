@@ -88,6 +88,14 @@ When the frontend requests metadata for a window, the response includes the full
 - Tab ID, name, entity name, table ID, HQL filter clause
 - Tab hierarchy (parent tab, tab level, sequence)
 - Ordered list of fields with full metadata
+- `printConfig` (`TabPrintConfig`): Print / Email toolbar configuration, `null` when the tab has no print process (`AD_Tab.AD_Process_ID`). It holds:
+  - `url`: the classic print URL, from `OBViewTab.getPrintUrl`.
+  - `hasEmail`: the URL is for orders, invoices or payments.
+  - `legacy`: the process is not a PrintController `print.html` document, so the client prints through the classic `PrinterReports` page.
+  - `directPrint`: the process direct-print flag.
+  - `keyParam`: the classic `inpKeyName`.
+
+  Same rules as the classic UI (`OBViewTab.getIconButtons` / `PrintButton`). See the client doc `docs/features/toolbar-print-email/README.md`.
 
 #### Field Level (`FieldBuilder`, `FieldBuilderWithColumn`, `FieldBuilderWithoutColumn`)
 
@@ -369,6 +377,7 @@ This module defines three AD windows:
 ### Legacy Forwarding
 - Requests to classic paths (e.g., `/info`, `/Selector`) are forwarded to the original Classic servlets
 - Session attributes are bridged for backward compatibility (e.g., UsedByLink window+record context)
+- `businessUtility/PrinterReports.html` (toolbar Print of non-PrintController processes) gets a shim (`PRINTER_REPORTS_SHIM_SCRIPT`). Its `openPDF` loads the print process in the same window, served directly by Classic, instead of opening a second window the browser would block. The shim also keeps the window open.
 
 ---
 
