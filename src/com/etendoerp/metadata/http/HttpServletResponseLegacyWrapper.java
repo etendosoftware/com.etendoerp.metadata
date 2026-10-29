@@ -33,6 +33,10 @@ package com.etendoerp.metadata.http;
   */
  public class HttpServletResponseLegacyWrapper extends javax.servlet.http.HttpServletResponseWrapper {
 
+   static final String CONTENT_DISPOSITION_HEADER = "Content-Disposition";
+   private static final String ATTACHMENT_DISPOSITION = "attachment";
+   private static final String HTML_CONTENT_TYPE = "text/html";
+
    // Buffer to capture response content.
    private final ByteArrayOutputStream contentCapture;
    private CapturingServletOutputStream capturingStream;
@@ -44,6 +48,11 @@ package com.etendoerp.metadata.http;
    // Encoding resolved on first read/write and reused for the lifetime of the
    // wrapper, so encoding changes mid-flight don't corrupt the captured bytes.
    private String capturedEncoding;
+   // Content-Type and Content-Disposition declared by the included legacy servlet.
+   // The container ignores headers set inside a RequestDispatcher.include(), so they
+   // are recorded here to detect and replay file responses (e.g. bank files).
+   private String capturedContentType;
+   private String capturedContentDisposition;
 
    /**
     * Constructs a new HttpServletResponseLegacyWrapper.
@@ -102,6 +111,83 @@ package com.etendoerp.metadata.http;
    @Override
    public void setContentLengthLong(long len) {
      // no-op
+   }
+
+   /**
+    * Records the Content-Type declared by the included servlet and delegates to the wrapped response.
+    *
+    * @param type the declared content type
+    */
+   @Override
+   public void setContentType(String type) {
+     capturedContentType = type;
+     super.setContentType(type);
+   }
+
+   /**
+    * Records the Content-Disposition header (case-insensitive) and delegates to the wrapped response.
+    *
+    * @param name  the header name
+    * @param value the header value
+    */
+   @Override
+   public void setHeader(String name, String value) {
+     captureContentDisposition(name, value);
+     super.setHeader(name, value);
+   }
+
+   /**
+    * Records the Content-Disposition header (case-insensitive) and delegates to the wrapped response.
+    *
+    * @param name  the header name
+    * @param value the header value
+    */
+   @Override
+   public void addHeader(String name, String value) {
+     captureContentDisposition(name, value);
+     super.addHeader(name, value);
+   }
+
+   private void captureContentDisposition(String name, String value) {
+     if (CONTENT_DISPOSITION_HEADER.equalsIgnoreCase(name)) {
+       capturedContentDisposition = value;
+     }
+   }
+
+   /**
+    * Returns the Content-Type declared by the included servlet.
+    *
+    * @return the declared content type, or {@code null} when none was set
+    */
+   public String getCapturedContentType() {
+     return capturedContentType;
+   }
+
+   /**
+    * Returns the Content-Disposition header declared by the included servlet.
+    *
+    * @return the declared content disposition, or {@code null} when none was set
+    */
+   public String getCapturedContentDisposition() {
+     return capturedContentDisposition;
+   }
+
+   /**
+    * Tells whether the included servlet answered with a file instead of a page: its
+    * Content-Disposition is an attachment, or it declares a disposition for a non-HTML
+    * content type (e.g. {@code inline; filename=...} with {@code application/txt}).
+    * Responses without a Content-Disposition (pages, AJAX, JSON, XML) are never files.
+    *
+    * @return {@code true} when the captured output must be delivered as a download
+    */
+   public boolean isFileResponse() {
+     if (capturedContentDisposition == null) {
+       return false;
+     }
+     if (capturedContentDisposition.trim().toLowerCase().startsWith(ATTACHMENT_DISPOSITION)) {
+       return true;
+     }
+     return capturedContentType == null || !capturedContentType.toLowerCase().contains(HTML_CONTENT_TYPE);
    }
 
    /**
@@ -223,6 +309,8 @@ package com.etendoerp.metadata.http;
      writer = null;
      capturingStream = null;
      capturedEncoding = null;
+     capturedContentType = null;
+     capturedContentDisposition = null;
    }
 
    /**

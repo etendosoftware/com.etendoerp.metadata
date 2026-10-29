@@ -77,14 +77,14 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
     private static final String JWT_TOKEN = "#JWT_TOKEN";
     private static final String HTML_EXTENSION = ".html";
     private static final String JS_EXTENSION = ".js";
-    private static final String ACTION_JSON_SEPARATOR = "',action:";
-    private static final String HTML_UTF8_CONTENT_TYPE = "text/html; charset=UTF-8";
-    private static final String UTF8_CHARSET = "UTF-8";
+    static final String ACTION_JSON_SEPARATOR = "',action:";
+    static final String HTML_UTF8_CONTENT_TYPE = "text/html; charset=UTF-8";
+    static final String UTF8_CHARSET = "UTF-8";
     private static final String JSON_CONTENT_TYPE_PREFIX = "application/json";
     private static final String TOKEN_PARAM = "token";
     private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String BEARER_PREFIX = "Bearer ";
-    private static final String META_LEGACY_PATH = "/meta/legacy";
+    static final String META_LEGACY_PATH = "/meta/legacy";
     private static final String WEB_PATH = "/web/";
     private static final String SRC_REPLACE_STRING = "src=\"";
     /** Path segment identifying a Classic info-window (search/selector) page. */
@@ -252,6 +252,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             "if(typeof HTMLFormElement!=='undefined'&&HTMLFormElement.prototype&&!HTMLFormElement.prototype.__etendoSubmitHooked){" +
             "var origSubmit=HTMLFormElement.prototype.submit;" +
             "HTMLFormElement.prototype.submit=function(){" +
+            "if(this&&(this.target==='_top'||this.target==='_parent'))this.target='_self';" +
             "try{" +
             "var cmd=(this&&this.Command&&this.Command.value)||null;" +
             "if(cmd&&!isRefreshCommand(cmd))window.sendMessage('"
@@ -326,7 +327,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
      * like {@code PROCESSDEFAULT} requires a {@code startsWith} check rather than
      * equality.
      */
-    private static final String COMMAND_PARAM = "Command";
+    static final String COMMAND_PARAM = "Command";
     private static final String PROCESS_COMMAND_PREFIX = "PROCESS";
     /** Dojo DataGrid info-selector data commands; their responses are XML, not HTML. */
     private static final String COMMAND_STRUCTURE = "STRUCTURE";
@@ -356,7 +357,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             "class=\"MessageBox(ERROR|SUCCESS|WARNING|INFO)\"", Pattern.CASE_INSENSITIVE);
 
     /** Shared HTML preamble for all postMessage forwarder pages. */
-    private static final String HTML_DOCTYPE_HEAD =
+    static final String HTML_DOCTYPE_HEAD =
             "<!DOCTYPE html>\n<html><head><meta charset=\"" + UTF8_CHARSET + "\"><script>";
 
     /**
@@ -552,6 +553,8 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
                 processLegacyRequest(req, res, path);
             } else if (isJavaScriptRequest(path)) {
                 processJavaScriptRequest(req, res, path);
+            } else if (LegacyPopupResponses.isDownloadRequest(path)) {
+                LegacyPopupResponses.serveDownload(req, res);
             } else if (isLegacyFollowupRequest(req)) {
                 processLegacyFollowupRequest(req, res);
             } else if (isRedirectRequest(path)) {
@@ -917,11 +920,30 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             HttpServletResponseLegacyWrapper wrapper,
             String path, String contextPath) throws IOException {
 
+        // Checked before decoding the body: files may be binary, and Intrastat still calls
+        // sendRedirect after streaming its file.
+        if (wrapper.isFileResponse()) {
+            HttpSession session = RequestContext.get().getRequest().getSession(true);
+            LegacyPopupResponses.writeCapturedFileForwarder(res, session, wrapper, contextPath);
+            return;
+        }
+
         String output = wrapper.getCapturedOutputAsString();
 
         List<ReportInfo> reports = extractReportsFromBody(output, contextPath);
         if (!reports.isEmpty()) {
             writeOpenLegacyReportForwarder(res, reports);
+            return;
+        }
+
+        String downloadReportUrl = LegacyPopupResponses.extractDownloadReportUrl(output);
+        if (downloadReportUrl != null) {
+            LegacyPopupResponses.writeFileDownloadForwarder(res, downloadReportUrl, "");
+            return;
+        }
+
+        if (LegacyPopupResponses.isClosePopupOnOpen(output, LegacyPopupResponses.currentCommand())) {
+            LegacyPopupResponses.writeProcessOrderForwarder(res);
             return;
         }
 
@@ -1104,7 +1126,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         res.getWriter().flush();
     }
 
-    private String buildForwarderPayload(String type, String title, String text) {
+    static String buildForwarderPayload(String type, String title, String text) {
         try {
             JSONObject payload = new JSONObject();
             payload.put("type", type);
