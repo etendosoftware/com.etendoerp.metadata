@@ -176,6 +176,7 @@ public class TabBuilder extends Builder {
 
       json.put("obuiappCanAdd", Boolean.TRUE.equals(tab.isObuiappCanAdd()));
       json.put(TABLE_FULLY_AUDITED, Boolean.TRUE.equals(tab.getTable().isFullyAudited()));
+      putValueOrNull(json, TabPrintConfig.PRINT_CONFIG, TabPrintConfig.toJSON(tab, this::findKeyColumn));
 
       return json;
     } catch (JSONException e) {
@@ -372,17 +373,29 @@ public class TabBuilder extends Builder {
       return;
     }
 
-    Column keyColumn = table.getADColumnList().stream()
-        .filter(column -> Boolean.TRUE.equals(column.isKeyColumn()))
-        .findFirst()
-        .orElse(null);
-
+    Column keyColumn = findKeyColumn();
     if (keyColumn != null) {
       JSONObject syntheticFieldJson = buildSyntheticFieldJson(keyColumn, ID_HQL_NAME);
       if (syntheticFieldJson != null) {
         fieldsJson.put(ID_HQL_NAME, syntheticFieldJson);
       }
     }
+  }
+
+  /**
+   * Returns the key column of the tab's table.
+   *
+   * @return the first column flagged as key, or {@code null} when the tab has no table or no key
+   */
+  private Column findKeyColumn() {
+    Table table = tab.getTable();
+    if (table == null) {
+      return null;
+    }
+    return table.getADColumnList().stream()
+        .filter(column -> Boolean.TRUE.equals(column.isKeyColumn()))
+        .findFirst()
+        .orElse(null);
   }
 
   /**
