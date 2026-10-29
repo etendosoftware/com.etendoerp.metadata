@@ -353,6 +353,7 @@ This module defines three AD windows:
 ### Menu (`MenuService` / `MenuBuilder`)
 - Returns the full menu tree for the current role
 - Resolves menu actions: Window, Form, Process, External link
+- Form entries carry `formId` and `formUrl`. `formUrl` is the form's default model implementation mapping, the address Classic opens, so it also works for forms provided by modules. When the entry has no mapping, it falls back to `/ad_forms/<SimpleClassName>.html` (see `MenuBuilder#resolveFormUrl` and the client's `docs/features/application-forms/README.md`)
 - Supports recent items and favorites integration
 
 ### Labels & Localization
