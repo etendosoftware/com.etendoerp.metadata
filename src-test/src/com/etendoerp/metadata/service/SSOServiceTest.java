@@ -53,6 +53,7 @@ import org.openbravo.dal.service.OBCriteria;
 import org.openbravo.dal.service.OBDal;
 
 import com.etendoerp.metadata.auth.LoginDefaultsResolver;
+import com.etendoerp.metadata.auth.LoginSessionRegistry;
 import com.etendoerp.metadata.auth.Utils;
 import com.etendoerp.metadata.data.AuthData;
 import com.etendoerp.metadata.exceptions.UnprocessableContentException;
@@ -494,9 +495,13 @@ class SSOServiceTest {
              MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
              MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class);
              MockedStatic<Utils> utilsStatic = mockStatic(Utils.class);
-             MockedStatic<LoginDefaultsResolver> resolverStatic = mockStatic(LoginDefaultsResolver.class)) {
+             MockedStatic<LoginDefaultsResolver> resolverStatic = mockStatic(LoginDefaultsResolver.class);
+             MockedStatic<LoginSessionRegistry> registryStatic = mockStatic(LoginSessionRegistry.class)) {
             mockProperties(providerStatic, propsWithAuthType(MIDDLEWARE_TYPE));
             OBCriteria criteria = mockOBDalCriteria(obDalStatic);
+            // Like Classic's SSO login, the successful session is recorded without a lock check
+            registryStatic.when(() -> LoginSessionRegistry.register(any(), eq("testuser"), eq("usr-123"),
+                eq(LoginSessionRegistry.SUCCESS_STATUS))).thenReturn("session-123");
 
             ETRXTokenUser mockTokenUser = mock(ETRXTokenUser.class);
             User mockUser = mock(User.class);
@@ -513,6 +518,7 @@ class SSOServiceTest {
             assertEquals("jwt-token", result.getString("token"));
             assertEquals("usr-123", result.getString("userId"));
             assertEquals("testuser", result.getString("username"));
+            assertEquals("session-123", result.getString(LoginSessionRegistry.SESSION_ID));
         }
         // The user has no valid Classic login defaults: authentication fails, no token is issued
         responseWriter = new StringWriter();

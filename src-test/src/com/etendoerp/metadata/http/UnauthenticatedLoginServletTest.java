@@ -54,7 +54,33 @@ public class UnauthenticatedLoginServletTest {
      */
     @Test
     public void testDoPostDelegatesToMetadataServletWithPathInfoForRouting() throws Exception {
+        assertEquals("/com.etendoerp.metadata.meta/login",
+                forwardedPathInfo("/sws/com.etendoerp.metadata.meta/login"));
+    }
+
+    /**
+     * Verifies that the login guard path, also mapped to this servlet, is forwarded with its own
+     * {@code /com.etendoerp.metadata.meta/login-guard} path info.
+     *
+     * @throws Exception if the servlet invocation fails
+     */
+    @Test
+    public void testDoPostForwardsTheLoginGuardPathInfo() throws Exception {
+        assertEquals("/com.etendoerp.metadata.meta/login-guard",
+                forwardedPathInfo("/sws/com.etendoerp.metadata.meta/login-guard"));
+    }
+
+    /**
+     * Sends a POST request mapped at the given servlet path through the servlet and captures the
+     * path info of the request it hands to {@link MetadataServlet}.
+     *
+     * @param servletPath the exact servlet path the request was mapped to
+     * @return the forwarded path info
+     * @throws Exception if the servlet invocation fails
+     */
+    private String forwardedPathInfo(String servletPath) throws Exception {
         when(request.getMethod()).thenReturn("POST");
+        when(request.getServletPath()).thenReturn(servletPath);
         String[] capturedPathInfo = new String[1];
 
         try (MockedConstruction<MetadataServlet> construction = mockConstruction(MetadataServlet.class,
@@ -65,8 +91,7 @@ public class UnauthenticatedLoginServletTest {
                 }).when(mock).process(any(HttpServletRequest.class), any(HttpServletResponse.class)))) {
             UnauthenticatedLoginServlet servlet = new UnauthenticatedLoginServlet();
             servlet.service(request, response);
-
-            assertEquals("/com.etendoerp.metadata.meta/login", capturedPathInfo[0]);
         }
+        return capturedPathInfo[0];
     }
 }
