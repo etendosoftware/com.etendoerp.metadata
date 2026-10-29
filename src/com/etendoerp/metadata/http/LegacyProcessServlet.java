@@ -18,6 +18,7 @@ package com.etendoerp.metadata.http;
 
 import com.auth0.jwt.interfaces.Claim;
 import com.auth0.jwt.interfaces.DecodedJWT;
+import com.etendoerp.metadata.auth.LoginSessionRegistry;
 import com.etendoerp.metadata.data.RequestVariables;
 import com.etendoerp.metadata.exceptions.InternalServerException;
 import com.etendoerp.metadata.utils.LegacyPaths;
@@ -29,7 +30,6 @@ import org.apache.logging.log4j.Logger;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
-import org.openbravo.base.HttpBaseUtils;
 import org.openbravo.base.exception.OBException;
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
 import org.openbravo.base.secureApp.VariablesSecureApp;
@@ -37,7 +37,6 @@ import org.openbravo.base.session.OBPropertiesProvider;
 import org.openbravo.client.kernel.RequestContext;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
-import org.openbravo.erpCommon.security.SessionLogin;
 import org.openbravo.model.ad.access.User;
 import org.openbravo.model.financialmgmt.accounting.coa.AcctSchema;
 
@@ -1507,14 +1506,9 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
 
     /**
      * Creates a new session in the database (AD_Session table).
-     * This method is a duplication of the logic found in
-     * {@link org.openbravo.authentication.AuthenticationManager# createDBSession(HttpServletRequest, String, String, String)}.
-     *
-     * The duplication is necessary because the original method in
-     * AuthenticationManager is 'protected'
-     * and cannot be accessed directly from this context, even though we need to
-     * manually establish
-     * a session during the JWT-based redirect login flow.
+     * Delegates to {@link LoginSessionRegistry#register}, which reproduces the logic of the
+     * {@code protected} {@code AuthenticationManager#createDBSession} so that it can be used
+     * during the JWT-based redirect login flow.
      *
      * @param req         The current HTTP request.
      * @param strUser     The username for the session.
@@ -1522,12 +1516,12 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
      * @return The ID of the created session.
      */
     protected final String createDBSession(HttpServletRequest req, String strUser, String strUserAuth) {
-        return createDBSession(req, strUser, strUserAuth, "S");
+        return createDBSession(req, strUser, strUserAuth, LoginSessionRegistry.SUCCESS_STATUS);
     }
 
     /**
      * Internal implementation for creating a database session.
-     * Duplicated from {@link org.openbravo.authentication.AuthenticationManager}.
+     * See {@link LoginSessionRegistry#register}.
      *
      * @param req                The current HTTP request.
      * @param strUser            The username for the session.
@@ -1538,35 +1532,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
      */
     protected final String createDBSession(HttpServletRequest req, String strUser, String strUserAuth,
             String successSessionType) {
-        try {
-            if (strUserAuth == null && StringUtils.isEmpty(strUser)) {
-                return null;
-            }
-
-            if (req == null) {
-                throw new OBException("Request object is null, cannot create DB session");
-            }
-
-            String usr = strUserAuth == null ? "0" : strUserAuth;
-
-            final SessionLogin sl = new SessionLogin(req, "0", "0", usr);
-
-            if (strUserAuth == null) {
-                sl.setStatus("F");
-            } else {
-                sl.setStatus(successSessionType);
-            }
-
-            sl.setUserName(strUser);
-            if (req != null) {
-                sl.setServerUrl(HttpBaseUtils.getLocalAddress(req));
-            }
-            sl.save();
-            return sl.getSessionID();
-        } catch (Exception e) {
-            log.error("Error creating DB session", e);
-            return null;
-        }
+        return LoginSessionRegistry.register(req, strUser, strUserAuth, successSessionType);
     }
 
     /**
