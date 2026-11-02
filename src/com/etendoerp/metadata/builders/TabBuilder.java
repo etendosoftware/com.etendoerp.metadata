@@ -82,6 +82,12 @@ public class TabBuilder extends Builder {
   private final TabAccess tabAccess;
   private final boolean isWindowReadOnly;
   private final List<FieldAccess> preloadedFieldAccessList;
+  /**
+   * Read-only state already resolved by the caller with Classic's rule (see
+   * {@link RoleAccessResolver#isTabReadOnly}); {@code null} when built through the legacy
+   * constructors, which derive it from {@code isWindowReadOnly} and {@code tabAccess}.
+   */
+  private Boolean resolvedTabReadOnly;
 
   /** Memoized result of {@link #resolveParentProperty()}; {@code null} until first resolved. */
   private String parentProperty;
@@ -121,6 +127,22 @@ public class TabBuilder extends Builder {
     this.tabAccess = tabAccess;
     this.isWindowReadOnly = isWindowReadOnly;
     this.preloadedFieldAccessList = preloadedFieldAccessList;
+  }
+
+  /**
+   * Creates a TabBuilder whose role access was already resolved by the caller.
+   *
+   * @param tab           the tab entity to build JSON for
+   * @param tabAccess     the active tab access of the role for this tab, or {@code null}
+   * @param fieldAccesses the field accesses of {@code tabAccess} (ignored when it is {@code null})
+   * @param isTabReadOnly {@code true} if the tab is read-only for the role
+   * @return the configured builder
+   */
+  public static TabBuilder withResolvedAccess(Tab tab, TabAccess tabAccess, List<FieldAccess> fieldAccesses,
+      boolean isTabReadOnly) {
+    TabBuilder builder = new TabBuilder(tab, tabAccess, isTabReadOnly, fieldAccesses);
+    builder.resolvedTabReadOnly = isTabReadOnly;
+    return builder;
   }
 
   public JSONObject toJSON() {
@@ -168,8 +190,7 @@ public class TabBuilder extends Builder {
         addTreeProperties(json, tableTree);
       }
 
-      boolean isTabReadOnly = isWindowReadOnly || (tabAccess != null && !tabAccess.isEditableField());
-      if (isTabReadOnly) {
+      if (isTabReadOnly()) {
         json.put("uIPattern", "RO");
         json.put("readOnly", true);
       }
@@ -306,17 +327,31 @@ public class TabBuilder extends Builder {
     return jsonColumns;
   }
 
-  private JSONObject getFields() throws JSONException {
-    if (preloadedFieldAccessList != null) {
-      return preloadedFieldAccessList.isEmpty()
-          ? TabProcessor.getTabFields(tab)
-          : TabProcessor.getTabFields(tabAccess, preloadedFieldAccessList);
+  private boolean isTabReadOnly() {
+    if (resolvedTabReadOnly != null) {
+      return resolvedTabReadOnly;
     }
+    return isWindowReadOnly || (tabAccess != null && !tabAccess.isEditableField());
+  }
 
-    List<FieldAccess> adFieldAccessList = tabAccess != null ? tabAccess.getADFieldAccessList() : null;
-    return (adFieldAccessList == null || adFieldAccessList.isEmpty())
-        ? TabProcessor.getTabFields(tab)
-        : TabProcessor.getTabFields(tabAccess);
+  /**
+   * Returns the complete field list of the tab with the role's Field Access applied on top of it.
+   * Fields without a Field Access row are kept and inherit the Tab Access editability, so the
+   * access configuration never hides a field.
+   */
+  private JSONObject getFields() throws JSONException {
+    JSONObject fields = TabProcessor.getTabFields(tab);
+    if (tabAccess == null || !Boolean.TRUE.equals(tabAccess.isActive())) {
+      return fields;
+    }
+    return FieldAccessOverlay.apply(fields, tabAccess, getFieldAccesses());
+  }
+
+  private List<FieldAccess> getFieldAccesses() {
+    if (preloadedFieldAccessList != null) {
+      return preloadedFieldAccessList;
+    }
+    return tabAccess.getADFieldAccessList();
   }
 
   /**

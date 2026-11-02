@@ -19,13 +19,9 @@ package com.etendoerp.metadata.builders;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
@@ -74,12 +70,7 @@ public class WindowBuilder extends Builder {
         }
 
         Role role = OBContext.getOBContext().getRole();
-        WindowAccess windowAccess = (WindowAccess) dal.createCriteria(WindowAccess.class) //
-                .add(Restrictions.eq(WindowAccess.PROPERTY_ROLE, role)) //
-                .add(Restrictions.eq(WindowAccess.PROPERTY_ACTIVE, true)) //
-                .add(Restrictions.eq(WindowAccess.PROPERTY_WINDOW, adWindow))//
-                .setMaxResults(1) //
-                .uniqueResult();
+        WindowAccess windowAccess = RoleAccessResolver.findActiveWindowAccess(role, adWindow);
 
         if (windowAccess == null) {
             boolean windowExistsForSomeRole = dal.createCriteria(WindowAccess.class) //
@@ -100,69 +91,24 @@ public class WindowBuilder extends Builder {
     }
 
     /**
-     * Loads all {@link TabAccess} entries for the given window access, eagerly fetching their
-     * associated {@link Tab} in the same round-trip to avoid an N+1 query pattern when the
-     * caller iterates and calls {@link TabAccess#getTab()} for every entry.
-     *
-     * @param windowAccess the window access whose tab accesses should be loaded
-     * @return all tab accesses (active and inactive) for the given window access, with tabs
-     *         pre-fetched
+     * Builds the tabs of the window in dictionary order, applying the role's Tab Access and Field
+     * Access exactly as Classic does: the read-only state comes from Classic's own rule and the
+     * Field Access is applied on top of the complete field list of each tab.
      */
-    private static List<TabAccess> getTabAccessesWithTabs(WindowAccess windowAccess) {
-        OBDal dal = OBDal.getReadOnlyInstance();
-        Map<String, Object> params = new HashMap<>();
-        params.put("windowAccessId", windowAccess.getId());
-        return dal.createQuery(TabAccess.class,
-                "as ta left join fetch ta.tab where ta.windowAccess.id = :windowAccessId", params)
-                .setFilterOnActive(false)
-                .list();
-    }
-
-    /**
-     * Batch-loads all {@link FieldAccess} entries for the given tab accesses in a single query,
-     * eagerly fetching their associated {@link org.openbravo.model.ad.ui.Field}, and groups the
-     * result by tab access ID. This avoids the N+1 pattern of calling
-     * {@link TabAccess#getADFieldAccessList()} once per tab.
-     *
-     * @param tabAccesses the tab accesses whose field accesses should be loaded
-     * @return a map from tab access ID to its list of field accesses
-     */
-    private static Map<String, List<FieldAccess>> getFieldAccessesByTabAccessId(List<TabAccess> tabAccesses) {
-        if (tabAccesses.isEmpty()) {
-            return Collections.emptyMap();
-        }
-
-        List<String> tabAccessIds = tabAccesses.stream().map(TabAccess::getId).collect(Collectors.toList());
-        OBDal dal = OBDal.getReadOnlyInstance();
-        Map<String, Object> params = new HashMap<>();
-        params.put("tabAccessIds", tabAccessIds);
-        List<FieldAccess> fieldAccesses = dal.createQuery(FieldAccess.class,
-                "as fa left join fetch fa.tabAccess left join fetch fa.field where fa.tabAccess.id in (:tabAccessIds)",
-                params)
-                .setFilterOnActive(false)
-                .list();
-
-        return fieldAccesses.stream().collect(Collectors.groupingBy(fa -> fa.getTabAccess().getId()));
-    }
-
-    private static JSONArray createTabsJson(List<TabAccess> tabAccesses, List<Tab> tabs, boolean isWindowReadOnly) {
+    private static JSONArray createTabsJson(WindowAccess windowAccess, List<TabAccess> tabAccesses, List<Tab> tabs) {
         final List<JSONObject> result = new ArrayList<>();
-        final Set<String> processedTabIds = new HashSet<>();
-        final Map<String, List<FieldAccess>> fieldAccessesByTabAccessId = getFieldAccessesByTabAccessId(tabAccesses);
-
-        for (TabAccess tabAccess : tabAccesses) {
-            Tab tab = tabAccess.getTab();
-            if (tabAccess.isActive() && tabAccess.isAllowRead() && isTabAllowedCached(tab)) {
-                List<FieldAccess> fieldAccesses = fieldAccessesByTabAccessId.getOrDefault(tabAccess.getId(),
-                        Collections.emptyList());
-                result.add(new TabBuilder(tab, tabAccess, isWindowReadOnly, fieldAccesses).toJSON());
-                processedTabIds.add(tab.getId());
-            }
-        }
+        final Map<String, TabAccess> activeTabAccessByTabId = RoleAccessResolver.indexActiveTabAccessesByTabId(
+                tabAccesses);
+        final Map<String, List<FieldAccess>> fieldAccessesByTabAccessId = RoleAccessResolver
+                .findFieldAccessesByTabAccessId(new ArrayList<>(activeTabAccessByTabId.values()));
 
         for (Tab tab : tabs) {
-            if (!processedTabIds.contains(tab.getId()) && isTabAllowedCached(tab)) {
-                result.add(new TabBuilder(tab, null, isWindowReadOnly).toJSON());
+            if (isTabAllowedCached(tab)) {
+                TabAccess tabAccess = activeTabAccessByTabId.get(tab.getId());
+                List<FieldAccess> fieldAccesses = RoleAccessResolver.fieldAccessesOf(tabAccess,
+                        fieldAccessesByTabAccessId);
+                boolean isTabReadOnly = RoleAccessResolver.isTabReadOnly(windowAccess, tab);
+                result.add(TabBuilder.withResolvedAccess(tab, tabAccess, fieldAccesses, isTabReadOnly).toJSON());
             }
         }
 
@@ -188,14 +134,13 @@ public class WindowBuilder extends Builder {
         // AD_Window_Access for this role, but another role has one). Surface it so the client can
         // tell it apart from a real grant instead of assuming any HTTP 200 means "access granted".
         boolean isWindowAccessible = windowAccess != null;
-        boolean isReadOnly = (windowAccess == null) || !windowAccess.isEditableField();
 
         Window window = windowAccess != null
                 ? windowAccess.getWindow()
                 : OBDal.getReadOnlyInstance().get(Window.class, id);
 
         List<TabAccess> tabAccesses = windowAccess != null
-                ? getTabAccessesWithTabs(windowAccess)
+                ? RoleAccessResolver.findTabAccesses(windowAccess)
                 : Collections.emptyList();
 
         JSONObject windowJson = converter.toJsonObject(window, DataResolvingMode.FULL_TRANSLATABLE);
@@ -205,7 +150,7 @@ public class WindowBuilder extends Builder {
             // Written before the tabs array on purpose: createTabsJson() may throw a JSONException
             // that is only logged below, and the access signal must survive a degraded response.
             windowJson.put(Constants.JSON_IS_WINDOW_ACCESSIBLE_KEY, isWindowAccessible);
-            windowJson.put("tabs", createTabsJson(tabAccesses, window.getADTabList(), isReadOnly));
+            windowJson.put("tabs", createTabsJson(windowAccess, tabAccesses, window.getADTabList()));
         } catch (JSONException e) {
             logger.error("Error creating JSON for window tabs: {}", e.getMessage(), e);
         }
