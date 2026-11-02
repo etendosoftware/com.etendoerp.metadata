@@ -28,6 +28,7 @@ import static org.mockito.Mockito.when;
 
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 import org.codehaus.jettison.json.JSONObject;
 import org.mockito.MockedConstruction;
@@ -91,6 +92,44 @@ abstract class TabBuilderTestBase {
             boolean isWindowReadOnly, TabAccess tabAccess,
             Consumer<MockedStatic<TabProcessor>> extraMocking,
             Consumer<JSONObject> assertions) {
+        runTabBuilder(mockContext, mockKernelUtils, tabFields, extraMocking,
+                () -> new TabBuilder(mockTab, tabAccess, isWindowReadOnly), assertions);
+    }
+
+    /**
+     * Executes a TabBuilder test using the 4-arg constructor with a pre-loaded field access list,
+     * as used by {@link WindowBuilder} to avoid per-tab field access queries.
+     */
+    protected void executeTabBuilderTestWithPreloadedFieldAccess(OBContext mockContext, KernelUtils mockKernelUtils,
+            Tab mockTab, JSONObject tabFields, TabAccess tabAccess, List<FieldAccess> preloadedFieldAccessList,
+            Consumer<JSONObject> assertions) {
+        runTabBuilder(mockContext, mockKernelUtils, tabFields,
+                mockedTabProcessor -> mockedTabProcessor
+                        .when(() -> TabProcessor.getTabFields(any(TabAccess.class), any(List.class)))
+                        .thenReturn(tabFields),
+                () -> new TabBuilder(mockTab, tabAccess, false, preloadedFieldAccessList), assertions);
+        verify(tabAccess, never()).getADFieldAccessList();
+    }
+
+    /**
+     * Executes a TabBuilder test built with {@link TabBuilder#withResolvedAccess}, the factory used
+     * by {@link WindowBuilder} and the tab service once the role access is resolved.
+     */
+    @SuppressWarnings("java:S107")
+    protected void executeResolvedAccessTabBuilderTest(OBContext mockContext, KernelUtils mockKernelUtils,
+            Tab mockTab, JSONObject tabFields, TabAccess tabAccess, List<FieldAccess> fieldAccesses,
+            boolean isTabReadOnly, Consumer<JSONObject> assertions) {
+        runTabBuilder(mockContext, mockKernelUtils, tabFields, null,
+                () -> TabBuilder.withResolvedAccess(mockTab, tabAccess, fieldAccesses, isTabReadOnly), assertions);
+    }
+
+    /**
+     * Runs a TabBuilder created by {@code builderFactory} with the static collaborators mocked and
+     * {@code TabProcessor.getTabFields(Tab)} answering {@code tabFields}.
+     */
+    private void runTabBuilder(OBContext mockContext, KernelUtils mockKernelUtils, JSONObject tabFields,
+            Consumer<MockedStatic<TabProcessor>> extraMocking, Supplier<TabBuilder> builderFactory,
+            Consumer<JSONObject> assertions) {
         try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
                 MockedStatic<KernelUtils> mockedKernelUtils = mockStatic(KernelUtils.class);
                 MockedStatic<TabProcessor> mockedTabProcessor = mockStatic(TabProcessor.class);
@@ -112,46 +151,9 @@ abstract class TabBuilderTestBase {
                 extraMocking.accept(mockedTabProcessor);
             }
 
-            TabBuilder tabBuilder = new TabBuilder(mockTab, tabAccess, isWindowReadOnly);
-            JSONObject result = tabBuilder.toJSON();
+            JSONObject result = builderFactory.get().toJSON();
 
             assertions.accept(result);
-        } catch (Exception e) {
-            String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getName();
-            fail("Unexpected exception: " + msg);
-        }
-    }
-
-    /**
-     * Executes a TabBuilder test using the 4-arg constructor with a pre-loaded field access list,
-     * as used by {@link WindowBuilder} to avoid per-tab field access queries.
-     */
-    protected void executeTabBuilderTestWithPreloadedFieldAccess(OBContext mockContext, KernelUtils mockKernelUtils,
-            Tab mockTab, JSONObject tabFields, TabAccess tabAccess, List<FieldAccess> preloadedFieldAccessList,
-            Consumer<JSONObject> assertions) {
-        try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
-                MockedStatic<KernelUtils> mockedKernelUtils = mockStatic(KernelUtils.class);
-                MockedStatic<TabProcessor> mockedTabProcessor = mockStatic(TabProcessor.class);
-                MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class,
-                        (mock, context) -> {
-                            JSONObject tabJson = new JSONObject();
-                            tabJson.put(ENTITY_NAME_KEY, TEST_TABLE_NAME);
-                            when(mock.toJsonObject(any(), any())).thenReturn(tabJson);
-                        })) {
-
-            mockedOBContext.when(OBContext::getOBContext).thenReturn(mockContext);
-            mockedKernelUtils.when(KernelUtils::getInstance).thenReturn(mockKernelUtils);
-
-            mockedTabProcessor.when(() -> TabProcessor.getTabFields(any(Tab.class))).thenReturn(tabFields);
-            mockedTabProcessor.when(() -> TabProcessor.getTabFields(any(TabAccess.class), any(List.class)))
-                    .thenReturn(tabFields);
-
-            TabBuilder tabBuilder = new TabBuilder(mockTab, tabAccess, false, preloadedFieldAccessList);
-            JSONObject result = tabBuilder.toJSON();
-
-            assertions.accept(result);
-
-            verify(tabAccess, never()).getADFieldAccessList();
         } catch (Exception e) {
             String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getName();
             fail("Unexpected exception: " + msg);
