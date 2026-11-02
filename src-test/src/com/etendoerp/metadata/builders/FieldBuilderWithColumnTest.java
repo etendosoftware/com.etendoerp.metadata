@@ -143,6 +143,7 @@ class FieldBuilderWithColumnTest {
     private static final String BUTTON_REF_LIST_STRING = "buttonRefList";
     private static final String WINDOW_ID_STRING = "window-id";
     private static final String ROLE_ID_STRING = "role-id";
+    private static final String PROCESS_ID_KEY = "processId";
 
     private static final String METH_CHECK_ACCESS_IN_DB = "checkAccessInDB";
     private static final String METH_IS_WINDOW_ACCESSIBLE = "isWindowAccessible";
@@ -298,7 +299,7 @@ class FieldBuilderWithColumnTest {
         try (MockedStatic<ProcessActionBuilder> mocked = mockStatic(ProcessActionBuilder.class)) {
 
             mocked.when(() -> ProcessActionBuilder.getFieldProcess(field, process))
-                    .thenReturn(new JSONObject().put("processId", "process-id"));
+                    .thenReturn(new JSONObject().put(PROCESS_ID_KEY, "process-id"));
 
             JSONObject result = executeToJSON(null);
             assertTrue(result.has("processAction"));
@@ -319,7 +320,7 @@ class FieldBuilderWithColumnTest {
                 MockedStatic<ProcessAccessChecker> checker = mockStatic(ProcessAccessChecker.class)) {
 
             mocked.when(() -> ProcessActionBuilder.getFieldProcess(field, process))
-                    .thenReturn(new JSONObject().put("processId", "process-id"));
+                    .thenReturn(new JSONObject().put(PROCESS_ID_KEY, "process-id"));
             checker.when(() -> ProcessAccessChecker.isProcessAccessible(field)).thenReturn(false);
 
             JSONObject result = executeToJSON(null);
@@ -337,7 +338,7 @@ class FieldBuilderWithColumnTest {
             legacy.when(() -> LegacyUtils.getLegacyProcess(FIELD_ID)).thenReturn(process);
 
             builder.when(() -> ProcessActionBuilder.getFieldProcess(field, process))
-                    .thenReturn(new JSONObject().put("processId", "legacy"));
+                    .thenReturn(new JSONObject().put(PROCESS_ID_KEY, "legacy"));
 
             JSONObject result = executeToJSON(null);
             assertTrue(result.has("processAction"));
