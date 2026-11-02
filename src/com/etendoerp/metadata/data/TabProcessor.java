@@ -93,9 +93,13 @@ public class TabProcessor {
     }
   }
 
+  /**
+   * A field without process access is kept: Classic shows its button disabled, so the field is
+   * flagged with {@code isProcessAccessible} instead of being dropped (see
+   * {@link ProcessAccessChecker}).
+   */
   private static boolean isFieldAccessible(Field field) {
-    return field.isActive() && hasAccessToProcess(field,
-        field.getTab().getWindow().getId()) && evaluateDisplayLogicAtServerLevel(field);
+    return field.isActive() && evaluateDisplayLogicAtServerLevel(field);
   }
 
   private static boolean isFieldAccessAccessible(FieldAccess fieldAccess) {
