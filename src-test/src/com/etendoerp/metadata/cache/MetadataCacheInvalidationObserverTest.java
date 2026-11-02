@@ -33,6 +33,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.verification.VerificationMode;
 import org.mockito.quality.Strictness;
 import org.openbravo.base.model.Entity;
 import org.openbravo.base.model.ModelProvider;
@@ -40,10 +41,12 @@ import org.openbravo.client.kernel.event.EntityDeleteEvent;
 import org.openbravo.client.kernel.event.EntityNewEvent;
 import org.openbravo.client.kernel.event.EntityUpdateEvent;
 import org.openbravo.dal.core.TriggerHandler;
+import org.openbravo.model.ad.domain.Preference;
 
 import com.etendoerp.metadata.builders.FieldBuilderWithColumn;
 import com.etendoerp.metadata.builders.WindowBuilder;
 import com.etendoerp.metadata.data.TabProcessor;
+import com.etendoerp.metadata.utils.Constants;
 
 /**
  * Unit tests for {@link MetadataCacheInvalidationObserver}.
@@ -55,8 +58,10 @@ class MetadataCacheInvalidationObserverTest {
 
   private static final String[] OBSERVED_ENTITY_NAMES = {
       "ADWindow", "ADTab", "ADField", "ADColumn",
-      "ADWindowAccess", "ADTabAccess", "ADFieldAccess"
+      "ADWindowAccess", "ADTabAccess", "ADFieldAccess",
+      "ADProcessAccess", "OBUIAPP_Process_Access", "ADPreference"
   };
+  private static final int PREFERENCE_ENTITY_INDEX = OBSERVED_ENTITY_NAMES.length - 1;
 
   @Test
   void onNewInvalidatesCachesForValidEvent() {
@@ -171,7 +176,7 @@ class MetadataCacheInvalidationObserverTest {
   }
 
   @Test
-  void getObservedEntitiesReturnsSevenEntities() {
+  void getObservedEntitiesReturnsAllObservedEntities() {
     try (
         MockedStatic<ModelProvider> modelProviderMock = mockStatic(ModelProvider.class);
         MockedStatic<TriggerHandler> triggerMock = mockStatic(TriggerHandler.class)
@@ -183,6 +188,47 @@ class MetadataCacheInvalidationObserverTest {
 
       assertNotNull(entities);
       assertEquals(OBSERVED_ENTITY_NAMES.length, entities.length);
+    }
+  }
+
+  /**
+   * Tests that saving the {@code SecuredProcess} preference invalidates the caches, because it
+   * decides whether process buttons are enabled.
+   */
+  @Test
+  void securedProcessPreferenceInvalidatesCaches() {
+    assertPreferenceInvalidation(Constants.SECURED_PROCESS_PREFERENCE, times(1));
+  }
+
+  /**
+   * Tests that any other preference (for instance a saved grid configuration) does not invalidate
+   * the caches.
+   */
+  @Test
+  void otherPreferencesDoNotInvalidateCaches() {
+    assertPreferenceInvalidation("ETMETA_GridConfiguration", never());
+  }
+
+  private void assertPreferenceInvalidation(String property, VerificationMode expectedInvalidations) {
+    try (
+        MockedStatic<ModelProvider> modelProviderMock = mockStatic(ModelProvider.class);
+        MockedStatic<TriggerHandler> triggerMock = mockStatic(TriggerHandler.class);
+        MockedStatic<TabProcessor> tabProcessorMock = mockStatic(TabProcessor.class);
+        MockedStatic<WindowBuilder> ignored = mockStatic(WindowBuilder.class);
+        MockedStatic<FieldBuilderWithColumn> ignored2 = mockStatic(FieldBuilderWithColumn.class)
+    ) {
+      setupMocks(modelProviderMock, triggerMock, OBSERVED_ENTITY_NAMES);
+
+      MetadataCacheInvalidationObserver observer = new MetadataCacheInvalidationObserver();
+      Preference preference = mock(Preference.class);
+      when(preference.getEntity()).thenReturn(observer.getObservedEntities()[PREFERENCE_ENTITY_INDEX]);
+      when(preference.getProperty()).thenReturn(property);
+      EntityUpdateEvent event = mock(EntityUpdateEvent.class);
+      when(event.getTargetInstance()).thenReturn(preference);
+
+      observer.onUpdate(event);
+
+      tabProcessorMock.verify(TabProcessor::clearFieldCache, expectedInvalidations);
     }
   }
 }

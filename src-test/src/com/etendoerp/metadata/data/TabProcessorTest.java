@@ -846,18 +846,16 @@ class TabProcessorTest {
   }
 
   /**
-   * Tests getTabFields(TabAccess) returns an empty result when the field's
-   * associated process
-   * is not accessible. This exercises the hasAccessToProcess check inside
-   * isFieldAccessible
-   * (called by isFieldAccessAccessible).
+   * Tests that a field whose process is not accessible is kept: Classic shows its button disabled,
+   * so the field is no longer dropped and the builder flags it with {@code isProcessAccessible}.
+   *
+   * @throws JSONException if JSON processing fails during field building
    */
   @Test
-  void testGetTabFieldsWithFieldAccessNoProcessAccessReturnsEmpty() {
+  void testGetTabFieldsWithFieldAccessNoProcessAccessKeepsField() throws JSONException {
     TabAccess mockTabAccess = mock(TabAccess.class);
     when(mockTabAccess.getId()).thenReturn(TEST_TAB_ID);
     when(mockTabAccess.getUpdated()).thenReturn(TEST_DATE);
-    when(mockTabAccess.getADFieldAccessList()).thenReturn(List.of(mockFieldAccess));
 
     when(mockColumn.getOBUIAPPProcess()).thenReturn(mockProcess);
     staticBaseProcessActionHandler
@@ -865,9 +863,15 @@ class TabProcessorTest {
             eq(mockProcess), any(Map.class)))
         .thenReturn(false);
 
-    JSONObject result = TabProcessor.getTabFields(mockTabAccess);
+    JSONObject expectedJSON = new JSONObject();
+    expectedJSON.put(FIELD_ACCESS_ID, "noProcessAccessField");
 
-    assertNotNull(result);
-    assertEquals(0, result.length());
+    try (MockedConstruction<FieldBuilderWithColumn> ignored = mockConstruction(FieldBuilderWithColumn.class,
+        (mock, context) -> when(mock.toJSON()).thenReturn(expectedJSON))) {
+
+      JSONObject result = TabProcessor.getTabFields(mockTabAccess, List.of(mockFieldAccess));
+
+      assertTrue(result.has(TEST_PROPERTY_NAME));
+    }
   }
 }
