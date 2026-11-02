@@ -25,8 +25,8 @@ import com.etendoerp.metadata.exceptions.UnprocessableContentException;
  * Username and password of a login request body, shared by the endpoints that authenticate them.
  */
 final class LoginCredentials {
-    private static final String USERNAME = "username";
-    private static final String PASSWORD = "password";
+    private static final String USERNAME_KEY = "username";
+    private static final String PASSWORD_KEY = "password";
 
     private final String username;
     private final String password;
@@ -44,8 +44,8 @@ final class LoginCredentials {
      * @throws UnprocessableContentException when the username or the password is missing
      */
     static LoginCredentials from(JSONObject body) {
-        String username = ProfileRequestUtils.getStringOrNull(body, USERNAME);
-        String password = ProfileRequestUtils.getStringOrNull(body, PASSWORD);
+        String username = ProfileRequestUtils.getStringOrNull(body, USERNAME_KEY);
+        String password = ProfileRequestUtils.getStringOrNull(body, PASSWORD_KEY);
 
         if (username == null || password == null) {
             throw new UnprocessableContentException("username and password are required");
