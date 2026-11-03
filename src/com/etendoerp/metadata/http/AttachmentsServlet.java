@@ -434,36 +434,42 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
             return;
         }
 
+        // Phases 1 (narrow admin load) + 2 (authorize with NO admin mode active).
+        Attachment attachment = validateAndGetAttachment(attachmentId, response, true);
+        if (attachment == null) {
+            return;
+        }
+
+        Map<String, String> params = new HashMap<>();
+
+        JSONObject requestBody = readRequestBody(request);
+        if (requestBody.has(PARAM_DESCRIPTION)) {
+            String description = requestBody.getString(PARAM_DESCRIPTION);
+            if (description != null && !description.isEmpty()) {
+                params.put(CORE_DESC_PARAMETER_ID, description);
+            }
+        }
+
+        if (params.isEmpty()) {
+            String description = request.getParameter(PARAM_DESCRIPTION);
+            if (description != null) {
+                params.put(CORE_DESC_PARAMETER_ID, description);
+            }
+        }
+
+        // Phase 3: narrow admin block, only around the physical mutation.
         try {
             OBContext.setAdminMode(true);
-
-            Map<String, String> params = new HashMap<>();
-
-            JSONObject requestBody = readRequestBody(request);
-            if (requestBody.has(PARAM_DESCRIPTION)) {
-                String description = requestBody.getString(PARAM_DESCRIPTION);
-                if (description != null && !description.isEmpty()) {
-                    params.put(CORE_DESC_PARAMETER_ID, description);
-                }
-            }
-
-            if (params.isEmpty()) {
-                String description = request.getParameter(PARAM_DESCRIPTION);
-                if (description != null) {
-                    params.put(CORE_DESC_PARAMETER_ID, description);
-                }
-            }
-
             attachManager.update(params, attachmentId, tabId);
-
-            JSONObject result = new JSONObject();
-            result.put(JSON_KEY_SUCCESS, true);
-            result.put(JSON_KEY_MESSAGE, MSG_ATTACHMENT_UPDATED);
-
-            sendJsonResponse(response, HttpStatus.SC_OK, result);
         } finally {
             OBContext.restorePreviousMode();
         }
+
+        JSONObject result = new JSONObject();
+        result.put(JSON_KEY_SUCCESS, true);
+        result.put(JSON_KEY_MESSAGE, MSG_ATTACHMENT_UPDATED);
+
+        sendJsonResponse(response, HttpStatus.SC_OK, result);
     }
 
     /**
@@ -473,24 +479,25 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
             throws IOException, JSONException {
         String attachmentId = request.getParameter(PARAM_ATTACHMENT_ID);
 
+        // Phases 1 (narrow admin load) + 2 (authorize with NO admin mode active).
+        Attachment attachment = validateAndGetAttachment(attachmentId, response, true);
+        if (attachment == null) {
+            return;
+        }
+
+        // Phase 3: narrow admin block, only around the physical mutation.
         try {
             OBContext.setAdminMode(true);
-
-            Attachment attachment = validateAndGetAttachment(attachmentId, response);
-            if (attachment == null) {
-                return;
-            }
-
             attachManager.delete(attachment);
-
-            JSONObject result = new JSONObject();
-            result.put(JSON_KEY_SUCCESS, true);
-            result.put(JSON_KEY_MESSAGE, MSG_ATTACHMENT_DELETED);
-
-            sendJsonResponse(response, HttpStatus.SC_OK, result);
         } finally {
             OBContext.restorePreviousMode();
         }
+
+        JSONObject result = new JSONObject();
+        result.put(JSON_KEY_SUCCESS, true);
+        result.put(JSON_KEY_MESSAGE, MSG_ATTACHMENT_DELETED);
+
+        sendJsonResponse(response, HttpStatus.SC_OK, result);
     }
 
     /**
@@ -505,6 +512,9 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
             return;
         }
 
+        Table table;
+
+        // Phase 1 - narrow admin block: only to resolve the tab's table.
         try {
             OBContext.setAdminMode(true);
 
@@ -513,7 +523,18 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
                 return;
             }
 
-            Table table = tab.getTable();
+            table = tab.getTable();
+        } finally {
+            OBContext.restorePreviousMode();
+        }
+
+        // Phase 2 - authorize with NO admin mode active.
+        assertRecordAccess(table, recordId, true);
+
+        // Phase 3 - narrow admin block, only around the physical mutation.
+        try {
+            OBContext.setAdminMode(true);
+
             OBCriteria<Attachment> criteria = OBDal.getInstance().createCriteria(Attachment.class);
             criteria.add(Restrictions.eq(Attachment.PROPERTY_TABLE, table));
             criteria.add(Restrictions.eq(Attachment.PROPERTY_RECORD, recordId));
