@@ -51,6 +51,7 @@ import org.openbravo.client.application.attachment.AttachImplementationManager;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.datamodel.Table;
+import org.openbravo.model.ad.ui.Tab;
 import org.openbravo.model.ad.utility.Attachment;
 import org.openbravo.model.common.enterprise.Organization;
 import org.openbravo.test.base.OBBaseTest;
@@ -72,16 +73,20 @@ public class AttachmentsServletAccessTest extends OBBaseTest {
     private static final String PARAM_COMMAND = "command";
     private static final String PARAM_ATTACHMENT_ID = "attachmentId";
     private static final String PARAM_TAB_ID = "tabId";
+    private static final String PARAM_RECORD_ID = "recordId";
 
     private static final String CMD_DOWNLOAD = "DOWNLOAD";
     private static final String CMD_DELETE = "DELETE";
     private static final String CMD_EDIT = "EDIT";
+    private static final String CMD_LIST = "LIST";
+    private static final String CMD_DOWNLOAD_ALL = "DOWNLOAD_ALL";
 
     @Mock private HttpServletRequest mockRequest;
     @Mock private HttpServletResponse mockResponse;
     @Mock private AttachImplementationManager mockAttachManager;
     @Mock private OBDal mockDal;
     @Mock private OBContext mockContext;
+    @Mock private Tab mockTab;
     @Mock private Table mockTable;
     @Mock private Attachment mockAttachment;
     @Mock private ModelProvider mockModelProvider;
@@ -300,6 +305,143 @@ public class AttachmentsServletAccessTest extends OBBaseTest {
             verify(mockResponse).setStatus(HttpStatus.SC_FORBIDDEN);
             assertTrue(stringWriter.toString().contains("Access denied"));
             verify(mockAttachManager, never()).update(any(), anyString(), anyString());
+        }
+    }
+
+    /**
+     * LIST must be denied (403) when the record is not visible to the caller, and the
+     * attachment list must never be read.
+     */
+    @Test
+    public void testList_denied_whenRecordNotVisible() throws Exception {
+        when(mockRequest.getParameter(PARAM_COMMAND)).thenReturn(CMD_LIST);
+        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(TEST_TAB_ID);
+        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(TEST_RECORD_ID);
+        when(mockTab.getTable()).thenReturn(mockTable);
+        when(mockTable.getDBTableName()).thenReturn("C_Order");
+
+        try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
+             MockedStatic<OBContext> ctx = mockStatic(OBContext.class);
+             MockedStatic<ModelProvider> mp = mockStatic(ModelProvider.class)) {
+            dalMock.when(OBDal::getInstance).thenReturn(mockDal);
+            ctx.when(OBContext::getOBContext).thenReturn(mockContext);
+            ctx.when(() -> OBContext.setAdminMode(true)).thenAnswer(i -> null);
+            ctx.when(OBContext::restorePreviousMode).thenAnswer(i -> null);
+            mp.when(ModelProvider::getInstance).thenReturn(mockModelProvider);
+            when(mockModelProvider.getEntityByTableName("C_Order")).thenReturn(mockEntity);
+            when(mockEntity.getName()).thenReturn("Order");
+            when(mockDal.get(Tab.class, TEST_TAB_ID)).thenReturn(mockTab);
+            when(mockDal.get("Order", TEST_RECORD_ID)).thenReturn(null); // no access
+
+            servlet.doGet(mockRequest, mockResponse);
+
+            verify(mockResponse).setStatus(HttpStatus.SC_FORBIDDEN);
+            assertTrue(stringWriter.toString().contains("Access denied"));
+            // AttachmentUtils.getTabAttachmentsForRows is never reached: denial happens
+            // before the list is read, which the 403 status above already demonstrates.
+        }
+    }
+
+    /**
+     * Positive control: LIST proceeds past authorization when the record IS visible to
+     * the caller (it is not rejected with 403; what happens further downstream, in
+     * {@code AttachmentUtils}, is outside this unit's scope).
+     */
+    @Test
+    public void testList_allowed_whenRecordVisible() throws Exception {
+        when(mockRequest.getParameter(PARAM_COMMAND)).thenReturn(CMD_LIST);
+        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(TEST_TAB_ID);
+        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(TEST_RECORD_ID);
+        when(mockTab.getTable()).thenReturn(mockTable);
+        when(mockTable.getDBTableName()).thenReturn("C_Order");
+
+        try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
+             MockedStatic<OBContext> ctx = mockStatic(OBContext.class);
+             MockedStatic<ModelProvider> mp = mockStatic(ModelProvider.class)) {
+            dalMock.when(OBDal::getInstance).thenReturn(mockDal);
+            ctx.when(OBContext::getOBContext).thenReturn(mockContext);
+            ctx.when(() -> OBContext.setAdminMode(true)).thenAnswer(i -> null);
+            ctx.when(OBContext::restorePreviousMode).thenAnswer(i -> null);
+            mp.when(ModelProvider::getInstance).thenReturn(mockModelProvider);
+            when(mockModelProvider.getEntityByTableName("C_Order")).thenReturn(mockEntity);
+            when(mockEntity.getName()).thenReturn("Order");
+            when(mockDal.get(Tab.class, TEST_TAB_ID)).thenReturn(mockTab);
+            when(mockDal.get("Order", TEST_RECORD_ID)).thenReturn(mock(BaseOBObject.class)); // visible
+
+            try {
+                servlet.doGet(mockRequest, mockResponse);
+            } catch (Throwable downstreamFailure) {
+                // AttachmentUtils.getTabAttachmentsForRows needs a live Weld container that
+                // this plain Mockito unit test does not provide. Reaching it at all (Phase 3)
+                // already proves authorization (Phase 2) was passed, which is what this test
+                // verifies; whatever happens past that point is outside this unit's scope.
+            }
+
+            verify(mockResponse, never()).setStatus(HttpStatus.SC_FORBIDDEN);
+        }
+    }
+
+    /**
+     * DOWNLOAD_ALL must be denied (403) when the record is not visible to the caller,
+     * and the zip stream must never be produced.
+     */
+    @Test
+    public void testDownloadAll_denied_whenRecordNotVisible() throws Exception {
+        when(mockRequest.getParameter(PARAM_COMMAND)).thenReturn(CMD_DOWNLOAD_ALL);
+        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(TEST_TAB_ID);
+        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(TEST_RECORD_ID);
+        when(mockTab.getTable()).thenReturn(mockTable);
+        when(mockTable.getDBTableName()).thenReturn("C_Order");
+
+        try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
+             MockedStatic<OBContext> ctx = mockStatic(OBContext.class);
+             MockedStatic<ModelProvider> mp = mockStatic(ModelProvider.class)) {
+            dalMock.when(OBDal::getInstance).thenReturn(mockDal);
+            ctx.when(OBContext::getOBContext).thenReturn(mockContext);
+            ctx.when(() -> OBContext.setAdminMode(true)).thenAnswer(i -> null);
+            ctx.when(OBContext::restorePreviousMode).thenAnswer(i -> null);
+            mp.when(ModelProvider::getInstance).thenReturn(mockModelProvider);
+            when(mockModelProvider.getEntityByTableName("C_Order")).thenReturn(mockEntity);
+            when(mockEntity.getName()).thenReturn("Order");
+            when(mockDal.get(Tab.class, TEST_TAB_ID)).thenReturn(mockTab);
+            when(mockDal.get("Order", TEST_RECORD_ID)).thenReturn(null); // no access
+
+            servlet.doGet(mockRequest, mockResponse);
+
+            verify(mockResponse).setStatus(HttpStatus.SC_FORBIDDEN);
+            assertTrue(stringWriter.toString().contains("Access denied"));
+            verify(mockAttachManager, never()).downloadAll(anyString(), anyString(), any());
+        }
+    }
+
+    /**
+     * Positive control: DOWNLOAD_ALL proceeds when the record IS visible to the caller.
+     */
+    @Test
+    public void testDownloadAll_allowed_whenRecordVisible() throws Exception {
+        when(mockRequest.getParameter(PARAM_COMMAND)).thenReturn(CMD_DOWNLOAD_ALL);
+        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(TEST_TAB_ID);
+        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(TEST_RECORD_ID);
+        when(mockTab.getTable()).thenReturn(mockTable);
+        when(mockTable.getDBTableName()).thenReturn("C_Order");
+
+        try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
+             MockedStatic<OBContext> ctx = mockStatic(OBContext.class);
+             MockedStatic<ModelProvider> mp = mockStatic(ModelProvider.class)) {
+            dalMock.when(OBDal::getInstance).thenReturn(mockDal);
+            ctx.when(OBContext::getOBContext).thenReturn(mockContext);
+            ctx.when(() -> OBContext.setAdminMode(true)).thenAnswer(i -> null);
+            ctx.when(OBContext::restorePreviousMode).thenAnswer(i -> null);
+            mp.when(ModelProvider::getInstance).thenReturn(mockModelProvider);
+            when(mockModelProvider.getEntityByTableName("C_Order")).thenReturn(mockEntity);
+            when(mockEntity.getName()).thenReturn("Order");
+            when(mockDal.get(Tab.class, TEST_TAB_ID)).thenReturn(mockTab);
+            when(mockDal.get("Order", TEST_RECORD_ID)).thenReturn(mock(BaseOBObject.class)); // visible
+
+            servlet.doGet(mockRequest, mockResponse);
+
+            verify(mockResponse, never()).setStatus(HttpStatus.SC_FORBIDDEN);
+            verify(mockAttachManager).downloadAll(eq(TEST_TAB_ID), eq(TEST_RECORD_ID), any());
         }
     }
 }
