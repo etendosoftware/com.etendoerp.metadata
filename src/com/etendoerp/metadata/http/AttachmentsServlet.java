@@ -113,7 +113,7 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
     private static final String CHARSET_UTF8 = "UTF-8";
 
     // Response messages
-    private static final String MSG_ERROR_PROCESSING_REQUEST = "Error processing request: ";
+    private static final String MSG_ERROR_PROCESSING_REQUEST = "Error processing request";
     private static final String MSG_INVALID_COMMAND = "Invalid command: ";
     private static final String MSG_COMMAND_REQUIRED = "Command parameter is required";
     private static final String MSG_TAB_RECORD_REQUIRED = "tabId and recordId are required";
@@ -191,7 +191,7 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
         } catch (Exception e) {
             log.error("Error processing GET request", e);
             sendErrorResponse(response, HttpStatus.SC_INTERNAL_SERVER_ERROR,
-                    MSG_ERROR_PROCESSING_REQUEST + e.getMessage());
+                    MSG_ERROR_PROCESSING_REQUEST);
         }
     }
 
@@ -206,7 +206,7 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
         } catch (Exception e) {
             log.error("Error processing POST request", e);
             sendErrorResponse(response, HttpStatus.SC_INTERNAL_SERVER_ERROR,
-                    MSG_ERROR_PROCESSING_REQUEST + e.getMessage());
+                    MSG_ERROR_PROCESSING_REQUEST);
         }
     }
 
@@ -390,7 +390,7 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
         } catch (Exception e) {
             log.error("Error uploading attachment", e);
             sendErrorResponse(response, HttpStatus.SC_INTERNAL_SERVER_ERROR,
-                    MSG_ERROR_PROCESSING_REQUEST + e.getMessage());
+                    MSG_ERROR_PROCESSING_REQUEST);
         } finally {
             // Ensure temp file is deleted
             if (tempFile != null && tempFile.exists()) {

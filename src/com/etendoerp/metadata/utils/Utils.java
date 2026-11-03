@@ -79,6 +79,7 @@ public class Utils {
     private Utils() { }
 
     private static final Logger logger = LogManager.getLogger(Utils.class);
+    private static final String GENERIC_ERROR_MESSAGE = "Error processing request";
     private static final MessageFactory messageFactory = new ParameterizedMessageFactory();
     private static final Map<String, Integer> exceptionStatusMap = buildExceptionMap();
     private static final DataToJsonConverter converter = new DataToJsonConverter();
@@ -292,8 +293,13 @@ public class Utils {
             t = t.getCause();
         }
 
+        // Log the real detail server-side only; the client only ever gets the generic message
+        // below, since the real message can leak SQL fragments, schema names, parser internals
+        // or file paths (ETP-6074 Finding 8).
+        logger.error(GENERIC_ERROR_MESSAGE, t);
+
         try {
-            json.put("error", t.getMessage());
+            json.put("error", GENERIC_ERROR_MESSAGE);
         } catch (JSONException e) {
             logger.warn(e.getMessage(), e);
         }
