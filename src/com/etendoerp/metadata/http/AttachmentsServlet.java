@@ -240,7 +240,7 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
      * Handles POST requests - supports UPLOAD, EDIT, DELETE, and DELETE_ALL commands
      */
     private void handlePost(HttpServletRequest request, HttpServletResponse response)
-            throws IOException, JSONException {
+            throws IOException, JSONException, ServletException {
         String command = request.getParameter(PARAM_COMMAND);
         if (command == null) {
             sendErrorResponse(response, HttpStatus.SC_BAD_REQUEST, MSG_COMMAND_REQUIRED);
@@ -329,27 +329,58 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
     }
 
     /**
-     * Upload a new attachment
+     * Upload a new attachment.
+     *
+     * <p>The record the attachment is being attached to is resolved and authorized
+     * (Phases 1-2, mirroring {@link #handleList}/{@link #handleDownloadAll}) before any
+     * physical file I/O happens. Upload requires write access to the owning record's
+     * organization <em>and</em> to the organization the caller is targeting in the
+     * request, since {@code attachManager.upload} ultimately files the attachment under
+     * the requested {@code orgId}.</p>
      */
     private void handleUpload(HttpServletRequest request, HttpServletResponse response)
-            throws IOException, JSONException {
+            throws IOException, JSONException, ServletException {
         if (!validateUploadParameters(request, response)) {
             return;
         }
 
+        UploadContext uploadContext = prepareUploadContext(request, response);
+        if (uploadContext == null) {
+            return; // Error response already sent (no file uploaded)
+        }
+
+        Table table;
+
+        // Phase 1 - narrow admin block: only to resolve the tab's table.
+        try {
+            OBContext.setAdminMode(true);
+
+            Tab tab = validateAndGetTab(uploadContext.tabId, response);
+            if (tab == null) {
+                return;
+            }
+
+            table = tab.getTable();
+        } finally {
+            OBContext.restorePreviousMode();
+        }
+
+        // Phase 2 - authorize with NO admin mode active.
+        assertRecordAccess(table, uploadContext.recordId, true);
+
+        if (!OBContext.getOBContext().getWritableOrganizations().contains(uploadContext.orgId)) {
+            throw new MetadataAccessException("Access denied");
+        }
+
+        // Phase 3 - narrow admin block, only around the physical upload.
         java.io.File tempFile = null;
         try {
             OBContext.setAdminMode(true);
-            
-            UploadContext uploadContext = prepareUploadContext(request, response);
-            if (uploadContext == null) {
-                return; // Error response already sent
-            }
 
             tempFile = createSecureTempFile(uploadContext.filePart);
             java.io.File finalFile = createFinalFile(tempFile, uploadContext.fileName);
-            
-            attachManager.upload(uploadContext.params, uploadContext.tabId, 
+
+            attachManager.upload(uploadContext.params, uploadContext.tabId,
                                uploadContext.recordId, uploadContext.orgId, finalFile);
 
             JSONObject result = new JSONObject();

@@ -27,6 +27,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.withSettings;
 
+import java.io.InputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.Collections;
@@ -35,6 +36,7 @@ import javax.servlet.ServletOutputStream;
 import javax.servlet.WriteListener;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.Part;
 
 import org.apache.http.HttpStatus;
 import org.junit.Before;
@@ -74,12 +76,15 @@ public class AttachmentsServletAccessTest extends OBBaseTest {
     private static final String PARAM_ATTACHMENT_ID = "attachmentId";
     private static final String PARAM_TAB_ID = "tabId";
     private static final String PARAM_RECORD_ID = "recordId";
+    private static final String PARAM_ORG_ID = "orgId";
+    private static final String PARAM_FILE = "file";
 
     private static final String CMD_DOWNLOAD = "DOWNLOAD";
     private static final String CMD_DELETE = "DELETE";
     private static final String CMD_EDIT = "EDIT";
     private static final String CMD_LIST = "LIST";
     private static final String CMD_DOWNLOAD_ALL = "DOWNLOAD_ALL";
+    private static final String CMD_UPLOAD = "UPLOAD";
 
     @Mock private HttpServletRequest mockRequest;
     @Mock private HttpServletResponse mockResponse;
@@ -92,6 +97,8 @@ public class AttachmentsServletAccessTest extends OBBaseTest {
     @Mock private ModelProvider mockModelProvider;
     @Mock private Entity mockEntity;
     @Mock private Organization mockOrganization;
+    @Mock private Part mockPart;
+    @Mock private InputStream mockInputStream;
 
     private AttachmentsServlet servlet;
     private StringWriter stringWriter;
@@ -442,6 +449,139 @@ public class AttachmentsServletAccessTest extends OBBaseTest {
 
             verify(mockResponse, never()).setStatus(HttpStatus.SC_FORBIDDEN);
             verify(mockAttachManager).downloadAll(eq(TEST_TAB_ID), eq(TEST_RECORD_ID), any());
+        }
+    }
+
+    /**
+     * Upload must be denied (403) when the owning record IS visible but its organization
+     * is not among the caller's writable organizations, and the file must never be
+     * handed to {@code attachManager.upload}.
+     */
+    @Test
+    public void testUpload_denied_whenRecordNotWritable() throws Exception {
+        when(mockRequest.getParameter(PARAM_COMMAND)).thenReturn(CMD_UPLOAD);
+        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(TEST_TAB_ID);
+        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(TEST_RECORD_ID);
+        when(mockRequest.getParameter(PARAM_ORG_ID)).thenReturn(TEST_ORG_ID);
+        when(mockRequest.getPart(PARAM_FILE)).thenReturn(mockPart);
+        when(mockPart.getHeader("content-disposition"))
+                .thenReturn("form-data; name=\"file\"; filename=\"test.txt\"");
+        when(mockTab.getTable()).thenReturn(mockTable);
+        when(mockTable.getDBTableName()).thenReturn("C_Order");
+
+        BaseOBObject record = mock(BaseOBObject.class, withSettings().extraInterfaces(OrganizationEnabled.class));
+        when(((OrganizationEnabled) record).getOrganization()).thenReturn(mockOrganization);
+        when(mockOrganization.getId()).thenReturn(TEST_ORG_ID);
+
+        try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
+             MockedStatic<OBContext> ctx = mockStatic(OBContext.class);
+             MockedStatic<ModelProvider> mp = mockStatic(ModelProvider.class)) {
+            dalMock.when(OBDal::getInstance).thenReturn(mockDal);
+            ctx.when(OBContext::getOBContext).thenReturn(mockContext);
+            ctx.when(() -> OBContext.setAdminMode(true)).thenAnswer(i -> null);
+            ctx.when(OBContext::restorePreviousMode).thenAnswer(i -> null);
+            mp.when(ModelProvider::getInstance).thenReturn(mockModelProvider);
+            when(mockModelProvider.getEntityByTableName("C_Order")).thenReturn(mockEntity);
+            when(mockEntity.getName()).thenReturn("Order");
+            when(mockDal.get(Tab.class, TEST_TAB_ID)).thenReturn(mockTab);
+            when(mockDal.get("Order", TEST_RECORD_ID)).thenReturn(record);
+            when(mockContext.getWritableOrganizations()).thenReturn(Collections.emptySet()); // record's org NOT writable
+
+            servlet.doPost(mockRequest, mockResponse);
+
+            verify(mockResponse).setStatus(HttpStatus.SC_FORBIDDEN);
+            assertTrue(stringWriter.toString().contains("Access denied"));
+            verify(mockAttachManager, never()).upload(any(), any(), any(), any(), any());
+        }
+    }
+
+    /**
+     * Upload must be denied (403) when the owning record IS writable but the request's
+     * {@code orgId} is not among the caller's writable organizations, and the file must
+     * never be handed to {@code attachManager.upload}.
+     */
+    @Test
+    public void testUpload_denied_whenOrgNotWritable() throws Exception {
+        final String requestOrgId = "org-999";
+
+        when(mockRequest.getParameter(PARAM_COMMAND)).thenReturn(CMD_UPLOAD);
+        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(TEST_TAB_ID);
+        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(TEST_RECORD_ID);
+        when(mockRequest.getParameter(PARAM_ORG_ID)).thenReturn(requestOrgId);
+        when(mockRequest.getPart(PARAM_FILE)).thenReturn(mockPart);
+        when(mockPart.getHeader("content-disposition"))
+                .thenReturn("form-data; name=\"file\"; filename=\"test.txt\"");
+        when(mockTab.getTable()).thenReturn(mockTable);
+        when(mockTable.getDBTableName()).thenReturn("C_Order");
+
+        BaseOBObject record = mock(BaseOBObject.class, withSettings().extraInterfaces(OrganizationEnabled.class));
+        when(((OrganizationEnabled) record).getOrganization()).thenReturn(mockOrganization);
+        when(mockOrganization.getId()).thenReturn(TEST_ORG_ID); // record's org IS writable
+
+        try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
+             MockedStatic<OBContext> ctx = mockStatic(OBContext.class);
+             MockedStatic<ModelProvider> mp = mockStatic(ModelProvider.class)) {
+            dalMock.when(OBDal::getInstance).thenReturn(mockDal);
+            ctx.when(OBContext::getOBContext).thenReturn(mockContext);
+            ctx.when(() -> OBContext.setAdminMode(true)).thenAnswer(i -> null);
+            ctx.when(OBContext::restorePreviousMode).thenAnswer(i -> null);
+            mp.when(ModelProvider::getInstance).thenReturn(mockModelProvider);
+            when(mockModelProvider.getEntityByTableName("C_Order")).thenReturn(mockEntity);
+            when(mockEntity.getName()).thenReturn("Order");
+            when(mockDal.get(Tab.class, TEST_TAB_ID)).thenReturn(mockTab);
+            when(mockDal.get("Order", TEST_RECORD_ID)).thenReturn(record);
+            // Writable orgs include the record's org but NOT the request's orgId.
+            when(mockContext.getWritableOrganizations()).thenReturn(Collections.singleton(TEST_ORG_ID));
+
+            servlet.doPost(mockRequest, mockResponse);
+
+            verify(mockResponse).setStatus(HttpStatus.SC_FORBIDDEN);
+            assertTrue(stringWriter.toString().contains("Access denied"));
+            verify(mockAttachManager, never()).upload(any(), any(), any(), any(), any());
+        }
+    }
+
+    /**
+     * Positive control: upload proceeds when the owning record's organization AND the
+     * request's orgId are both writable (it is not rejected with 403; what happens
+     * further downstream - the physical file I/O - is outside this unit's scope, mirroring
+     * {@code testUploadAttachment_ValidationSuccess}).
+     */
+    @Test
+    public void testUpload_allowed_whenWritable() throws Exception {
+        when(mockRequest.getParameter(PARAM_COMMAND)).thenReturn(CMD_UPLOAD);
+        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(TEST_TAB_ID);
+        when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(TEST_RECORD_ID);
+        when(mockRequest.getParameter(PARAM_ORG_ID)).thenReturn(TEST_ORG_ID);
+        when(mockRequest.getPart(PARAM_FILE)).thenReturn(mockPart);
+        when(mockPart.getHeader("content-disposition"))
+                .thenReturn("form-data; name=\"file\"; filename=\"test.txt\"");
+        when(mockPart.getInputStream()).thenReturn(mockInputStream);
+        when(mockInputStream.read(any(byte[].class))).thenReturn(-1);
+        when(mockTab.getTable()).thenReturn(mockTable);
+        when(mockTable.getDBTableName()).thenReturn("C_Order");
+
+        BaseOBObject record = mock(BaseOBObject.class, withSettings().extraInterfaces(OrganizationEnabled.class));
+        when(((OrganizationEnabled) record).getOrganization()).thenReturn(mockOrganization);
+        when(mockOrganization.getId()).thenReturn(TEST_ORG_ID);
+
+        try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
+             MockedStatic<OBContext> ctx = mockStatic(OBContext.class);
+             MockedStatic<ModelProvider> mp = mockStatic(ModelProvider.class)) {
+            dalMock.when(OBDal::getInstance).thenReturn(mockDal);
+            ctx.when(OBContext::getOBContext).thenReturn(mockContext);
+            ctx.when(() -> OBContext.setAdminMode(true)).thenAnswer(i -> null);
+            ctx.when(OBContext::restorePreviousMode).thenAnswer(i -> null);
+            mp.when(ModelProvider::getInstance).thenReturn(mockModelProvider);
+            when(mockModelProvider.getEntityByTableName("C_Order")).thenReturn(mockEntity);
+            when(mockEntity.getName()).thenReturn("Order");
+            when(mockDal.get(Tab.class, TEST_TAB_ID)).thenReturn(mockTab);
+            when(mockDal.get("Order", TEST_RECORD_ID)).thenReturn(record);
+            when(mockContext.getWritableOrganizations()).thenReturn(Collections.singleton(TEST_ORG_ID));
+
+            servlet.doPost(mockRequest, mockResponse);
+
+            verify(mockResponse, never()).setStatus(HttpStatus.SC_FORBIDDEN);
         }
     }
 }
