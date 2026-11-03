@@ -58,7 +58,11 @@ import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.hibernate.criterion.Restrictions;
+import org.openbravo.base.model.Entity;
+import org.openbravo.base.model.ModelProvider;
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
+import org.openbravo.base.structure.BaseOBObject;
+import org.openbravo.base.structure.OrganizationEnabled;
 import org.openbravo.client.application.attachment.AttachImplementationManager;
 import org.openbravo.client.application.attachment.AttachmentUtils;
 import org.openbravo.dal.core.OBContext;
@@ -181,6 +185,9 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
             throws IOException, ServletException {
         try {
             handleGet(request, response);
+        } catch (MetadataAccessException e) {
+            log.warn("Access denied: {}", e.getMessage());
+            sendErrorResponse(response, HttpStatus.SC_FORBIDDEN, "Access denied");
         } catch (Exception e) {
             log.error("Error processing GET request", e);
             sendErrorResponse(response, HttpStatus.SC_INTERNAL_SERVER_ERROR,
@@ -193,6 +200,9 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
             throws IOException, ServletException {
         try {
             handlePost(request, response);
+        } catch (MetadataAccessException e) {
+            log.warn("Access denied: {}", e.getMessage());
+            sendErrorResponse(response, HttpStatus.SC_FORBIDDEN, "Access denied");
         } catch (Exception e) {
             log.error("Error processing POST request", e);
             sendErrorResponse(response, HttpStatus.SC_INTERNAL_SERVER_ERROR,
@@ -356,17 +366,19 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
             throws IOException, JSONException {
         String attachmentId = request.getParameter(PARAM_ATTACHMENT_ID);
 
+        // Phases 1 (narrow admin load) + 2 (authorize with NO admin mode active).
+        Attachment attachment = validateAndGetAttachment(attachmentId, response, false);
+        if (attachment == null) {
+            return;
+        }
+
+        response.setContentType(CONTENT_TYPE_OCTET_STREAM);
+        response.setHeader(CONTENT_DISPOSITION_HEADER,
+                "attachment; filename=\"" + attachment.getName() + "\"");
+
+        // Phase 3: narrow admin block, only around the physical I/O.
         try {
             OBContext.setAdminMode(true);
-
-            Attachment attachment = validateAndGetAttachment(attachmentId, response);
-            if (attachment == null) {
-                return;
-            }
-
-            response.setContentType(CONTENT_TYPE_OCTET_STREAM);
-            response.setHeader(CONTENT_DISPOSITION_HEADER,
-                    "attachment; filename=\"" + attachment.getName() + "\"");
 
             try (OutputStream out = response.getOutputStream()) {
                 attachManager.download(attachmentId, out);
@@ -573,6 +585,90 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
         }
 
         return attachment;
+    }
+
+    /**
+     * Validates and retrieves an Attachment by ID, authorizing the caller against the
+     * record the attachment belongs to.
+     *
+     * <p>The attachment itself is loaded under a narrow admin block (it only holds
+     * pointers to the owning table/record). Authorization then runs with NO admin mode
+     * active, so DAL row-level security filters the owning-record load.</p>
+     *
+     * @param forWrite whether the caller must additionally have write access
+     *                 (an org in {@code OBContext#getWritableOrganizations()}) to the owning record
+     * @return the Attachment, or null if validation fails (error response already sent)
+     * @throws MetadataAccessException if the caller cannot access the owning record (maps to HTTP 403)
+     */
+    private Attachment validateAndGetAttachment(String attachmentId, HttpServletResponse response, boolean forWrite)
+            throws IOException, JSONException {
+        if (attachmentId == null) {
+            sendErrorResponse(response, HttpStatus.SC_BAD_REQUEST, MSG_ATTACHMENT_REQUIRED);
+            return null;
+        }
+
+        Attachment attachment;
+        Table table;
+        String recordId;
+
+        // Phase 1 - narrow admin block: only to read the attachment's own pointers.
+        try {
+            OBContext.setAdminMode(true);
+
+            attachment = OBDal.getInstance().get(Attachment.class, attachmentId);
+            if (attachment == null) {
+                sendErrorResponse(response, HttpStatus.SC_NOT_FOUND, MSG_ATTACHMENT_NOT_FOUND);
+                return null;
+            }
+
+            table = attachment.getTable();
+            recordId = attachment.getRecord();
+        } finally {
+            OBContext.restorePreviousMode();
+        }
+
+        // Phase 2 - authorize with NO admin mode active.
+        assertRecordAccess(table, recordId, forWrite);
+
+        return attachment;
+    }
+
+    /**
+     * Authorizes the current user against the record that owns an attachment.
+     * Loads the record under the caller's OBContext (no admin mode) so DAL row-level
+     * security applies. Denies with {@link MetadataAccessException} (HTTP 403).
+     *
+     * <p><strong>This method must never run while admin mode is active</strong> — admin mode
+     * bypasses the DAL client/organization read filter, which would defeat the authorization
+     * check entirely.</p>
+     *
+     * @param forWrite when true, also requires the record's organization to be among the
+     *                 caller's writable organizations
+     */
+    private void assertRecordAccess(Table table, String recordId, boolean forWrite) {
+        if (table == null || recordId == null) {
+            throw new MetadataAccessException("Access denied");
+        }
+
+        Entity entity = ModelProvider.getInstance().getEntityByTableName(table.getDBTableName());
+        if (entity == null) {
+            throw new MetadataAccessException("Access denied");
+        }
+
+        BaseOBObject record = OBDal.getInstance().get(entity.getName(), recordId);
+        if (record == null) {
+            throw new MetadataAccessException("Access denied");
+        }
+
+        if (forWrite) {
+            if (!(record instanceof OrganizationEnabled)) {
+                throw new MetadataAccessException("Access denied");
+            }
+            String orgId = ((OrganizationEnabled) record).getOrganization().getId();
+            if (!OBContext.getOBContext().getWritableOrganizations().contains(orgId)) {
+                throw new MetadataAccessException("Access denied");
+            }
+        }
     }
 
     /**
