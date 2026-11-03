@@ -36,10 +36,17 @@ import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.MockitoJUnitRunner;
+import org.openbravo.base.model.Entity;
+import org.openbravo.base.model.ModelProvider;
+import org.openbravo.base.structure.BaseOBObject;
+import org.openbravo.base.structure.OrganizationEnabled;
 import org.openbravo.client.application.attachment.AttachImplementationManager;
 import org.openbravo.dal.core.OBContext;
+import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.access.User;
+import org.openbravo.model.ad.datamodel.Table;
 import org.openbravo.model.ad.system.Client;
+import org.openbravo.model.ad.utility.Attachment;
 import org.openbravo.model.common.enterprise.Organization;
 import org.openbravo.test.base.OBBaseTest;
 
@@ -80,6 +87,11 @@ public class AttachmentsServletValidationTest extends OBBaseTest {
     @Mock private User mockUser;
     @Mock private Client mockClient;
     @Mock private Organization mockOrganization;
+    @Mock private OBDal mockDal;
+    @Mock private Table mockTable;
+    @Mock private Attachment mockAttachment;
+    @Mock private ModelProvider mockModelProvider;
+    @Mock private Entity mockEntity;
 
     private AttachmentsServlet servlet;
     private StringWriter stringWriter;
@@ -196,10 +208,28 @@ public class AttachmentsServletValidationTest extends OBBaseTest {
         when(mockRequest.getParameter(PARAM_DESCRIPTION)).thenReturn("Test description");
         when(mockRequest.getReader()).thenReturn(new BufferedReader(new StringReader("")));
 
-        try (MockedStatic<OBContext> contextMock = mockStatic(OBContext.class)) {
+        try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
+             MockedStatic<OBContext> contextMock = mockStatic(OBContext.class);
+             MockedStatic<ModelProvider> modelProviderMock = mockStatic(ModelProvider.class)) {
             contextMock.when(OBContext::getOBContext).thenReturn(mockContext);
             contextMock.when(() -> OBContext.setAdminMode(true)).thenAnswer(invocation -> null);
             contextMock.when(OBContext::restorePreviousMode).thenAnswer(invocation -> null);
+
+            dalMock.when(OBDal::getInstance).thenReturn(mockDal);
+            when(mockDal.get(Attachment.class, TEST_ATTACHMENT_ID)).thenReturn(mockAttachment);
+            when(mockAttachment.getTable()).thenReturn(mockTable);
+            when(mockAttachment.getRecord()).thenReturn(TEST_RECORD_ID);
+            when(mockTable.getDBTableName()).thenReturn("C_Order");
+            modelProviderMock.when(ModelProvider::getInstance).thenReturn(mockModelProvider);
+            when(mockModelProvider.getEntityByTableName("C_Order")).thenReturn(mockEntity);
+            when(mockEntity.getName()).thenReturn("Order");
+
+            BaseOBObject writableOwningRecord =
+                    mock(BaseOBObject.class, withSettings().extraInterfaces(OrganizationEnabled.class));
+            when(((OrganizationEnabled) writableOwningRecord).getOrganization()).thenReturn(mockOrganization);
+            when(mockOrganization.getId()).thenReturn(TEST_ORG_ID);
+            when(mockDal.get("Order", TEST_RECORD_ID)).thenReturn(writableOwningRecord);
+            when(mockContext.getWritableOrganizations()).thenReturn(java.util.Collections.singleton(TEST_ORG_ID));
 
             servlet.doPost(mockRequest, mockResponse);
 

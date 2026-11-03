@@ -25,9 +25,11 @@ import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.withSettings;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.util.Collections;
 
 import javax.servlet.ServletOutputStream;
 import javax.servlet.WriteListener;
@@ -44,11 +46,13 @@ import org.mockito.junit.MockitoJUnitRunner;
 import org.openbravo.base.model.Entity;
 import org.openbravo.base.model.ModelProvider;
 import org.openbravo.base.structure.BaseOBObject;
+import org.openbravo.base.structure.OrganizationEnabled;
 import org.openbravo.client.application.attachment.AttachImplementationManager;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.datamodel.Table;
 import org.openbravo.model.ad.utility.Attachment;
+import org.openbravo.model.common.enterprise.Organization;
 import org.openbravo.test.base.OBBaseTest;
 
 /**
@@ -62,11 +66,16 @@ public class AttachmentsServletAccessTest extends OBBaseTest {
 
     private static final String TEST_ATTACHMENT_ID = "attachment-abc";
     private static final String TEST_RECORD_ID = "record-456";
+    private static final String TEST_TAB_ID = "tab-123";
+    private static final String TEST_ORG_ID = "org-123";
 
     private static final String PARAM_COMMAND = "command";
     private static final String PARAM_ATTACHMENT_ID = "attachmentId";
+    private static final String PARAM_TAB_ID = "tabId";
 
     private static final String CMD_DOWNLOAD = "DOWNLOAD";
+    private static final String CMD_DELETE = "DELETE";
+    private static final String CMD_EDIT = "EDIT";
 
     @Mock private HttpServletRequest mockRequest;
     @Mock private HttpServletResponse mockResponse;
@@ -77,6 +86,7 @@ public class AttachmentsServletAccessTest extends OBBaseTest {
     @Mock private Attachment mockAttachment;
     @Mock private ModelProvider mockModelProvider;
     @Mock private Entity mockEntity;
+    @Mock private Organization mockOrganization;
 
     private AttachmentsServlet servlet;
     private StringWriter stringWriter;
@@ -175,6 +185,121 @@ public class AttachmentsServletAccessTest extends OBBaseTest {
 
             verify(mockResponse, never()).setStatus(HttpStatus.SC_FORBIDDEN);
             verify(mockAttachManager).download(eq(TEST_ATTACHMENT_ID), any());
+        }
+    }
+
+    /**
+     * Delete must be denied (403) when the attachment's owning record is visible but its
+     * organization is not among the caller's writable organizations, and the attachment
+     * must never be deleted.
+     */
+    @Test
+    public void testDelete_denied_whenNotWritable() throws Exception {
+        when(mockRequest.getParameter(PARAM_COMMAND)).thenReturn(CMD_DELETE);
+        when(mockRequest.getParameter(PARAM_ATTACHMENT_ID)).thenReturn(TEST_ATTACHMENT_ID);
+        when(mockAttachment.getTable()).thenReturn(mockTable);
+        when(mockAttachment.getRecord()).thenReturn(TEST_RECORD_ID);
+        when(mockTable.getDBTableName()).thenReturn("C_Order");
+
+        BaseOBObject record = mock(BaseOBObject.class, withSettings().extraInterfaces(OrganizationEnabled.class));
+        when(((OrganizationEnabled) record).getOrganization()).thenReturn(mockOrganization);
+        when(mockOrganization.getId()).thenReturn(TEST_ORG_ID);
+
+        try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
+             MockedStatic<OBContext> ctx = mockStatic(OBContext.class);
+             MockedStatic<ModelProvider> mp = mockStatic(ModelProvider.class)) {
+            dalMock.when(OBDal::getInstance).thenReturn(mockDal);
+            ctx.when(OBContext::getOBContext).thenReturn(mockContext);
+            ctx.when(() -> OBContext.setAdminMode(true)).thenAnswer(i -> null);
+            ctx.when(OBContext::restorePreviousMode).thenAnswer(i -> null);
+            mp.when(ModelProvider::getInstance).thenReturn(mockModelProvider);
+            when(mockModelProvider.getEntityByTableName("C_Order")).thenReturn(mockEntity);
+            when(mockEntity.getName()).thenReturn("Order");
+            when(mockDal.get(Attachment.class, TEST_ATTACHMENT_ID)).thenReturn(mockAttachment);
+            when(mockDal.get("Order", TEST_RECORD_ID)).thenReturn(record);
+            when(mockContext.getWritableOrganizations()).thenReturn(Collections.emptySet());
+
+            servlet.doPost(mockRequest, mockResponse);
+
+            verify(mockResponse).setStatus(HttpStatus.SC_FORBIDDEN);
+            assertTrue(stringWriter.toString().contains("Access denied"));
+            verify(mockAttachManager, never()).delete(any(Attachment.class));
+        }
+    }
+
+    /**
+     * Positive control: delete proceeds when the owning record's organization IS writable.
+     */
+    @Test
+    public void testDelete_allowed_whenWritable() throws Exception {
+        when(mockRequest.getParameter(PARAM_COMMAND)).thenReturn(CMD_DELETE);
+        when(mockRequest.getParameter(PARAM_ATTACHMENT_ID)).thenReturn(TEST_ATTACHMENT_ID);
+        when(mockAttachment.getTable()).thenReturn(mockTable);
+        when(mockAttachment.getRecord()).thenReturn(TEST_RECORD_ID);
+        when(mockTable.getDBTableName()).thenReturn("C_Order");
+
+        BaseOBObject record = mock(BaseOBObject.class, withSettings().extraInterfaces(OrganizationEnabled.class));
+        when(((OrganizationEnabled) record).getOrganization()).thenReturn(mockOrganization);
+        when(mockOrganization.getId()).thenReturn(TEST_ORG_ID);
+
+        try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
+             MockedStatic<OBContext> ctx = mockStatic(OBContext.class);
+             MockedStatic<ModelProvider> mp = mockStatic(ModelProvider.class)) {
+            dalMock.when(OBDal::getInstance).thenReturn(mockDal);
+            ctx.when(OBContext::getOBContext).thenReturn(mockContext);
+            ctx.when(() -> OBContext.setAdminMode(true)).thenAnswer(i -> null);
+            ctx.when(OBContext::restorePreviousMode).thenAnswer(i -> null);
+            mp.when(ModelProvider::getInstance).thenReturn(mockModelProvider);
+            when(mockModelProvider.getEntityByTableName("C_Order")).thenReturn(mockEntity);
+            when(mockEntity.getName()).thenReturn("Order");
+            when(mockDal.get(Attachment.class, TEST_ATTACHMENT_ID)).thenReturn(mockAttachment);
+            when(mockDal.get("Order", TEST_RECORD_ID)).thenReturn(record);
+            when(mockContext.getWritableOrganizations()).thenReturn(Collections.singleton(TEST_ORG_ID));
+
+            servlet.doPost(mockRequest, mockResponse);
+
+            verify(mockResponse, never()).setStatus(HttpStatus.SC_FORBIDDEN);
+            verify(mockAttachManager).delete(mockAttachment);
+        }
+    }
+
+    /**
+     * Edit must be denied (403) when the attachment's owning record is visible but its
+     * organization is not among the caller's writable organizations, and the attachment
+     * must never be updated.
+     */
+    @Test
+    public void testEdit_denied_whenNotWritable() throws Exception {
+        when(mockRequest.getParameter(PARAM_COMMAND)).thenReturn(CMD_EDIT);
+        when(mockRequest.getParameter(PARAM_ATTACHMENT_ID)).thenReturn(TEST_ATTACHMENT_ID);
+        when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(TEST_TAB_ID);
+        when(mockAttachment.getTable()).thenReturn(mockTable);
+        when(mockAttachment.getRecord()).thenReturn(TEST_RECORD_ID);
+        when(mockTable.getDBTableName()).thenReturn("C_Order");
+
+        BaseOBObject record = mock(BaseOBObject.class, withSettings().extraInterfaces(OrganizationEnabled.class));
+        when(((OrganizationEnabled) record).getOrganization()).thenReturn(mockOrganization);
+        when(mockOrganization.getId()).thenReturn(TEST_ORG_ID);
+
+        try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
+             MockedStatic<OBContext> ctx = mockStatic(OBContext.class);
+             MockedStatic<ModelProvider> mp = mockStatic(ModelProvider.class)) {
+            dalMock.when(OBDal::getInstance).thenReturn(mockDal);
+            ctx.when(OBContext::getOBContext).thenReturn(mockContext);
+            ctx.when(() -> OBContext.setAdminMode(true)).thenAnswer(i -> null);
+            ctx.when(OBContext::restorePreviousMode).thenAnswer(i -> null);
+            mp.when(ModelProvider::getInstance).thenReturn(mockModelProvider);
+            when(mockModelProvider.getEntityByTableName("C_Order")).thenReturn(mockEntity);
+            when(mockEntity.getName()).thenReturn("Order");
+            when(mockDal.get(Attachment.class, TEST_ATTACHMENT_ID)).thenReturn(mockAttachment);
+            when(mockDal.get("Order", TEST_RECORD_ID)).thenReturn(record);
+            when(mockContext.getWritableOrganizations()).thenReturn(Collections.emptySet());
+
+            servlet.doPost(mockRequest, mockResponse);
+
+            verify(mockResponse).setStatus(HttpStatus.SC_FORBIDDEN);
+            assertTrue(stringWriter.toString().contains("Access denied"));
+            verify(mockAttachManager, never()).update(any(), anyString(), anyString());
         }
     }
 }

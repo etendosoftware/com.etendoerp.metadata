@@ -22,9 +22,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.withSettings;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
@@ -33,6 +35,7 @@ import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.StringReader;
 import java.io.StringWriter;
+import java.util.Collections;
 
 import javax.servlet.ServletException;
 import javax.servlet.ServletOutputStream;
@@ -48,6 +51,10 @@ import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.MockitoJUnitRunner;
+import org.openbravo.base.model.Entity;
+import org.openbravo.base.model.ModelProvider;
+import org.openbravo.base.structure.BaseOBObject;
+import org.openbravo.base.structure.OrganizationEnabled;
 import org.openbravo.client.application.attachment.AttachImplementationManager;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBCriteria;
@@ -101,6 +108,8 @@ public class AttachmentsServletCoverageTest extends OBBaseTest {
     @Mock private OBCriteria<Attachment> mockCriteria;
     @Mock private Part mockPart;
     @Mock private InputStream mockInputStream;
+    @Mock private ModelProvider mockModelProvider;
+    @Mock private Entity mockEntity;
 
     private AttachmentsServlet servlet;
     private StringWriter stringWriter;
@@ -237,9 +246,35 @@ public class AttachmentsServletCoverageTest extends OBBaseTest {
         return longName + ".txt";
     }
 
+    /**
+     * Stubs the attachment's owning record as visible and writable, so the record-level
+     * authorization added to EDIT/DELETE/DOWNLOAD passes and the handler reaches its
+     * normal success path. Mirrors the pattern used by the access-focused test class.
+     */
+    private void stubRecordAccessGranted(MockedStatic<ModelProvider> modelProviderMock) {
+        when(mockAttachment.getTable()).thenReturn(mockTable);
+        when(mockAttachment.getRecord()).thenReturn(TEST_RECORD_ID);
+        when(mockTable.getDBTableName()).thenReturn("C_Order");
+        modelProviderMock.when(ModelProvider::getInstance).thenReturn(mockModelProvider);
+        when(mockModelProvider.getEntityByTableName("C_Order")).thenReturn(mockEntity);
+        when(mockEntity.getName()).thenReturn("Order");
+
+        BaseOBObject ownerRecord = mock(BaseOBObject.class, withSettings().extraInterfaces(OrganizationEnabled.class));
+        when(((OrganizationEnabled) ownerRecord).getOrganization()).thenReturn(mockOrganization);
+        when(mockOrganization.getId()).thenReturn(TEST_ORG_ID);
+        when(mockDal.get("Order", TEST_RECORD_ID)).thenReturn(ownerRecord);
+        when(mockContext.getWritableOrganizations()).thenReturn(Collections.singleton(TEST_ORG_ID));
+    }
+
     private void assertEditRequestSucceeds() throws Exception {
-        try (MockedStatic<OBContext> contextMock = mockStatic(OBContext.class)) {
+        try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
+             MockedStatic<OBContext> contextMock = mockStatic(OBContext.class);
+             MockedStatic<ModelProvider> modelProviderMock = mockStatic(ModelProvider.class)) {
             mockStaticContext(contextMock);
+            dalMock.when(OBDal::getInstance).thenReturn(mockDal);
+            when(mockDal.get(Attachment.class, TEST_ATTACHMENT_ID)).thenReturn(mockAttachment);
+            stubRecordAccessGranted(modelProviderMock);
+
             servlet.doPost(mockRequest, mockResponse);
             verify(mockResponse).setStatus(HttpStatus.SC_OK);
         }
@@ -300,9 +335,13 @@ public class AttachmentsServletCoverageTest extends OBBaseTest {
 
     private void assertAttachmentLookup(boolean found) throws Exception {
         try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
-             MockedStatic<OBContext> contextMock = mockStatic(OBContext.class)) {
+             MockedStatic<OBContext> contextMock = mockStatic(OBContext.class);
+             MockedStatic<ModelProvider> modelProviderMock = mockStatic(ModelProvider.class)) {
             mockAttachmentLookup("DOWNLOAD", dalMock, contextMock);
             when(mockDal.get(Attachment.class, TEST_ATTACHMENT_ID)).thenReturn(found ? mockAttachment : null);
+            if (found) {
+                stubRecordAccessGranted(modelProviderMock);
+            }
             servlet.doGet(found ? TEST_PATH : null, mockRequest, mockResponse);
             if (found) {
                 verify(mockResponse).setContentType("application/octet-stream");

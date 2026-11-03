@@ -53,6 +53,7 @@ import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.base.model.Entity;
 import org.openbravo.base.model.ModelProvider;
 import org.openbravo.base.structure.BaseOBObject;
+import org.openbravo.base.structure.OrganizationEnabled;
 import org.openbravo.client.application.attachment.AttachImplementationManager;
 import org.openbravo.client.application.attachment.AttachmentUtils;
 import org.openbravo.dal.core.OBContext;
@@ -399,8 +400,12 @@ public class AttachmentsServletTest extends OBBaseTest {
         when(mockRequest.getParameter(PARAM_DESCRIPTION)).thenReturn("Updated description");
         when(mockRequest.getReader()).thenReturn(new BufferedReader(new StringReader("{}")));
 
-        try (MockedStatic<OBContext> contextMock = mockStatic(OBContext.class)) {
+        try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
+             MockedStatic<OBContext> contextMock = mockStatic(OBContext.class);
+             MockedStatic<ModelProvider> modelProviderMock = mockStatic(ModelProvider.class)) {
+            dalMock.when(OBDal::getInstance).thenReturn(mockDal);
             contextMock.when(OBContext::getOBContext).thenReturn(mockContext);
+            stubAttachmentAccessGranted(modelProviderMock);
 
             // Act
             servlet.doPost(mockRequest, mockResponse);
@@ -448,8 +453,12 @@ public class AttachmentsServletTest extends OBBaseTest {
         when(mockRequest.getReader()).thenReturn(new BufferedReader(
                 new StringReader("{\"description\":\"JSON description\"}")));
 
-        try (MockedStatic<OBContext> contextMock = mockStatic(OBContext.class)) {
+        try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
+             MockedStatic<OBContext> contextMock = mockStatic(OBContext.class);
+             MockedStatic<ModelProvider> modelProviderMock = mockStatic(ModelProvider.class)) {
+            dalMock.when(OBDal::getInstance).thenReturn(mockDal);
             contextMock.when(OBContext::getOBContext).thenReturn(mockContext);
+            stubAttachmentAccessGranted(modelProviderMock);
 
             // Act
             servlet.doPost(mockRequest, mockResponse);
@@ -504,13 +513,23 @@ public class AttachmentsServletTest extends OBBaseTest {
         List<Attachment> mockAttachments = createMockAttachmentsForDeletion();
 
         try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
-             MockedStatic<OBContext> contextMock = mockStatic(OBContext.class)) {
+             MockedStatic<OBContext> contextMock = mockStatic(OBContext.class);
+             MockedStatic<ModelProvider> modelProviderMock = mockStatic(ModelProvider.class)) {
 
             dalMock.when(OBDal::getInstance).thenReturn(mockDal);
             contextMock.when(OBContext::getOBContext).thenReturn(mockContext);
 
             when(mockDal.get(Tab.class, TEST_TAB_ID)).thenReturn(mockTab);
             when(mockTab.getTable()).thenReturn(mockTable);
+            when(mockTable.getDBTableName()).thenReturn("C_Order");
+            modelProviderMock.when(ModelProvider::getInstance).thenReturn(mockModelProvider);
+            when(mockModelProvider.getEntityByTableName("C_Order")).thenReturn(mockEntity);
+            when(mockEntity.getName()).thenReturn("Order");
+            BaseOBObject writableOwningRecord = mock(BaseOBObject.class, withSettings().extraInterfaces(OrganizationEnabled.class));
+            when(((OrganizationEnabled) writableOwningRecord).getOrganization()).thenReturn(mockOrganization);
+            when(mockOrganization.getId()).thenReturn(TEST_ORG_ID);
+            when(mockDal.get("Order", TEST_RECORD_ID)).thenReturn(writableOwningRecord);
+            when(mockContext.getWritableOrganizations()).thenReturn(java.util.Collections.singleton(TEST_ORG_ID));
             when(mockDal.createCriteria(Attachment.class)).thenReturn(mockCriteria);
             when(mockCriteria.add(any())).thenReturn(mockCriteria);
             when(mockCriteria.list()).thenReturn(mockAttachments);
@@ -668,11 +687,12 @@ public class AttachmentsServletTest extends OBBaseTest {
         when(mockRequest.getParameter(PARAM_ATTACHMENT_ID)).thenReturn(TEST_ATTACHMENT_ID);
 
         try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
-             MockedStatic<OBContext> contextMock = mockStatic(OBContext.class)) {
+             MockedStatic<OBContext> contextMock = mockStatic(OBContext.class);
+             MockedStatic<ModelProvider> modelProviderMock = mockStatic(ModelProvider.class)) {
 
             dalMock.when(OBDal::getInstance).thenReturn(mockDal);
             contextMock.when(OBContext::getOBContext).thenReturn(mockContext);
-            when(mockDal.get(Attachment.class, TEST_ATTACHMENT_ID)).thenReturn(mockAttachment);
+            stubAttachmentAccessGranted(modelProviderMock);
 
             // Act
             servlet.doPost(TEST_PATH, mockRequest, mockResponse);
@@ -693,11 +713,12 @@ public class AttachmentsServletTest extends OBBaseTest {
         when(mockRequest.getParameter(PARAM_ATTACHMENT_ID)).thenReturn(TEST_ATTACHMENT_ID);
 
         try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
-             MockedStatic<OBContext> contextMock = mockStatic(OBContext.class)) {
+             MockedStatic<OBContext> contextMock = mockStatic(OBContext.class);
+             MockedStatic<ModelProvider> modelProviderMock = mockStatic(ModelProvider.class)) {
 
             dalMock.when(OBDal::getInstance).thenReturn(mockDal);
             contextMock.when(OBContext::getOBContext).thenReturn(mockContext);
-            when(mockDal.get(Attachment.class, TEST_ATTACHMENT_ID)).thenReturn(mockAttachment);
+            stubAttachmentAccessGranted(modelProviderMock);
 
             // Act
             servlet.doDelete(TEST_PATH, mockRequest, mockResponse);
@@ -759,11 +780,12 @@ public class AttachmentsServletTest extends OBBaseTest {
         when(mockRequest.getParameter(PARAM_ATTACHMENT_ID)).thenReturn(TEST_ATTACHMENT_ID);
 
         try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
-             MockedStatic<OBContext> contextMock = mockStatic(OBContext.class)) {
+             MockedStatic<OBContext> contextMock = mockStatic(OBContext.class);
+             MockedStatic<ModelProvider> modelProviderMock = mockStatic(ModelProvider.class)) {
 
             dalMock.when(OBDal::getInstance).thenReturn(mockDal);
             contextMock.when(OBContext::getOBContext).thenReturn(mockContext);
-            when(mockDal.get(Attachment.class, TEST_ATTACHMENT_ID)).thenReturn(mockAttachment);
+            stubAttachmentAccessGranted(modelProviderMock);
 
             // Act
             servlet.doPost(mockRequest, mockResponse);
@@ -815,6 +837,29 @@ public class AttachmentsServletTest extends OBBaseTest {
         attachments.add(attachment1);
 
         return attachments;
+    }
+
+    /**
+     * Stubs {@code mockAttachment}'s owning record as visible and writable to the caller,
+     * via {@link ModelProvider} + {@link OBDal}, so EDIT/DELETE record-level authorization
+     * passes and the handler reaches its normal success path.
+     *
+     * Callers must already have {@code OBDal::getInstance} stubbed to {@code mockDal}.
+     */
+    private void stubAttachmentAccessGranted(MockedStatic<ModelProvider> modelProviderMock) {
+        when(mockDal.get(Attachment.class, TEST_ATTACHMENT_ID)).thenReturn(mockAttachment);
+        when(mockAttachment.getTable()).thenReturn(mockTable);
+        when(mockAttachment.getRecord()).thenReturn(TEST_RECORD_ID);
+        when(mockTable.getDBTableName()).thenReturn("C_Order");
+        modelProviderMock.when(ModelProvider::getInstance).thenReturn(mockModelProvider);
+        when(mockModelProvider.getEntityByTableName("C_Order")).thenReturn(mockEntity);
+        when(mockEntity.getName()).thenReturn("Order");
+
+        BaseOBObject writableOwningRecord = mock(BaseOBObject.class, withSettings().extraInterfaces(OrganizationEnabled.class));
+        when(((OrganizationEnabled) writableOwningRecord).getOrganization()).thenReturn(mockOrganization);
+        when(mockOrganization.getId()).thenReturn(TEST_ORG_ID);
+        when(mockDal.get("Order", TEST_RECORD_ID)).thenReturn(writableOwningRecord);
+        when(mockContext.getWritableOrganizations()).thenReturn(java.util.Collections.singleton(TEST_ORG_ID));
     }
 
 }
