@@ -30,6 +30,7 @@ import java.io.PrintWriter;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -253,23 +254,43 @@ public class AttachmentsServletTest extends OBBaseTest {
         when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(TEST_RECORD_ID);
         when(mockRequest.getParameter(PARAM_ORG_ID)).thenReturn(TEST_ORG_ID);
         when(mockRequest.getPart(PARAM_FILE)).thenReturn(mockPart);
-        
+
         when(mockPart.getInputStream()).thenReturn(mockInputStream);
         when(mockPart.getHeader("content-disposition")).thenReturn("form-data; name=\"file\"; filename=\"test.txt\"");
         when(mockInputStream.read(any(byte[].class))).thenReturn(-1);
 
-        try (MockedStatic<OBContext> contextMock = mockStatic(OBContext.class)) {
+        // The record-level + org-level authorization added to UPLOAD needs the tab's
+        // table to resolve to a visible, writable owning record; stub it as such here
+        // so this test still reaches the physical upload path it is validating.
+        when(mockTab.getTable()).thenReturn(mockTable);
+        when(mockTable.getDBTableName()).thenReturn("C_Order");
+        BaseOBObject ownerRecord = mock(BaseOBObject.class, withSettings().extraInterfaces(OrganizationEnabled.class));
+        when(((OrganizationEnabled) ownerRecord).getOrganization()).thenReturn(mockOrganization);
+        when(mockOrganization.getId()).thenReturn(TEST_ORG_ID);
+
+        try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
+             MockedStatic<OBContext> contextMock = mockStatic(OBContext.class);
+             MockedStatic<ModelProvider> modelProviderMock = mockStatic(ModelProvider.class)) {
+            dalMock.when(OBDal::getInstance).thenReturn(mockDal);
+            when(mockDal.get(Tab.class, TEST_TAB_ID)).thenReturn(mockTab);
+            when(mockDal.get("Order", TEST_RECORD_ID)).thenReturn(ownerRecord);
+            modelProviderMock.when(ModelProvider::getInstance).thenReturn(mockModelProvider);
+            when(mockModelProvider.getEntityByTableName("C_Order")).thenReturn(mockEntity);
+            when(mockEntity.getName()).thenReturn("Order");
+
             contextMock.when(OBContext::getOBContext).thenReturn(mockContext);
             contextMock.when(() -> OBContext.setAdminMode(true)).thenAnswer(invocation -> null);
             contextMock.when(OBContext::restorePreviousMode).thenAnswer(invocation -> null);
+            when(mockContext.getWritableOrganizations()).thenReturn(Collections.singleton(TEST_ORG_ID));
 
             // Act
             servlet.doPost(mockRequest, mockResponse);
 
             // Assert - Could be 200 (success) or 500 (if file operations fail in CI)
-            // The important thing is that validation passed and we didn't get 400 (bad request)
+            // The important thing is that validation and authorization passed and we
+            // didn't get 400 (bad request) or 403 (forbidden)
             verify(mockResponse, atLeastOnce()).setStatus(anyInt());
-            
+
             // Verify that the upload validation logic was reached (not rejected due to missing params)
             verify(mockRequest).getPart(PARAM_FILE);
         }
