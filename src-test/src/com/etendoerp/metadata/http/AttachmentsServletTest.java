@@ -50,6 +50,9 @@ import org.mockito.MockedStatic;
 import org.mockito.junit.MockitoJUnitRunner;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONObject;
+import org.openbravo.base.model.Entity;
+import org.openbravo.base.model.ModelProvider;
+import org.openbravo.base.structure.BaseOBObject;
 import org.openbravo.client.application.attachment.AttachImplementationManager;
 import org.openbravo.client.application.attachment.AttachmentUtils;
 import org.openbravo.dal.core.OBContext;
@@ -119,6 +122,9 @@ public class AttachmentsServletTest extends OBBaseTest {
     @Mock private OBCriteria<Attachment> mockCriteria;
     @Mock private Part mockPart;
     @Mock private InputStream mockInputStream;
+    @Mock private ModelProvider mockModelProvider;
+    @Mock private Entity mockEntity;
+    @Mock private BaseOBObject mockOwningRecord;
 
     private AttachmentsServlet servlet;
     private StringWriter stringWriter;
@@ -326,13 +332,22 @@ public class AttachmentsServletTest extends OBBaseTest {
         when(mockRequest.getParameter(PARAM_COMMAND)).thenReturn(CMD_DOWNLOAD);
         when(mockRequest.getParameter(PARAM_ATTACHMENT_ID)).thenReturn(TEST_ATTACHMENT_ID);
         when(mockAttachment.getName()).thenReturn("test-file.txt");
+        when(mockAttachment.getTable()).thenReturn(mockTable);
+        when(mockAttachment.getRecord()).thenReturn(TEST_RECORD_ID);
+        when(mockTable.getDBTableName()).thenReturn("C_Order");
 
         try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
-             MockedStatic<OBContext> contextMock = mockStatic(OBContext.class)) {
+             MockedStatic<OBContext> contextMock = mockStatic(OBContext.class);
+             MockedStatic<ModelProvider> modelProviderMock = mockStatic(ModelProvider.class)) {
 
             dalMock.when(OBDal::getInstance).thenReturn(mockDal);
             contextMock.when(OBContext::getOBContext).thenReturn(mockContext);
+            modelProviderMock.when(ModelProvider::getInstance).thenReturn(mockModelProvider);
+            when(mockModelProvider.getEntityByTableName("C_Order")).thenReturn(mockEntity);
+            when(mockEntity.getName()).thenReturn("Order");
             when(mockDal.get(Attachment.class, TEST_ATTACHMENT_ID)).thenReturn(mockAttachment);
+            // owning record is visible to the caller -> access granted:
+            when(mockDal.get("Order", TEST_RECORD_ID)).thenReturn(mockOwningRecord);
 
             // Act
             servlet.doGet(mockRequest, mockResponse);
