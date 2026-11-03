@@ -278,13 +278,29 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
             return;
         }
 
+        Tab tab;
+        Table table;
+
+        // Phase 1 - narrow admin block: only to resolve the tab and its table.
         try {
             OBContext.setAdminMode(true);
 
-            Tab tab = validateAndGetTab(tabId, response);
+            tab = validateAndGetTab(tabId, response);
             if (tab == null) {
                 return;
             }
+
+            table = tab.getTable();
+        } finally {
+            OBContext.restorePreviousMode();
+        }
+
+        // Phase 2 - authorize with NO admin mode active.
+        assertRecordAccess(table, recordId, false);
+
+        // Phase 3 - narrow admin block, only around the attachment list read.
+        try {
+            OBContext.setAdminMode(true);
 
             String[] recordIds = new String[] { recordId };
             List<JSONObject> attachmentsList = AttachmentUtils.getTabAttachmentsForRows(tab, recordIds);
@@ -401,6 +417,9 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
             return;
         }
 
+        Table table;
+
+        // Phase 1 - narrow admin block: only to resolve the tab's table.
         try {
             OBContext.setAdminMode(true);
 
@@ -409,8 +428,20 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
                 return;
             }
 
-            response.setContentType(CONTENT_TYPE_ZIP);
-            response.setHeader(CONTENT_DISPOSITION_HEADER, CONTENT_DISPOSITION_VALUE);
+            table = tab.getTable();
+        } finally {
+            OBContext.restorePreviousMode();
+        }
+
+        // Phase 2 - authorize with NO admin mode active.
+        assertRecordAccess(table, recordId, false);
+
+        response.setContentType(CONTENT_TYPE_ZIP);
+        response.setHeader(CONTENT_DISPOSITION_HEADER, CONTENT_DISPOSITION_VALUE);
+
+        // Phase 3 - narrow admin block, only around the physical I/O.
+        try {
+            OBContext.setAdminMode(true);
 
             try (OutputStream out = response.getOutputStream()) {
                 attachManager.downloadAll(tabId, recordId, out);

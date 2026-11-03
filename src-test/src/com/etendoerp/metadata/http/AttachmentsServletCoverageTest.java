@@ -319,9 +319,20 @@ public class AttachmentsServletCoverageTest extends OBBaseTest {
 
     private void assertDownloadAll(String tabId, boolean validTab) throws Exception {
         try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
-             MockedStatic<OBContext> contextMock = mockStatic(OBContext.class)) {
+             MockedStatic<OBContext> contextMock = mockStatic(OBContext.class);
+             MockedStatic<ModelProvider> modelProviderMock = mockStatic(ModelProvider.class)) {
             mockTabLookup(DOWNLOAD_ALL_CMD, tabId, dalMock, contextMock);
             when(mockDal.get(Tab.class, tabId)).thenReturn(validTab ? mockTab : null);
+            if (validTab) {
+                // The record-level authorization added to DOWNLOAD_ALL needs the tab's table
+                // to resolve to a visible owning record; stub it as visible here.
+                when(mockTab.getTable()).thenReturn(mockTable);
+                when(mockTable.getDBTableName()).thenReturn("C_Order");
+                modelProviderMock.when(ModelProvider::getInstance).thenReturn(mockModelProvider);
+                when(mockModelProvider.getEntityByTableName("C_Order")).thenReturn(mockEntity);
+                when(mockEntity.getName()).thenReturn("Order");
+                when(mockDal.get("Order", TEST_RECORD_ID)).thenReturn(mock(BaseOBObject.class));
+            }
             servlet.doGet(mockRequest, mockResponse);
             if (validTab) {
                 verify(mockResponse).setContentType("application/zip");
