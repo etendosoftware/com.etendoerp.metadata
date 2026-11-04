@@ -52,6 +52,9 @@ public class MenuBuilder extends Builder {
     private static final String MENU_CACHE = "MENU_METADATA";
     private static final String CACHE_KEY_SEPARATOR = "_";
     private static final String OPEN_LINK_IN_BROWSER = "openLinkInBrowser";
+    private static final String FORM_URL_KEY = "formUrl";
+    private static final String AD_FORMS_PREFIX = "/ad_forms/";
+    private static final String HTML_SUFFIX = ".html";
     private static final String DEFAULT_MAPPINGS_HQL = "select mim from ADModelImplementationMapping mim "
         + "where mim.default = true and mim.modelObject.process is not null";
     private static final CachedConcurrentMap<String, JSONObject> menuCache = new CachedConcurrentMap<>(MENU_CACHE);
@@ -260,20 +263,53 @@ public class MenuBuilder extends Builder {
     /**
      * Adds form URL information to the provided JSON object.
      *
-     * @param json The JSONObject to populate.
-     * @param form The Form associated with the menu entry.
+     * @param json  The JSONObject to populate.
+     * @param entry The MenuOption entry of the form.
+     * @param form  The Form associated with the menu entry.
      * @throws JSONException If an error occurs while adding data to the JSON object.
      */
-    private void addFormInfo(JSONObject json, Form form) throws JSONException {
+    private void addFormInfo(JSONObject json, MenuOption entry, Form form) throws JSONException {
         json.put("formId", form.getId());
+        String formUrl = resolveFormUrl(entry, form);
+        if (formUrl != null) {
+            json.put(FORM_URL_KEY, formUrl);
+        }
+    }
+
+    /**
+     * Resolves the address the form is served at. Classic only marks a menu entry as
+     * {@link MenuManager.MenuEntryType#Form} when the form has a default model implementation
+     * mapping, and keeps that mapping name as the entry id (see {@code GlobalMenu#linkMenus}); it is
+     * the address Classic opens, so it also covers forms provided by modules, which are not served
+     * under {@code /ad_forms/}. Any other entry falls back to the address derived from the class name.
+     *
+     * @param entry The MenuOption entry of the form.
+     * @param form  The Form associated with the menu entry.
+     * @return The form address, or null when it cannot be resolved.
+     */
+    private String resolveFormUrl(MenuOption entry, Form form) {
+        String mappingName = entry.getId();
+        if (entry.getType() == MenuManager.MenuEntryType.Form && mappingName != null && !mappingName.isEmpty()) {
+            return mappingName;
+        }
+        return deriveFormUrlFromClassName(form);
+    }
+
+    /**
+     * Derives the form address from its Java class name, as {@code /ad_forms/<SimpleName>.html}.
+     *
+     * @param form The Form associated with the menu entry.
+     * @return The derived address, or null when the form has no Java class name.
+     */
+    private String deriveFormUrlFromClassName(Form form) {
         String javaClassName = form.getJavaClassName();
         if (javaClassName == null || javaClassName.isEmpty()) {
-            return;
+            return null;
         }
         String simpleClassName = javaClassName.contains(".")
             ? javaClassName.substring(javaClassName.lastIndexOf('.') + 1)
             : javaClassName;
-        json.put("formUrl", "/ad_forms/" + simpleClassName + ".html");
+        return AD_FORMS_PREFIX + simpleClassName + HTML_SUFFIX;
     }
 
     /**
@@ -314,7 +350,7 @@ public class MenuBuilder extends Builder {
 
             Form form = menu.getSpecialForm();
             if (null != form) {
-                addFormInfo(json, form);
+                addFormInfo(json, entry, form);
             }
 
             List<MenuOption> children = entry.getChildren();

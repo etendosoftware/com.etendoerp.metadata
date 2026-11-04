@@ -624,10 +624,15 @@ class MenuBuilderTest {
   // -------------------------------------------------------------------------
 
   /**
-   * Tests addFormInfo across its Java-class-name derivation paths: a fully qualified name and a
-   * simple name both yield a {@code /ad_forms/<SimpleName>.html} formUrl, while a null or empty
-   * class name sets only formId and omits formUrl. {@code formId} is always emitted verbatim.
+   * Tests addFormInfo across its form-URL resolution paths. A {@code Form} menu entry yields its
+   * default mapping name (the address Classic opens, which for module forms is not under
+   * {@code /ad_forms/}); a {@code Form} entry without a mapping name, or any other entry type,
+   * falls back to {@code /ad_forms/<SimpleName>.html} derived from the Java class name, and a null
+   * or empty class name then sets only formId and omits formUrl. {@code formId} is always emitted
+   * verbatim.
    *
+   * @param entryType       The menu entry type.
+   * @param mappingName     The menu entry id, i.e. the form's default mapping name (may be null).
    * @param javaClassName   The form's Java class name (null/empty for the formId-only cases).
    * @param formId          The form id, expected verbatim in the JSON.
    * @param expectedFormUrl The expected formUrl, or null when it must be omitted.
@@ -635,20 +640,25 @@ class MenuBuilderTest {
    */
   @ParameterizedTest
   @CsvSource(nullValues = "NULL", value = {
-      "org.openbravo.erpCommon.ad_forms.SomeForm, FORM_ABC_123, /ad_forms/SomeForm.html",
-      "SimpleFormClass, FORM_SIMPLE_456, /ad_forms/SimpleFormClass.html",
-      "NULL, FORM_NULL_789, NULL",
-      "'', FORM_EMPTY_000, NULL"
+      "Form, /com.example.module.ad_forms/ModuleForm.html, com.example.module.ad_forms.ModuleForm, "
+          + "FORM_MODULE_321, /com.example.module.ad_forms/ModuleForm.html",
+      "Form, NULL, org.openbravo.erpCommon.ad_forms.SomeForm, FORM_NO_MAPPING_654, /ad_forms/SomeForm.html",
+      "Form, '', SimpleFormClass, FORM_EMPTY_MAPPING_987, /ad_forms/SimpleFormClass.html",
+      "External, NULL, org.openbravo.erpCommon.ad_forms.SomeForm, FORM_ABC_123, /ad_forms/SomeForm.html",
+      "External, NULL, SimpleFormClass, FORM_SIMPLE_456, /ad_forms/SimpleFormClass.html",
+      "External, NULL, NULL, FORM_NULL_789, NULL",
+      "External, NULL, '', FORM_EMPTY_000, NULL"
   })
-  void testAddFormInfoDerivesFormUrlFromJavaClassName(String javaClassName, String formId,
-      String expectedFormUrl) throws JSONException {
+  void testAddFormInfoResolvesFormUrl(MenuManager.MenuEntryType entryType, String mappingName,
+      String javaClassName, String formId, String expectedFormUrl) throws JSONException {
     MenuOption childOption = mock(MenuOption.class);
     Menu childMenu = mock(Menu.class);
     Form mockForm = mock(Form.class);
 
     when(rootMenuOption.getChildren()).thenReturn(List.of(childOption));
     when(childOption.getMenu()).thenReturn(childMenu);
-    when(childOption.getType()).thenReturn(MenuManager.MenuEntryType.External);
+    when(childOption.getType()).thenReturn(entryType);
+    when(childOption.getId()).thenReturn(mappingName);
     when(childMenu.getId()).thenReturn(FORM_MENU_ID);
     when(childMenu.get(Menu.PROPERTY_ETMETAICON, language, FORM_MENU_ID)).thenReturn(FORM_ICON);
     when(childMenu.get(Menu.PROPERTY_NAME, language, FORM_MENU_ID)).thenReturn("Form Menu");
@@ -657,7 +667,8 @@ class MenuBuilderTest {
     when(childMenu.getAction()).thenReturn("F");
     when(childMenu.getSpecialForm()).thenReturn(mockForm);
     when(mockForm.getId()).thenReturn(formId);
-    when(mockForm.getJavaClassName()).thenReturn(javaClassName);
+    // Lenient: when the entry has a default mapping, the class name is never read.
+    lenient().when(mockForm.getJavaClassName()).thenReturn(javaClassName);
 
     withMenuBuilder(builder -> {
       JSONObject result = builder.toJSON();
