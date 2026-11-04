@@ -23,6 +23,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.BufferedReader;
+import java.io.StringReader;
 import java.util.Date;
 
 import javax.servlet.http.HttpServletRequest;
@@ -38,7 +40,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
+import com.auth0.jwt.interfaces.Claim;
 import com.auth0.jwt.interfaces.DecodedJWT;
+import com.etendoerp.metadata.auth.LoginSessionRegistry;
 import com.etendoerp.metadata.auth.TokenRevocationStore;
 import com.etendoerp.metadata.auth.Utils;
 import com.etendoerp.metadata.exceptions.MethodNotAllowedException;
@@ -49,23 +53,57 @@ import com.etendoerp.metadata.exceptions.UnauthorizedException;
 class LogoutServiceTest {
 
     private static final String RAW_TOKEN = "header.payload.signature";
+    private static final String POST_METHOD = "POST";
+    private static final String USER_ID = "user-1";
+    private static final String SESSION_ID = "session-1";
 
     @Mock private HttpServletRequest request;
     @Mock private HttpServletResponse response;
 
     private MockedStatic<Utils> authUtilsStatic;
     private MockedStatic<TokenRevocationStore> revocationStoreStatic;
+    private MockedStatic<LoginSessionRegistry> registryStatic;
 
     @BeforeEach
     void setUp() {
         authUtilsStatic = mockStatic(Utils.class);
         revocationStoreStatic = mockStatic(TokenRevocationStore.class);
+        registryStatic = mockStatic(LoginSessionRegistry.class);
     }
 
     @AfterEach
     void tearDown() {
+        registryStatic.close();
         authUtilsStatic.close();
         revocationStoreStatic.close();
+    }
+
+    /**
+     * Stubs a POST logout request carrying a valid Bearer token of {@link #USER_ID}.
+     *
+     * @return the expiration date of the stubbed token
+     */
+    private Date stubValidTokenRequest() {
+        when(request.getMethod()).thenReturn(POST_METHOD);
+        DecodedJWT decoded = mock(DecodedJWT.class);
+        Claim userClaim = mock(Claim.class);
+        Date expiresAt = new Date();
+        when(userClaim.asString()).thenReturn(USER_ID);
+        when(decoded.getClaim("user")).thenReturn(userClaim);
+        when(decoded.getExpiresAt()).thenReturn(expiresAt);
+        authUtilsStatic.when(() -> Utils.decodeBearerToken(request)).thenReturn(decoded);
+        authUtilsStatic.when(() -> Utils.extractBearerToken(request)).thenReturn(RAW_TOKEN);
+        return expiresAt;
+    }
+
+    /**
+     * Stubs the raw JSON body of the logout request.
+     *
+     * @param body the raw JSON body
+     * @throws Exception if stubbing the mocked reader fails
+     */
+    private void setRequestBody(String body) throws Exception {
+        when(request.getReader()).thenReturn(new BufferedReader(new StringReader(body)));
     }
 
     @Test
@@ -78,7 +116,7 @@ class LogoutServiceTest {
 
     @Test
     void missingTokenIsRejected() {
-        when(request.getMethod()).thenReturn("POST");
+        when(request.getMethod()).thenReturn(POST_METHOD);
         authUtilsStatic.when(() -> Utils.decodeBearerToken(request)).thenReturn(null);
 
         LogoutService service = new LogoutService(request, response);
@@ -90,17 +128,47 @@ class LogoutServiceTest {
 
     @Test
     void validTokenRevokesRawTokenAndReturns200() throws Exception {
-        when(request.getMethod()).thenReturn("POST");
-        DecodedJWT decoded = mock(DecodedJWT.class);
-        Date expiresAt = new Date();
-        when(decoded.getExpiresAt()).thenReturn(expiresAt);
-        authUtilsStatic.when(() -> Utils.decodeBearerToken(request)).thenReturn(decoded);
-        authUtilsStatic.when(() -> Utils.extractBearerToken(request)).thenReturn(RAW_TOKEN);
+        Date expiresAt = stubValidTokenRequest();
 
         LogoutService service = new LogoutService(request, response);
         service.process();
 
         revocationStoreStatic.verify(() -> TokenRevocationStore.revoke(RAW_TOKEN, expiresAt));
+        verify(response).setStatus(HttpServletResponse.SC_OK);
+    }
+
+    /**
+     * A body naming the login session closes it on behalf of the token's user, next to the token
+     * revocation.
+     *
+     * @throws Exception if the request body cannot be read or the service fails
+     */
+    @Test
+    void sessionIdInBodyClosesTheLoginSessionOfTheTokenUser() throws Exception {
+        stubValidTokenRequest();
+        setRequestBody("{\"sessionId\":\"" + SESSION_ID + "\"}");
+
+        new LogoutService(request, response).process();
+
+        registryStatic.verify(() -> LoginSessionRegistry.close(SESSION_ID, USER_ID));
+        verify(response).setStatus(HttpServletResponse.SC_OK);
+    }
+
+    /**
+     * Without a body (a token from a login that recorded no session) no session is closed and the
+     * logout still succeeds.
+     *
+     * @throws Exception if the request body cannot be read or the service fails
+     */
+    @Test
+    void missingSessionIdClosesNoSession() throws Exception {
+        stubValidTokenRequest();
+        setRequestBody("");
+
+        new LogoutService(request, response).process();
+
+        registryStatic.verify(() -> LoginSessionRegistry.close(
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()), never());
         verify(response).setStatus(HttpServletResponse.SC_OK);
     }
 
@@ -112,12 +180,7 @@ class LogoutServiceTest {
      */
     @Test
     void revocationFailurePropagatesUncaught() {
-        when(request.getMethod()).thenReturn("POST");
-        DecodedJWT decoded = mock(DecodedJWT.class);
-        Date expiresAt = new Date();
-        when(decoded.getExpiresAt()).thenReturn(expiresAt);
-        authUtilsStatic.when(() -> Utils.decodeBearerToken(request)).thenReturn(decoded);
-        authUtilsStatic.when(() -> Utils.extractBearerToken(request)).thenReturn(RAW_TOKEN);
+        Date expiresAt = stubValidTokenRequest();
         revocationStoreStatic.when(() -> TokenRevocationStore.revoke(RAW_TOKEN, expiresAt))
                 .thenThrow(new RuntimeException("DB unavailable"));
 

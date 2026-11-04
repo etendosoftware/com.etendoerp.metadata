@@ -53,6 +53,7 @@ import org.openbravo.dal.service.OBCriteria;
 import org.openbravo.dal.service.OBDal;
 
 import com.etendoerp.metadata.auth.LoginDefaultsResolver;
+import com.etendoerp.metadata.auth.LoginSessionRegistry;
 import com.etendoerp.metadata.auth.Utils;
 import com.etendoerp.metadata.data.AuthData;
 import com.etendoerp.metadata.exceptions.UnprocessableContentException;
@@ -83,6 +84,8 @@ class SSOServiceTest {
     private static final String TEST_REDIRECT_URI = "http://localhost/callback";
     private static final String PROVIDERS_KEY = "providers";
     private static final String LOCALHOST_INVALID = "localhost.invalid";
+    private static final String SSO_USER_ID = "usr-123";
+    private static final String SSO_USERNAME = "testuser";
     private static final String CODE_BODY = "{\"code\":\"test-code\"}";
     // Minimal valid JWT: header.payload.signature (signature is irrelevant for decode)
     private static final String FAKE_JWT =
@@ -494,14 +497,18 @@ class SSOServiceTest {
              MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
              MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class);
              MockedStatic<Utils> utilsStatic = mockStatic(Utils.class);
-             MockedStatic<LoginDefaultsResolver> resolverStatic = mockStatic(LoginDefaultsResolver.class)) {
+             MockedStatic<LoginDefaultsResolver> resolverStatic = mockStatic(LoginDefaultsResolver.class);
+             MockedStatic<LoginSessionRegistry> registryStatic = mockStatic(LoginSessionRegistry.class)) {
             mockProperties(providerStatic, propsWithAuthType(MIDDLEWARE_TYPE));
             OBCriteria criteria = mockOBDalCriteria(obDalStatic);
+            // Like Classic's SSO login, the successful session is recorded without a lock check
+            registryStatic.when(() -> LoginSessionRegistry.register(any(), eq(SSO_USERNAME), eq(SSO_USER_ID),
+                eq(LoginSessionRegistry.SUCCESS_STATUS))).thenReturn("session-123");
 
             ETRXTokenUser mockTokenUser = mock(ETRXTokenUser.class);
             User mockUser = mock(User.class);
-            when(mockUser.getId()).thenReturn("usr-123");
-            when(mockUser.getUsername()).thenReturn("testuser");
+            when(mockUser.getId()).thenReturn(SSO_USER_ID);
+            when(mockUser.getUsername()).thenReturn(SSO_USERNAME);
             when(mockTokenUser.getUserForToken()).thenReturn(mockUser);
             when(criteria.uniqueResult()).thenReturn(mockTokenUser);
             AuthData classicDefaults = new AuthData(mockUser, mock(Role.class), mock(Organization.class),
@@ -511,8 +518,9 @@ class SSOServiceTest {
 
             JSONObject result = spyExecuteAndParse();
             assertEquals("jwt-token", result.getString("token"));
-            assertEquals("usr-123", result.getString("userId"));
-            assertEquals("testuser", result.getString("username"));
+            assertEquals(SSO_USER_ID, result.getString("userId"));
+            assertEquals(SSO_USERNAME, result.getString("username"));
+            assertEquals("session-123", result.getString(LoginSessionRegistry.SESSION_ID));
         }
         // The user has no valid Classic login defaults: authentication fails, no token is issued
         responseWriter = new StringWriter();

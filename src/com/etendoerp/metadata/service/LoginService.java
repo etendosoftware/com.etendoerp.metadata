@@ -18,13 +18,11 @@
 package com.etendoerp.metadata.service;
 
 import java.io.IOException;
-import java.util.Optional;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.codehaus.jettison.json.JSONObject;
-import org.openbravo.authentication.hashing.PasswordHash;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.access.Role;
@@ -32,7 +30,9 @@ import org.openbravo.model.ad.access.User;
 import org.openbravo.model.common.enterprise.Organization;
 import org.openbravo.model.common.enterprise.Warehouse;
 
+import com.etendoerp.metadata.auth.LoginAttemptGuard;
 import com.etendoerp.metadata.auth.LoginDefaultsResolver;
+import com.etendoerp.metadata.auth.LoginSessionRegistry;
 import com.etendoerp.metadata.auth.Utils;
 import com.etendoerp.metadata.data.AuthData;
 import com.etendoerp.metadata.exceptions.InternalServerException;
@@ -52,16 +52,16 @@ import com.etendoerp.metadata.exceptions.UnprocessableContentException;
  * issued - unlike a role switch on an already-authenticated session, there is no prior JWT to
  * fall back on here, so the frontend cannot recover without a login path of its own.
  * <p>
- * Authenticates via {@link PasswordHash#getUserWithPassword}, part of core (not
- * {@code com.smf.securewebservices}), so no pre-existing session or token is required. When the
+ * Authenticates via {@link LoginAttemptGuard}, which applies the Classic failed-attempt delay and
+ * user lock on top of core's password check (not {@code com.smf.securewebservices}), so no
+ * pre-existing session or token is required. The successful login is recorded in the Classic
+ * session registry and its id is returned as {@code sessionId} next to the token. When the
  * request names no role, the role, organization and warehouse follow the Classic login rule (see
  * {@link LoginDefaultsResolver}). Role, organization, and warehouse resolution then goes through
  * {@link com.etendoerp.metadata.auth.Utils#generateToken}, which already tolerates an
  * organization with no warehouses (see its {@code "0"} sentinel).
  */
 public class LoginService extends MetadataService {
-    private static final String USERNAME = "username";
-    private static final String PASSWORD = "password";
     private static final String ROLE = "role";
     private static final String ORGANIZATION = "organization";
     private static final String WAREHOUSE = "warehouse";
@@ -87,23 +87,17 @@ public class LoginService extends MetadataService {
             OBContext.setAdminMode(true);
 
             JSONObject body = com.etendoerp.metadata.utils.Utils.getRequestData(getRequest());
-            String username = ProfileRequestUtils.getStringOrNull(body, USERNAME);
-            String password = ProfileRequestUtils.getStringOrNull(body, PASSWORD);
-
-            if (username == null || password == null) {
-                throw new UnprocessableContentException("username and password are required");
-            }
-
-            Optional<User> authenticatedUser = PasswordHash.getUserWithPassword(username, password);
-            if (!authenticatedUser.isPresent()) {
-                throw new UnauthorizedException("Invalid username or password");
-            }
-            User user = authenticatedUser.get();
+            LoginCredentials credentials = LoginCredentials.from(body);
+            String userId = LoginAttemptGuard.authenticate(getRequest(), credentials.getUsername(),
+                credentials.getPassword());
+            User user = OBDal.getInstance().get(User.class, userId);
 
             AuthData authData = resolveAuthData(body, user);
             String token = com.etendoerp.metadata.auth.Utils.generateToken(authData, null);
+            String sessionId = LoginSessionRegistry.register(getRequest(), credentials.getUsername(), userId,
+                LoginSessionRegistry.SUCCESS_STATUS);
 
-            write(new JSONObject().put(TOKEN, token));
+            write(new JSONObject().put(TOKEN, token).put(LoginSessionRegistry.SESSION_ID, sessionId));
         } catch (UnauthorizedException | UnprocessableContentException e) {
             throw e;
         } catch (Exception e) {

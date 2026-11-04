@@ -22,7 +22,11 @@ import java.io.IOException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.apache.commons.lang3.StringUtils;
+import org.codehaus.jettison.json.JSONObject;
+
 import com.auth0.jwt.interfaces.DecodedJWT;
+import com.etendoerp.metadata.auth.LoginSessionRegistry;
 import com.etendoerp.metadata.auth.TokenRevocationStore;
 import com.etendoerp.metadata.auth.Utils;
 import com.etendoerp.metadata.exceptions.MethodNotAllowedException;
@@ -35,13 +39,15 @@ import com.etendoerp.metadata.exceptions.UnauthorizedException;
  * means this works regardless of which login path issued the token — not every issuer sets
  * {@code jti} (classic {@code /sws/login} doesn't).
  * <p>
- * No request body is read; the {@code Authorization} header is the only input, and the caller
- * (the frontend's BFF logout route) treats the response as best-effort and doesn't depend on its
- * body.
+ * The {@code Authorization} header identifies the token to revoke. An optional JSON body
+ * {@code {"sessionId": "..."}} names the {@code AD_Session} recorded at login, which is then closed
+ * (see {@link LoginSessionRegistry#close}). The caller (the frontend's BFF logout route) treats the
+ * response as best-effort and doesn't depend on its body.
  *
  * @see com.etendoerp.metadata.auth.TokenRevocationStore
  */
 public class LogoutService extends MetadataService {
+    private static final String USER_CLAIM = "user";
 
     /**
      * Creates a new LogoutService for the given request/response pair.
@@ -66,7 +72,21 @@ public class LogoutService extends MetadataService {
 
         String rawToken = Utils.extractBearerToken(getRequest());
         TokenRevocationStore.revoke(rawToken, decoded.getExpiresAt());
+        closeLoginSession(decoded);
 
         getResponse().setStatus(HttpServletResponse.SC_OK);
+    }
+
+    /**
+     * Closes the {@code AD_Session} recorded at login when the body names it, as Classic does when
+     * its HTTP session ends. Only a session of the token's user can be closed.
+     */
+    private void closeLoginSession(DecodedJWT decoded) {
+        JSONObject body = com.etendoerp.metadata.utils.Utils.getRequestData(getRequest());
+        String sessionId = body.optString(LoginSessionRegistry.SESSION_ID, null);
+        if (StringUtils.isBlank(sessionId)) {
+            return;
+        }
+        LoginSessionRegistry.close(sessionId, decoded.getClaim(USER_CLAIM).asString());
     }
 }

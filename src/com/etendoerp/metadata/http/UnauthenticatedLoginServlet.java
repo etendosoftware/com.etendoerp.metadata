@@ -28,7 +28,8 @@ import javax.servlet.http.HttpServletResponse;
 import com.etendoerp.metadata.utils.Constants;
 
 /**
- * Exposes {@code POST /sws/com.etendoerp.metadata.meta/login} without requiring a pre-existing
+ * Exposes {@code POST /sws/com.etendoerp.metadata.meta/login} and
+ * {@code POST /sws/com.etendoerp.metadata.meta/login-guard} without requiring a pre-existing
  * Bearer token, mirroring how {@code com.smf.securewebservices.service.SecureLoginServlet} is
  * separately mapped to the exact path {@code /sws/login} to bypass the same requirement.
  * <p>
@@ -44,10 +45,14 @@ import com.etendoerp.metadata.utils.Constants;
  * unaffected and keeps going through the normal authenticated flow.
  *
  * @see com.etendoerp.metadata.service.LoginService
+ * @see com.etendoerp.metadata.service.LoginGuardService
  */
-@WebServlet(urlPatterns = { "/sws/com.etendoerp.metadata.meta/login" })
+@WebServlet(urlPatterns = { UnauthenticatedLoginServlet.META_SERVLET_PATH + Constants.LOGIN_PATH,
+        UnauthenticatedLoginServlet.META_SERVLET_PATH + Constants.LOGIN_GUARD_PATH })
 public class UnauthenticatedLoginServlet extends HttpServlet {
     private static final long serialVersionUID = 1L;
+    private static final String SWS_SERVLET_PATH = "/sws";
+    static final String META_SERVLET_PATH = SWS_SERVLET_PATH + "/com.etendoerp.metadata.meta";
 
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws IOException {
@@ -58,12 +63,13 @@ public class UnauthenticatedLoginServlet extends HttpServlet {
      * An exact-path {@code @WebServlet} mapping (no {@code *}) leaves {@code getPathInfo()} null
      * - there is no "extra" path segment left to report. {@link ServiceFactory} routes purely
      * off {@code getPathInfo()}, so without this override it would see an empty path and 404.
-     * Wrapping it to report the same {@code /com.etendoerp.metadata.meta/login} segment the
-     * wildcard-mapped route would have produced lets {@link ServiceFactory#normalizePath} reduce
-     * it to {@link Constants#LOGIN_PATH} exactly as it does for every other {@code /meta/*} call.
+     * Wrapping it to report the same segment the wildcard-mapped route would have produced (the
+     * servlet path without its {@code /sws} prefix, e.g. {@code /com.etendoerp.metadata.meta/login})
+     * lets {@link ServiceFactory#normalizePath} reduce it to {@link Constants#LOGIN_PATH} or
+     * {@link Constants#LOGIN_GUARD_PATH} exactly as it does for every other {@code /meta/*} call.
      */
     private HttpServletRequest withPathInfo(HttpServletRequest original) {
-        String pathInfo = "/com.etendoerp.metadata.meta" + Constants.LOGIN_PATH;
+        String pathInfo = original.getServletPath().substring(SWS_SERVLET_PATH.length());
         return new HttpServletRequestWrapper(original) {
             @Override
             public String getPathInfo() {
