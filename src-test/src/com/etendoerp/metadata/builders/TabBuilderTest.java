@@ -357,6 +357,7 @@ class TabBuilderTest extends TabBuilderTestBase {
     void toJSONSetsReadOnlyPatternWhenTabAccessIsNotEditable() throws Exception {
         TestContext ctx = setupTestContext();
         TabAccess mockTabAccess = mock(TabAccess.class);
+        when(mockTabAccess.isActive()).thenReturn(true);
         when(mockTabAccess.isEditableField()).thenReturn(false);
         when(mockTabAccess.getADFieldAccessList()).thenReturn(List.of());
         setupBasicMocks(ctx.context, ctx.language, ctx.tab, ctx.table, ctx.kernelUtils, List.of());
@@ -381,6 +382,7 @@ class TabBuilderTest extends TabBuilderTestBase {
     void toJSONDoesNotSetReadOnlyPatternWhenEditable() throws Exception {
         TestContext ctx = setupTestContext();
         TabAccess mockTabAccess = mock(TabAccess.class);
+        when(mockTabAccess.isActive()).thenReturn(true);
         when(mockTabAccess.isEditableField()).thenReturn(true);
         when(mockTabAccess.getADFieldAccessList()).thenReturn(List.of());
         setupBasicMocks(ctx.context, ctx.language, ctx.tab, ctx.table, ctx.kernelUtils, List.of());
@@ -678,6 +680,7 @@ class TabBuilderTest extends TabBuilderTestBase {
         TestContext ctx = setupTestContext();
         TabAccess mockTabAccess = mock(TabAccess.class);
         FieldAccess mockFieldAccess = mock(FieldAccess.class);
+        when(mockTabAccess.isActive()).thenReturn(true);
         when(mockTabAccess.getADFieldAccessList()).thenReturn(List.of(mockFieldAccess));
 
         setupBasicMocks(ctx.context, ctx.language, ctx.tab, ctx.table, ctx.kernelUtils, List.of());

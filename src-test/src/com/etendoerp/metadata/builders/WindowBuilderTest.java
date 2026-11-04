@@ -442,7 +442,8 @@ class WindowBuilderTest {
   @Test
   void toJSONWithoutTabAccessStillBuildsEveryTab() throws Exception {
     setupWindowAccess(true, true);
-    when(mockWindow.getADTabList()).thenReturn(List.of(mockTab(TAB_ID_HYPHEN)));
+    Tab tab = mockTab(TAB_ID_HYPHEN);
+    when(mockWindow.getADTabList()).thenReturn(List.of(tab));
 
     JSONObject result = executeToJSONWithTabs(createWindowBuilder(), TAB_ID_HYPHEN);
 
@@ -501,7 +502,8 @@ class WindowBuilderTest {
     Tab firstTab = mockTab(TAB_ID_HYPHEN + 1);
     Tab secondTab = mockTab(TAB_ID_HYPHEN + 2);
     when(mockWindow.getADTabList()).thenReturn(List.of(firstTab, secondTab));
-    when(mockTabAccessQuery.list()).thenReturn(List.of(mockTabAccess(secondTab, true)));
+    TabAccess secondTabAccess = mockTabAccess(secondTab, true);
+    when(mockTabAccessQuery.list()).thenReturn(List.of(secondTabAccess));
 
     executeToJSONWithTabs(createWindowBuilder(), TAB_ID_HYPHEN);
 
