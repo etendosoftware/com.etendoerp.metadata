@@ -146,6 +146,8 @@ public class Constants {
     public static final String CHANGE_PROFILE_PATH = "/change-profile";
     public static final String LOGIN_PATH = "/login";
     public static final String LOGIN_DEFAULTS_PATH = "/login-defaults";
+    public static final String LOGIN_GUARD_PATH = "/login-guard";
+    public static final String LOGIN_SESSION_PATH = "/login-session";
 
     // Audit Fields
     public static final String CREATION_DATE = "creationDate";

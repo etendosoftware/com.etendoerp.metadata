@@ -55,6 +55,20 @@ class ServiceFactoryTest {
   }
 
   @Test
+  void getServiceReturnsLoginGuardService() {
+    MetadataService service = ServiceFactory.getService(mockRequestWithPath("/com.etendoerp.metadata.meta/login-guard"), mockResponse);
+    assertNotNull(service, SERVICE_NOT_NULL);
+    assertInstanceOf(LoginGuardService.class, service);
+  }
+
+  @Test
+  void getServiceReturnsLoginSessionService() {
+    MetadataService service = ServiceFactory.getService(mockRequestWithPath("/com.etendoerp.metadata.meta/login-session"), mockResponse);
+    assertNotNull(service, SERVICE_NOT_NULL);
+    assertInstanceOf(LoginSessionService.class, service);
+  }
+
+  @Test
   void getServiceReturnsMenuService() {
     MetadataService service = ServiceFactory.getService(mockRequestWithPath("/com.etendoerp.metadata.meta/menu"), mockResponse);
     assertNotNull(service, SERVICE_NOT_NULL);

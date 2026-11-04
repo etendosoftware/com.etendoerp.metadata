@@ -18,6 +18,7 @@ package com.etendoerp.metadata.http;
 
 import com.auth0.jwt.interfaces.Claim;
 import com.auth0.jwt.interfaces.DecodedJWT;
+import com.etendoerp.metadata.auth.LoginSessionRegistry;
 import com.etendoerp.metadata.data.RequestVariables;
 import com.etendoerp.metadata.exceptions.InternalServerException;
 import com.etendoerp.metadata.utils.LegacyPaths;
@@ -29,7 +30,6 @@ import org.apache.logging.log4j.Logger;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
-import org.openbravo.base.HttpBaseUtils;
 import org.openbravo.base.exception.OBException;
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
 import org.openbravo.base.secureApp.VariablesSecureApp;
@@ -37,7 +37,6 @@ import org.openbravo.base.session.OBPropertiesProvider;
 import org.openbravo.client.kernel.RequestContext;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
-import org.openbravo.erpCommon.security.SessionLogin;
 import org.openbravo.model.ad.access.User;
 import org.openbravo.model.financialmgmt.accounting.coa.AcctSchema;
 
@@ -77,20 +76,41 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
     private static final String JWT_TOKEN = "#JWT_TOKEN";
     private static final String HTML_EXTENSION = ".html";
     private static final String JS_EXTENSION = ".js";
-    private static final String ACTION_JSON_SEPARATOR = "',action:";
-    private static final String HTML_UTF8_CONTENT_TYPE = "text/html; charset=UTF-8";
-    private static final String UTF8_CHARSET = "UTF-8";
+    static final String ACTION_JSON_SEPARATOR = "',action:";
+    static final String HTML_UTF8_CONTENT_TYPE = "text/html; charset=UTF-8";
+    static final String UTF8_CHARSET = "UTF-8";
     private static final String JSON_CONTENT_TYPE_PREFIX = "application/json";
     private static final String TOKEN_PARAM = "token";
     private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String BEARER_PREFIX = "Bearer ";
-    private static final String META_LEGACY_PATH = "/meta/legacy";
+    static final String META_LEGACY_PATH = "/meta/legacy";
     private static final String WEB_PATH = "/web/";
     private static final String SRC_REPLACE_STRING = "src=\"";
     /** Path segment identifying a Classic info-window (search/selector) page. */
     private static final String INFO_PATH_SEGMENT = "info/";
     /** Function present only in Classic search/selector popups; gates the selector shim. */
     private static final String VALIDATE_SELECTOR_MARKER = "validateSelector";
+    /** Classic page that stores the records to print in session and opens the print process. */
+    private static final String PRINTER_REPORTS_PAGE = "businessUtility/PrinterReports.html";
+
+    /**
+     * Script injected into the Classic {@code PrinterReports} page, which the new UI opens in its
+     * own browser window to print a tab whose print process is not a PrintController document
+     * (e.g. Business Partner, Remittance, Tax Payment). Outside the Classic MDI layout the page
+     * runs {@code openPDF(url)} on load, which opens a second window that the browser blocks
+     * (no user gesture), and then closes itself with {@code closePage()}. The shim loads the print
+     * process in the same window instead, served directly by Classic (the {@code /meta/legacy/}
+     * prefix is stripped, as the popup URL fix does), and keeps the window open.
+     */
+    private static final String PRINTER_REPORTS_SHIM_SCRIPT = "<script>(function(){" +
+            "window.openPDF=function(url){" +
+            "var target=new URL(url,window.location.href);" +
+            "target.pathname=target.pathname.replace('/meta/legacy/','/');" +
+            "window.location.replace(target.href);" +
+            "return true;" +
+            "};" +
+            "window.closePage=function(){return true;};" +
+            "})();</script>";
 
     private static final String RECEIVE_AND_POST_MESSAGE_SCRIPT = "<script>window.addEventListener(\"message\", (event) => {"
             +
@@ -252,6 +272,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             "if(typeof HTMLFormElement!=='undefined'&&HTMLFormElement.prototype&&!HTMLFormElement.prototype.__etendoSubmitHooked){" +
             "var origSubmit=HTMLFormElement.prototype.submit;" +
             "HTMLFormElement.prototype.submit=function(){" +
+            "if(this&&(this.target==='_top'||this.target==='_parent'))this.target='_self';" +
             "try{" +
             "var cmd=(this&&this.Command&&this.Command.value)||null;" +
             "if(cmd&&!isRefreshCommand(cmd))window.sendMessage('"
@@ -326,7 +347,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
      * like {@code PROCESSDEFAULT} requires a {@code startsWith} check rather than
      * equality.
      */
-    private static final String COMMAND_PARAM = "Command";
+    static final String COMMAND_PARAM = "Command";
     private static final String PROCESS_COMMAND_PREFIX = "PROCESS";
     /** Dojo DataGrid info-selector data commands; their responses are XML, not HTML. */
     private static final String COMMAND_STRUCTURE = "STRUCTURE";
@@ -356,7 +377,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             "class=\"MessageBox(ERROR|SUCCESS|WARNING|INFO)\"", Pattern.CASE_INSENSITIVE);
 
     /** Shared HTML preamble for all postMessage forwarder pages. */
-    private static final String HTML_DOCTYPE_HEAD =
+    static final String HTML_DOCTYPE_HEAD =
             "<!DOCTYPE html>\n<html><head><meta charset=\"" + UTF8_CHARSET + "\"><script>";
 
     /**
@@ -552,6 +573,8 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
                 processLegacyRequest(req, res, path);
             } else if (isJavaScriptRequest(path)) {
                 processJavaScriptRequest(req, res, path);
+            } else if (LegacyPopupResponses.isDownloadRequest(path)) {
+                LegacyPopupResponses.serveDownload(req, res);
             } else if (isLegacyFollowupRequest(req)) {
                 processLegacyFollowupRequest(req, res);
             } else if (isRedirectRequest(path)) {
@@ -917,11 +940,30 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             HttpServletResponseLegacyWrapper wrapper,
             String path, String contextPath) throws IOException {
 
+        // Checked before decoding the body: files may be binary, and Intrastat still calls
+        // sendRedirect after streaming its file.
+        if (wrapper.isFileResponse()) {
+            HttpSession session = RequestContext.get().getRequest().getSession(true);
+            LegacyPopupResponses.writeCapturedFileForwarder(res, session, wrapper, contextPath);
+            return;
+        }
+
         String output = wrapper.getCapturedOutputAsString();
 
         List<ReportInfo> reports = extractReportsFromBody(output, contextPath);
         if (!reports.isEmpty()) {
             writeOpenLegacyReportForwarder(res, reports);
+            return;
+        }
+
+        String downloadReportUrl = LegacyPopupResponses.extractDownloadReportUrl(output);
+        if (downloadReportUrl != null) {
+            LegacyPopupResponses.writeFileDownloadForwarder(res, downloadReportUrl, "");
+            return;
+        }
+
+        if (LegacyPopupResponses.isClosePopupOnOpen(output, LegacyPopupResponses.currentCommand())) {
+            LegacyPopupResponses.writeProcessOrderForwarder(res);
             return;
         }
 
@@ -1104,7 +1146,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         res.getWriter().flush();
     }
 
-    private String buildForwarderPayload(String type, String title, String text) {
+    static String buildForwarderPayload(String type, String title, String text) {
         try {
             JSONObject payload = new JSONObject();
             payload.put("type", type);
@@ -1507,14 +1549,9 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
 
     /**
      * Creates a new session in the database (AD_Session table).
-     * This method is a duplication of the logic found in
-     * {@link org.openbravo.authentication.AuthenticationManager# createDBSession(HttpServletRequest, String, String, String)}.
-     *
-     * The duplication is necessary because the original method in
-     * AuthenticationManager is 'protected'
-     * and cannot be accessed directly from this context, even though we need to
-     * manually establish
-     * a session during the JWT-based redirect login flow.
+     * Delegates to {@link LoginSessionRegistry#register}, which reproduces the logic of the
+     * {@code protected} {@code AuthenticationManager#createDBSession} so that it can be used
+     * during the JWT-based redirect login flow.
      *
      * @param req         The current HTTP request.
      * @param strUser     The username for the session.
@@ -1522,12 +1559,12 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
      * @return The ID of the created session.
      */
     protected final String createDBSession(HttpServletRequest req, String strUser, String strUserAuth) {
-        return createDBSession(req, strUser, strUserAuth, "S");
+        return createDBSession(req, strUser, strUserAuth, LoginSessionRegistry.SUCCESS_STATUS);
     }
 
     /**
      * Internal implementation for creating a database session.
-     * Duplicated from {@link org.openbravo.authentication.AuthenticationManager}.
+     * See {@link LoginSessionRegistry#register}.
      *
      * @param req                The current HTTP request.
      * @param strUser            The username for the session.
@@ -1538,35 +1575,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
      */
     protected final String createDBSession(HttpServletRequest req, String strUser, String strUserAuth,
             String successSessionType) {
-        try {
-            if (strUserAuth == null && StringUtils.isEmpty(strUser)) {
-                return null;
-            }
-
-            if (req == null) {
-                throw new OBException("Request object is null, cannot create DB session");
-            }
-
-            String usr = strUserAuth == null ? "0" : strUserAuth;
-
-            final SessionLogin sl = new SessionLogin(req, "0", "0", usr);
-
-            if (strUserAuth == null) {
-                sl.setStatus("F");
-            } else {
-                sl.setStatus(successSessionType);
-            }
-
-            sl.setUserName(strUser);
-            if (req != null) {
-                sl.setServerUrl(HttpBaseUtils.getLocalAddress(req));
-            }
-            sl.save();
-            return sl.getSessionID();
-        } catch (Exception e) {
-            log.error("Error creating DB session", e);
-            return null;
-        }
+        return LoginSessionRegistry.register(req, strUser, strUserAuth, successSessionType);
     }
 
     /**
@@ -1902,6 +1911,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
 
         responseString = injectFrameMenuShim(responseString);
         responseString = injectSelectorPopupShim(path, responseString);
+        responseString = injectPrinterReportsShim(path, responseString);
 
         if (responseString.contains(FRAMESET_CLOSE_TAG)) {
             return responseString.replace(HEAD_CLOSE_TAG, RECEIVE_AND_POST_MESSAGE_SCRIPT.concat(HEAD_CLOSE_TAG));
@@ -1974,6 +1984,22 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
      */
     private static boolean isSelectorPopupPage(String path, String responseString) {
         return path != null && path.contains(INFO_PATH_SEGMENT) && responseString.contains(VALIDATE_SELECTOR_MARKER);
+    }
+
+    /**
+     * Injects {@link #PRINTER_REPORTS_SHIM_SCRIPT} into the Classic {@code PrinterReports} page so
+     * the print process opens in the same window. Any other page is returned unchanged.
+     *
+     * @param path           the requested resource path
+     * @param responseString the HTML response after previous injections
+     * @return the HTML with the shim injected before {@code </HEAD>}, or the original HTML when
+     *         the page is not {@code PrinterReports}
+     */
+    private String injectPrinterReportsShim(String path, String responseString) {
+        if (path == null || !path.endsWith(PRINTER_REPORTS_PAGE) || !responseString.contains(HEAD_CLOSE_TAG)) {
+            return responseString;
+        }
+        return responseString.replace(HEAD_CLOSE_TAG, PRINTER_REPORTS_SHIM_SCRIPT.concat(HEAD_CLOSE_TAG));
     }
 
     private String injectCodeAfterFunctionCall(String originalRes, String originalFunctionCall, String newFunctionCall,

@@ -17,11 +17,13 @@
 
 package com.etendoerp.metadata.service;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
@@ -30,7 +32,6 @@ import static org.mockito.Mockito.when;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.util.Optional;
 
 import org.junit.After;
 import org.junit.Before;
@@ -39,14 +40,17 @@ import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.MockedStatic;
 import org.mockito.junit.MockitoJUnitRunner;
-import org.openbravo.authentication.hashing.PasswordHash;
 import org.openbravo.model.ad.access.Role;
 import org.openbravo.model.ad.access.User;
 import org.openbravo.model.ad.system.Client;
 import org.openbravo.model.common.enterprise.Organization;
 import org.openbravo.model.common.enterprise.Warehouse;
 
+import org.codehaus.jettison.json.JSONObject;
+
+import com.etendoerp.metadata.auth.LoginAttemptGuard;
 import com.etendoerp.metadata.auth.LoginDefaultsResolver;
+import com.etendoerp.metadata.auth.LoginSessionRegistry;
 import com.etendoerp.metadata.auth.Utils;
 import com.etendoerp.metadata.data.AuthData;
 import com.etendoerp.metadata.exceptions.MethodNotAllowedException;
@@ -59,33 +63,39 @@ import com.etendoerp.metadata.exceptions.UnprocessableContentException;
 @RunWith(MockitoJUnitRunner.Silent.class)
 public class LoginServiceTest extends AbstractProfileServiceTest {
     private static final String USERNAME = "test-user";
-    private static final String PASSWORD = "test-password"; // NOSONAR - fake value, only used to stub a mocked PasswordHash call
+    private static final String PASSWORD = "test-password"; // NOSONAR - fake value, only used to stub a mocked LoginAttemptGuard call
+    private static final String USER_ID = "user-1";
+    private static final String SESSION_ID = "session-1";
 
     private static final String CREDENTIALS_BODY = "{\"username\":\"test-user\",\"password\":\"test-password\"}";
     private static final String FAKE_TOKEN = "fake-jwt-token";
     private static final String POST_METHOD = "POST";
     private static final String ROLE_ID = "role-1";
 
-    private MockedStatic<PasswordHash> passwordHashMock;
+    private MockedStatic<LoginAttemptGuard> guardMock;
+    private MockedStatic<LoginSessionRegistry> registryMock;
     private MockedStatic<LoginDefaultsResolver> resolverMock;
 
     /**
-     * Initializes the {@code PasswordHash} and {@link LoginDefaultsResolver} static mocks, on top of the shared mocks from
+     * Initializes the {@link LoginAttemptGuard}, {@link LoginSessionRegistry} and
+     * {@link LoginDefaultsResolver} static mocks, on top of the shared mocks from
      * {@link AbstractProfileServiceTest}.
      */
     @Before
-    public void setUpPasswordHashMock() {
-        passwordHashMock = mockStatic(PasswordHash.class);
+    public void setUpLoginMocks() {
+        guardMock = mockStatic(LoginAttemptGuard.class);
+        registryMock = mockStatic(LoginSessionRegistry.class);
         resolverMock = mockStatic(LoginDefaultsResolver.class);
     }
 
     /**
-     * Releases the static mocks opened in {@link #setUpPasswordHashMock()}.
+     * Releases the static mocks opened in {@link #setUpLoginMocks()}.
      */
     @After
-    public void tearDownPasswordHashMock() {
+    public void tearDownLoginMocks() {
         resolverMock.close();
-        passwordHashMock.close();
+        registryMock.close();
+        guardMock.close();
     }
 
     /**
@@ -121,25 +131,51 @@ public class LoginServiceTest extends AbstractProfileServiceTest {
     }
 
     /**
-     * Wrong credentials must be rejected with {@link UnauthorizedException}.
+     * Credentials refused by {@link LoginAttemptGuard} (wrong password or locked user) must be
+     * rejected with its {@link UnauthorizedException}, and no token or session must be issued.
      *
      * @throws Exception if the request body cannot be read
      */
     @Test
     public void testProcessInvalidCredentialsThrowsUnauthorized() throws Exception {
         when(mockRequest.getMethod()).thenReturn(POST_METHOD);
-        setRequestBody("{\"username\":\"test-user\",\"password\":\"wrong\"}");
+        setRequestBody(CREDENTIALS_BODY);
 
-        passwordHashMock.when(() -> PasswordHash.getUserWithPassword(USERNAME, "wrong"))
-                .thenReturn(Optional.empty());
+        guardMock.when(() -> LoginAttemptGuard.authenticate(mockRequest, USERNAME, PASSWORD))
+                .thenThrow(new UnauthorizedException("User is locked"));
 
         LoginService service = new LoginService(mockRequest, mockResponse);
         try {
             service.process();
             fail("Expected UnauthorizedException");
         } catch (UnauthorizedException expected) {
-            // expected
+            assertEquals("User is locked", expected.getMessage());
         }
+        authUtilsMock.verify(() -> Utils.generateToken(any(AuthData.class), any()), never());
+        registryMock.verify(() -> LoginSessionRegistry.register(any(), any(), any(), any()), never());
+    }
+
+    /**
+     * A successful login is recorded in the Classic session registry with the typed username, and
+     * its id is returned next to the token.
+     *
+     * @throws Exception if the request body cannot be read or the service fails
+     */
+    @Test
+    public void testProcessRegistersSuccessfulSession() throws Exception {
+        StringWriter stringWriter = stubTokenResponse();
+        User mockUser = stubLoginRequest(CREDENTIALS_BODY);
+        stubClassicDefaults(mockUser);
+        registryMock.when(() -> LoginSessionRegistry.register(mockRequest, USERNAME, USER_ID,
+                LoginSessionRegistry.SUCCESS_STATUS)).thenReturn(SESSION_ID);
+
+        new LoginService(mockRequest, mockResponse).process();
+
+        JSONObject response = new JSONObject(stringWriter.toString());
+        assertEquals(FAKE_TOKEN, response.getString("token"));
+        assertEquals(SESSION_ID, response.getString(LoginSessionRegistry.SESSION_ID));
+        registryMock.verify(() -> LoginSessionRegistry.register(eq(mockRequest), eq(USERNAME), eq(USER_ID),
+                eq(LoginSessionRegistry.SUCCESS_STATUS)));
     }
 
     /**
@@ -231,10 +267,8 @@ public class LoginServiceTest extends AbstractProfileServiceTest {
     public void testProcessUsesRequestedRole() throws Exception {
         stubTokenResponse();
         stubLoginRequest("{\"username\":\"test-user\",\"password\":\"test-password\",\"role\":\"role-1\"}");
-        Role role = mock(Role.class);
-        Client client = mock(Client.class);
-        when(role.getClient()).thenReturn(client);
-        when(obDal.get(Role.class, ROLE_ID)).thenReturn(role);
+        Role role = stubRequestedRole();
+        Client client = role.getClient();
 
         new LoginService(mockRequest, mockResponse).process();
 
@@ -251,16 +285,9 @@ public class LoginServiceTest extends AbstractProfileServiceTest {
      */
     @Test
     public void testProcessInvalidOrganizationThrowsUnprocessable() throws Exception {
-        when(mockRequest.getMethod()).thenReturn(POST_METHOD);
-        setRequestBody("{\"username\":\"test-user\",\"password\":\"test-password\",\"role\":\"role-1\",\"organization\":\"missing-org\"}");
-
-        User mockUser = mock(User.class);
-        Role role = mock(Role.class);
-        when(role.getClient()).thenReturn(mock(Client.class));
-
-        passwordHashMock.when(() -> PasswordHash.getUserWithPassword(USERNAME, PASSWORD))
-                .thenReturn(Optional.of(mockUser));
-        when(obDal.get(Role.class, ROLE_ID)).thenReturn(role);
+        stubLoginRequest(
+                "{\"username\":\"test-user\",\"password\":\"test-password\",\"role\":\"role-1\",\"organization\":\"missing-org\"}");
+        stubRequestedRole();
         when(obDal.get(Organization.class, "missing-org")).thenReturn(null);
 
         LoginService service = new LoginService(mockRequest, mockResponse);
@@ -275,16 +302,9 @@ public class LoginServiceTest extends AbstractProfileServiceTest {
      */
     @Test
     public void testProcessInvalidWarehouseThrowsUnprocessable() throws Exception {
-        when(mockRequest.getMethod()).thenReturn(POST_METHOD);
-        setRequestBody("{\"username\":\"test-user\",\"password\":\"test-password\",\"role\":\"role-1\",\"warehouse\":\"missing-wh\"}");
-
-        User mockUser = mock(User.class);
-        Role role = mock(Role.class);
-        when(role.getClient()).thenReturn(mock(Client.class));
-
-        passwordHashMock.when(() -> PasswordHash.getUserWithPassword(USERNAME, PASSWORD))
-                .thenReturn(Optional.of(mockUser));
-        when(obDal.get(Role.class, ROLE_ID)).thenReturn(role);
+        stubLoginRequest(
+                "{\"username\":\"test-user\",\"password\":\"test-password\",\"role\":\"role-1\",\"warehouse\":\"missing-wh\"}");
+        stubRequestedRole();
         when(obDal.get(Warehouse.class, "missing-wh")).thenReturn(null);
 
         LoginService service = new LoginService(mockRequest, mockResponse);
@@ -303,9 +323,21 @@ public class LoginServiceTest extends AbstractProfileServiceTest {
         when(mockRequest.getMethod()).thenReturn(POST_METHOD);
         setRequestBody(body);
         User mockUser = mock(User.class);
-        passwordHashMock.when(() -> PasswordHash.getUserWithPassword(USERNAME, PASSWORD))
-                .thenReturn(Optional.of(mockUser));
+        guardMock.when(() -> LoginAttemptGuard.authenticate(mockRequest, USERNAME, PASSWORD)).thenReturn(USER_ID);
+        when(obDal.get(User.class, USER_ID)).thenReturn(mockUser);
         return mockUser;
+    }
+
+    /**
+     * Stubs the role named in the request body ({@link #ROLE_ID}) with its own client.
+     *
+     * @return the stubbed role
+     */
+    private Role stubRequestedRole() {
+        Role role = mock(Role.class);
+        when(role.getClient()).thenReturn(mock(Client.class));
+        when(obDal.get(Role.class, ROLE_ID)).thenReturn(role);
+        return role;
     }
 
     /**

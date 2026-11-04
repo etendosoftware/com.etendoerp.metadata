@@ -56,6 +56,7 @@ import com.auth0.jwt.interfaces.RSAKeyProvider;
 import com.etendoerp.etendorx.auth.JwkRSAKeyProvider;
 import com.etendoerp.etendorx.data.ETRXTokenUser;
 import com.etendoerp.metadata.auth.LoginDefaultsResolver;
+import com.etendoerp.metadata.auth.LoginSessionRegistry;
 import com.etendoerp.metadata.auth.Utils;
 import com.etendoerp.metadata.data.AuthData;
 
@@ -236,11 +237,15 @@ public class SSOService {
             AuthData authData = LoginDefaultsResolver.resolve(user);
 
             String token = Utils.generateToken(authData, null);
+            // Classic's SSO login records a successful session without checking the user lock
+            String sessionId = LoginSessionRegistry.register(request, user.getUsername(), user.getId(),
+                LoginSessionRegistry.SUCCESS_STATUS);
 
             JSONObject result = new JSONObject();
             result.put("token", token);
             result.put("userId", user.getId());
             result.put("username", user.getUsername());
+            result.put(LoginSessionRegistry.SESSION_ID, sessionId);
             writeJson(response, HttpServletResponse.SC_OK, result);
 
         } catch (Exception e) {
