@@ -18,6 +18,7 @@
 package com.etendoerp.metadata.builders;
 
 import com.etendoerp.metadata.cache.ADCacheProvider;
+import com.etendoerp.metadata.data.ProcessAccessChecker;
 import com.etendoerp.metadata.data.ReferenceSelectors;
 import com.etendoerp.metadata.utils.Constants;
 import com.etendoerp.metadata.utils.LegacyUtils;
@@ -426,6 +427,8 @@ public class FieldBuilderWithColumn extends FieldBuilder {
         if (processAction != null) {
             json.put(PROCESS_ACTION, ProcessActionBuilder.getFieldProcess(field, processAction));
         }
+
+        json.put(Constants.JSON_IS_PROCESS_ACCESSIBLE_KEY, ProcessAccessChecker.isProcessAccessible(field));
     }
 
     private Process resolveProcessAction(Field field, boolean isLegacy) {

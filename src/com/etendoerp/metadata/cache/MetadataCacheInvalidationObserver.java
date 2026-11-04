@@ -23,12 +23,17 @@ import org.openbravo.base.model.Entity;
 import org.openbravo.base.model.ModelProvider;
 import org.openbravo.client.kernel.event.EntityDeleteEvent;
 import org.openbravo.client.kernel.event.EntityNewEvent;
+import org.openbravo.client.kernel.event.EntityPersistenceEvent;
 import org.openbravo.client.kernel.event.EntityPersistenceEventObserver;
 import org.openbravo.client.kernel.event.EntityUpdateEvent;
+import org.openbravo.model.ad.domain.Preference;
+
+import com.etendoerp.metadata.utils.Constants;
 
 /**
  * Observes changes to Application Dictionary entities (Window, Tab, Field, Column,
- * and their access records) and invalidates all metadata caches.
+ * and their access records, including Process Access and the {@code SecuredProcess}
+ * preference that decide whether a button is enabled) and invalidates all metadata caches.
  * <p>
  * Follows the same pattern as MenuCacheHandler in the classic interface.
  * The base class {@link EntityPersistenceEventObserver#isValidEvent} already
@@ -43,28 +48,46 @@ class MetadataCacheInvalidationObserver extends EntityPersistenceEventObserver {
       ModelProvider.getInstance().getEntity("ADColumn"),
       ModelProvider.getInstance().getEntity("ADWindowAccess"),
       ModelProvider.getInstance().getEntity("ADTabAccess"),
-      ModelProvider.getInstance().getEntity("ADFieldAccess")
+      ModelProvider.getInstance().getEntity("ADFieldAccess"),
+      ModelProvider.getInstance().getEntity("ADProcessAccess"),
+      ModelProvider.getInstance().getEntity("OBUIAPP_Process_Access"),
+      ModelProvider.getInstance().getEntity(Preference.ENTITY_NAME)
   };
 
   public void onNew(@Observes EntityNewEvent event) {
-    if (!isValidEvent(event)) {
+    if (!isRelevantEvent(event)) {
       return;
     }
     MetadataCacheManager.invalidateAll();
   }
 
   public void onUpdate(@Observes EntityUpdateEvent event) {
-    if (!isValidEvent(event)) {
+    if (!isRelevantEvent(event)) {
       return;
     }
     MetadataCacheManager.invalidateAll();
   }
 
   public void onDelete(@Observes EntityDeleteEvent event) {
-    if (!isValidEvent(event)) {
+    if (!isRelevantEvent(event)) {
       return;
     }
     MetadataCacheManager.invalidateAll();
+  }
+
+  /**
+   * Preferences are saved constantly (for instance grid configurations), so among them only the
+   * {@code SecuredProcess} one invalidates the caches.
+   */
+  private boolean isRelevantEvent(EntityPersistenceEvent event) {
+    if (!isValidEvent(event)) {
+      return false;
+    }
+    if (!(event.getTargetInstance() instanceof Preference)) {
+      return true;
+    }
+    Preference preference = (Preference) event.getTargetInstance();
+    return Constants.SECURED_PROCESS_PREFERENCE.equals(preference.getProperty());
   }
 
   @Override

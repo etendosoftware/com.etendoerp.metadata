@@ -92,6 +92,7 @@ import org.openbravo.userinterface.selector.Selector;
 import org.openbravo.userinterface.selector.SelectorField;
 
 import com.etendoerp.etendorx.utils.DataSourceUtils;
+import com.etendoerp.metadata.data.ProcessAccessChecker;
 import com.etendoerp.metadata.data.ReferenceSelectors;
 import com.etendoerp.metadata.utils.Constants;
 import com.etendoerp.metadata.utils.LegacyUtils;
@@ -142,6 +143,7 @@ class FieldBuilderWithColumnTest {
     private static final String BUTTON_REF_LIST_STRING = "buttonRefList";
     private static final String WINDOW_ID_STRING = "window-id";
     private static final String ROLE_ID_STRING = "role-id";
+    private static final String PROCESS_ID_KEY = "processId";
 
     private static final String METH_CHECK_ACCESS_IN_DB = "checkAccessInDB";
     private static final String METH_IS_WINDOW_ACCESSIBLE = "isWindowAccessible";
@@ -297,10 +299,32 @@ class FieldBuilderWithColumnTest {
         try (MockedStatic<ProcessActionBuilder> mocked = mockStatic(ProcessActionBuilder.class)) {
 
             mocked.when(() -> ProcessActionBuilder.getFieldProcess(field, process))
-                    .thenReturn(new JSONObject().put("processId", "process-id"));
+                    .thenReturn(new JSONObject().put(PROCESS_ID_KEY, "process-id"));
 
             JSONObject result = executeToJSON(null);
             assertTrue(result.has("processAction"));
+        }
+    }
+
+    /**
+     * Tests that a button field carries the role's process access, so the client can disable the
+     * button as Classic does instead of hiding it.
+     *
+     * @throws JSONException if the field JSON cannot be built or read
+     */
+    @Test
+    void testToJSONFlagsProcessAccessOfButtonField() throws JSONException {
+        when(column.getProcess()).thenReturn(process);
+
+        try (MockedStatic<ProcessActionBuilder> mocked = mockStatic(ProcessActionBuilder.class);
+                MockedStatic<ProcessAccessChecker> checker = mockStatic(ProcessAccessChecker.class)) {
+
+            mocked.when(() -> ProcessActionBuilder.getFieldProcess(field, process))
+                    .thenReturn(new JSONObject().put(PROCESS_ID_KEY, "process-id"));
+            checker.when(() -> ProcessAccessChecker.isProcessAccessible(field)).thenReturn(false);
+
+            JSONObject result = executeToJSON(null);
+            assertFalse(result.getBoolean(Constants.JSON_IS_PROCESS_ACCESSIBLE_KEY));
         }
     }
 
@@ -314,7 +338,7 @@ class FieldBuilderWithColumnTest {
             legacy.when(() -> LegacyUtils.getLegacyProcess(FIELD_ID)).thenReturn(process);
 
             builder.when(() -> ProcessActionBuilder.getFieldProcess(field, process))
-                    .thenReturn(new JSONObject().put("processId", "legacy"));
+                    .thenReturn(new JSONObject().put(PROCESS_ID_KEY, "legacy"));
 
             JSONObject result = executeToJSON(null);
             assertTrue(result.has("processAction"));

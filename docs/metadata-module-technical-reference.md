@@ -85,7 +85,8 @@ When the frontend requests metadata for a window, the response includes the full
 - Window ID, name, description, type
 - Role-based access check (throws 401 if no access, 404 if window doesn't exist)
 - Ordered list of tabs with role-based tab visibility
-- Tab access permissions (read-only vs. read-write at tab level)
+- Tab access permissions (read-only vs. read-write at tab level): a tab is served with `uIPattern: "RO"` when Classic's rule (`WindowAccessData.hasReadOnlyAccess`) says it is read-only for the role (read-only Table Access, read-only Window Access without an editable Tab Access, or a non-editable Tab Access without editable Field Access). Resolved by `RoleAccessResolver`
+- Field Access applied on top of the complete field list of each tab with an active Tab Access (`FieldAccessOverlay`): listed fields take their *Editable* value, unlisted fields inherit the Tab Access; no field is hidden. The same resolution is applied by `/meta/tab/{id}` when the role has an active Window Access
 
 #### Tab Level (`TabBuilder`)
 - Tab ID, name, entity name, table ID, HQL filter clause
@@ -113,6 +114,9 @@ Each field in the JSON response includes:
 | `type` | Field type for rendering | See "Field Types" below |
 | `required` | Mandatory flag | `AD_COLUMN.ISMANDATORY` |
 | `readOnly` | Read-only flag | Combined from field access + column settings |
+| `isReadOnly` / `isEditable` / `checkOnSave` | Role editability of the field | `AD_FIELD.ISREADONLY` + Tab Access / Field Access of the role |
+| `isUpdatable` | Column updatable flag | `AD_COLUMN.ISUPDATEABLE` |
+| `isProcessAccessible` | `false` when the role cannot run the button's process (the client disables the button, as Classic) | `ProcessAccessChecker`: `BaseProcessActionHandler.hasAccess` for Process Definitions; explicit-access or `SecuredProcess` → active `AD_Process_Access` for classic processes |
 | `displayed` | Show/hide flag | `AD_FIELD.ISDISPLAYED` + display logic evaluation |
 | `displayLogic` | Dynamic display expression | `AD_FIELD.DISPLAYLOGIC` (parsed) |
 | `readOnlyLogic` | Dynamic read-only expression | `AD_COLUMN.READONLYLOGIC` (parsed) |
@@ -421,7 +425,9 @@ See the client's `docs/features/login-logout/README.md`.
 
 ## Caching
 
-`MetadataCacheManager` provides in-memory caching for expensive metadata queries. Cache invalidation is event-driven via `MetadataCacheInvalidationObserver`, which listens for AD entity changes.
+`MetadataCacheManager` provides in-memory caching for expensive metadata queries. Cache invalidation is event-driven via `MetadataCacheInvalidationObserver`, which listens for AD entity changes: windows, tabs, fields, columns, Window/Tab/Field Access, Process Access (`AD_Process_Access`, `OBUIAPP_Process_Access`) and the `SecuredProcess` preference (other preferences are ignored, since they are saved constantly).
+
+The field cache key includes the `OBContext` (user, role, client, organization, language), so per-role values such as `isProcessAccessible` are cached per role. Field Access is applied after the cache on a copy, so the cached field objects are never mutated.
 
 ---
 
@@ -461,7 +467,7 @@ Custom exception types:
 - `REFRESH_INTERVAL` is a class-level setting returned in the metadata. Instance-level override is not supported — all instances of a widget class share the same refresh interval.
 
 ### Read-Only Mode Enforcement on Tab-Level Permissions
-- Tab-level read/write permissions are returned in metadata but their enforcement on data submission (write operations) is handled by core DAL, not by this module.
+- Tab-level and field-level read/write permissions are returned in metadata (ETP-6003) but their enforcement on data submission (write operations) is handled by Classic (`DefaultDataSourceService.testAccessPermissions`, for Field Access rows with *Check on Save*), not by this module. As in Classic, there is no server-side check against deleting records of a read-only tab, and process execution is not re-checked against Process Access by this module.
 
 ### Callout Integration with Out-Fields
 - Out-field metadata of type `"calloutInput"` is emitted but the actual callout invocation chain (passing the suffix-based values to the Classic callout engine) depends on frontend implementation.

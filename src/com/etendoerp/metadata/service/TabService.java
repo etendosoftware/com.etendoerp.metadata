@@ -23,8 +23,11 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
+import org.openbravo.model.ad.access.TabAccess;
+import org.openbravo.model.ad.access.WindowAccess;
 import org.openbravo.model.ad.ui.Tab;
 
+import com.etendoerp.metadata.builders.RoleAccessResolver;
 import com.etendoerp.metadata.builders.TabBuilder;
 import com.etendoerp.metadata.exceptions.NotFoundException;
 
@@ -57,10 +60,29 @@ public class TabService extends MetadataService {
                 throw new NotFoundException("Tab not found: " + tabId);
             }
 
-            writeWithETag(new TabBuilder(tab, null, false).toJSON());
+            writeWithETag(createTabBuilder(tab).toJSON());
         } finally {
             OBContext.restorePreviousMode();
         }
+    }
+
+    /**
+     * Applies the role's Tab Access and Field Access when the role has an active Window Access for
+     * the tab's window. Without it the tab is served as before (editable): this endpoint also feeds
+     * the Pick and Execute grids, whose referenced windows are usually not granted to the role.
+     */
+    static TabBuilder createTabBuilder(Tab tab) {
+        WindowAccess windowAccess = RoleAccessResolver.findActiveWindowAccess(OBContext.getOBContext().getRole(),
+                tab.getWindow());
+        if (windowAccess == null) {
+            return new TabBuilder(tab, null, false);
+        }
+
+        TabAccess tabAccess = RoleAccessResolver.indexActiveTabAccessesByTabId(
+                RoleAccessResolver.findTabAccesses(windowAccess)).get(tab.getId());
+        boolean isTabReadOnly = RoleAccessResolver.isTabReadOnly(windowAccess, tab);
+        return TabBuilder.withResolvedAccess(tab, tabAccess, RoleAccessResolver.findFieldAccesses(tabAccess),
+                isTabReadOnly);
     }
 
     /**

@@ -181,6 +181,21 @@ public class Constants {
      */
     public static final String JSON_IS_WINDOW_ACCESSIBLE_KEY = "isWindowAccessible";
 
+    // === Role access JSON keys (Tab Access / Field Access / Process Access) ===
+    public static final String JSON_IS_READ_ONLY_KEY = "isReadOnly";
+    public static final String JSON_IS_EDITABLE_KEY = "isEditable";
+    public static final String JSON_IS_UPDATABLE_KEY = "isUpdatable";
+    public static final String JSON_CHECK_ON_SAVE_KEY = "checkOnSave";
+    public static final String JSON_COLUMN_NAME_KEY = "columnName";
+    /**
+     * Key flagging a button field whose process the current role cannot run. Classic keeps such a
+     * button visible but disabled (WindowSettingsActionHandler.getNotAccessibleProcesses), and so
+     * does the new UI.
+     */
+    public static final String JSON_IS_PROCESS_ACCESSIBLE_KEY = "isProcessAccessible";
+    /** Preference that makes every process of a window require an explicit Process Access grant. */
+    public static final String SECURED_PROCESS_PREFERENCE = "SecuredProcess";
+
     // === Legacy process action JSON keys ===
     //
     // Keys used to serialize {@link com.etendoerp.metadata.builders.LegacyProcessParams}

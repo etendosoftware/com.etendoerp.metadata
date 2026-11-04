@@ -16,6 +16,7 @@
  */
 package com.etendoerp.metadata.builders;
 
+import static com.etendoerp.metadata.MetadataTestConstants.ROLE_ID;
 import static com.etendoerp.metadata.MetadataTestConstants.ROLE_NAME;
 import static com.etendoerp.metadata.MetadataTestConstants.TABS;
 import static com.etendoerp.metadata.MetadataTestConstants.TAB_ID_HYPHEN;
@@ -24,6 +25,8 @@ import static com.etendoerp.metadata.utils.Constants.JSON_IS_WINDOW_ACCESSIBLE_K
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -40,6 +43,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import org.codehaus.jettison.json.JSONArray;
@@ -57,6 +61,7 @@ import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBCriteria;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.dal.service.OBQuery;
+import org.openbravo.erpCommon.utility.WindowAccessData;
 import org.openbravo.model.ad.access.FieldAccess;
 import org.openbravo.model.ad.access.Role;
 import org.openbravo.model.ad.access.TabAccess;
@@ -64,6 +69,7 @@ import org.openbravo.model.ad.access.WindowAccess;
 import org.openbravo.model.ad.system.Language;
 import org.openbravo.model.ad.ui.Tab;
 import org.openbravo.model.ad.ui.Window;
+import org.openbravo.service.db.DalConnectionProvider;
 import org.openbravo.service.json.DataToJsonConverter;
 
 import com.etendoerp.metadata.exceptions.NotFoundException;
@@ -96,6 +102,11 @@ class WindowBuilderTest {
   @Mock
   private OBQuery<FieldAccess> mockFieldAccessQuery;
 
+  /** Arguments of every TabBuilder constructed during a test: tab, tabAccess, readOnly, fieldAccesses. */
+  private final List<List<?>> tabBuilderArguments = new ArrayList<>();
+  /** Value returned by Classic's {@code WindowAccessData.hasReadOnlyAccess} in the tests. */
+  private boolean classicTabReadOnly;
+
   // Test data
   private static final String WINDOW_TYPE = "windowType";
   private static final String WINDOW_TYPE_VALUE = "OBUIAPP_PickAndExecute";
@@ -117,6 +128,8 @@ class WindowBuilderTest {
     when(mockContext.getLanguage()).thenReturn(mockLanguage);
     when(mockContext.getRole()).thenReturn(mockRole);
     when(mockRole.getName()).thenReturn(ROLE_NAME);
+    when(mockRole.getId()).thenReturn(ROLE_ID);
+    when(mockWindowAccess.getRole()).thenReturn(mockRole);
 
     when(mockOBDal.createQuery(eq(TabAccess.class), anyString(), anyMap())).thenReturn(mockTabAccessQuery);
     when(mockTabAccessQuery.setFilterOnActive(anyBoolean())).thenReturn(mockTabAccessQuery);
@@ -190,6 +203,7 @@ class WindowBuilderTest {
    */
   private MockedConstruction<TabBuilder> createTabBuilderMock(String tabId) {
     return mockConstruction(TabBuilder.class, (mock, context) -> {
+      tabBuilderArguments.add(new ArrayList<>(context.arguments()));
       JSONObject tabJson = new JSONObject();
       tabJson.put("id", tabId);
       when(mock.toJSON()).thenReturn(tabJson);
@@ -232,10 +246,24 @@ class WindowBuilderTest {
   private JSONObject executeToJSONWithTabs(WindowBuilder windowBuilder, String tabId) {
     try (MockedStatic<OBContext> ignored = createOBContextMock();
          MockedStatic<OBDal> ignored3 = createOBDalMock();
+         MockedStatic<WindowAccessData> ignored4 = createWindowAccessDataMock();
+         MockedConstruction<DalConnectionProvider> ignored5 = mockConstruction(DalConnectionProvider.class);
          MockedConstruction<DataToJsonConverter> ignored1 = createDataToJsonConverterMock();
          MockedConstruction<TabBuilder> ignored2 = createTabBuilderMock(tabId)) {
       return windowBuilder.toJSON();
     }
+  }
+
+  /**
+   * Mocks Classic's read-only rule so it answers {@link #classicTabReadOnly} for every tab.
+   *
+   * @return a MockedStatic of WindowAccessData
+   */
+  private MockedStatic<WindowAccessData> createWindowAccessDataMock() {
+    MockedStatic<WindowAccessData> mocked = mockStatic(WindowAccessData.class);
+    mocked.when(() -> WindowAccessData.hasReadOnlyAccess(any(), anyString(), anyString()))
+        .thenAnswer(invocation -> classicTabReadOnly);
+    return mocked;
   }
 
   /**
@@ -389,69 +417,98 @@ class WindowBuilderTest {
   }
 
   /**
-   * Tests that the toJSON method excludes tabs that are inactive or have no read access.
-   * It mocks the OBDal, OBContext, and DataToJsonConverter to simulate a scenario
-   * where the current role has access to the window but not to certain tabs.
+   * Tests that an inactive Tab Access is ignored, as in Classic: the tab is still built from the
+   * window's tab list, without any tab access.
    *
    * @throws Exception if any unexpected error occurs during the test execution.
    */
   @Test
-  void toJSONWithInactiveTabAccessExcludesTab() throws Exception {
+  void toJSONWithInactiveTabAccessBuildsTabWithoutTabAccess() throws Exception {
     setupWindowAccess(true, true);
-    setupTabAccess(false, true);
-    
-    WindowBuilder windowBuilder = createWindowBuilder();
-    JSONObject result = executeToJSON(windowBuilder);
+    setupTabAccess(false);
 
-    assertNotNull(result);
-    assertTrue(result.has(TABS));
-    JSONArray tabs = result.getJSONArray(TABS);
-    assertEquals(0, tabs.length());
+    JSONObject result = executeToJSONWithTabs(createWindowBuilder(), TAB_ID_HYPHEN);
+
+    assertEquals(1, result.getJSONArray(TABS).length());
+    assertNull(tabBuilderArguments.get(0).get(1), "An inactive tab access must not reach the TabBuilder");
   }
 
   /**
-   * Tests that the toJSON method excludes tabs that have no read access.
-   * It mocks the OBDal, OBContext, and DataToJsonConverter to simulate a scenario
-   * where the current role has access to the window but not to certain tabs.
+   * Tests that a tab without any Tab Access row is still built, so the access configuration never
+   * hides a tab.
    *
    * @throws Exception if any unexpected error occurs during the test execution.
    */
   @Test
-  void toJSONWithNoReadAccessTabAccessExcludesTab() throws Exception {
+  void toJSONWithoutTabAccessStillBuildsEveryTab() throws Exception {
     setupWindowAccess(true, true);
-    setupTabAccess(true, false);
-    
-    WindowBuilder windowBuilder = createWindowBuilder();
-    JSONObject result = executeToJSON(windowBuilder);
+    Tab tab = mockTab(TAB_ID_HYPHEN);
+    when(mockWindow.getADTabList()).thenReturn(List.of(tab));
 
-    assertNotNull(result);
-    assertTrue(result.has(TABS));
-    JSONArray tabs = result.getJSONArray(TABS);
-    assertEquals(0, tabs.length());
+    JSONObject result = executeToJSONWithTabs(createWindowBuilder(), TAB_ID_HYPHEN);
+
+    assertEquals(1, result.getJSONArray(TABS).length());
+    assertNull(tabBuilderArguments.get(0).get(1));
+    assertEquals(Collections.emptyList(), tabBuilderArguments.get(0).get(3));
   }
 
   /**
-   * Tests that the toJSON method includes tabs when the user has active tab access and read permission.
-   * It mocks the OBDal, OBContext, and DataToJsonConverter to simulate a scenario
-   * where the current role has access to the window and tabs.
+   * Tests that an active Tab Access is handed to the TabBuilder together with the read-only state
+   * resolved by Classic's rule.
    *
    * @throws Exception if any unexpected error occurs during the test execution.
    */
   @Test
-  void toJSONWithActiveTabAccessAndReadPermissionIncludesTab() throws Exception {
+  void toJSONWithActiveTabAccessPassesItWithClassicReadOnlyState() throws Exception {
     setupWindowAccess(true, true);
-    setupTabAccess(true, true);
-    
-    WindowBuilder windowBuilder = createWindowBuilder();
-    JSONObject result = executeToJSONWithTabs(windowBuilder, TAB_ID_HYPHEN);
+    TabAccess tabAccess = setupTabAccess(true);
+    classicTabReadOnly = true;
 
-    assertNotNull(result);
-    assertTrue(result.has(TABS));
+    JSONObject result = executeToJSONWithTabs(createWindowBuilder(), TAB_ID_HYPHEN);
+
     JSONArray tabs = result.getJSONArray(TABS);
     assertEquals(1, tabs.length());
+    assertEquals(TAB_ID_HYPHEN, tabs.getJSONObject(0).getString("id"));
+    assertSame(tabAccess, tabBuilderArguments.get(0).get(1));
+    assertEquals(true, tabBuilderArguments.get(0).get(2));
+  }
 
-    JSONObject tabJson = tabs.getJSONObject(0);
-    assertEquals(TAB_ID_HYPHEN, tabJson.getString("id"));
+  /**
+   * Tests that a tab is editable when Classic's rule says so, even if the window access itself is
+   * read-only: an editable Tab Access overrides a read-only Window Access, as in Classic.
+   *
+   * @throws Exception if any unexpected error occurs during the test execution.
+   */
+  @Test
+  void toJSONWithEditableTabUnderReadOnlyWindowKeepsTabEditable() throws Exception {
+    setupWindowAccess(true, true);
+    when(mockWindowAccess.isEditableField()).thenReturn(false);
+    setupTabAccess(true);
+    classicTabReadOnly = false;
+
+    executeToJSONWithTabs(createWindowBuilder(), TAB_ID_HYPHEN);
+
+    assertEquals(false, tabBuilderArguments.get(0).get(2));
+  }
+
+  /**
+   * Tests that tabs are built in the window's tab order, whatever the order of the Tab Access rows.
+   *
+   * @throws Exception if any unexpected error occurs during the test execution.
+   */
+  @Test
+  void toJSONKeepsWindowTabOrder() throws Exception {
+    setupWindowAccess(true, true);
+    Tab firstTab = mockTab(TAB_ID_HYPHEN + 1);
+    Tab secondTab = mockTab(TAB_ID_HYPHEN + 2);
+    when(mockWindow.getADTabList()).thenReturn(List.of(firstTab, secondTab));
+    TabAccess secondTabAccess = mockTabAccess(secondTab, true);
+    when(mockTabAccessQuery.list()).thenReturn(List.of(secondTabAccess));
+
+    executeToJSONWithTabs(createWindowBuilder(), TAB_ID_HYPHEN);
+
+    assertSame(firstTab, tabBuilderArguments.get(0).get(0));
+    assertSame(secondTab, tabBuilderArguments.get(1).get(0));
   }
 
   /**
@@ -467,30 +524,20 @@ class WindowBuilderTest {
     setupWindowAccess(true, true);
 
     List<TabAccess> tabAccesses = new ArrayList<>();
+    List<Tab> tabs = new ArrayList<>();
     for (int i = 0; i < 3; i++) {
-      TabAccess mockTabAccess = mock(TabAccess.class);
-      Tab mockTab = mock(Tab.class);
-      when(mockTabAccess.isActive()).thenReturn(true);
-      when(mockTabAccess.isAllowRead()).thenReturn(true);
-      when(mockTabAccess.getTab()).thenReturn(mockTab);
-      when(mockTab.getId()).thenReturn(TAB_ID_HYPHEN + i);
-      when(mockTab.getDisplayLogic()).thenReturn(null);
-      tabAccesses.add(mockTabAccess);
+      Tab mockTab = mockTab(TAB_ID_HYPHEN + i);
+      tabAccesses.add(mockTabAccess(mockTab, true));
+      tabs.add(mockTab);
     }
     when(mockTabAccessQuery.list()).thenReturn(tabAccesses);
+    when(mockWindow.getADTabList()).thenReturn(tabs);
 
-    WindowBuilder windowBuilder = createWindowBuilder();
-    JSONObject result;
-    try (MockedStatic<OBContext> ignored = createOBContextMock();
-         MockedStatic<OBDal> ignored3 = createOBDalMock();
-         MockedConstruction<DataToJsonConverter> ignored1 = createDataToJsonConverterMock();
-         MockedConstruction<TabBuilder> ignored2 = createTabBuilderMock(TAB_ID_HYPHEN)) {
-      result = windowBuilder.toJSON();
-    }
+    JSONObject result = executeToJSONWithTabs(createWindowBuilder(), TAB_ID_HYPHEN);
 
     assertNotNull(result);
-    JSONArray tabs = result.getJSONArray(TABS);
-    assertEquals(3, tabs.length());
+    JSONArray resultTabs = result.getJSONArray(TABS);
+    assertEquals(3, resultTabs.length());
 
     verify(mockOBDal, times(1)).createQuery(eq(TabAccess.class), anyString(), anyMap());
     verify(mockOBDal, times(1)).createQuery(eq(FieldAccess.class), anyString(), anyMap());
@@ -540,23 +587,46 @@ class WindowBuilderTest {
   }
 
   /**
-   * Sets up the mock behavior for TabAccess and Tab entities.
+   * Sets up a single tab in the window with a Tab Access row.
    *
-   * @param isActive   whether the tab access is active
-   * @param allowRead  whether the tab access allows read
+   * @param isActive whether the tab access is active
+   * @return the mocked tab access
    */
-  private void setupTabAccess(boolean isActive, boolean allowRead) {
-    TabAccess mockTabAccess = mock(TabAccess.class);
-    Tab mockTab = mock(Tab.class);
+  private TabAccess setupTabAccess(boolean isActive) {
+    Tab tab = mockTab(TAB_ID_HYPHEN);
+    TabAccess tabAccess = mockTabAccess(tab, isActive);
+    when(mockTabAccessQuery.list()).thenReturn(List.of(tabAccess));
+    when(mockWindow.getADTabList()).thenReturn(List.of(tab));
+    return tabAccess;
+  }
 
-    List<TabAccess> tabAccessList = List.of(mockTabAccess);
-    when(mockTabAccessQuery.list()).thenReturn(tabAccessList);
+  /**
+   * Creates a mocked tab without display logic.
+   *
+   * @param tabId the tab ID
+   * @return the mocked tab
+   */
+  private static Tab mockTab(String tabId) {
+    Tab tab = mock(Tab.class);
+    when(tab.getId()).thenReturn(tabId);
+    when(tab.getDisplayLogic()).thenReturn(null);
+    return tab;
+  }
 
-    when(mockTabAccess.isActive()).thenReturn(isActive);
-    when(mockTabAccess.isAllowRead()).thenReturn(allowRead);
-    when(mockTabAccess.getTab()).thenReturn(mockTab);
-    when(mockTab.getId()).thenReturn(TAB_ID_HYPHEN);
-    when(mockTab.getDisplayLogic()).thenReturn(null);
+  /**
+   * Creates a mocked Tab Access for the given tab.
+   *
+   * @param tab      the tab of the access row
+   * @param isActive whether the access row is active
+   * @return the mocked tab access
+   */
+  private static TabAccess mockTabAccess(Tab tab, boolean isActive) {
+    String tabAccessId = tab.getId() + "-access";
+    TabAccess tabAccess = mock(TabAccess.class);
+    when(tabAccess.isActive()).thenReturn(isActive);
+    when(tabAccess.getTab()).thenReturn(tab);
+    when(tabAccess.getId()).thenReturn(tabAccessId);
+    return tabAccess;
   }
 
   /**
@@ -627,7 +697,7 @@ class WindowBuilderTest {
   @Test
   void toJSONEmitsAccessibilityFlagAlongsideTabs() throws Exception {
     setupWindowAccess(true, true);
-    setupTabAccess(true, true);
+    setupTabAccess(true);
     WindowBuilder windowBuilder = createWindowBuilder();
 
     JSONObject result = executeToJSONWithTabs(windowBuilder, TAB_ID_HYPHEN);
