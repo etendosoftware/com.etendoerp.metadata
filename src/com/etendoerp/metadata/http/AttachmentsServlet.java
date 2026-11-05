@@ -652,26 +652,6 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
     }
 
     /**
-     * Validates and retrieves an Attachment by ID
-     * @return The Attachment object or null if validation fails (error response already sent)
-     */
-    private Attachment validateAndGetAttachment(String attachmentId, HttpServletResponse response)
-            throws IOException, JSONException {
-        if (attachmentId == null) {
-            sendErrorResponse(response, HttpStatus.SC_BAD_REQUEST, MSG_ATTACHMENT_REQUIRED);
-            return null;
-        }
-
-        Attachment attachment = OBDal.getInstance().get(Attachment.class, attachmentId);
-        if (attachment == null) {
-            sendErrorResponse(response, HttpStatus.SC_NOT_FOUND, MSG_ATTACHMENT_NOT_FOUND);
-            return null;
-        }
-
-        return attachment;
-    }
-
-    /**
      * Validates and retrieves an Attachment by ID, authorizing the caller against the
      * record the attachment belongs to.
      *
