@@ -23,6 +23,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 import java.io.InputStream;
@@ -494,8 +495,8 @@ public class AttachmentsServletAccessTest extends OBBaseTest {
         when(mockRequest.getPart(PARAM_FILE)).thenReturn(mockPart);
         when(mockPart.getHeader(AttachmentsAccessStubs.CONTENT_DISPOSITION_TOKEN))
                 .thenReturn(AttachmentsAccessStubs.UPLOAD_CONTENT_DISPOSITION);
-        when(mockPart.getInputStream()).thenReturn(mockInputStream);
-        when(mockInputStream.read(any(byte[].class))).thenReturn(-1);
+        lenient().when(mockPart.getInputStream()).thenReturn(mockInputStream);
+        lenient().when(mockInputStream.read(any(byte[].class))).thenReturn(-1);
         when(mockTab.getTable()).thenReturn(mockTable);
 
         try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
