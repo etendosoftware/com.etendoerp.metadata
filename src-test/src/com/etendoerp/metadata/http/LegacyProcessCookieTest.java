@@ -21,6 +21,7 @@ public class LegacyProcessCookieTest {
 
   /**
    * Default (non-production, non-cross-site) cookies use SameSite=Lax without Domain/Secure.
+   * @throws ReflectiveOperationException if the private builder cannot be invoked
    */
   @Test public void sameSiteLaxByDefaultNoDomainNoEmptyAttr() throws ReflectiveOperationException {
     String h = build(false, false);
@@ -34,6 +35,7 @@ public class LegacyProcessCookieTest {
 
   /**
    * Cross-site requests in production use SameSite=None and are marked Secure.
+   * @throws ReflectiveOperationException if the private builder cannot be invoked
    */
   @Test public void crossSiteProductionIsNoneAndSecure() throws ReflectiveOperationException {
     String h = build(true, true);
@@ -43,6 +45,7 @@ public class LegacyProcessCookieTest {
 
   /**
    * Cross-site requests over plain HTTP fall back to SameSite=Lax (None requires Secure).
+   * @throws ReflectiveOperationException if the private builder cannot be invoked
    */
   @Test public void crossSiteOnHttpFallsBackToLax() throws ReflectiveOperationException {
     String h = build(false, true); // None without Secure is invalid -> Lax
