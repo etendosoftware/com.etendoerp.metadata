@@ -22,11 +22,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.withSettings;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
@@ -35,7 +33,6 @@ import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.StringReader;
 import java.io.StringWriter;
-import java.util.Collections;
 
 import javax.servlet.ServletException;
 import javax.servlet.ServletOutputStream;
@@ -53,8 +50,6 @@ import org.mockito.MockedStatic;
 import org.mockito.junit.MockitoJUnitRunner;
 import org.openbravo.base.model.Entity;
 import org.openbravo.base.model.ModelProvider;
-import org.openbravo.base.structure.BaseOBObject;
-import org.openbravo.base.structure.OrganizationEnabled;
 import org.openbravo.client.application.attachment.AttachImplementationManager;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBCriteria;
@@ -254,16 +249,8 @@ public class AttachmentsServletCoverageTest extends OBBaseTest {
     private void stubRecordAccessGranted(MockedStatic<ModelProvider> modelProviderMock) {
         when(mockAttachment.getTable()).thenReturn(mockTable);
         when(mockAttachment.getRecord()).thenReturn(TEST_RECORD_ID);
-        when(mockTable.getDBTableName()).thenReturn("C_Order");
-        modelProviderMock.when(ModelProvider::getInstance).thenReturn(mockModelProvider);
-        when(mockModelProvider.getEntityByTableName("C_Order")).thenReturn(mockEntity);
-        when(mockEntity.getName()).thenReturn("Order");
-
-        BaseOBObject ownerRecord = mock(BaseOBObject.class, withSettings().extraInterfaces(OrganizationEnabled.class));
-        when(((OrganizationEnabled) ownerRecord).getOrganization()).thenReturn(mockOrganization);
-        when(mockOrganization.getId()).thenReturn(TEST_ORG_ID);
-        when(mockDal.get("Order", TEST_RECORD_ID)).thenReturn(ownerRecord);
-        when(mockContext.getWritableOrganizations()).thenReturn(Collections.singleton(TEST_ORG_ID));
+        AttachmentsAccessStubs.stubEntityResolution(mockTable, modelProviderMock, mockModelProvider, mockEntity);
+        AttachmentsAccessStubs.stubRecordWritable(mockDal, mockContext, TEST_RECORD_ID, mockOrganization, TEST_ORG_ID);
     }
 
     private void assertEditRequestSucceeds() throws Exception {
@@ -327,11 +314,8 @@ public class AttachmentsServletCoverageTest extends OBBaseTest {
                 // The record-level authorization added to DOWNLOAD_ALL needs the tab's table
                 // to resolve to a visible owning record; stub it as visible here.
                 when(mockTab.getTable()).thenReturn(mockTable);
-                when(mockTable.getDBTableName()).thenReturn("C_Order");
-                modelProviderMock.when(ModelProvider::getInstance).thenReturn(mockModelProvider);
-                when(mockModelProvider.getEntityByTableName("C_Order")).thenReturn(mockEntity);
-                when(mockEntity.getName()).thenReturn("Order");
-                when(mockDal.get("Order", TEST_RECORD_ID)).thenReturn(mock(BaseOBObject.class));
+                AttachmentsAccessStubs.stubEntityResolution(mockTable, modelProviderMock, mockModelProvider, mockEntity);
+                AttachmentsAccessStubs.stubRecordVisible(mockDal, TEST_RECORD_ID);
             }
             servlet.doGet(mockRequest, mockResponse);
             if (validTab) {
