@@ -17,6 +17,7 @@
 package com.etendoerp.metadata.http;
 
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.withSettings;
 
@@ -61,10 +62,10 @@ final class AttachmentsAccessStubs {
      */
     static void stubEntityResolution(Table mockTable, MockedStatic<ModelProvider> modelProviderMock,
             ModelProvider mockModelProvider, Entity mockEntity) {
-        when(mockTable.getDBTableName()).thenReturn(TABLE_C_ORDER);
+        lenient().when(mockTable.getDBTableName()).thenReturn(TABLE_C_ORDER);
         modelProviderMock.when(ModelProvider::getInstance).thenReturn(mockModelProvider);
-        when(mockModelProvider.getEntityByTableName(TABLE_C_ORDER)).thenReturn(mockEntity);
-        when(mockEntity.getName()).thenReturn(ENTITY_ORDER);
+        lenient().when(mockModelProvider.getEntityByTableName(TABLE_C_ORDER)).thenReturn(mockEntity);
+        lenient().when(mockEntity.getName()).thenReturn(ENTITY_ORDER);
     }
 
     /**
@@ -72,7 +73,7 @@ final class AttachmentsAccessStubs {
      * authorization denies access (DAL row-level security hid it, or it does not exist).
      */
     static void stubRecordNotFound(OBDal mockDal, String recordId) {
-        when(mockDal.get(ENTITY_ORDER, recordId)).thenReturn(null);
+        lenient().when(mockDal.get(ENTITY_ORDER, recordId)).thenReturn(null);
     }
 
     /**
@@ -81,7 +82,7 @@ final class AttachmentsAccessStubs {
      */
     static BaseOBObject stubRecordVisible(OBDal mockDal, String recordId) {
         BaseOBObject ownerRecord = mock(BaseOBObject.class);
-        when(mockDal.get(ENTITY_ORDER, recordId)).thenReturn(ownerRecord);
+        lenient().when(mockDal.get(ENTITY_ORDER, recordId)).thenReturn(ownerRecord);
         return ownerRecord;
     }
 
@@ -93,7 +94,7 @@ final class AttachmentsAccessStubs {
     static BaseOBObject stubRecordWritable(OBDal mockDal, OBContext mockContext, String recordId,
             Organization mockOrganization, String orgId) {
         BaseOBObject ownerRecord = stubRecordWithOrganization(mockDal, recordId, mockOrganization, orgId);
-        when(mockContext.getWritableOrganizations()).thenReturn(Collections.singleton(orgId));
+        lenient().when(mockContext.getWritableOrganizations()).thenReturn(Collections.singleton(orgId));
         return ownerRecord;
     }
 
@@ -104,16 +105,16 @@ final class AttachmentsAccessStubs {
     static BaseOBObject stubRecordNotWritable(OBDal mockDal, OBContext mockContext, String recordId,
             Organization mockOrganization, String orgId) {
         BaseOBObject ownerRecord = stubRecordWithOrganization(mockDal, recordId, mockOrganization, orgId);
-        when(mockContext.getWritableOrganizations()).thenReturn(Collections.emptySet());
+        lenient().when(mockContext.getWritableOrganizations()).thenReturn(Collections.emptySet());
         return ownerRecord;
     }
 
     private static BaseOBObject stubRecordWithOrganization(OBDal mockDal, String recordId,
             Organization mockOrganization, String orgId) {
         BaseOBObject ownerRecord = mock(BaseOBObject.class, withSettings().extraInterfaces(OrganizationEnabled.class));
-        when(((OrganizationEnabled) ownerRecord).getOrganization()).thenReturn(mockOrganization);
-        when(mockOrganization.getId()).thenReturn(orgId);
-        when(mockDal.get(ENTITY_ORDER, recordId)).thenReturn(ownerRecord);
+        lenient().when(((OrganizationEnabled) ownerRecord).getOrganization()).thenReturn(mockOrganization);
+        lenient().when(mockOrganization.getId()).thenReturn(orgId);
+        lenient().when(mockDal.get(ENTITY_ORDER, recordId)).thenReturn(ownerRecord);
         return ownerRecord;
     }
 }
