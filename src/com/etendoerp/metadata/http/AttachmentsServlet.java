@@ -126,6 +126,7 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
     private static final String MSG_ATTACHMENT_UPDATED = "Attachment updated successfully";
     private static final String MSG_ATTACHMENT_DELETED = "Attachment deleted successfully";
     private static final String MSG_ALL_ATTACHMENTS_DELETED = "All attachments deleted successfully";
+    private static final String MSG_ACCESS_DENIED = "Access denied";
 
     // JSON keys
     private static final String JSON_KEY_ATTACHMENTS = "attachments";
@@ -187,7 +188,7 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
             handleGet(request, response);
         } catch (MetadataAccessException e) {
             log.warn("Access denied: {}", e.getMessage());
-            sendErrorResponse(response, HttpStatus.SC_FORBIDDEN, "Access denied");
+            sendErrorResponse(response, HttpStatus.SC_FORBIDDEN, MSG_ACCESS_DENIED);
         } catch (Exception e) {
             log.error("Error processing GET request", e);
             sendErrorResponse(response, HttpStatus.SC_INTERNAL_SERVER_ERROR,
@@ -202,7 +203,7 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
             handlePost(request, response);
         } catch (MetadataAccessException e) {
             log.warn("Access denied: {}", e.getMessage());
-            sendErrorResponse(response, HttpStatus.SC_FORBIDDEN, "Access denied");
+            sendErrorResponse(response, HttpStatus.SC_FORBIDDEN, MSG_ACCESS_DENIED);
         } catch (Exception e) {
             log.error("Error processing POST request", e);
             sendErrorResponse(response, HttpStatus.SC_INTERNAL_SERVER_ERROR,
@@ -369,7 +370,7 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
         assertRecordAccess(table, uploadContext.recordId, true);
 
         if (!OBContext.getOBContext().getWritableOrganizations().contains(uploadContext.orgId)) {
-            throw new MetadataAccessException("Access denied");
+            throw new MetadataAccessException(MSG_ACCESS_DENIED);
         }
 
         // Phase 3 - narrow admin block, only around the physical upload.
@@ -730,26 +731,26 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
      */
     private void assertRecordAccess(Table table, String recordId, boolean forWrite) {
         if (table == null || recordId == null) {
-            throw new MetadataAccessException("Access denied");
+            throw new MetadataAccessException(MSG_ACCESS_DENIED);
         }
 
         Entity entity = ModelProvider.getInstance().getEntityByTableName(table.getDBTableName());
         if (entity == null) {
-            throw new MetadataAccessException("Access denied");
+            throw new MetadataAccessException(MSG_ACCESS_DENIED);
         }
 
-        BaseOBObject record = OBDal.getInstance().get(entity.getName(), recordId);
-        if (record == null) {
-            throw new MetadataAccessException("Access denied");
+        BaseOBObject ownerRecord = OBDal.getInstance().get(entity.getName(), recordId);
+        if (ownerRecord == null) {
+            throw new MetadataAccessException(MSG_ACCESS_DENIED);
         }
 
         if (forWrite) {
-            if (!(record instanceof OrganizationEnabled)) {
-                throw new MetadataAccessException("Access denied");
+            if (!(ownerRecord instanceof OrganizationEnabled)) {
+                throw new MetadataAccessException(MSG_ACCESS_DENIED);
             }
-            String orgId = ((OrganizationEnabled) record).getOrganization().getId();
+            String orgId = ((OrganizationEnabled) ownerRecord).getOrganization().getId();
             if (!OBContext.getOBContext().getWritableOrganizations().contains(orgId)) {
-                throw new MetadataAccessException("Access denied");
+                throw new MetadataAccessException(MSG_ACCESS_DENIED);
             }
         }
     }

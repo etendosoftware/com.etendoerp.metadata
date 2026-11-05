@@ -38,8 +38,6 @@ import org.mockito.MockedStatic;
 import org.mockito.junit.MockitoJUnitRunner;
 import org.openbravo.base.model.Entity;
 import org.openbravo.base.model.ModelProvider;
-import org.openbravo.base.structure.BaseOBObject;
-import org.openbravo.base.structure.OrganizationEnabled;
 import org.openbravo.client.application.attachment.AttachImplementationManager;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
@@ -219,17 +217,8 @@ public class AttachmentsServletValidationTest extends OBBaseTest {
             when(mockDal.get(Attachment.class, TEST_ATTACHMENT_ID)).thenReturn(mockAttachment);
             when(mockAttachment.getTable()).thenReturn(mockTable);
             when(mockAttachment.getRecord()).thenReturn(TEST_RECORD_ID);
-            when(mockTable.getDBTableName()).thenReturn("C_Order");
-            modelProviderMock.when(ModelProvider::getInstance).thenReturn(mockModelProvider);
-            when(mockModelProvider.getEntityByTableName("C_Order")).thenReturn(mockEntity);
-            when(mockEntity.getName()).thenReturn("Order");
-
-            BaseOBObject writableOwningRecord =
-                    mock(BaseOBObject.class, withSettings().extraInterfaces(OrganizationEnabled.class));
-            when(((OrganizationEnabled) writableOwningRecord).getOrganization()).thenReturn(mockOrganization);
-            when(mockOrganization.getId()).thenReturn(TEST_ORG_ID);
-            when(mockDal.get("Order", TEST_RECORD_ID)).thenReturn(writableOwningRecord);
-            when(mockContext.getWritableOrganizations()).thenReturn(java.util.Collections.singleton(TEST_ORG_ID));
+            AttachmentsAccessStubs.stubEntityResolution(mockTable, modelProviderMock, mockModelProvider, mockEntity);
+            AttachmentsAccessStubs.stubRecordWritable(mockDal, mockContext, TEST_RECORD_ID, mockOrganization, TEST_ORG_ID);
 
             servlet.doPost(mockRequest, mockResponse);
 

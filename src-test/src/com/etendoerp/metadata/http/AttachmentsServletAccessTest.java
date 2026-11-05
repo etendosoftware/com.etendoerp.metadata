@@ -20,17 +20,14 @@ import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.withSettings;
 
 import java.io.InputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.util.Collections;
 
 import javax.servlet.ServletOutputStream;
 import javax.servlet.WriteListener;
@@ -47,8 +44,6 @@ import org.mockito.MockedStatic;
 import org.mockito.junit.MockitoJUnitRunner;
 import org.openbravo.base.model.Entity;
 import org.openbravo.base.model.ModelProvider;
-import org.openbravo.base.structure.BaseOBObject;
-import org.openbravo.base.structure.OrganizationEnabled;
 import org.openbravo.client.application.attachment.AttachImplementationManager;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
@@ -145,7 +140,6 @@ public class AttachmentsServletAccessTest extends OBBaseTest {
         when(mockRequest.getParameter(PARAM_ATTACHMENT_ID)).thenReturn(TEST_ATTACHMENT_ID);
         when(mockAttachment.getTable()).thenReturn(mockTable);
         when(mockAttachment.getRecord()).thenReturn(TEST_RECORD_ID);
-        when(mockTable.getDBTableName()).thenReturn("C_Order");
 
         try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
              MockedStatic<OBContext> ctx = mockStatic(OBContext.class);
@@ -154,16 +148,14 @@ public class AttachmentsServletAccessTest extends OBBaseTest {
             ctx.when(OBContext::getOBContext).thenReturn(mockContext);
             ctx.when(() -> OBContext.setAdminMode(true)).thenAnswer(i -> null);
             ctx.when(OBContext::restorePreviousMode).thenAnswer(i -> null);
-            mp.when(ModelProvider::getInstance).thenReturn(mockModelProvider);
-            when(mockModelProvider.getEntityByTableName("C_Order")).thenReturn(mockEntity);
-            when(mockEntity.getName()).thenReturn("Order");
+            AttachmentsAccessStubs.stubEntityResolution(mockTable, mp, mockModelProvider, mockEntity);
             when(mockDal.get(Attachment.class, TEST_ATTACHMENT_ID)).thenReturn(mockAttachment);
-            when(mockDal.get("Order", TEST_RECORD_ID)).thenReturn(null); // no access
+            AttachmentsAccessStubs.stubRecordNotFound(mockDal, TEST_RECORD_ID); // no access
 
             servlet.doGet(mockRequest, mockResponse);
 
             verify(mockResponse).setStatus(HttpStatus.SC_FORBIDDEN);
-            assertTrue(stringWriter.toString().contains("Access denied"));
+            assertTrue(stringWriter.toString().contains(AttachmentsAccessStubs.MSG_ACCESS_DENIED));
             verify(mockAttachManager, never()).download(anyString(), any());
         }
     }
@@ -178,7 +170,6 @@ public class AttachmentsServletAccessTest extends OBBaseTest {
         when(mockAttachment.getTable()).thenReturn(mockTable);
         when(mockAttachment.getRecord()).thenReturn(TEST_RECORD_ID);
         when(mockAttachment.getName()).thenReturn("test-file.txt");
-        when(mockTable.getDBTableName()).thenReturn("C_Order");
 
         try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
              MockedStatic<OBContext> ctx = mockStatic(OBContext.class);
@@ -187,11 +178,9 @@ public class AttachmentsServletAccessTest extends OBBaseTest {
             ctx.when(OBContext::getOBContext).thenReturn(mockContext);
             ctx.when(() -> OBContext.setAdminMode(true)).thenAnswer(i -> null);
             ctx.when(OBContext::restorePreviousMode).thenAnswer(i -> null);
-            mp.when(ModelProvider::getInstance).thenReturn(mockModelProvider);
-            when(mockModelProvider.getEntityByTableName("C_Order")).thenReturn(mockEntity);
-            when(mockEntity.getName()).thenReturn("Order");
+            AttachmentsAccessStubs.stubEntityResolution(mockTable, mp, mockModelProvider, mockEntity);
             when(mockDal.get(Attachment.class, TEST_ATTACHMENT_ID)).thenReturn(mockAttachment);
-            when(mockDal.get("Order", TEST_RECORD_ID)).thenReturn(mock(BaseOBObject.class)); // visible
+            AttachmentsAccessStubs.stubRecordVisible(mockDal, TEST_RECORD_ID); // visible
 
             servlet.doGet(mockRequest, mockResponse);
 
@@ -211,11 +200,6 @@ public class AttachmentsServletAccessTest extends OBBaseTest {
         when(mockRequest.getParameter(PARAM_ATTACHMENT_ID)).thenReturn(TEST_ATTACHMENT_ID);
         when(mockAttachment.getTable()).thenReturn(mockTable);
         when(mockAttachment.getRecord()).thenReturn(TEST_RECORD_ID);
-        when(mockTable.getDBTableName()).thenReturn("C_Order");
-
-        BaseOBObject record = mock(BaseOBObject.class, withSettings().extraInterfaces(OrganizationEnabled.class));
-        when(((OrganizationEnabled) record).getOrganization()).thenReturn(mockOrganization);
-        when(mockOrganization.getId()).thenReturn(TEST_ORG_ID);
 
         try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
              MockedStatic<OBContext> ctx = mockStatic(OBContext.class);
@@ -224,17 +208,14 @@ public class AttachmentsServletAccessTest extends OBBaseTest {
             ctx.when(OBContext::getOBContext).thenReturn(mockContext);
             ctx.when(() -> OBContext.setAdminMode(true)).thenAnswer(i -> null);
             ctx.when(OBContext::restorePreviousMode).thenAnswer(i -> null);
-            mp.when(ModelProvider::getInstance).thenReturn(mockModelProvider);
-            when(mockModelProvider.getEntityByTableName("C_Order")).thenReturn(mockEntity);
-            when(mockEntity.getName()).thenReturn("Order");
+            AttachmentsAccessStubs.stubEntityResolution(mockTable, mp, mockModelProvider, mockEntity);
             when(mockDal.get(Attachment.class, TEST_ATTACHMENT_ID)).thenReturn(mockAttachment);
-            when(mockDal.get("Order", TEST_RECORD_ID)).thenReturn(record);
-            when(mockContext.getWritableOrganizations()).thenReturn(Collections.emptySet());
+            AttachmentsAccessStubs.stubRecordNotWritable(mockDal, mockContext, TEST_RECORD_ID, mockOrganization, TEST_ORG_ID);
 
             servlet.doPost(mockRequest, mockResponse);
 
             verify(mockResponse).setStatus(HttpStatus.SC_FORBIDDEN);
-            assertTrue(stringWriter.toString().contains("Access denied"));
+            assertTrue(stringWriter.toString().contains(AttachmentsAccessStubs.MSG_ACCESS_DENIED));
             verify(mockAttachManager, never()).delete(any(Attachment.class));
         }
     }
@@ -248,11 +229,6 @@ public class AttachmentsServletAccessTest extends OBBaseTest {
         when(mockRequest.getParameter(PARAM_ATTACHMENT_ID)).thenReturn(TEST_ATTACHMENT_ID);
         when(mockAttachment.getTable()).thenReturn(mockTable);
         when(mockAttachment.getRecord()).thenReturn(TEST_RECORD_ID);
-        when(mockTable.getDBTableName()).thenReturn("C_Order");
-
-        BaseOBObject record = mock(BaseOBObject.class, withSettings().extraInterfaces(OrganizationEnabled.class));
-        when(((OrganizationEnabled) record).getOrganization()).thenReturn(mockOrganization);
-        when(mockOrganization.getId()).thenReturn(TEST_ORG_ID);
 
         try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
              MockedStatic<OBContext> ctx = mockStatic(OBContext.class);
@@ -261,12 +237,9 @@ public class AttachmentsServletAccessTest extends OBBaseTest {
             ctx.when(OBContext::getOBContext).thenReturn(mockContext);
             ctx.when(() -> OBContext.setAdminMode(true)).thenAnswer(i -> null);
             ctx.when(OBContext::restorePreviousMode).thenAnswer(i -> null);
-            mp.when(ModelProvider::getInstance).thenReturn(mockModelProvider);
-            when(mockModelProvider.getEntityByTableName("C_Order")).thenReturn(mockEntity);
-            when(mockEntity.getName()).thenReturn("Order");
+            AttachmentsAccessStubs.stubEntityResolution(mockTable, mp, mockModelProvider, mockEntity);
             when(mockDal.get(Attachment.class, TEST_ATTACHMENT_ID)).thenReturn(mockAttachment);
-            when(mockDal.get("Order", TEST_RECORD_ID)).thenReturn(record);
-            when(mockContext.getWritableOrganizations()).thenReturn(Collections.singleton(TEST_ORG_ID));
+            AttachmentsAccessStubs.stubRecordWritable(mockDal, mockContext, TEST_RECORD_ID, mockOrganization, TEST_ORG_ID);
 
             servlet.doPost(mockRequest, mockResponse);
 
@@ -287,11 +260,6 @@ public class AttachmentsServletAccessTest extends OBBaseTest {
         when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(TEST_TAB_ID);
         when(mockAttachment.getTable()).thenReturn(mockTable);
         when(mockAttachment.getRecord()).thenReturn(TEST_RECORD_ID);
-        when(mockTable.getDBTableName()).thenReturn("C_Order");
-
-        BaseOBObject record = mock(BaseOBObject.class, withSettings().extraInterfaces(OrganizationEnabled.class));
-        when(((OrganizationEnabled) record).getOrganization()).thenReturn(mockOrganization);
-        when(mockOrganization.getId()).thenReturn(TEST_ORG_ID);
 
         try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
              MockedStatic<OBContext> ctx = mockStatic(OBContext.class);
@@ -300,17 +268,14 @@ public class AttachmentsServletAccessTest extends OBBaseTest {
             ctx.when(OBContext::getOBContext).thenReturn(mockContext);
             ctx.when(() -> OBContext.setAdminMode(true)).thenAnswer(i -> null);
             ctx.when(OBContext::restorePreviousMode).thenAnswer(i -> null);
-            mp.when(ModelProvider::getInstance).thenReturn(mockModelProvider);
-            when(mockModelProvider.getEntityByTableName("C_Order")).thenReturn(mockEntity);
-            when(mockEntity.getName()).thenReturn("Order");
+            AttachmentsAccessStubs.stubEntityResolution(mockTable, mp, mockModelProvider, mockEntity);
             when(mockDal.get(Attachment.class, TEST_ATTACHMENT_ID)).thenReturn(mockAttachment);
-            when(mockDal.get("Order", TEST_RECORD_ID)).thenReturn(record);
-            when(mockContext.getWritableOrganizations()).thenReturn(Collections.emptySet());
+            AttachmentsAccessStubs.stubRecordNotWritable(mockDal, mockContext, TEST_RECORD_ID, mockOrganization, TEST_ORG_ID);
 
             servlet.doPost(mockRequest, mockResponse);
 
             verify(mockResponse).setStatus(HttpStatus.SC_FORBIDDEN);
-            assertTrue(stringWriter.toString().contains("Access denied"));
+            assertTrue(stringWriter.toString().contains(AttachmentsAccessStubs.MSG_ACCESS_DENIED));
             verify(mockAttachManager, never()).update(any(), anyString(), anyString());
         }
     }
@@ -325,7 +290,6 @@ public class AttachmentsServletAccessTest extends OBBaseTest {
         when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(TEST_TAB_ID);
         when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(TEST_RECORD_ID);
         when(mockTab.getTable()).thenReturn(mockTable);
-        when(mockTable.getDBTableName()).thenReturn("C_Order");
 
         try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
              MockedStatic<OBContext> ctx = mockStatic(OBContext.class);
@@ -334,16 +298,14 @@ public class AttachmentsServletAccessTest extends OBBaseTest {
             ctx.when(OBContext::getOBContext).thenReturn(mockContext);
             ctx.when(() -> OBContext.setAdminMode(true)).thenAnswer(i -> null);
             ctx.when(OBContext::restorePreviousMode).thenAnswer(i -> null);
-            mp.when(ModelProvider::getInstance).thenReturn(mockModelProvider);
-            when(mockModelProvider.getEntityByTableName("C_Order")).thenReturn(mockEntity);
-            when(mockEntity.getName()).thenReturn("Order");
+            AttachmentsAccessStubs.stubEntityResolution(mockTable, mp, mockModelProvider, mockEntity);
             when(mockDal.get(Tab.class, TEST_TAB_ID)).thenReturn(mockTab);
-            when(mockDal.get("Order", TEST_RECORD_ID)).thenReturn(null); // no access
+            AttachmentsAccessStubs.stubRecordNotFound(mockDal, TEST_RECORD_ID); // no access
 
             servlet.doGet(mockRequest, mockResponse);
 
             verify(mockResponse).setStatus(HttpStatus.SC_FORBIDDEN);
-            assertTrue(stringWriter.toString().contains("Access denied"));
+            assertTrue(stringWriter.toString().contains(AttachmentsAccessStubs.MSG_ACCESS_DENIED));
             // AttachmentUtils.getTabAttachmentsForRows is never reached: denial happens
             // before the list is read, which the 403 status above already demonstrates.
         }
@@ -360,7 +322,6 @@ public class AttachmentsServletAccessTest extends OBBaseTest {
         when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(TEST_TAB_ID);
         when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(TEST_RECORD_ID);
         when(mockTab.getTable()).thenReturn(mockTable);
-        when(mockTable.getDBTableName()).thenReturn("C_Order");
 
         try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
              MockedStatic<OBContext> ctx = mockStatic(OBContext.class);
@@ -369,11 +330,9 @@ public class AttachmentsServletAccessTest extends OBBaseTest {
             ctx.when(OBContext::getOBContext).thenReturn(mockContext);
             ctx.when(() -> OBContext.setAdminMode(true)).thenAnswer(i -> null);
             ctx.when(OBContext::restorePreviousMode).thenAnswer(i -> null);
-            mp.when(ModelProvider::getInstance).thenReturn(mockModelProvider);
-            when(mockModelProvider.getEntityByTableName("C_Order")).thenReturn(mockEntity);
-            when(mockEntity.getName()).thenReturn("Order");
+            AttachmentsAccessStubs.stubEntityResolution(mockTable, mp, mockModelProvider, mockEntity);
             when(mockDal.get(Tab.class, TEST_TAB_ID)).thenReturn(mockTab);
-            when(mockDal.get("Order", TEST_RECORD_ID)).thenReturn(mock(BaseOBObject.class)); // visible
+            AttachmentsAccessStubs.stubRecordVisible(mockDal, TEST_RECORD_ID); // visible
 
             try {
                 servlet.doGet(mockRequest, mockResponse);
@@ -398,7 +357,6 @@ public class AttachmentsServletAccessTest extends OBBaseTest {
         when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(TEST_TAB_ID);
         when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(TEST_RECORD_ID);
         when(mockTab.getTable()).thenReturn(mockTable);
-        when(mockTable.getDBTableName()).thenReturn("C_Order");
 
         try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
              MockedStatic<OBContext> ctx = mockStatic(OBContext.class);
@@ -407,16 +365,14 @@ public class AttachmentsServletAccessTest extends OBBaseTest {
             ctx.when(OBContext::getOBContext).thenReturn(mockContext);
             ctx.when(() -> OBContext.setAdminMode(true)).thenAnswer(i -> null);
             ctx.when(OBContext::restorePreviousMode).thenAnswer(i -> null);
-            mp.when(ModelProvider::getInstance).thenReturn(mockModelProvider);
-            when(mockModelProvider.getEntityByTableName("C_Order")).thenReturn(mockEntity);
-            when(mockEntity.getName()).thenReturn("Order");
+            AttachmentsAccessStubs.stubEntityResolution(mockTable, mp, mockModelProvider, mockEntity);
             when(mockDal.get(Tab.class, TEST_TAB_ID)).thenReturn(mockTab);
-            when(mockDal.get("Order", TEST_RECORD_ID)).thenReturn(null); // no access
+            AttachmentsAccessStubs.stubRecordNotFound(mockDal, TEST_RECORD_ID); // no access
 
             servlet.doGet(mockRequest, mockResponse);
 
             verify(mockResponse).setStatus(HttpStatus.SC_FORBIDDEN);
-            assertTrue(stringWriter.toString().contains("Access denied"));
+            assertTrue(stringWriter.toString().contains(AttachmentsAccessStubs.MSG_ACCESS_DENIED));
             verify(mockAttachManager, never()).downloadAll(anyString(), anyString(), any());
         }
     }
@@ -430,7 +386,6 @@ public class AttachmentsServletAccessTest extends OBBaseTest {
         when(mockRequest.getParameter(PARAM_TAB_ID)).thenReturn(TEST_TAB_ID);
         when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(TEST_RECORD_ID);
         when(mockTab.getTable()).thenReturn(mockTable);
-        when(mockTable.getDBTableName()).thenReturn("C_Order");
 
         try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
              MockedStatic<OBContext> ctx = mockStatic(OBContext.class);
@@ -439,11 +394,9 @@ public class AttachmentsServletAccessTest extends OBBaseTest {
             ctx.when(OBContext::getOBContext).thenReturn(mockContext);
             ctx.when(() -> OBContext.setAdminMode(true)).thenAnswer(i -> null);
             ctx.when(OBContext::restorePreviousMode).thenAnswer(i -> null);
-            mp.when(ModelProvider::getInstance).thenReturn(mockModelProvider);
-            when(mockModelProvider.getEntityByTableName("C_Order")).thenReturn(mockEntity);
-            when(mockEntity.getName()).thenReturn("Order");
+            AttachmentsAccessStubs.stubEntityResolution(mockTable, mp, mockModelProvider, mockEntity);
             when(mockDal.get(Tab.class, TEST_TAB_ID)).thenReturn(mockTab);
-            when(mockDal.get("Order", TEST_RECORD_ID)).thenReturn(mock(BaseOBObject.class)); // visible
+            AttachmentsAccessStubs.stubRecordVisible(mockDal, TEST_RECORD_ID); // visible
 
             servlet.doGet(mockRequest, mockResponse);
 
@@ -464,14 +417,9 @@ public class AttachmentsServletAccessTest extends OBBaseTest {
         when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(TEST_RECORD_ID);
         when(mockRequest.getParameter(PARAM_ORG_ID)).thenReturn(TEST_ORG_ID);
         when(mockRequest.getPart(PARAM_FILE)).thenReturn(mockPart);
-        when(mockPart.getHeader("content-disposition"))
-                .thenReturn("form-data; name=\"file\"; filename=\"test.txt\"");
+        when(mockPart.getHeader(AttachmentsAccessStubs.CONTENT_DISPOSITION_TOKEN))
+                .thenReturn(AttachmentsAccessStubs.UPLOAD_CONTENT_DISPOSITION);
         when(mockTab.getTable()).thenReturn(mockTable);
-        when(mockTable.getDBTableName()).thenReturn("C_Order");
-
-        BaseOBObject record = mock(BaseOBObject.class, withSettings().extraInterfaces(OrganizationEnabled.class));
-        when(((OrganizationEnabled) record).getOrganization()).thenReturn(mockOrganization);
-        when(mockOrganization.getId()).thenReturn(TEST_ORG_ID);
 
         try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
              MockedStatic<OBContext> ctx = mockStatic(OBContext.class);
@@ -480,17 +428,15 @@ public class AttachmentsServletAccessTest extends OBBaseTest {
             ctx.when(OBContext::getOBContext).thenReturn(mockContext);
             ctx.when(() -> OBContext.setAdminMode(true)).thenAnswer(i -> null);
             ctx.when(OBContext::restorePreviousMode).thenAnswer(i -> null);
-            mp.when(ModelProvider::getInstance).thenReturn(mockModelProvider);
-            when(mockModelProvider.getEntityByTableName("C_Order")).thenReturn(mockEntity);
-            when(mockEntity.getName()).thenReturn("Order");
+            AttachmentsAccessStubs.stubEntityResolution(mockTable, mp, mockModelProvider, mockEntity);
             when(mockDal.get(Tab.class, TEST_TAB_ID)).thenReturn(mockTab);
-            when(mockDal.get("Order", TEST_RECORD_ID)).thenReturn(record);
-            when(mockContext.getWritableOrganizations()).thenReturn(Collections.emptySet()); // record's org NOT writable
+            // record's org NOT writable
+            AttachmentsAccessStubs.stubRecordNotWritable(mockDal, mockContext, TEST_RECORD_ID, mockOrganization, TEST_ORG_ID);
 
             servlet.doPost(mockRequest, mockResponse);
 
             verify(mockResponse).setStatus(HttpStatus.SC_FORBIDDEN);
-            assertTrue(stringWriter.toString().contains("Access denied"));
+            assertTrue(stringWriter.toString().contains(AttachmentsAccessStubs.MSG_ACCESS_DENIED));
             verify(mockAttachManager, never()).upload(any(), any(), any(), any(), any());
         }
     }
@@ -509,14 +455,9 @@ public class AttachmentsServletAccessTest extends OBBaseTest {
         when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(TEST_RECORD_ID);
         when(mockRequest.getParameter(PARAM_ORG_ID)).thenReturn(requestOrgId);
         when(mockRequest.getPart(PARAM_FILE)).thenReturn(mockPart);
-        when(mockPart.getHeader("content-disposition"))
-                .thenReturn("form-data; name=\"file\"; filename=\"test.txt\"");
+        when(mockPart.getHeader(AttachmentsAccessStubs.CONTENT_DISPOSITION_TOKEN))
+                .thenReturn(AttachmentsAccessStubs.UPLOAD_CONTENT_DISPOSITION);
         when(mockTab.getTable()).thenReturn(mockTable);
-        when(mockTable.getDBTableName()).thenReturn("C_Order");
-
-        BaseOBObject record = mock(BaseOBObject.class, withSettings().extraInterfaces(OrganizationEnabled.class));
-        when(((OrganizationEnabled) record).getOrganization()).thenReturn(mockOrganization);
-        when(mockOrganization.getId()).thenReturn(TEST_ORG_ID); // record's org IS writable
 
         try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
              MockedStatic<OBContext> ctx = mockStatic(OBContext.class);
@@ -525,18 +466,15 @@ public class AttachmentsServletAccessTest extends OBBaseTest {
             ctx.when(OBContext::getOBContext).thenReturn(mockContext);
             ctx.when(() -> OBContext.setAdminMode(true)).thenAnswer(i -> null);
             ctx.when(OBContext::restorePreviousMode).thenAnswer(i -> null);
-            mp.when(ModelProvider::getInstance).thenReturn(mockModelProvider);
-            when(mockModelProvider.getEntityByTableName("C_Order")).thenReturn(mockEntity);
-            when(mockEntity.getName()).thenReturn("Order");
+            AttachmentsAccessStubs.stubEntityResolution(mockTable, mp, mockModelProvider, mockEntity);
             when(mockDal.get(Tab.class, TEST_TAB_ID)).thenReturn(mockTab);
-            when(mockDal.get("Order", TEST_RECORD_ID)).thenReturn(record);
             // Writable orgs include the record's org but NOT the request's orgId.
-            when(mockContext.getWritableOrganizations()).thenReturn(Collections.singleton(TEST_ORG_ID));
+            AttachmentsAccessStubs.stubRecordWritable(mockDal, mockContext, TEST_RECORD_ID, mockOrganization, TEST_ORG_ID);
 
             servlet.doPost(mockRequest, mockResponse);
 
             verify(mockResponse).setStatus(HttpStatus.SC_FORBIDDEN);
-            assertTrue(stringWriter.toString().contains("Access denied"));
+            assertTrue(stringWriter.toString().contains(AttachmentsAccessStubs.MSG_ACCESS_DENIED));
             verify(mockAttachManager, never()).upload(any(), any(), any(), any(), any());
         }
     }
@@ -554,16 +492,11 @@ public class AttachmentsServletAccessTest extends OBBaseTest {
         when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(TEST_RECORD_ID);
         when(mockRequest.getParameter(PARAM_ORG_ID)).thenReturn(TEST_ORG_ID);
         when(mockRequest.getPart(PARAM_FILE)).thenReturn(mockPart);
-        when(mockPart.getHeader("content-disposition"))
-                .thenReturn("form-data; name=\"file\"; filename=\"test.txt\"");
+        when(mockPart.getHeader(AttachmentsAccessStubs.CONTENT_DISPOSITION_TOKEN))
+                .thenReturn(AttachmentsAccessStubs.UPLOAD_CONTENT_DISPOSITION);
         when(mockPart.getInputStream()).thenReturn(mockInputStream);
         when(mockInputStream.read(any(byte[].class))).thenReturn(-1);
         when(mockTab.getTable()).thenReturn(mockTable);
-        when(mockTable.getDBTableName()).thenReturn("C_Order");
-
-        BaseOBObject record = mock(BaseOBObject.class, withSettings().extraInterfaces(OrganizationEnabled.class));
-        when(((OrganizationEnabled) record).getOrganization()).thenReturn(mockOrganization);
-        when(mockOrganization.getId()).thenReturn(TEST_ORG_ID);
 
         try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
              MockedStatic<OBContext> ctx = mockStatic(OBContext.class);
@@ -572,12 +505,9 @@ public class AttachmentsServletAccessTest extends OBBaseTest {
             ctx.when(OBContext::getOBContext).thenReturn(mockContext);
             ctx.when(() -> OBContext.setAdminMode(true)).thenAnswer(i -> null);
             ctx.when(OBContext::restorePreviousMode).thenAnswer(i -> null);
-            mp.when(ModelProvider::getInstance).thenReturn(mockModelProvider);
-            when(mockModelProvider.getEntityByTableName("C_Order")).thenReturn(mockEntity);
-            when(mockEntity.getName()).thenReturn("Order");
+            AttachmentsAccessStubs.stubEntityResolution(mockTable, mp, mockModelProvider, mockEntity);
             when(mockDal.get(Tab.class, TEST_TAB_ID)).thenReturn(mockTab);
-            when(mockDal.get("Order", TEST_RECORD_ID)).thenReturn(record);
-            when(mockContext.getWritableOrganizations()).thenReturn(Collections.singleton(TEST_ORG_ID));
+            AttachmentsAccessStubs.stubRecordWritable(mockDal, mockContext, TEST_RECORD_ID, mockOrganization, TEST_ORG_ID);
 
             servlet.doPost(mockRequest, mockResponse);
 
