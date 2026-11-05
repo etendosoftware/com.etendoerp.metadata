@@ -515,4 +515,73 @@ public class AttachmentsServletAccessTest extends OBBaseTest {
             verify(mockResponse, never()).setStatus(HttpStatus.SC_FORBIDDEN);
         }
     }
+
+    /**
+     * Delete must be denied (403) when the attachment has no owning table.
+     */
+    @Test
+    public void testDelete_denied_whenTableNull() throws Exception {
+        lenient().when(mockAttachment.getTable()).thenReturn(null);
+        lenient().when(mockAttachment.getRecord()).thenReturn(TEST_RECORD_ID);
+        assertDeleteDenied(() -> { });
+    }
+
+    /**
+     * Delete must be denied (403) when the attachment has no owning record id.
+     */
+    @Test
+    public void testDelete_denied_whenRecordIdNull() throws Exception {
+        lenient().when(mockAttachment.getTable()).thenReturn(mockTable);
+        lenient().when(mockAttachment.getRecord()).thenReturn(null);
+        assertDeleteDenied(() -> { });
+    }
+
+    /**
+     * Delete must be denied (403) when the owning table does not resolve to a DAL entity.
+     */
+    @Test
+    public void testDelete_denied_whenEntityNotResolved() throws Exception {
+        lenient().when(mockAttachment.getTable()).thenReturn(mockTable);
+        lenient().when(mockAttachment.getRecord()).thenReturn(TEST_RECORD_ID);
+        assertDeleteDenied(() -> lenient().when(mockModelProvider.getEntityByTableName(
+                AttachmentsAccessStubs.TABLE_C_ORDER)).thenReturn(null));
+    }
+
+    /**
+     * Delete must be denied (403) when the owning record is visible but is not
+     * organization-enabled, so its writability cannot be established.
+     */
+    @Test
+    public void testDelete_denied_whenRecordNotOrganizationEnabled() throws Exception {
+        lenient().when(mockAttachment.getTable()).thenReturn(mockTable);
+        lenient().when(mockAttachment.getRecord()).thenReturn(TEST_RECORD_ID);
+        assertDeleteDenied(() -> AttachmentsAccessStubs.stubRecordVisible(mockDal, TEST_RECORD_ID));
+    }
+
+    /**
+     * Runs a DELETE with the standard entity resolution plus {@code extraStubs} and asserts
+     * it is rejected with 403 without touching the attachment.
+     */
+    private void assertDeleteDenied(Runnable extraStubs) throws Exception {
+        when(mockRequest.getParameter(PARAM_COMMAND)).thenReturn(CMD_DELETE);
+        when(mockRequest.getParameter(PARAM_ATTACHMENT_ID)).thenReturn(TEST_ATTACHMENT_ID);
+
+        try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
+             MockedStatic<OBContext> ctx = mockStatic(OBContext.class);
+             MockedStatic<ModelProvider> mp = mockStatic(ModelProvider.class)) {
+            dalMock.when(OBDal::getInstance).thenReturn(mockDal);
+            ctx.when(OBContext::getOBContext).thenReturn(mockContext);
+            ctx.when(() -> OBContext.setAdminMode(true)).thenAnswer(i -> null);
+            ctx.when(OBContext::restorePreviousMode).thenAnswer(i -> null);
+            AttachmentsAccessStubs.stubEntityResolution(mockTable, mp, mockModelProvider, mockEntity);
+            when(mockDal.get(Attachment.class, TEST_ATTACHMENT_ID)).thenReturn(mockAttachment);
+            extraStubs.run();
+
+            servlet.doPost(mockRequest, mockResponse);
+
+            verify(mockResponse).setStatus(HttpStatus.SC_FORBIDDEN);
+            assertTrue(stringWriter.toString().contains(AttachmentsAccessStubs.MSG_ACCESS_DENIED));
+            verify(mockAttachManager, never()).delete(any(Attachment.class));
+        }
+    }
 }
