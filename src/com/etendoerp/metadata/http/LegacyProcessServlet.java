@@ -507,7 +507,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
      * Sets the JSESSIONID cookie in the response if it hasn't been set yet.
      * It ensures that the cookie is scoped to the Tomcat context Path, marked
      * HttpOnly, and given a valid SameSite attribute (see
-     * {@link #buildSessionCookieHeader(String, boolean, boolean)}).
+     * {@link LegacySessionCookie#header(String, boolean, boolean)}).
      *
      * @param res       the HttpServletResponse where the cookie will be added
      * @param sessionId the session identifier to be stored in the cookie
@@ -539,29 +539,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         boolean crossSite = Boolean.parseBoolean(OBPropertiesProvider.getInstance()
                 .getOpenbravoProperties().getProperty("metadata.legacyCookie.crossSite", "false"));
 
-        res.addHeader(SET_COOKIE, buildSessionCookieHeader(sessionId, isProduction, crossSite));
-    }
-
-    /**
-     * Builds the Set-Cookie header value for the legacy JSESSIONID cookie.
-     * Defaults to SameSite=Lax; only uses SameSite=None (with Secure) when the
-     * request is cross-site AND running in production, since None requires Secure
-     * and would otherwise be rejected or invalid on plain HTTP.
-     *
-     * @param sessionId    the session identifier to be stored in the cookie
-     * @param isProduction whether the server is running in a production environment
-     * @param crossSite    whether the cookie must be usable in a cross-site context
-     * @return the fully formed Set-Cookie header value
-     */
-    static String buildSessionCookieHeader(String sessionId, boolean isProduction, boolean crossSite) {
-        boolean useNone = crossSite && isProduction; // None requires Secure
-        StringBuilder sb = new StringBuilder();
-        sb.append("JSESSIONID=").append(sessionId);
-        sb.append("; Path=/etendo");
-        sb.append("; HttpOnly");
-        if (isProduction) sb.append("; Secure");
-        sb.append("; SameSite=").append(useNone ? "None" : "Lax");
-        return sb.toString();
+        res.addHeader(SET_COOKIE, LegacySessionCookie.header(sessionId, isProduction, crossSite));
     }
 
     /**
