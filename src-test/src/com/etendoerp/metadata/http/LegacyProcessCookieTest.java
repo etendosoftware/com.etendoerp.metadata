@@ -12,7 +12,22 @@ public class LegacyProcessCookieTest {
    * Builds the cookie header with the given flags.
    */
   private String build(boolean prod, boolean crossSite) {
-    return LegacySessionCookie.header("SID123", prod, crossSite);
+    return LegacySessionCookie.header("SID123", "/etendo", prod, crossSite);
+  }
+
+  /**
+   * The cookie is scoped to the actual context path, not a hardcoded one.
+   */
+  @Test public void pathFollowsContextPath() {
+    assertTrue(LegacySessionCookie.header("SID123", "/erp", false, false).contains("; Path=/erp;"));
+  }
+
+  /**
+   * The root context (empty context path) scopes the cookie to "/".
+   */
+  @Test public void rootContextUsesSlashPath() {
+    assertTrue(LegacySessionCookie.header("SID123", "", false, false).contains("; Path=/;"));
+    assertTrue(LegacySessionCookie.header("SID123", null, false, false).contains("; Path=/;"));
   }
 
   /**

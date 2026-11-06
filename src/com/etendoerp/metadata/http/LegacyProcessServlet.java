@@ -507,12 +507,13 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
      * Sets the JSESSIONID cookie in the response if it hasn't been set yet.
      * It ensures that the cookie is scoped to the Tomcat context Path, marked
      * HttpOnly, and given a valid SameSite attribute (see
-     * {@link LegacySessionCookie#header(String, boolean, boolean)}).
+     * {@link LegacySessionCookie#header(String, String, boolean, boolean)}).
      *
-     * @param res       the HttpServletResponse where the cookie will be added
-     * @param sessionId the session identifier to be stored in the cookie
+     * @param res         the HttpServletResponse where the cookie will be added
+     * @param sessionId   the session identifier to be stored in the cookie
+     * @param contextPath the Tomcat context path the cookie is scoped to
      */
-    private void setSessionCookie(HttpServletResponse res, String sessionId) {
+    private void setSessionCookie(HttpServletResponse res, String sessionId, String contextPath) {
         if (res.getHeaders(SET_COOKIE) != null &&
                 res.getHeaders(SET_COOKIE).stream().anyMatch(h -> h.contains("JSESSIONID"))) {
             // Session cookie already set
@@ -539,7 +540,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         boolean crossSite = Boolean.parseBoolean(OBPropertiesProvider.getInstance()
                 .getOpenbravoProperties().getProperty("metadata.legacyCookie.crossSite", "false"));
 
-        res.addHeader(SET_COOKIE, LegacySessionCookie.header(sessionId, isProduction, crossSite));
+        res.addHeader(SET_COOKIE, LegacySessionCookie.header(sessionId, contextPath, isProduction, crossSite));
     }
 
     /**
@@ -561,7 +562,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             String path = req.getPathInfo();
             HttpSession session = req.getSession(true);
 
-            setSessionCookie(res, session.getId());
+            setSessionCookie(res, session.getId(), req.getContextPath());
 
             if (isLegacyRequest(path)) {
                 processLegacyRequest(req, res, path);

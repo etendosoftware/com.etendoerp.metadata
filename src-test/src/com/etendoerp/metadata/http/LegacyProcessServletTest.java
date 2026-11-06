@@ -568,8 +568,8 @@ public class LegacyProcessServletTest extends OBBaseTest {
         when(response.getHeaders(SET_COOKIE_HEADER)).thenReturn(Collections.emptyList());
 
         invokePrivateMethod(legacyProcessServlet, "setSessionCookie",
-                new Class<?>[] { HttpServletResponse.class, String.class },
-                response, "test-session-id");
+                new Class<?>[] { HttpServletResponse.class, String.class, String.class },
+                response, "test-session-id", "/etendo");
 
         verify(response).addHeader(eq(SET_COOKIE_HEADER), contains("JSESSIONID=test-session-id"));
     }
@@ -583,8 +583,8 @@ public class LegacyProcessServletTest extends OBBaseTest {
                 java.util.List.of("JSESSIONID=existing-id; Path=/; HttpOnly"));
 
         invokePrivateMethod(legacyProcessServlet, "setSessionCookie",
-                new Class<?>[] { HttpServletResponse.class, String.class },
-                response, "new-session-id");
+                new Class<?>[] { HttpServletResponse.class, String.class, String.class },
+                response, "new-session-id", "/etendo");
 
         verify(response, never()).addHeader(eq(SET_COOKIE_HEADER), anyString());
     }

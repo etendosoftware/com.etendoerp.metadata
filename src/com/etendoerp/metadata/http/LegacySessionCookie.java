@@ -33,15 +33,16 @@ final class LegacySessionCookie {
      * and would otherwise be rejected or invalid on plain HTTP.
      *
      * @param sessionId    the session identifier to be stored in the cookie
+     * @param contextPath  the Tomcat context path the cookie is scoped to ("" for the root context)
      * @param isProduction whether the server is running in a production environment
      * @param crossSite    whether the cookie must be usable in a cross-site context
      * @return the fully formed Set-Cookie header value
      */
-    static String header(String sessionId, boolean isProduction, boolean crossSite) {
+    static String header(String sessionId, String contextPath, boolean isProduction, boolean crossSite) {
         boolean useNone = crossSite && isProduction; // None requires Secure
         StringBuilder sb = new StringBuilder();
         sb.append("JSESSIONID=").append(sessionId);
-        sb.append("; Path=/etendo");
+        sb.append("; Path=").append(contextPath == null || contextPath.isEmpty() ? "/" : contextPath);
         sb.append("; HttpOnly");
         if (isProduction) sb.append("; Secure");
         sb.append("; SameSite=").append(useNone ? "None" : "Lax");
