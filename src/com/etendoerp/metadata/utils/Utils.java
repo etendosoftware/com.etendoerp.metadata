@@ -293,13 +293,15 @@ public class Utils {
             t = t.getCause();
         }
 
-        // Log the real detail server-side only; the client only ever gets the generic message
-        // below, since the real message can leak SQL fragments, schema names, parser internals
-        // or file paths (ETP-6074 Finding 8).
-        logger.error(GENERIC_ERROR_MESSAGE, t);
+        // Only our own client-error exceptions carry messages written for the client. Anything
+        // else (a 500, or a third-party exception) gets the generic message, since its text can
+        // leak SQL fragments, schema names, parser internals or file paths (ETP-6074 Finding 8).
+        // Callers already log the full detail server-side.
+        boolean clientMessage = getHttpStatusFor(t) < SC_INTERNAL_SERVER_ERROR
+                && t.getClass().getPackageName().equals(ConflictException.class.getPackageName());
 
         try {
-            json.put("error", GENERIC_ERROR_MESSAGE);
+            json.put("error", clientMessage ? t.getMessage() : GENERIC_ERROR_MESSAGE);
         } catch (JSONException e) {
             logger.warn(e.getMessage(), e);
         }

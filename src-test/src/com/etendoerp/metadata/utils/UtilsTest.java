@@ -180,6 +180,33 @@ public class UtilsTest {
     }
 
     /**
+     * Our own client-error exceptions (4xx) carry messages written for the client, so their
+     * message is returned as-is.
+     *
+     * @throws JSONException if an error occurs during JSON processing
+     */
+    @Test
+    public void testConvertToJsonKeepsClientErrorMessage() throws JSONException {
+        JSONObject json = Utils.convertToJson(
+                new com.etendoerp.metadata.exceptions.UnprocessableContentException("Invalid organization: X"));
+
+        assertEquals("Invalid organization: X", json.getString(ERROR_KEY));
+    }
+
+    /**
+     * Our own exceptions that map to 500 still get the generic message.
+     *
+     * @throws JSONException if an error occurs during JSON processing
+     */
+    @Test
+    public void testConvertToJsonHidesOwnServerErrorMessage() throws JSONException {
+        JSONObject json = Utils.convertToJson(
+                new com.etendoerp.metadata.exceptions.InternalServerException("SELECT * FROM secret"));
+
+        assertEquals(GENERIC_ERROR_MESSAGE, json.getString(ERROR_KEY));
+    }
+
+    /**
      * Tests converting an exception with null message.
      * Note: JSONObject may not include keys with null values, so we just verify
      * that the method returns a valid JSON object without throwing exceptions.
