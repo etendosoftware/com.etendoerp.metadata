@@ -158,7 +158,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
         when(request.getLocales()).thenReturn(Collections.emptyEnumeration());
         when(request.getAttributeNames()).thenReturn(Collections.emptyEnumeration());
         when(session.getAttributeNames()).thenReturn(Collections.emptyEnumeration());
-        when(request.getContextPath()).thenReturn("/etendo");
+        when(request.getContextPath()).thenReturn(DEFAULT_CONTEXT_PATH);
     }
 
     /**
@@ -569,7 +569,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
 
         invokePrivateMethod(legacyProcessServlet, "setSessionCookie",
                 new Class<?>[] { HttpServletResponse.class, String.class, String.class },
-                response, "test-session-id", "/etendo");
+                response, "test-session-id", DEFAULT_CONTEXT_PATH);
 
         verify(response).addHeader(eq(SET_COOKIE_HEADER), contains("JSESSIONID=test-session-id"));
     }
@@ -590,9 +590,9 @@ public class LegacyProcessServletTest extends OBBaseTest {
 
         invokePrivateMethod(legacyProcessServlet, "writeRedirect",
                 new Class<?>[] { HttpServletResponse.class, HttpServletResponseLegacyWrapper.class, String.class },
-                response, wrapper, "/etendo");
+                response, wrapper, DEFAULT_CONTEXT_PATH);
 
-        verify(response).setContentType("text/html; charset=UTF-8");
+        verify(response).setContentType(HTML_UTF8_CONTENT_TYPE);
     }
 
     /**
@@ -605,7 +605,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
 
         invokePrivateMethod(legacyProcessServlet, "setSessionCookie",
                 new Class<?>[] { HttpServletResponse.class, String.class, String.class },
-                response, "new-session-id", "/etendo");
+                response, "new-session-id", DEFAULT_CONTEXT_PATH);
 
         verify(response, never()).addHeader(eq(SET_COOKIE_HEADER), anyString());
     }
@@ -2029,7 +2029,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
                 new Class<?>[] { HttpServletResponse.class, String.class },
                 response, "<html>test</html>");
 
-        verify(response).setContentType("text/html; charset=UTF-8");
+        verify(response).setContentType(HTML_UTF8_CONTENT_TYPE);
         verify(response).setStatus(HttpServletResponse.SC_OK);
         assertTrue("Writer should contain HTML", sw.toString().contains("<html>test</html>"));
     }
