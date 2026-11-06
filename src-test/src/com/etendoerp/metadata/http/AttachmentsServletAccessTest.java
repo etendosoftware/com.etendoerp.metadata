@@ -51,6 +51,7 @@ import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.datamodel.Table;
 import org.openbravo.model.ad.ui.Tab;
 import org.openbravo.model.ad.utility.Attachment;
+import org.openbravo.model.ad.system.Client;
 import org.openbravo.model.common.enterprise.Organization;
 import org.openbravo.test.base.OBBaseTest;
 
@@ -93,6 +94,7 @@ public class AttachmentsServletAccessTest extends OBBaseTest {
     @Mock private ModelProvider mockModelProvider;
     @Mock private Entity mockEntity;
     @Mock private Organization mockOrganization;
+    @Mock private Client mockClient;
     @Mock private Part mockPart;
     @Mock private InputStream mockInputStream;
 
@@ -556,6 +558,58 @@ public class AttachmentsServletAccessTest extends OBBaseTest {
         lenient().when(mockAttachment.getTable()).thenReturn(mockTable);
         lenient().when(mockAttachment.getRecord()).thenReturn(TEST_RECORD_ID);
         assertDeleteDenied(() -> AttachmentsAccessStubs.stubRecordVisible(mockDal, TEST_RECORD_ID));
+    }
+
+    /**
+     * Download must be denied (403) when {@code OBDal.get} returns the owning record (it only
+     * checks entity-level access) but the record belongs to an organization the caller cannot
+     * read. This is the cross-organization IDOR.
+     */
+    @Test
+    public void testDownload_denied_whenRecordOrgNotReadable() throws Exception {
+        lenient().when(mockAttachment.getTable()).thenReturn(mockTable);
+        lenient().when(mockAttachment.getRecord()).thenReturn(TEST_RECORD_ID);
+        assertDownloadDenied(() -> AttachmentsAccessStubs.stubRecordInUnreadableOrg(
+                mockDal, mockContext, TEST_RECORD_ID, mockOrganization, TEST_ORG_ID));
+    }
+
+    /**
+     * Download must be denied (403) when the owning record belongs to a client the caller
+     * cannot read. This is the cross-client IDOR.
+     */
+    @Test
+    public void testDownload_denied_whenRecordClientNotReadable() throws Exception {
+        lenient().when(mockAttachment.getTable()).thenReturn(mockTable);
+        lenient().when(mockAttachment.getRecord()).thenReturn(TEST_RECORD_ID);
+        assertDownloadDenied(() -> AttachmentsAccessStubs.stubRecordInUnreadableClient(
+                mockDal, mockContext, TEST_RECORD_ID, mockClient, "client-other"));
+    }
+
+    /**
+     * Runs a DOWNLOAD with the standard entity resolution plus {@code extraStubs} and asserts
+     * it is rejected with 403 without streaming the file.
+     */
+    private void assertDownloadDenied(Runnable extraStubs) throws Exception {
+        when(mockRequest.getParameter(PARAM_COMMAND)).thenReturn(CMD_DOWNLOAD);
+        when(mockRequest.getParameter(PARAM_ATTACHMENT_ID)).thenReturn(TEST_ATTACHMENT_ID);
+
+        try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
+             MockedStatic<OBContext> ctx = mockStatic(OBContext.class);
+             MockedStatic<ModelProvider> mp = mockStatic(ModelProvider.class)) {
+            dalMock.when(OBDal::getInstance).thenReturn(mockDal);
+            ctx.when(OBContext::getOBContext).thenReturn(mockContext);
+            ctx.when(() -> OBContext.setAdminMode(true)).thenAnswer(i -> null);
+            ctx.when(OBContext::restorePreviousMode).thenAnswer(i -> null);
+            AttachmentsAccessStubs.stubEntityResolution(mockTable, mp, mockModelProvider, mockEntity);
+            when(mockDal.get(Attachment.class, TEST_ATTACHMENT_ID)).thenReturn(mockAttachment);
+            extraStubs.run();
+
+            servlet.doGet(mockRequest, mockResponse);
+
+            verify(mockResponse).setStatus(HttpStatus.SC_FORBIDDEN);
+            assertTrue(stringWriter.toString().contains(AttachmentsAccessStubs.MSG_ACCESS_DENIED));
+            verify(mockAttachManager, never()).download(anyString(), any());
+        }
     }
 
     /**

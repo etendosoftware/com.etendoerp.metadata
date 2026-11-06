@@ -39,6 +39,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.nio.file.Files;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -62,6 +63,7 @@ import org.openbravo.base.model.Entity;
 import org.openbravo.base.model.ModelProvider;
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
 import org.openbravo.base.structure.BaseOBObject;
+import org.openbravo.base.structure.ClientEnabled;
 import org.openbravo.base.structure.OrganizationEnabled;
 import org.openbravo.client.application.attachment.AttachImplementationManager;
 import org.openbravo.client.application.attachment.AttachmentUtils;
@@ -657,7 +659,7 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
      *
      * <p>The attachment itself is loaded under a narrow admin block (it only holds
      * pointers to the owning table/record). Authorization then runs with NO admin mode
-     * active, so DAL row-level security filters the owning-record load.</p>
+     * active, against the owning record (see {@link #assertRecordAccess}).</p>
      *
      * @param forWrite whether the caller must additionally have write access
      *                 (an org in {@code OBContext#getWritableOrganizations()}) to the owning record
@@ -699,12 +701,15 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
 
     /**
      * Authorizes the current user against the record that owns an attachment.
-     * Loads the record under the caller's OBContext (no admin mode) so DAL row-level
-     * security applies. Denies with {@link MetadataAccessException} (HTTP 403).
+     * Loads the record under the caller's OBContext (no admin mode), so the role must be
+     * able to read the entity, and then requires the record's client and organization to
+     * be readable by the caller. Denies with {@link MetadataAccessException} (HTTP 403).
+     *
+     * <p>{@code OBDal.get} only checks entity-level read access: it does NOT filter by the
+     * record's client or organization, so that check is done explicitly here.</p>
      *
      * <p><strong>This method must never run while admin mode is active</strong> — admin mode
-     * bypasses the DAL client/organization read filter, which would defeat the authorization
-     * check entirely.</p>
+     * bypasses the entity read check and the readable client/organization lists.</p>
      *
      * @param forWrite when true, also requires the record's organization to be among the
      *                 caller's writable organizations
@@ -720,7 +725,7 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
         }
 
         BaseOBObject ownerRecord = OBDal.getInstance().get(entity.getName(), recordId);
-        if (ownerRecord == null) {
+        if (ownerRecord == null || !isReadableByCaller(ownerRecord)) {
             throw new MetadataAccessException(MSG_ACCESS_DENIED);
         }
 
@@ -733,6 +738,20 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
                 throw new MetadataAccessException(MSG_ACCESS_DENIED);
             }
         }
+    }
+
+    /**
+     * Whether the record's client and organization are among the caller's readable ones.
+     * Records without a client/organization are only gated by entity-level read access.
+     */
+    private static boolean isReadableByCaller(BaseOBObject ownerRecord) {
+        OBContext context = OBContext.getOBContext();
+        if (ownerRecord instanceof ClientEnabled && !Arrays.asList(context.getReadableClients())
+                .contains(((ClientEnabled) ownerRecord).getClient().getId())) {
+            return false;
+        }
+        return !(ownerRecord instanceof OrganizationEnabled) || Arrays.asList(context.getReadableOrganizations())
+                .contains(((OrganizationEnabled) ownerRecord).getOrganization().getId());
     }
 
     /**

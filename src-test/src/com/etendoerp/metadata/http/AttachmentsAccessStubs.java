@@ -27,10 +27,12 @@ import org.mockito.MockedStatic;
 import org.openbravo.base.model.Entity;
 import org.openbravo.base.model.ModelProvider;
 import org.openbravo.base.structure.BaseOBObject;
+import org.openbravo.base.structure.ClientEnabled;
 import org.openbravo.base.structure.OrganizationEnabled;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.datamodel.Table;
+import org.openbravo.model.ad.system.Client;
 import org.openbravo.model.common.enterprise.Organization;
 
 /**
@@ -70,7 +72,7 @@ final class AttachmentsAccessStubs {
 
     /**
      * Stubs the owning record as not found for {@code recordId}, so record-level
-     * authorization denies access (DAL row-level security hid it, or it does not exist).
+     * authorization denies access (it does not exist).
      */
     static void stubRecordNotFound(OBDal mockDal, String recordId) {
         lenient().when(mockDal.get(ENTITY_ORDER, recordId)).thenReturn(null);
@@ -94,7 +96,34 @@ final class AttachmentsAccessStubs {
     static BaseOBObject stubRecordWritable(OBDal mockDal, OBContext mockContext, String recordId,
             Organization mockOrganization, String orgId) {
         BaseOBObject ownerRecord = stubRecordWithOrganization(mockDal, recordId, mockOrganization, orgId);
+        lenient().when(mockContext.getReadableOrganizations()).thenReturn(new String[] { orgId });
         lenient().when(mockContext.getWritableOrganizations()).thenReturn(Collections.singleton(orgId));
+        return ownerRecord;
+    }
+
+    /**
+     * Stubs the owning record as loadable by entity (as {@code OBDal.get} does regardless of
+     * organization) but belonging to an organization that is NOT readable by the caller, so
+     * even read access must be denied.
+     */
+    static BaseOBObject stubRecordInUnreadableOrg(OBDal mockDal, OBContext mockContext, String recordId,
+            Organization mockOrganization, String orgId) {
+        BaseOBObject ownerRecord = stubRecordWithOrganization(mockDal, recordId, mockOrganization, orgId);
+        lenient().when(mockContext.getReadableOrganizations()).thenReturn(new String[] { "0" });
+        return ownerRecord;
+    }
+
+    /**
+     * Stubs the owning record as loadable by entity but belonging to a client that is NOT
+     * readable by the caller, so read access must be denied.
+     */
+    static BaseOBObject stubRecordInUnreadableClient(OBDal mockDal, OBContext mockContext, String recordId,
+            Client mockClient, String clientId) {
+        BaseOBObject ownerRecord = mock(BaseOBObject.class, withSettings().extraInterfaces(ClientEnabled.class));
+        lenient().when(((ClientEnabled) ownerRecord).getClient()).thenReturn(mockClient);
+        lenient().when(mockClient.getId()).thenReturn(clientId);
+        lenient().when(mockContext.getReadableClients()).thenReturn(new String[] { "0" });
+        lenient().when(mockDal.get(ENTITY_ORDER, recordId)).thenReturn(ownerRecord);
         return ownerRecord;
     }
 
@@ -105,6 +134,7 @@ final class AttachmentsAccessStubs {
     static BaseOBObject stubRecordNotWritable(OBDal mockDal, OBContext mockContext, String recordId,
             Organization mockOrganization, String orgId) {
         BaseOBObject ownerRecord = stubRecordWithOrganization(mockDal, recordId, mockOrganization, orgId);
+        lenient().when(mockContext.getReadableOrganizations()).thenReturn(new String[] { orgId });
         lenient().when(mockContext.getWritableOrganizations()).thenReturn(Collections.emptySet());
         return ownerRecord;
     }
