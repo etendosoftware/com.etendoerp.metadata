@@ -978,7 +978,10 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         String location = wrapper.getRedirectLocation();
         String html = getHtmlRedirect(location, true, contextPath);
 
-        res.setContentType(wrapper.getContentType());
+        // The body is always our own HTML redirect page. A redirecting legacy servlet sets no
+        // Content-Type, and with X-Content-Type-Options: nosniff the browser would then show
+        // the page as plain text instead of following the meta refresh.
+        res.setContentType(HTML_UTF8_CONTENT_TYPE);
         res.setStatus(wrapper.getStatus());
         res.getWriter().write(html);
         res.getWriter().flush();

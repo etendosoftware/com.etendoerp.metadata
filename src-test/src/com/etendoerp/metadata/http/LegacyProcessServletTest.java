@@ -575,6 +575,27 @@ public class LegacyProcessServletTest extends OBBaseTest {
     }
 
     /**
+     * The meta-refresh page written for a redirecting legacy servlet is always declared as
+     * HTML, even though the wrapped servlet set no Content-Type: with nosniff the browser
+     * would otherwise render it as plain text.
+     *
+     * @throws Exception if the private method cannot be invoked
+     */
+    @Test
+    public void testWriteRedirectDeclaresHtmlContentType() throws Exception {
+        HttpServletResponseLegacyWrapper wrapper = org.mockito.Mockito.mock(HttpServletResponseLegacyWrapper.class);
+        when(wrapper.getRedirectLocation()).thenReturn("/etendo/ad_actionButton/CreateFrom.html");
+        when(wrapper.getContentType()).thenReturn(null);
+        when(wrapper.getStatus()).thenReturn(HttpServletResponse.SC_OK);
+
+        invokePrivateMethod(legacyProcessServlet, "writeRedirect",
+                new Class<?>[] { HttpServletResponse.class, HttpServletResponseLegacyWrapper.class, String.class },
+                response, wrapper, "/etendo");
+
+        verify(response).setContentType("text/html; charset=UTF-8");
+    }
+
+    /**
      * Tests setSessionCookie early-return when JSESSIONID is already present in headers.
      */
     @Test
