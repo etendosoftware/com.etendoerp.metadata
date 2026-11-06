@@ -79,6 +79,7 @@ public class Utils {
     private Utils() { }
 
     private static final Logger logger = LogManager.getLogger(Utils.class);
+    private static final String GENERIC_ERROR_MESSAGE = "Error processing request";
     private static final MessageFactory messageFactory = new ParameterizedMessageFactory();
     private static final Map<String, Integer> exceptionStatusMap = buildExceptionMap();
     private static final DataToJsonConverter converter = new DataToJsonConverter();
@@ -292,8 +293,15 @@ public class Utils {
             t = t.getCause();
         }
 
+        // Only our own client-error exceptions carry messages written for the client. Anything
+        // else (a 500, or a third-party exception) gets the generic message, since its text can
+        // leak SQL fragments, schema names, parser internals or file paths (ETP-6074 Finding 8).
+        // Callers already log the full detail server-side.
+        boolean clientMessage = getHttpStatusFor(t) < SC_INTERNAL_SERVER_ERROR
+                && t.getClass().getPackageName().equals(ConflictException.class.getPackageName());
+
         try {
-            json.put("error", t.getMessage());
+            json.put("error", clientMessage ? t.getMessage() : GENERIC_ERROR_MESSAGE);
         } catch (JSONException e) {
             logger.warn(e.getMessage(), e);
         }

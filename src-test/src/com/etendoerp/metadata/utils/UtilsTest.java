@@ -142,8 +142,11 @@ public class UtilsTest {
 
     // ========== convertToJson Tests ==========
 
+    private static final String GENERIC_ERROR_MESSAGE = "Error processing request";
+
     /**
-     * Tests converting an exception to JSON.
+     * Tests that converting an exception to JSON never leaks the real exception message
+     * (ETP-6074 Finding 8): the response must carry the fixed generic message instead.
      *
      * @throws JSONException if an error occurs during JSON processing
      */
@@ -154,11 +157,13 @@ public class UtilsTest {
 
         assertNotNull(JSON_NOT_NULL, json);
         assertTrue("JSON should have error key", json.has(ERROR_KEY));
-        assertEquals("Error message should match", TEST_ERROR_MESSAGE, json.getString(ERROR_KEY));
+        assertEquals("Error message should be the generic message, not the real detail",
+                GENERIC_ERROR_MESSAGE, json.getString(ERROR_KEY));
     }
 
     /**
-     * Tests converting an exception with a cause to JSON.
+     * Tests converting an exception with a cause to JSON: the generic message must be returned
+     * regardless of the cause's own message (ETP-6074 Finding 8).
      *
      * @throws JSONException if an error occurs during JSON processing
      */
@@ -170,7 +175,35 @@ public class UtilsTest {
 
         assertNotNull(JSON_NOT_NULL, json);
         assertTrue("JSON should have error key", json.has(ERROR_KEY));
-        assertEquals("Error should be from cause", "Root cause", json.getString(ERROR_KEY));
+        assertEquals("Error message should be the generic message, not the cause's detail",
+                GENERIC_ERROR_MESSAGE, json.getString(ERROR_KEY));
+    }
+
+    /**
+     * Our own client-error exceptions (4xx) carry messages written for the client, so their
+     * message is returned as-is.
+     *
+     * @throws JSONException if an error occurs during JSON processing
+     */
+    @Test
+    public void testConvertToJsonKeepsClientErrorMessage() throws JSONException {
+        JSONObject json = Utils.convertToJson(
+                new com.etendoerp.metadata.exceptions.UnprocessableContentException("Invalid organization: X"));
+
+        assertEquals("Invalid organization: X", json.getString(ERROR_KEY));
+    }
+
+    /**
+     * Our own exceptions that map to 500 still get the generic message.
+     *
+     * @throws JSONException if an error occurs during JSON processing
+     */
+    @Test
+    public void testConvertToJsonHidesOwnServerErrorMessage() throws JSONException {
+        JSONObject json = Utils.convertToJson(
+                new com.etendoerp.metadata.exceptions.InternalServerException("SELECT * FROM secret"));
+
+        assertEquals(GENERIC_ERROR_MESSAGE, json.getString(ERROR_KEY));
     }
 
     /**

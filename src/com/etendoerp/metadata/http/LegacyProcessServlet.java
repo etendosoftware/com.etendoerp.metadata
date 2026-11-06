@@ -41,7 +41,6 @@ import org.openbravo.model.ad.access.User;
 import org.openbravo.model.financialmgmt.accounting.coa.AcctSchema;
 
 import javax.servlet.ServletException;
-import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
@@ -506,13 +505,15 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
 
     /**
      * Sets the JSESSIONID cookie in the response if it hasn't been set yet.
-     * It ensures that the cookie is configured with proper Path, Domain, HttpOnly,
-     * and SameSite attributes.
+     * It ensures that the cookie is scoped to the Tomcat context Path, marked
+     * HttpOnly, and given a valid SameSite attribute (see
+     * {@link LegacySessionCookie#header(String, String, boolean, boolean)}).
      *
-     * @param res       the HttpServletResponse where the cookie will be added
-     * @param sessionId the session identifier to be stored in the cookie
+     * @param res         the HttpServletResponse where the cookie will be added
+     * @param sessionId   the session identifier to be stored in the cookie
+     * @param contextPath the Tomcat context path the cookie is scoped to
      */
-    private void setSessionCookie(HttpServletResponse res, String sessionId) {
+    private void setSessionCookie(HttpServletResponse res, String sessionId, String contextPath) {
         if (res.getHeaders(SET_COOKIE) != null &&
                 res.getHeaders(SET_COOKIE).stream().anyMatch(h -> h.contains("JSESSIONID"))) {
             // Session cookie already set
@@ -534,18 +535,12 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         if (host.contains(":"))
             host = host.split(":")[0];
 
-        Cookie cookie = new Cookie("JSESSIONID", sessionId);
-        cookie.setPath("/");
-        cookie.setHttpOnly(true);
-
         boolean isProduction = !host.equalsIgnoreCase("localhost") && !host.startsWith("127.");
-        cookie.setSecure(isProduction);
 
-        res.addHeader(SET_COOKIE,
-                String.format("JSESSIONID=%s; Path=/; Domain=%s; HttpOnly; %s; SameSite=None",
-                        sessionId,
-                        host,
-                        isProduction ? "Secure" : ""));
+        boolean crossSite = Boolean.parseBoolean(OBPropertiesProvider.getInstance()
+                .getOpenbravoProperties().getProperty("metadata.legacyCookie.crossSite", "false"));
+
+        res.addHeader(SET_COOKIE, LegacySessionCookie.header(sessionId, contextPath, isProduction, crossSite));
     }
 
     /**
@@ -567,7 +562,7 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
             String path = req.getPathInfo();
             HttpSession session = req.getSession(true);
 
-            setSessionCookie(res, session.getId());
+            setSessionCookie(res, session.getId(), req.getContextPath());
 
             if (isLegacyRequest(path)) {
                 processLegacyRequest(req, res, path);
@@ -983,7 +978,10 @@ public class LegacyProcessServlet extends HttpSecureAppServlet {
         String location = wrapper.getRedirectLocation();
         String html = getHtmlRedirect(location, true, contextPath);
 
-        res.setContentType(wrapper.getContentType());
+        // The body is always our own HTML redirect page. A redirecting legacy servlet sets no
+        // Content-Type, and with X-Content-Type-Options: nosniff the browser would then show
+        // the page as plain text instead of following the meta refresh.
+        res.setContentType(HTML_UTF8_CONTENT_TYPE);
         res.setStatus(wrapper.getStatus());
         res.getWriter().write(html);
         res.getWriter().flush();

@@ -158,7 +158,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
         when(request.getLocales()).thenReturn(Collections.emptyEnumeration());
         when(request.getAttributeNames()).thenReturn(Collections.emptyEnumeration());
         when(session.getAttributeNames()).thenReturn(Collections.emptyEnumeration());
-        when(request.getContextPath()).thenReturn("/etendo");
+        when(request.getContextPath()).thenReturn(DEFAULT_CONTEXT_PATH);
     }
 
     /**
@@ -568,10 +568,31 @@ public class LegacyProcessServletTest extends OBBaseTest {
         when(response.getHeaders(SET_COOKIE_HEADER)).thenReturn(Collections.emptyList());
 
         invokePrivateMethod(legacyProcessServlet, "setSessionCookie",
-                new Class<?>[] { HttpServletResponse.class, String.class },
-                response, "test-session-id");
+                new Class<?>[] { HttpServletResponse.class, String.class, String.class },
+                response, "test-session-id", DEFAULT_CONTEXT_PATH);
 
         verify(response).addHeader(eq(SET_COOKIE_HEADER), contains("JSESSIONID=test-session-id"));
+    }
+
+    /**
+     * The meta-refresh page written for a redirecting legacy servlet is always declared as
+     * HTML, even though the wrapped servlet set no Content-Type: with nosniff the browser
+     * would otherwise render it as plain text.
+     *
+     * @throws Exception if the private method cannot be invoked
+     */
+    @Test
+    public void testWriteRedirectDeclaresHtmlContentType() throws Exception {
+        HttpServletResponseLegacyWrapper wrapper = org.mockito.Mockito.mock(HttpServletResponseLegacyWrapper.class);
+        when(wrapper.getRedirectLocation()).thenReturn("/etendo/ad_actionButton/CreateFrom.html");
+        when(wrapper.getContentType()).thenReturn(null);
+        when(wrapper.getStatus()).thenReturn(HttpServletResponse.SC_OK);
+
+        invokePrivateMethod(legacyProcessServlet, "writeRedirect",
+                new Class<?>[] { HttpServletResponse.class, HttpServletResponseLegacyWrapper.class, String.class },
+                response, wrapper, DEFAULT_CONTEXT_PATH);
+
+        verify(response).setContentType(HTML_UTF8_CONTENT_TYPE);
     }
 
     /**
@@ -583,8 +604,8 @@ public class LegacyProcessServletTest extends OBBaseTest {
                 java.util.List.of("JSESSIONID=existing-id; Path=/; HttpOnly"));
 
         invokePrivateMethod(legacyProcessServlet, "setSessionCookie",
-                new Class<?>[] { HttpServletResponse.class, String.class },
-                response, "new-session-id");
+                new Class<?>[] { HttpServletResponse.class, String.class, String.class },
+                response, "new-session-id", DEFAULT_CONTEXT_PATH);
 
         verify(response, never()).addHeader(eq(SET_COOKIE_HEADER), anyString());
     }
@@ -2008,7 +2029,7 @@ public class LegacyProcessServletTest extends OBBaseTest {
                 new Class<?>[] { HttpServletResponse.class, String.class },
                 response, "<html>test</html>");
 
-        verify(response).setContentType("text/html; charset=UTF-8");
+        verify(response).setContentType(HTML_UTF8_CONTENT_TYPE);
         verify(response).setStatus(HttpServletResponse.SC_OK);
         assertTrue("Writer should contain HTML", sw.toString().contains("<html>test</html>"));
     }
