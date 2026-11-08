@@ -348,6 +348,7 @@ public abstract class FieldBuilder extends Builder {
             }
         }
         selectorInfo.put("gridColumns", gridColumns);
+        selectorInfo.put("pickListColumns", SelectorPropertiesUtil.buildPickListColumns(selector));
 
         if (gridColumns.length() > 0) {
             selectorInfo.put("hasTableRelated", true);

@@ -17,12 +17,17 @@
 
 package com.etendoerp.metadata.utils;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
+import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
+import org.openbravo.dal.core.DalUtil;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.service.json.JsonConstants;
+import org.openbravo.userinterface.selector.Selector;
 import org.openbravo.userinterface.selector.SelectorField;
 
 import com.etendoerp.metadata.builders.FieldBuilder;
@@ -163,6 +168,39 @@ public final class SelectorPropertiesUtil {
         column.put("enableFiltering", selectorField.isFilterable());
         column.put("referenceId", resolveReferenceId(selectorField));
         column.put("sortNo", selectorField.getSortno());
+        return column;
+    }
+
+    /**
+     * Builds the columns Classic shows in the dropdown ("picklist") of a selector: first the display field and
+     * then, in their sequence order, the active selector fields flagged with {@code showInPicklist}. Each entry
+     * has the same shape as a grid column, with its {@code accessorKey} written the way the datasource returns
+     * it (nested properties joined with {@link DalUtil#FIELDSEPARATOR}).
+     *
+     * @param selector The selector definition.
+     * @return The picklist columns; empty when the selector has no display field and no flagged field.
+     * @throws JSONException if a column cannot be built.
+     */
+    public static JSONArray buildPickListColumns(Selector selector) throws JSONException {
+        List<SelectorField> fields = new ArrayList<>(selector.getOBUISELSelectorFieldList());
+        fields.sort(Comparator.comparing(SelectorField::getSortno, Comparator.nullsLast(Comparator.naturalOrder())));
+
+        JSONArray columns = new JSONArray();
+        SelectorField displayField = selector.getDisplayfield();
+        if (displayField != null) {
+            columns.put(buildPickListColumn(displayField));
+        }
+        for (SelectorField selectorField : fields) {
+            if (selectorField.isActive() && selectorField.isShowInPicklist() && !selectorField.equals(displayField)) {
+                columns.put(buildPickListColumn(selectorField));
+            }
+        }
+        return columns;
+    }
+
+    private static JSONObject buildPickListColumn(SelectorField selectorField) throws JSONException {
+        JSONObject column = buildGridColumn(selectorField);
+        column.put("accessorKey", column.getString("accessorKey").replace(".", DalUtil.FIELDSEPARATOR));
         return column;
     }
 
