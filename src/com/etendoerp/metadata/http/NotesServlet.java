@@ -65,7 +65,7 @@ public class NotesServlet extends HttpSecureAppServlet {
     private static final String CONTENT_TYPE_JSON = "application/json";
     private static final String CHARSET_UTF8 = "UTF-8";
     private static final String ISO_DATE_FORMAT = "yyyy-MM-dd'T'HH:mm:ss'Z'";
-    private static final String ERROR_PROCESSING_REQUEST = "Error processing request: ";
+    private static final String ERROR_PROCESSING_REQUEST = "Error processing request";
     private static final String ERROR_INVALID_TABLE_ID = "Invalid table ID: ";
     private static final String ERROR_RECORD_NOT_ACCESSIBLE = "Insufficient permissions to access record: ";
 
@@ -77,7 +77,7 @@ public class NotesServlet extends HttpSecureAppServlet {
         } catch (Exception e) {
             log.error("Error processing GET request", e);
             sendErrorResponse(response, HttpStatus.SC_INTERNAL_SERVER_ERROR,
-                    ERROR_PROCESSING_REQUEST + e.getMessage());
+                    ERROR_PROCESSING_REQUEST);
         }
     }
 
@@ -89,7 +89,7 @@ public class NotesServlet extends HttpSecureAppServlet {
         } catch (Exception e) {
             log.error("Error processing POST request", e);
             sendErrorResponse(response, HttpStatus.SC_INTERNAL_SERVER_ERROR,
-                    ERROR_PROCESSING_REQUEST + e.getMessage());
+                    ERROR_PROCESSING_REQUEST);
         }
     }
 
@@ -101,7 +101,7 @@ public class NotesServlet extends HttpSecureAppServlet {
         } catch (Exception e) {
             log.error("Error processing DELETE request", e);
             sendErrorResponse(response, HttpStatus.SC_INTERNAL_SERVER_ERROR,
-                    ERROR_PROCESSING_REQUEST + e.getMessage());
+                    ERROR_PROCESSING_REQUEST);
         }
     }
 
@@ -243,7 +243,7 @@ public class NotesServlet extends HttpSecureAppServlet {
         } catch (Exception e) {
             log.error("Error in handleDelete", e);
             sendErrorResponse(response, HttpStatus.SC_INTERNAL_SERVER_ERROR,
-                    ERROR_PROCESSING_REQUEST + e.getMessage());
+                    ERROR_PROCESSING_REQUEST);
         } finally {
             OBContext.restorePreviousMode();
         }

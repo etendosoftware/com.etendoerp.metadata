@@ -36,6 +36,7 @@ class UtilsExceptionJsonTest {
 
   private static final String TEST_ERROR_MESSAGE = "Test error message";
   private static final String ERROR = "error";
+  private static final String GENERIC_ERROR_MESSAGE = "Error processing request";
 
   /**
    * Tests the getHttpStatusFor method with different exception types.
@@ -50,34 +51,36 @@ class UtilsExceptionJsonTest {
   }
 
   /**
-   * Tests the convertToJson method with simple exception.
+   * Tests that convertToJson returns the fixed generic message instead of the real exception
+   * detail (ETP-6074 Finding 8).
    */
   @Test
   void convertToJsonWithSimpleExceptionReturnsJsonWithErrorMessage() {
     String errorMessage = TEST_ERROR_MESSAGE;
     Exception exception = new RuntimeException(errorMessage);
-    
+
     JSONObject result = Utils.convertToJson(exception);
-    
+
     assertNotNull(result);
     assertTrue(result.has(ERROR));
-    assertEquals(errorMessage, result.optString(ERROR));
+    assertEquals(GENERIC_ERROR_MESSAGE, result.optString(ERROR));
   }
 
   /**
-   * Tests the convertToJson method with exception that has a cause.
+   * Tests that convertToJson returns the fixed generic message, not the cause's own detail
+   * (ETP-6074 Finding 8).
    */
   @Test
   void convertToJsonWithExceptionWithCauseReturnsJsonWithCauseMessage() {
     String causeMessage = "Root cause message";
     Exception cause = new IllegalArgumentException(causeMessage);
     Exception exception = new RuntimeException("Wrapper exception", cause);
-    
+
     JSONObject result = Utils.convertToJson(exception);
-    
+
     assertNotNull(result);
     assertTrue(result.has(ERROR));
-    assertEquals(causeMessage, result.optString(ERROR)); // Uses ERROR key and cause message
+    assertEquals(GENERIC_ERROR_MESSAGE, result.optString(ERROR));
   }
 
   /**
@@ -102,49 +105,50 @@ class UtilsExceptionJsonTest {
   }
 
   /**
-   * Test para convertToJson con excepción que tiene causa nula pero mensaje largo
+   * Test para convertToJson con excepción que tiene causa nula pero mensaje largo: debe
+   * devolver el mensaje genérico, nunca el detalle real (ETP-6074 Finding 8).
    */
   @Test
   void convertToJsonWithExceptionWithLongMessage() {
     String longMessage = "A".repeat(1000);
     Exception exception = new RuntimeException(longMessage);
-    
+
     JSONObject result = Utils.convertToJson(exception);
-    
+
     assertNotNull(result);
     assertTrue(result.has(ERROR));
-    assertEquals(longMessage, result.optString(ERROR));
+    assertEquals(GENERIC_ERROR_MESSAGE, result.optString(ERROR));
   }
 
   /**
-   * Test para convertToJson con excepción anidada múltiples niveles
+   * Test para convertToJson con excepción anidada múltiples niveles: debe devolver el
+   * mensaje genérico sin importar el nivel de anidamiento (ETP-6074 Finding 8).
    */
   @Test
   void convertToJsonWithDeeplyNestedException() {
     Exception level3 = new RuntimeException("Level 3");
     Exception level2 = new IllegalStateException("Level 2", level3);
     Exception level1 = new OBException("Level 1", level2);
-    
+
     JSONObject result = Utils.convertToJson(level1);
-    
+
     assertNotNull(result);
     assertTrue(result.has(ERROR));
-    // The implementation goes one level deep, not all the way to the root
-    assertEquals("Level 2", result.optString(ERROR));
+    assertEquals(GENERIC_ERROR_MESSAGE, result.optString(ERROR));
   }
 
   /**
-   * Test para convertToJson con excepción con mensaje vacío
+   * Test para convertToJson con excepción con mensaje vacío: debe devolver igualmente el
+   * mensaje genérico (ETP-6074 Finding 8).
    */
   @Test
   void convertToJsonWithEmptyMessageException() {
     Exception exception = new RuntimeException("");
-    
+
     JSONObject result = Utils.convertToJson(exception);
-    
+
     assertNotNull(result);
     assertTrue(result.has(ERROR));
-    // Should handle empty message gracefully
-    assertEquals("", result.optString(ERROR));
+    assertEquals(GENERIC_ERROR_MESSAGE, result.optString(ERROR));
   }
 }

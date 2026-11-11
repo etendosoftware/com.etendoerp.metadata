@@ -39,6 +39,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.nio.file.Files;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -58,7 +59,12 @@ import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.hibernate.criterion.Restrictions;
+import org.openbravo.base.model.Entity;
+import org.openbravo.base.model.ModelProvider;
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
+import org.openbravo.base.structure.BaseOBObject;
+import org.openbravo.base.structure.ClientEnabled;
+import org.openbravo.base.structure.OrganizationEnabled;
 import org.openbravo.client.application.attachment.AttachImplementationManager;
 import org.openbravo.client.application.attachment.AttachmentUtils;
 import org.openbravo.dal.core.OBContext;
@@ -109,7 +115,7 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
     private static final String CHARSET_UTF8 = "UTF-8";
 
     // Response messages
-    private static final String MSG_ERROR_PROCESSING_REQUEST = "Error processing request: ";
+    private static final String MSG_ERROR_PROCESSING_REQUEST = "Error processing request";
     private static final String MSG_INVALID_COMMAND = "Invalid command: ";
     private static final String MSG_COMMAND_REQUIRED = "Command parameter is required";
     private static final String MSG_TAB_RECORD_REQUIRED = "tabId and recordId are required";
@@ -122,6 +128,7 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
     private static final String MSG_ATTACHMENT_UPDATED = "Attachment updated successfully";
     private static final String MSG_ATTACHMENT_DELETED = "Attachment deleted successfully";
     private static final String MSG_ALL_ATTACHMENTS_DELETED = "All attachments deleted successfully";
+    private static final String MSG_ACCESS_DENIED = "Access denied";
 
     // JSON keys
     private static final String JSON_KEY_ATTACHMENTS = "attachments";
@@ -181,10 +188,13 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
             throws IOException, ServletException {
         try {
             handleGet(request, response);
+        } catch (MetadataAccessException e) {
+            log.warn("Access denied: {}", e.getMessage());
+            sendErrorResponse(response, HttpStatus.SC_FORBIDDEN, MSG_ACCESS_DENIED);
         } catch (Exception e) {
             log.error("Error processing GET request", e);
             sendErrorResponse(response, HttpStatus.SC_INTERNAL_SERVER_ERROR,
-                    MSG_ERROR_PROCESSING_REQUEST + e.getMessage());
+                    MSG_ERROR_PROCESSING_REQUEST);
         }
     }
 
@@ -193,10 +203,13 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
             throws IOException, ServletException {
         try {
             handlePost(request, response);
+        } catch (MetadataAccessException e) {
+            log.warn("Access denied: {}", e.getMessage());
+            sendErrorResponse(response, HttpStatus.SC_FORBIDDEN, MSG_ACCESS_DENIED);
         } catch (Exception e) {
             log.error("Error processing POST request", e);
             sendErrorResponse(response, HttpStatus.SC_INTERNAL_SERVER_ERROR,
-                    MSG_ERROR_PROCESSING_REQUEST + e.getMessage());
+                    MSG_ERROR_PROCESSING_REQUEST);
         }
     }
 
@@ -230,7 +243,7 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
      * Handles POST requests - supports UPLOAD, EDIT, DELETE, and DELETE_ALL commands
      */
     private void handlePost(HttpServletRequest request, HttpServletResponse response)
-            throws IOException, JSONException {
+            throws IOException, JSONException, ServletException {
         String command = request.getParameter(PARAM_COMMAND);
         if (command == null) {
             sendErrorResponse(response, HttpStatus.SC_BAD_REQUEST, MSG_COMMAND_REQUIRED);
@@ -268,13 +281,29 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
             return;
         }
 
+        Tab tab;
+        Table table;
+
+        // Phase 1 - narrow admin block: only to resolve the tab and its table.
         try {
             OBContext.setAdminMode(true);
 
-            Tab tab = validateAndGetTab(tabId, response);
+            tab = validateAndGetTab(tabId, response);
             if (tab == null) {
                 return;
             }
+
+            table = tab.getTable();
+        } finally {
+            OBContext.restorePreviousMode();
+        }
+
+        // Phase 2 - authorize with NO admin mode active.
+        assertRecordAccess(table, recordId, false);
+
+        // Phase 3 - narrow admin block, only around the attachment list read.
+        try {
+            OBContext.setAdminMode(true);
 
             String[] recordIds = new String[] { recordId };
             List<JSONObject> attachmentsList = AttachmentUtils.getTabAttachmentsForRows(tab, recordIds);
@@ -303,27 +332,58 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
     }
 
     /**
-     * Upload a new attachment
+     * Upload a new attachment.
+     *
+     * <p>The record the attachment is being attached to is resolved and authorized
+     * (Phases 1-2, mirroring {@link #handleList}/{@link #handleDownloadAll}) before any
+     * physical file I/O happens. Upload requires write access to the owning record's
+     * organization <em>and</em> to the organization the caller is targeting in the
+     * request, since {@code attachManager.upload} ultimately files the attachment under
+     * the requested {@code orgId}.</p>
      */
     private void handleUpload(HttpServletRequest request, HttpServletResponse response)
-            throws IOException, JSONException {
+            throws IOException, JSONException, ServletException {
         if (!validateUploadParameters(request, response)) {
             return;
         }
 
+        UploadContext uploadContext = prepareUploadContext(request, response);
+        if (uploadContext == null) {
+            return; // Error response already sent (no file uploaded)
+        }
+
+        Table table;
+
+        // Phase 1 - narrow admin block: only to resolve the tab's table.
+        try {
+            OBContext.setAdminMode(true);
+
+            Tab tab = validateAndGetTab(uploadContext.tabId, response);
+            if (tab == null) {
+                return;
+            }
+
+            table = tab.getTable();
+        } finally {
+            OBContext.restorePreviousMode();
+        }
+
+        // Phase 2 - authorize with NO admin mode active.
+        assertRecordAccess(table, uploadContext.recordId, true);
+
+        if (!OBContext.getOBContext().getWritableOrganizations().contains(uploadContext.orgId)) {
+            throw new MetadataAccessException(MSG_ACCESS_DENIED);
+        }
+
+        // Phase 3 - narrow admin block, only around the physical upload.
         java.io.File tempFile = null;
         try {
             OBContext.setAdminMode(true);
-            
-            UploadContext uploadContext = prepareUploadContext(request, response);
-            if (uploadContext == null) {
-                return; // Error response already sent
-            }
 
             tempFile = createSecureTempFile(uploadContext.filePart);
             java.io.File finalFile = createFinalFile(tempFile, uploadContext.fileName);
-            
-            attachManager.upload(uploadContext.params, uploadContext.tabId, 
+
+            attachManager.upload(uploadContext.params, uploadContext.tabId,
                                uploadContext.recordId, uploadContext.orgId, finalFile);
 
             JSONObject result = new JSONObject();
@@ -333,7 +393,7 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
         } catch (Exception e) {
             log.error("Error uploading attachment", e);
             sendErrorResponse(response, HttpStatus.SC_INTERNAL_SERVER_ERROR,
-                    MSG_ERROR_PROCESSING_REQUEST + e.getMessage());
+                    MSG_ERROR_PROCESSING_REQUEST);
         } finally {
             // Ensure temp file is deleted
             if (tempFile != null && tempFile.exists()) {
@@ -356,17 +416,19 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
             throws IOException, JSONException {
         String attachmentId = request.getParameter(PARAM_ATTACHMENT_ID);
 
+        // Phases 1 (narrow admin load) + 2 (authorize with NO admin mode active).
+        Attachment attachment = validateAndGetAttachment(attachmentId, response, false);
+        if (attachment == null) {
+            return;
+        }
+
+        response.setContentType(CONTENT_TYPE_OCTET_STREAM);
+        response.setHeader(CONTENT_DISPOSITION_HEADER,
+                "attachment; filename=\"" + attachment.getName() + "\"");
+
+        // Phase 3: narrow admin block, only around the physical I/O.
         try {
             OBContext.setAdminMode(true);
-
-            Attachment attachment = validateAndGetAttachment(attachmentId, response);
-            if (attachment == null) {
-                return;
-            }
-
-            response.setContentType(CONTENT_TYPE_OCTET_STREAM);
-            response.setHeader(CONTENT_DISPOSITION_HEADER,
-                    "attachment; filename=\"" + attachment.getName() + "\"");
 
             try (OutputStream out = response.getOutputStream()) {
                 attachManager.download(attachmentId, out);
@@ -389,6 +451,9 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
             return;
         }
 
+        Table table;
+
+        // Phase 1 - narrow admin block: only to resolve the tab's table.
         try {
             OBContext.setAdminMode(true);
 
@@ -397,8 +462,20 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
                 return;
             }
 
-            response.setContentType(CONTENT_TYPE_ZIP);
-            response.setHeader(CONTENT_DISPOSITION_HEADER, CONTENT_DISPOSITION_VALUE);
+            table = tab.getTable();
+        } finally {
+            OBContext.restorePreviousMode();
+        }
+
+        // Phase 2 - authorize with NO admin mode active.
+        assertRecordAccess(table, recordId, false);
+
+        response.setContentType(CONTENT_TYPE_ZIP);
+        response.setHeader(CONTENT_DISPOSITION_HEADER, CONTENT_DISPOSITION_VALUE);
+
+        // Phase 3 - narrow admin block, only around the physical I/O.
+        try {
+            OBContext.setAdminMode(true);
 
             try (OutputStream out = response.getOutputStream()) {
                 attachManager.downloadAll(tabId, recordId, out);
@@ -422,36 +499,42 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
             return;
         }
 
+        // Phases 1 (narrow admin load) + 2 (authorize with NO admin mode active).
+        Attachment attachment = validateAndGetAttachment(attachmentId, response, true);
+        if (attachment == null) {
+            return;
+        }
+
+        Map<String, String> params = new HashMap<>();
+
+        JSONObject requestBody = readRequestBody(request);
+        if (requestBody.has(PARAM_DESCRIPTION)) {
+            String description = requestBody.getString(PARAM_DESCRIPTION);
+            if (description != null && !description.isEmpty()) {
+                params.put(CORE_DESC_PARAMETER_ID, description);
+            }
+        }
+
+        if (params.isEmpty()) {
+            String description = request.getParameter(PARAM_DESCRIPTION);
+            if (description != null) {
+                params.put(CORE_DESC_PARAMETER_ID, description);
+            }
+        }
+
+        // Phase 3: narrow admin block, only around the physical mutation.
         try {
             OBContext.setAdminMode(true);
-
-            Map<String, String> params = new HashMap<>();
-
-            JSONObject requestBody = readRequestBody(request);
-            if (requestBody.has(PARAM_DESCRIPTION)) {
-                String description = requestBody.getString(PARAM_DESCRIPTION);
-                if (description != null && !description.isEmpty()) {
-                    params.put(CORE_DESC_PARAMETER_ID, description);
-                }
-            }
-
-            if (params.isEmpty()) {
-                String description = request.getParameter(PARAM_DESCRIPTION);
-                if (description != null) {
-                    params.put(CORE_DESC_PARAMETER_ID, description);
-                }
-            }
-
             attachManager.update(params, attachmentId, tabId);
-
-            JSONObject result = new JSONObject();
-            result.put(JSON_KEY_SUCCESS, true);
-            result.put(JSON_KEY_MESSAGE, MSG_ATTACHMENT_UPDATED);
-
-            sendJsonResponse(response, HttpStatus.SC_OK, result);
         } finally {
             OBContext.restorePreviousMode();
         }
+
+        JSONObject result = new JSONObject();
+        result.put(JSON_KEY_SUCCESS, true);
+        result.put(JSON_KEY_MESSAGE, MSG_ATTACHMENT_UPDATED);
+
+        sendJsonResponse(response, HttpStatus.SC_OK, result);
     }
 
     /**
@@ -461,24 +544,25 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
             throws IOException, JSONException {
         String attachmentId = request.getParameter(PARAM_ATTACHMENT_ID);
 
+        // Phases 1 (narrow admin load) + 2 (authorize with NO admin mode active).
+        Attachment attachment = validateAndGetAttachment(attachmentId, response, true);
+        if (attachment == null) {
+            return;
+        }
+
+        // Phase 3: narrow admin block, only around the physical mutation.
         try {
             OBContext.setAdminMode(true);
-
-            Attachment attachment = validateAndGetAttachment(attachmentId, response);
-            if (attachment == null) {
-                return;
-            }
-
             attachManager.delete(attachment);
-
-            JSONObject result = new JSONObject();
-            result.put(JSON_KEY_SUCCESS, true);
-            result.put(JSON_KEY_MESSAGE, MSG_ATTACHMENT_DELETED);
-
-            sendJsonResponse(response, HttpStatus.SC_OK, result);
         } finally {
             OBContext.restorePreviousMode();
         }
+
+        JSONObject result = new JSONObject();
+        result.put(JSON_KEY_SUCCESS, true);
+        result.put(JSON_KEY_MESSAGE, MSG_ATTACHMENT_DELETED);
+
+        sendJsonResponse(response, HttpStatus.SC_OK, result);
     }
 
     /**
@@ -493,6 +577,9 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
             return;
         }
 
+        Table table;
+
+        // Phase 1 - narrow admin block: only to resolve the tab's table.
         try {
             OBContext.setAdminMode(true);
 
@@ -501,7 +588,18 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
                 return;
             }
 
-            Table table = tab.getTable();
+            table = tab.getTable();
+        } finally {
+            OBContext.restorePreviousMode();
+        }
+
+        // Phase 2 - authorize with NO admin mode active.
+        assertRecordAccess(table, recordId, true);
+
+        // Phase 3 - narrow admin block, only around the physical mutation.
+        try {
+            OBContext.setAdminMode(true);
+
             OBCriteria<Attachment> criteria = OBDal.getInstance().createCriteria(Attachment.class);
             criteria.add(Restrictions.eq(Attachment.PROPERTY_TABLE, table));
             criteria.add(Restrictions.eq(Attachment.PROPERTY_RECORD, recordId));
@@ -556,23 +654,104 @@ public class AttachmentsServlet extends HttpSecureAppServlet {
     }
 
     /**
-     * Validates and retrieves an Attachment by ID
-     * @return The Attachment object or null if validation fails (error response already sent)
+     * Validates and retrieves an Attachment by ID, authorizing the caller against the
+     * record the attachment belongs to.
+     *
+     * <p>The attachment itself is loaded under a narrow admin block (it only holds
+     * pointers to the owning table/record). Authorization then runs with NO admin mode
+     * active, against the owning record (see {@link #assertRecordAccess}).</p>
+     *
+     * @param forWrite whether the caller must additionally have write access
+     *                 (an org in {@code OBContext#getWritableOrganizations()}) to the owning record
+     * @return the Attachment, or null if validation fails (error response already sent)
+     * @throws MetadataAccessException if the caller cannot access the owning record (maps to HTTP 403)
      */
-    private Attachment validateAndGetAttachment(String attachmentId, HttpServletResponse response)
+    private Attachment validateAndGetAttachment(String attachmentId, HttpServletResponse response, boolean forWrite)
             throws IOException, JSONException {
         if (attachmentId == null) {
             sendErrorResponse(response, HttpStatus.SC_BAD_REQUEST, MSG_ATTACHMENT_REQUIRED);
             return null;
         }
 
-        Attachment attachment = OBDal.getInstance().get(Attachment.class, attachmentId);
-        if (attachment == null) {
-            sendErrorResponse(response, HttpStatus.SC_NOT_FOUND, MSG_ATTACHMENT_NOT_FOUND);
-            return null;
+        Attachment attachment;
+        Table table;
+        String recordId;
+
+        // Phase 1 - narrow admin block: only to read the attachment's own pointers.
+        try {
+            OBContext.setAdminMode(true);
+
+            attachment = OBDal.getInstance().get(Attachment.class, attachmentId);
+            if (attachment == null) {
+                sendErrorResponse(response, HttpStatus.SC_NOT_FOUND, MSG_ATTACHMENT_NOT_FOUND);
+                return null;
+            }
+
+            table = attachment.getTable();
+            recordId = attachment.getRecord();
+        } finally {
+            OBContext.restorePreviousMode();
         }
 
+        // Phase 2 - authorize with NO admin mode active.
+        assertRecordAccess(table, recordId, forWrite);
+
         return attachment;
+    }
+
+    /**
+     * Authorizes the current user against the record that owns an attachment.
+     * Loads the record under the caller's OBContext (no admin mode), so the role must be
+     * able to read the entity, and then requires the record's client and organization to
+     * be readable by the caller. Denies with {@link MetadataAccessException} (HTTP 403).
+     *
+     * <p>{@code OBDal.get} only checks entity-level read access: it does NOT filter by the
+     * record's client or organization, so that check is done explicitly here.</p>
+     *
+     * <p><strong>This method must never run while admin mode is active</strong> — admin mode
+     * bypasses the entity read check and the readable client/organization lists.</p>
+     *
+     * @param forWrite when true, also requires the record's organization to be among the
+     *                 caller's writable organizations
+     */
+    private void assertRecordAccess(Table table, String recordId, boolean forWrite) {
+        if (table == null || recordId == null) {
+            throw new MetadataAccessException(MSG_ACCESS_DENIED);
+        }
+
+        Entity entity = ModelProvider.getInstance().getEntityByTableName(table.getDBTableName());
+        if (entity == null) {
+            throw new MetadataAccessException(MSG_ACCESS_DENIED);
+        }
+
+        BaseOBObject ownerRecord = OBDal.getInstance().get(entity.getName(), recordId);
+        if (ownerRecord == null || !isReadableByCaller(ownerRecord)) {
+            throw new MetadataAccessException(MSG_ACCESS_DENIED);
+        }
+
+        if (forWrite) {
+            if (!(ownerRecord instanceof OrganizationEnabled)) {
+                throw new MetadataAccessException(MSG_ACCESS_DENIED);
+            }
+            String orgId = ((OrganizationEnabled) ownerRecord).getOrganization().getId();
+            if (!OBContext.getOBContext().getWritableOrganizations().contains(orgId)) {
+                throw new MetadataAccessException(MSG_ACCESS_DENIED);
+            }
+        }
+    }
+
+    /**
+     * Whether the record's client and organization are among the caller's readable ones.
+     * Records without a client/organization are only gated by entity-level read access.
+     */
+    private static boolean isReadableByCaller(BaseOBObject ownerRecord) {
+        OBContext context = OBContext.getOBContext();
+        if (ownerRecord instanceof ClientEnabled && !Arrays.asList(context.getReadableClients())
+                .contains(((ClientEnabled) ownerRecord).getClient().getId())) {
+            return false;
+        }
+        return !(ownerRecord instanceof OrganizationEnabled) || Arrays.asList(context.getReadableOrganizations())
+                .contains(((OrganizationEnabled) ownerRecord).getOrganization().getId());
     }
 
     /**

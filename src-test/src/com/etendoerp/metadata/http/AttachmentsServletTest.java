@@ -50,6 +50,9 @@ import org.mockito.MockedStatic;
 import org.mockito.junit.MockitoJUnitRunner;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONObject;
+import org.openbravo.base.model.Entity;
+import org.openbravo.base.model.ModelProvider;
+import org.openbravo.base.structure.BaseOBObject;
 import org.openbravo.client.application.attachment.AttachImplementationManager;
 import org.openbravo.client.application.attachment.AttachmentUtils;
 import org.openbravo.dal.core.OBContext;
@@ -119,6 +122,9 @@ public class AttachmentsServletTest extends OBBaseTest {
     @Mock private OBCriteria<Attachment> mockCriteria;
     @Mock private Part mockPart;
     @Mock private InputStream mockInputStream;
+    @Mock private ModelProvider mockModelProvider;
+    @Mock private Entity mockEntity;
+    @Mock private BaseOBObject mockOwningRecord;
 
     private AttachmentsServlet servlet;
     private StringWriter stringWriter;
@@ -246,23 +252,37 @@ public class AttachmentsServletTest extends OBBaseTest {
         when(mockRequest.getParameter(PARAM_RECORD_ID)).thenReturn(TEST_RECORD_ID);
         when(mockRequest.getParameter(PARAM_ORG_ID)).thenReturn(TEST_ORG_ID);
         when(mockRequest.getPart(PARAM_FILE)).thenReturn(mockPart);
-        
+
         when(mockPart.getInputStream()).thenReturn(mockInputStream);
-        when(mockPart.getHeader("content-disposition")).thenReturn("form-data; name=\"file\"; filename=\"test.txt\"");
+        when(mockPart.getHeader(AttachmentsAccessStubs.CONTENT_DISPOSITION_TOKEN))
+                .thenReturn(AttachmentsAccessStubs.UPLOAD_CONTENT_DISPOSITION);
         when(mockInputStream.read(any(byte[].class))).thenReturn(-1);
 
-        try (MockedStatic<OBContext> contextMock = mockStatic(OBContext.class)) {
+        // The record-level + org-level authorization added to UPLOAD needs the tab's
+        // table to resolve to a visible, writable owning record; stub it as such here
+        // so this test still reaches the physical upload path it is validating.
+        when(mockTab.getTable()).thenReturn(mockTable);
+
+        try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
+             MockedStatic<OBContext> contextMock = mockStatic(OBContext.class);
+             MockedStatic<ModelProvider> modelProviderMock = mockStatic(ModelProvider.class)) {
+            dalMock.when(OBDal::getInstance).thenReturn(mockDal);
+            when(mockDal.get(Tab.class, TEST_TAB_ID)).thenReturn(mockTab);
+            AttachmentsAccessStubs.stubEntityResolution(mockTable, modelProviderMock, mockModelProvider, mockEntity);
+
             contextMock.when(OBContext::getOBContext).thenReturn(mockContext);
             contextMock.when(() -> OBContext.setAdminMode(true)).thenAnswer(invocation -> null);
             contextMock.when(OBContext::restorePreviousMode).thenAnswer(invocation -> null);
+            AttachmentsAccessStubs.stubRecordWritable(mockDal, mockContext, TEST_RECORD_ID, mockOrganization, TEST_ORG_ID);
 
             // Act
             servlet.doPost(mockRequest, mockResponse);
 
             // Assert - Could be 200 (success) or 500 (if file operations fail in CI)
-            // The important thing is that validation passed and we didn't get 400 (bad request)
+            // The important thing is that validation and authorization passed and we
+            // didn't get 400 (bad request) or 403 (forbidden)
             verify(mockResponse, atLeastOnce()).setStatus(anyInt());
-            
+
             // Verify that the upload validation logic was reached (not rejected due to missing params)
             verify(mockRequest).getPart(PARAM_FILE);
         }
@@ -326,13 +346,19 @@ public class AttachmentsServletTest extends OBBaseTest {
         when(mockRequest.getParameter(PARAM_COMMAND)).thenReturn(CMD_DOWNLOAD);
         when(mockRequest.getParameter(PARAM_ATTACHMENT_ID)).thenReturn(TEST_ATTACHMENT_ID);
         when(mockAttachment.getName()).thenReturn("test-file.txt");
+        when(mockAttachment.getTable()).thenReturn(mockTable);
+        when(mockAttachment.getRecord()).thenReturn(TEST_RECORD_ID);
 
         try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
-             MockedStatic<OBContext> contextMock = mockStatic(OBContext.class)) {
+             MockedStatic<OBContext> contextMock = mockStatic(OBContext.class);
+             MockedStatic<ModelProvider> modelProviderMock = mockStatic(ModelProvider.class)) {
 
             dalMock.when(OBDal::getInstance).thenReturn(mockDal);
             contextMock.when(OBContext::getOBContext).thenReturn(mockContext);
+            AttachmentsAccessStubs.stubEntityResolution(mockTable, modelProviderMock, mockModelProvider, mockEntity);
             when(mockDal.get(Attachment.class, TEST_ATTACHMENT_ID)).thenReturn(mockAttachment);
+            // owning record is visible to the caller -> access granted:
+            when(mockDal.get(AttachmentsAccessStubs.ENTITY_ORDER, TEST_RECORD_ID)).thenReturn(mockOwningRecord);
 
             // Act
             servlet.doGet(mockRequest, mockResponse);
@@ -384,8 +410,12 @@ public class AttachmentsServletTest extends OBBaseTest {
         when(mockRequest.getParameter(PARAM_DESCRIPTION)).thenReturn("Updated description");
         when(mockRequest.getReader()).thenReturn(new BufferedReader(new StringReader("{}")));
 
-        try (MockedStatic<OBContext> contextMock = mockStatic(OBContext.class)) {
+        try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
+             MockedStatic<OBContext> contextMock = mockStatic(OBContext.class);
+             MockedStatic<ModelProvider> modelProviderMock = mockStatic(ModelProvider.class)) {
+            dalMock.when(OBDal::getInstance).thenReturn(mockDal);
             contextMock.when(OBContext::getOBContext).thenReturn(mockContext);
+            stubAttachmentAccessGranted(modelProviderMock);
 
             // Act
             servlet.doPost(mockRequest, mockResponse);
@@ -433,8 +463,12 @@ public class AttachmentsServletTest extends OBBaseTest {
         when(mockRequest.getReader()).thenReturn(new BufferedReader(
                 new StringReader("{\"description\":\"JSON description\"}")));
 
-        try (MockedStatic<OBContext> contextMock = mockStatic(OBContext.class)) {
+        try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
+             MockedStatic<OBContext> contextMock = mockStatic(OBContext.class);
+             MockedStatic<ModelProvider> modelProviderMock = mockStatic(ModelProvider.class)) {
+            dalMock.when(OBDal::getInstance).thenReturn(mockDal);
             contextMock.when(OBContext::getOBContext).thenReturn(mockContext);
+            stubAttachmentAccessGranted(modelProviderMock);
 
             // Act
             servlet.doPost(mockRequest, mockResponse);
@@ -489,13 +523,16 @@ public class AttachmentsServletTest extends OBBaseTest {
         List<Attachment> mockAttachments = createMockAttachmentsForDeletion();
 
         try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
-             MockedStatic<OBContext> contextMock = mockStatic(OBContext.class)) {
+             MockedStatic<OBContext> contextMock = mockStatic(OBContext.class);
+             MockedStatic<ModelProvider> modelProviderMock = mockStatic(ModelProvider.class)) {
 
             dalMock.when(OBDal::getInstance).thenReturn(mockDal);
             contextMock.when(OBContext::getOBContext).thenReturn(mockContext);
 
             when(mockDal.get(Tab.class, TEST_TAB_ID)).thenReturn(mockTab);
             when(mockTab.getTable()).thenReturn(mockTable);
+            AttachmentsAccessStubs.stubEntityResolution(mockTable, modelProviderMock, mockModelProvider, mockEntity);
+            AttachmentsAccessStubs.stubRecordWritable(mockDal, mockContext, TEST_RECORD_ID, mockOrganization, TEST_ORG_ID);
             when(mockDal.createCriteria(Attachment.class)).thenReturn(mockCriteria);
             when(mockCriteria.add(any())).thenReturn(mockCriteria);
             when(mockCriteria.list()).thenReturn(mockAttachments);
@@ -653,11 +690,12 @@ public class AttachmentsServletTest extends OBBaseTest {
         when(mockRequest.getParameter(PARAM_ATTACHMENT_ID)).thenReturn(TEST_ATTACHMENT_ID);
 
         try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
-             MockedStatic<OBContext> contextMock = mockStatic(OBContext.class)) {
+             MockedStatic<OBContext> contextMock = mockStatic(OBContext.class);
+             MockedStatic<ModelProvider> modelProviderMock = mockStatic(ModelProvider.class)) {
 
             dalMock.when(OBDal::getInstance).thenReturn(mockDal);
             contextMock.when(OBContext::getOBContext).thenReturn(mockContext);
-            when(mockDal.get(Attachment.class, TEST_ATTACHMENT_ID)).thenReturn(mockAttachment);
+            stubAttachmentAccessGranted(modelProviderMock);
 
             // Act
             servlet.doPost(TEST_PATH, mockRequest, mockResponse);
@@ -678,11 +716,12 @@ public class AttachmentsServletTest extends OBBaseTest {
         when(mockRequest.getParameter(PARAM_ATTACHMENT_ID)).thenReturn(TEST_ATTACHMENT_ID);
 
         try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
-             MockedStatic<OBContext> contextMock = mockStatic(OBContext.class)) {
+             MockedStatic<OBContext> contextMock = mockStatic(OBContext.class);
+             MockedStatic<ModelProvider> modelProviderMock = mockStatic(ModelProvider.class)) {
 
             dalMock.when(OBDal::getInstance).thenReturn(mockDal);
             contextMock.when(OBContext::getOBContext).thenReturn(mockContext);
-            when(mockDal.get(Attachment.class, TEST_ATTACHMENT_ID)).thenReturn(mockAttachment);
+            stubAttachmentAccessGranted(modelProviderMock);
 
             // Act
             servlet.doDelete(TEST_PATH, mockRequest, mockResponse);
@@ -744,11 +783,12 @@ public class AttachmentsServletTest extends OBBaseTest {
         when(mockRequest.getParameter(PARAM_ATTACHMENT_ID)).thenReturn(TEST_ATTACHMENT_ID);
 
         try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
-             MockedStatic<OBContext> contextMock = mockStatic(OBContext.class)) {
+             MockedStatic<OBContext> contextMock = mockStatic(OBContext.class);
+             MockedStatic<ModelProvider> modelProviderMock = mockStatic(ModelProvider.class)) {
 
             dalMock.when(OBDal::getInstance).thenReturn(mockDal);
             contextMock.when(OBContext::getOBContext).thenReturn(mockContext);
-            when(mockDal.get(Attachment.class, TEST_ATTACHMENT_ID)).thenReturn(mockAttachment);
+            stubAttachmentAccessGranted(modelProviderMock);
 
             // Act
             servlet.doPost(mockRequest, mockResponse);
@@ -800,6 +840,21 @@ public class AttachmentsServletTest extends OBBaseTest {
         attachments.add(attachment1);
 
         return attachments;
+    }
+
+    /**
+     * Stubs {@code mockAttachment}'s owning record as visible and writable to the caller,
+     * via {@link ModelProvider} + {@link OBDal}, so EDIT/DELETE record-level authorization
+     * passes and the handler reaches its normal success path.
+     *
+     * Callers must already have {@code OBDal::getInstance} stubbed to {@code mockDal}.
+     */
+    private void stubAttachmentAccessGranted(MockedStatic<ModelProvider> modelProviderMock) {
+        when(mockDal.get(Attachment.class, TEST_ATTACHMENT_ID)).thenReturn(mockAttachment);
+        when(mockAttachment.getTable()).thenReturn(mockTable);
+        when(mockAttachment.getRecord()).thenReturn(TEST_RECORD_ID);
+        AttachmentsAccessStubs.stubEntityResolution(mockTable, modelProviderMock, mockModelProvider, mockEntity);
+        AttachmentsAccessStubs.stubRecordWritable(mockDal, mockContext, TEST_RECORD_ID, mockOrganization, TEST_ORG_ID);
     }
 
 }

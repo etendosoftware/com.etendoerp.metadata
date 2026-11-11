@@ -36,10 +36,15 @@ import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.MockitoJUnitRunner;
+import org.openbravo.base.model.Entity;
+import org.openbravo.base.model.ModelProvider;
 import org.openbravo.client.application.attachment.AttachImplementationManager;
 import org.openbravo.dal.core.OBContext;
+import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.access.User;
+import org.openbravo.model.ad.datamodel.Table;
 import org.openbravo.model.ad.system.Client;
+import org.openbravo.model.ad.utility.Attachment;
 import org.openbravo.model.common.enterprise.Organization;
 import org.openbravo.test.base.OBBaseTest;
 
@@ -80,6 +85,11 @@ public class AttachmentsServletValidationTest extends OBBaseTest {
     @Mock private User mockUser;
     @Mock private Client mockClient;
     @Mock private Organization mockOrganization;
+    @Mock private OBDal mockDal;
+    @Mock private Table mockTable;
+    @Mock private Attachment mockAttachment;
+    @Mock private ModelProvider mockModelProvider;
+    @Mock private Entity mockEntity;
 
     private AttachmentsServlet servlet;
     private StringWriter stringWriter;
@@ -196,10 +206,19 @@ public class AttachmentsServletValidationTest extends OBBaseTest {
         when(mockRequest.getParameter(PARAM_DESCRIPTION)).thenReturn("Test description");
         when(mockRequest.getReader()).thenReturn(new BufferedReader(new StringReader("")));
 
-        try (MockedStatic<OBContext> contextMock = mockStatic(OBContext.class)) {
+        try (MockedStatic<OBDal> dalMock = mockStatic(OBDal.class);
+             MockedStatic<OBContext> contextMock = mockStatic(OBContext.class);
+             MockedStatic<ModelProvider> modelProviderMock = mockStatic(ModelProvider.class)) {
             contextMock.when(OBContext::getOBContext).thenReturn(mockContext);
             contextMock.when(() -> OBContext.setAdminMode(true)).thenAnswer(invocation -> null);
             contextMock.when(OBContext::restorePreviousMode).thenAnswer(invocation -> null);
+
+            dalMock.when(OBDal::getInstance).thenReturn(mockDal);
+            when(mockDal.get(Attachment.class, TEST_ATTACHMENT_ID)).thenReturn(mockAttachment);
+            when(mockAttachment.getTable()).thenReturn(mockTable);
+            when(mockAttachment.getRecord()).thenReturn(TEST_RECORD_ID);
+            AttachmentsAccessStubs.stubEntityResolution(mockTable, modelProviderMock, mockModelProvider, mockEntity);
+            AttachmentsAccessStubs.stubRecordWritable(mockDal, mockContext, TEST_RECORD_ID, mockOrganization, TEST_ORG_ID);
 
             servlet.doPost(mockRequest, mockResponse);
 
