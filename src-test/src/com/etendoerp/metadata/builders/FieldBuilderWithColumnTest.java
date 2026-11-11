@@ -599,6 +599,20 @@ class FieldBuilderWithColumnTest {
         assertEquals(propertyPath, result.getJSONObject("column").getString("propertyPath"));
     }
 
+    /**
+     * Tests that a property field whose path crosses a related record is named after that path, the
+     * key under which the datasource returns its value, instead of the property of its column.
+     *
+     * @throws JSONException if JSON creation fails
+     */
+    @Test
+    void testToJSONWithDottedPropertyFieldUsesPathAsHqlName() throws JSONException {
+        JSONObject result = executeToJSON(() -> when(field.getProperty()).thenReturn("testEntity.testProp"));
+
+        assertEquals("testEntity$testProp", result.getString("hqlName"),
+                "hqlName of a property field must match the datasource key of its _extraProperties value");
+    }
+
     /* ---------------------------------------------------------------------- */
     /* Color field name tests */
     /* ---------------------------------------------------------------------- */
