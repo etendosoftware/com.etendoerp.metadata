@@ -162,13 +162,25 @@ public final class SelectorPropertiesUtil {
     public static JSONObject buildGridColumn(SelectorField selectorField) throws JSONException {
         JSONObject column = new JSONObject();
         column.put("id", selectorField.getId());
-        column.put("header", selectorField.get(SelectorField.PROPERTY_NAME, OBContext.getOBContext().getLanguage()));
+        column.put("header", resolveHeader(selectorField));
         column.put("accessorKey", FieldBuilder.getPropertyOrDataSourceField(selectorField));
         column.put("enableSorting", selectorField.isSortable());
         column.put("enableFiltering", selectorField.isFilterable());
         column.put("referenceId", resolveReferenceId(selectorField));
         column.put("sortNo", selectorField.getSortno());
         return column;
+    }
+
+    /**
+     * Header of a selector column: its name translated to the context language, or the untranslated name when
+     * there is no {@link OBContext} (e.g. outside a request).
+     */
+    private static Object resolveHeader(SelectorField selectorField) {
+        OBContext context = OBContext.getOBContext();
+        if (context == null || context.getLanguage() == null) {
+            return selectorField.getName();
+        }
+        return selectorField.get(SelectorField.PROPERTY_NAME, context.getLanguage());
     }
 
     /**

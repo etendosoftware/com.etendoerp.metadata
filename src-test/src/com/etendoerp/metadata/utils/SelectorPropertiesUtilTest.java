@@ -35,6 +35,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.Collections;
 import java.util.List;
 
+import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.junit.jupiter.api.Test;
@@ -305,6 +306,65 @@ class SelectorPropertiesUtilTest {
     JSONObject result = buildColumn(sf);
 
     assertFalse(result.has(KEY_REFERENCE_ID));
+  }
+
+  /**
+   * Builds a selector field mock that has a header and an accessor but no reference.
+   */
+  private static SelectorField pickListField(MockedStatic<FieldBuilder> fb, String id, String accessor,
+      boolean showInPicklist, long sortNo) {
+    SelectorField sf = mock(SelectorField.class);
+    when(sf.getId()).thenReturn(id);
+    when(sf.isActive()).thenReturn(true);
+    when(sf.isShowInPicklist()).thenReturn(showInPicklist);
+    when(sf.getSortno()).thenReturn(sortNo);
+    when(sf.getName()).thenReturn(id + "-name");
+    stubName(fb, sf, accessor);
+    return sf;
+  }
+
+  /**
+   * Tests buildPickListColumns puts the display field first, then the flagged fields by sequence,
+   * skipping unflagged ones, and writes nested properties with the datasource separator.
+   *
+   * @throws JSONException if the JSON structure cannot be built
+   */
+  @Test
+  void testBuildPickListColumnsOrderAndFlags() throws JSONException {
+    Selector selector = mock(Selector.class);
+    try (MockedStatic<OBContext> obContext = mockStatic(OBContext.class);
+        MockedStatic<FieldBuilder> fb = mockStatic(FieldBuilder.class, CALLS_REAL_METHODS)) {
+      obContext.when(OBContext::getOBContext).thenReturn(null);
+      SelectorField display = pickListField(fb, "display", "name", false, 30L);
+      SelectorField second = pickListField(fb, "second", "parent.child", true, 20L);
+      SelectorField first = pickListField(fb, "first", "code", true, 10L);
+      SelectorField hidden = pickListField(fb, "hidden", "other", false, 5L);
+      when(selector.getDisplayfield()).thenReturn(display);
+      when(selector.getOBUISELSelectorFieldList()).thenReturn(List.of(display, second, hidden, first));
+
+      JSONArray result = SelectorPropertiesUtil.buildPickListColumns(selector);
+
+      assertEquals(3, result.length());
+      assertEquals("display", result.getJSONObject(0).getString("id"));
+      assertEquals("first", result.getJSONObject(1).getString("id"));
+      assertEquals("parent" + JsonConstants.FIELD_SEPARATOR + "child",
+          result.getJSONObject(2).getString("accessorKey"));
+      assertEquals("display-name", result.getJSONObject(0).getString("header"));
+    }
+  }
+
+  /**
+   * Tests buildPickListColumns is empty when there is no display field and no flagged field.
+   *
+   * @throws JSONException if the JSON structure cannot be built
+   */
+  @Test
+  void testBuildPickListColumnsEmpty() throws JSONException {
+    Selector selector = mock(Selector.class);
+    when(selector.getDisplayfield()).thenReturn(null);
+    when(selector.getOBUISELSelectorFieldList()).thenReturn(Collections.emptyList());
+
+    assertEquals(0, SelectorPropertiesUtil.buildPickListColumns(selector).length());
   }
 
   /**
