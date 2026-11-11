@@ -30,6 +30,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
+import com.etendoerp.metadata.builders.FieldBuilder;
 import com.etendoerp.metadata.builders.FieldBuilderWithoutColumn;
 import com.etendoerp.metadata.cache.ADCacheProvider;
 import org.apache.logging.log4j.LogManager;
@@ -169,11 +170,23 @@ public class TabProcessor {
       BiFunction<T, Boolean, JSONObject> fieldMapper, JSONObject result) throws JSONException {
     String entityColumnName = getEntityColumnName(column);
     if (entityColumnName != null) {
-      result.put(entityColumnName, fieldMapper.apply(fieldLike, true));
+      JSONObject fieldJson = fieldMapper.apply(fieldLike, true);
+      result.put(getFieldKey(fieldJson, entityColumnName), fieldJson);
     } else {
       logger.warn("Could not determine entity column name for column: {} - skipping field",
           column.getDBColumnName());
     }
+  }
+
+  /**
+   * A property field whose path crosses a related record is keyed by its path (e.g.
+   * {@code finPayment$paymentDate}), as Classic names it. Keying it by the property of its column
+   * ({@code paymentDate}) would collide with a property of the tab's own entity.
+   */
+  private static String getFieldKey(JSONObject fieldJson, String entityColumnName) {
+    String propertyFieldName = FieldBuilder.getPropertyFieldName(
+        fieldJson.optString(Field.PROPERTY_PROPERTY, null));
+    return propertyFieldName != null ? propertyFieldName : entityColumnName;
   }
 
   private static <T> void processFieldWithoutColumn(T fieldLike, FieldProcessors<T> processors,
