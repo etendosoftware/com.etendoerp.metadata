@@ -17,12 +17,17 @@
 
 package com.etendoerp.metadata.utils;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
+import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
+import org.openbravo.dal.core.DalUtil;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.service.json.JsonConstants;
+import org.openbravo.userinterface.selector.Selector;
 import org.openbravo.userinterface.selector.SelectorField;
 
 import com.etendoerp.metadata.builders.FieldBuilder;
@@ -35,6 +40,8 @@ import com.etendoerp.metadata.builders.FieldBuilder;
  * @author Futit Services S.L.
  */
 public final class SelectorPropertiesUtil {
+    private static final String ACCESSOR_KEY = "accessorKey";
+
 
     /**
      * Private constructor to prevent instantiation of this utility class.
@@ -157,12 +164,57 @@ public final class SelectorPropertiesUtil {
     public static JSONObject buildGridColumn(SelectorField selectorField) throws JSONException {
         JSONObject column = new JSONObject();
         column.put("id", selectorField.getId());
-        column.put("header", selectorField.get(SelectorField.PROPERTY_NAME, OBContext.getOBContext().getLanguage()));
-        column.put("accessorKey", FieldBuilder.getPropertyOrDataSourceField(selectorField));
+        column.put("header", resolveHeader(selectorField));
+        column.put(ACCESSOR_KEY, FieldBuilder.getPropertyOrDataSourceField(selectorField));
         column.put("enableSorting", selectorField.isSortable());
         column.put("enableFiltering", selectorField.isFilterable());
         column.put("referenceId", resolveReferenceId(selectorField));
         column.put("sortNo", selectorField.getSortno());
+        return column;
+    }
+
+    /**
+     * Header of a selector column: its name translated to the context language, or the untranslated name when
+     * there is no {@link OBContext} (e.g. outside a request).
+     */
+    private static Object resolveHeader(SelectorField selectorField) {
+        OBContext context = OBContext.getOBContext();
+        if (context == null || context.getLanguage() == null) {
+            return selectorField.getName();
+        }
+        return selectorField.get(SelectorField.PROPERTY_NAME, context.getLanguage());
+    }
+
+    /**
+     * Builds the columns Classic shows in the dropdown ("picklist") of a selector: first the display field and
+     * then, in their sequence order, the active selector fields flagged with {@code showInPicklist}. Each entry
+     * has the same shape as a grid column, with its {@code accessorKey} written the way the datasource returns
+     * it (nested properties joined with {@link DalUtil#FIELDSEPARATOR}).
+     *
+     * @param selector The selector definition.
+     * @return The picklist columns; empty when the selector has no display field and no flagged field.
+     * @throws JSONException if a column cannot be built.
+     */
+    public static JSONArray buildPickListColumns(Selector selector) throws JSONException {
+        List<SelectorField> fields = new ArrayList<>(selector.getOBUISELSelectorFieldList());
+        fields.sort(Comparator.comparing(SelectorField::getSortno, Comparator.nullsLast(Comparator.naturalOrder())));
+
+        JSONArray columns = new JSONArray();
+        SelectorField displayField = selector.getDisplayfield();
+        if (displayField != null) {
+            columns.put(buildPickListColumn(displayField));
+        }
+        for (SelectorField selectorField : fields) {
+            if (selectorField.isActive() && selectorField.isShowInPicklist() && !selectorField.equals(displayField)) {
+                columns.put(buildPickListColumn(selectorField));
+            }
+        }
+        return columns;
+    }
+
+    private static JSONObject buildPickListColumn(SelectorField selectorField) throws JSONException {
+        JSONObject column = buildGridColumn(selectorField);
+        column.put(ACCESSOR_KEY, column.getString(ACCESSOR_KEY).replace(".", DalUtil.FIELDSEPARATOR));
         return column;
     }
 
