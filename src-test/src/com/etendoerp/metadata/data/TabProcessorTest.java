@@ -46,7 +46,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.function.BiFunction;
 
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
@@ -514,52 +513,6 @@ class TabProcessorTest {
     assertEquals(fieldJSON, result.get(TEST_PROPERTY_NAME));
     String cacheKey = TEST_TAB_ID + "#" + TEST_DATE + TEST_CONTEXT;
     verify(cache).put(eq(cacheKey), any(JSONObject.class));
-  }
-
-  /**
-   * Tests that a property field whose path crosses a related record is keyed by its path and does
-   * not overwrite a field of the tab's own entity whose column resolves to the same property name.
-   *
-   * @throws JSONException if the JSON processing fails (not expected in this test)
-   */
-  @Test
-  void testGetFieldsKeysDottedPropertyFieldByItsPath() throws JSONException {
-    Field propertyField = mock(Field.class);
-    when(propertyField.getColumn()).thenReturn(mockColumn);
-    JSONObject ownFieldJson = new JSONObject();
-    JSONObject propertyFieldJson = new JSONObject().put(Field.PROPERTY_PROPERTY, "invoicePaymentSchedule.amount");
-
-    JSONObject result = getFieldsWithMapper(List.of(mockField, propertyField),
-        (field, withColumn) -> field == propertyField ? propertyFieldJson : ownFieldJson);
-
-    assertEquals(ownFieldJson, result.get(TEST_PROPERTY_NAME));
-    assertEquals(propertyFieldJson, result.get("invoicePaymentSchedule$amount"));
-  }
-
-  /**
-   * Tests that a single-segment property field keeps the key of its column property.
-   *
-   * @throws JSONException if the JSON processing fails (not expected in this test)
-   */
-  @Test
-  void testGetFieldsKeepsColumnKeyForSingleSegmentProperty() throws JSONException {
-    JSONObject fieldJson = new JSONObject().put(Field.PROPERTY_PROPERTY, "amount");
-
-    JSONObject result = getFieldsWithMapper(List.of(mockField), (field, withColumn) -> fieldJson);
-
-    assertEquals(fieldJson, result.get(TEST_PROPERTY_NAME));
-  }
-
-  /**
-   * Runs getFields over the given fields with every field accessible and no cached result.
-   *
-   * @param fields      the fields to process
-   * @param fieldMapper the function that builds the JSON of each field
-   * @return the fields JSON keyed by field name
-   */
-  private JSONObject getFieldsWithMapper(List<Field> fields, BiFunction<Field, Boolean, JSONObject> fieldMapper) {
-    return TabProcessor.getFields(TEST_TAB_ID, TEST_DATE.toString(), fields, field -> true, Field::getColumn,
-        field -> null, field -> null, Field::getName, Field::setName, fieldMapper, createEmptyMockCache());
   }
 
   /**

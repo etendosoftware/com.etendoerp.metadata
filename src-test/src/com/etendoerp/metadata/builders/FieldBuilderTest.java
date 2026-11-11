@@ -907,10 +907,10 @@ class FieldBuilderTest {
    * Tests that getHqlName names a property field whose path crosses a related record after its
    * path, as Classic does, without resolving the column of the related table.
    *
-   * @throws Exception if reflection fails or method invocation fails
+   * @throws ReflectiveOperationException if the method cannot be found or invoked
    */
   @Test
-  void testGetHqlNameUsesPropertyFieldNameForDottedProperty() throws Exception {
+  void testGetHqlNameUsesPropertyFieldNameForDottedProperty() throws ReflectiveOperationException {
     when(field.getProperty()).thenReturn(DOTTED_PROPERTY);
 
     assertEquals(DOTTED_PROPERTY_FIELD_NAME, invokeGetHqlName(field));
@@ -921,10 +921,10 @@ class FieldBuilderTest {
    * Tests that getHqlName keeps resolving a single-segment property field through its column,
    * since such a property is already a property of the tab's own entity.
    *
-   * @throws Exception if reflection fails or method invocation fails
+   * @throws ReflectiveOperationException if the method cannot be found or invoked
    */
   @Test
-  void testGetHqlNameIgnoresSingleSegmentProperty() throws Exception {
+  void testGetHqlNameIgnoresSingleSegmentProperty() throws ReflectiveOperationException {
     when(field.getProperty()).thenReturn("amount");
     when(column.getTable()).thenReturn(table);
     when(table.getDataOriginType()).thenReturn("HQL");
@@ -960,9 +960,9 @@ class FieldBuilderTest {
    *
    * @param target the field to resolve
    * @return the resolved HQL name
-   * @throws Exception if reflection fails or method invocation fails
+   * @throws ReflectiveOperationException if the method cannot be found or invoked
    */
-  private static String invokeGetHqlName(Field target) throws Exception {
+  private static String invokeGetHqlName(Field target) throws ReflectiveOperationException {
     Method method = FieldBuilder.class.getDeclaredMethod(GET_HQL_NAME_METHOD, Field.class);
     method.setAccessible(true);
     return (String) method.invoke(null, target);
