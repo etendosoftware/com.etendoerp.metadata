@@ -40,6 +40,8 @@ import com.etendoerp.metadata.builders.FieldBuilder;
  * @author Futit Services S.L.
  */
 public final class SelectorPropertiesUtil {
+    private static final String ACCESSOR_KEY = "accessorKey";
+
 
     /**
      * Private constructor to prevent instantiation of this utility class.
@@ -163,7 +165,7 @@ public final class SelectorPropertiesUtil {
         JSONObject column = new JSONObject();
         column.put("id", selectorField.getId());
         column.put("header", resolveHeader(selectorField));
-        column.put("accessorKey", FieldBuilder.getPropertyOrDataSourceField(selectorField));
+        column.put(ACCESSOR_KEY, FieldBuilder.getPropertyOrDataSourceField(selectorField));
         column.put("enableSorting", selectorField.isSortable());
         column.put("enableFiltering", selectorField.isFilterable());
         column.put("referenceId", resolveReferenceId(selectorField));
@@ -212,7 +214,7 @@ public final class SelectorPropertiesUtil {
 
     private static JSONObject buildPickListColumn(SelectorField selectorField) throws JSONException {
         JSONObject column = buildGridColumn(selectorField);
-        column.put("accessorKey", column.getString("accessorKey").replace(".", DalUtil.FIELDSEPARATOR));
+        column.put(ACCESSOR_KEY, column.getString(ACCESSOR_KEY).replace(".", DalUtil.FIELDSEPARATOR));
         return column;
     }
 
