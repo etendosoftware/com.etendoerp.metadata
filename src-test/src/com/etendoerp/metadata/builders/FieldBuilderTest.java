@@ -33,6 +33,8 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.lang.reflect.Method;
@@ -45,6 +47,9 @@ import org.codehaus.jettison.json.JSONObject;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.MockedConstruction;
 import org.mockito.MockedStatic;
@@ -143,6 +148,10 @@ class FieldBuilderTest {
   private static final String VALUE_PROPERTY = "valueProperty";
   private static final String SEARCH_FIELD = "searchField";
   private static final String GET_HQL_NAME_METHOD = "getHqlName";
+  private static final String SPACED_FIELD_NAME = "Test Field";
+  private static final String CAMEL_CASED_FIELD_NAME = "testField";
+  private static final String DOTTED_PROPERTY = "finPayment.paymentDate";
+  private static final String DOTTED_PROPERTY_FIELD_NAME = "finPayment$paymentDate";
   private static final String TEST_TABLE = "TestTable";
   private static final String BOOLEAN_FIELD = "booleanField";
   private static final String DISPLAY = "display";
@@ -846,13 +855,13 @@ class FieldBuilderTest {
   void testGetHqlNameFallsBackWhenNotTableBased() throws Exception {
     when(column.getTable()).thenReturn(table);
     when(table.getDataOriginType()).thenReturn("HQL");
-    when(field.getName()).thenReturn("Test Field");
+    when(field.getName()).thenReturn(SPACED_FIELD_NAME);
 
     Method method = FieldBuilder.class.getDeclaredMethod(GET_HQL_NAME_METHOD, Field.class);
     method.setAccessible(true);
     String result = (String) method.invoke(null, field);
 
-    assertEquals("testField", result);
+    assertEquals(CAMEL_CASED_FIELD_NAME, result);
   }
 
   @Test
@@ -861,7 +870,7 @@ class FieldBuilderTest {
     when(table.getDataOriginType()).thenReturn("Table");
     when(table.getDBTableName()).thenReturn(DB_TABLE_NAME);
     when(column.getDBColumnName()).thenReturn(DB_COLUMN_NAME);
-    when(field.getName()).thenReturn("Test Field");
+    when(field.getName()).thenReturn(SPACED_FIELD_NAME);
 
     try (MockedStatic<DataSourceUtils> mockedDataSourceUtils = mockStatic(DataSourceUtils.class)) {
       mockedDataSourceUtils.when(() -> DataSourceUtils.getHQLColumnName(true, DB_TABLE_NAME, DB_COLUMN_NAME))
@@ -871,7 +880,7 @@ class FieldBuilderTest {
       method.setAccessible(true);
       String result = (String) method.invoke(null, field);
 
-      assertEquals("testField", result);
+      assertEquals(CAMEL_CASED_FIELD_NAME, result);
     }
   }
 
@@ -892,6 +901,71 @@ class FieldBuilderTest {
     String result = (String) method.invoke(null, field);
 
     assertEquals(TEST_FIELD, result);
+  }
+
+  /**
+   * Tests that getHqlName names a property field whose path crosses a related record after its
+   * path, as Classic does, without resolving the column of the related table.
+   *
+   * @throws ReflectiveOperationException if the method cannot be found or invoked
+   */
+  @Test
+  void testGetHqlNameUsesPropertyFieldNameForDottedProperty() throws ReflectiveOperationException {
+    when(field.getProperty()).thenReturn(DOTTED_PROPERTY);
+
+    assertEquals(DOTTED_PROPERTY_FIELD_NAME, invokeGetHqlName(field));
+    verify(field, never()).getColumn();
+  }
+
+  /**
+   * Tests that getHqlName keeps resolving a single-segment property field through its column,
+   * since such a property is already a property of the tab's own entity.
+   *
+   * @throws ReflectiveOperationException if the method cannot be found or invoked
+   */
+  @Test
+  void testGetHqlNameIgnoresSingleSegmentProperty() throws ReflectiveOperationException {
+    when(field.getProperty()).thenReturn("amount");
+    when(column.getTable()).thenReturn(table);
+    when(table.getDataOriginType()).thenReturn("HQL");
+    when(field.getName()).thenReturn(SPACED_FIELD_NAME);
+
+    assertEquals(CAMEL_CASED_FIELD_NAME, invokeGetHqlName(field));
+  }
+
+  /**
+   * Tests that getPropertyFieldName replaces every dot of a multi-segment path.
+   */
+  @Test
+  void testGetPropertyFieldNameReplacesEveryDot() {
+    assertEquals("paymentDetails$finPayment$paymentDate",
+        FieldBuilder.getPropertyFieldName("paymentDetails.finPayment.paymentDate"));
+    assertEquals(DOTTED_PROPERTY_FIELD_NAME, FieldBuilder.getPropertyFieldName(DOTTED_PROPERTY));
+  }
+
+  /**
+   * Tests that getPropertyFieldName returns null when there is no related-record path.
+   *
+   * @param property the property value under test
+   */
+  @ParameterizedTest
+  @NullAndEmptySource
+  @ValueSource(strings = { "amount" })
+  void testGetPropertyFieldNameReturnsNullWithoutDot(String property) {
+    assertNull(FieldBuilder.getPropertyFieldName(property));
+  }
+
+  /**
+   * Invokes the protected static getHqlName method through reflection.
+   *
+   * @param target the field to resolve
+   * @return the resolved HQL name
+   * @throws ReflectiveOperationException if the method cannot be found or invoked
+   */
+  private static String invokeGetHqlName(Field target) throws ReflectiveOperationException {
+    Method method = FieldBuilder.class.getDeclaredMethod(GET_HQL_NAME_METHOD, Field.class);
+    method.setAccessible(true);
+    return (String) method.invoke(null, target);
   }
 
   /**
@@ -1406,7 +1480,7 @@ class FieldBuilderTest {
     when(column.getTable()).thenReturn(table);
     when(table.getDBTableName()).thenReturn(TEST_DB_TABLE);
     when(column.getDBColumnName()).thenReturn(TEST_DB_COLUMN);
-    when(field.getName()).thenReturn("Test Field");
+    when(field.getName()).thenReturn(SPACED_FIELD_NAME);
 
     try (MockedStatic<DataSourceUtils> mockedDataSourceUtils = mockStatic(DataSourceUtils.class)) {
       mockedDataSourceUtils.when(() -> DataSourceUtils.getHQLColumnName(true, TEST_DB_TABLE, TEST_DB_COLUMN))
@@ -1417,7 +1491,7 @@ class FieldBuilderTest {
       String result = (String) method.invoke(null, field);
 
       // Should fall back to camelCase of field name
-      assertEquals("testField", result);
+      assertEquals(CAMEL_CASED_FIELD_NAME, result);
     }
   }
 

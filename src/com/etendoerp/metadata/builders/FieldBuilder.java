@@ -672,7 +672,9 @@ public abstract class FieldBuilder extends Builder {
 
     /**
      * Generates the HQL (Hibernate Query Language) property name for a field.
-     * Attempts to determine the correct HQL name from database table and column
+     * A property field whose path crosses a related record is named after its path
+     * (see {@link #getPropertyFieldName(String)}).
+     * Otherwise, attempts to determine the correct HQL name from database table and column
      * information.
      * If matched, returns the HQL property name via DataSourceUtils.
      * If column lookup fails, matches the field name normalized to camelCase (e.g.
@@ -683,6 +685,10 @@ public abstract class FieldBuilder extends Builder {
      * @return The HQL property name, or camelCased field name as fallback
      */
     protected static String getHqlName(Field field) {
+        String propertyFieldName = getPropertyFieldName(field.getProperty());
+        if (propertyFieldName != null) {
+            return propertyFieldName;
+        }
         try {
             Column fieldColumn = field.getColumn();
             // Only attempt DAL entity lookup for physical table-based tables (not HQL or other virtual types)
@@ -701,6 +707,22 @@ public abstract class FieldBuilder extends Builder {
 
         String name = field.getName().replaceAll("\\s+", "");
         return Character.toLowerCase(name.charAt(0)) + name.substring(1);
+    }
+
+    /**
+     * Returns the name of a property field whose property path crosses a related record
+     * (e.g. {@code finPayment.paymentDate} becomes {@code finPayment$paymentDate}).
+     * Classic names these fields the same way (OBViewFieldHandler.getName), and it is the key under
+     * which the datasource returns the value requested through {@code _extraProperties}.
+     *
+     * @param property the AD_Field property path, may be {@code null}
+     * @return the property field name, or {@code null} when the property does not contain a dot
+     */
+    public static String getPropertyFieldName(String property) {
+        if (property == null || !property.contains(DalUtil.DOT)) {
+            return null;
+        }
+        return property.replace(DalUtil.DOT, DalUtil.FIELDSEPARATOR);
     }
 
     /**
