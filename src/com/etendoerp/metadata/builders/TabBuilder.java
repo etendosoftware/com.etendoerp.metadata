@@ -77,6 +77,7 @@ public class TabBuilder extends Builder {
    * toolbar button on such tabs (see OBViewTab.getIconButtons).
    */
   private static final String TABLE_FULLY_AUDITED = "tableFullyAudited";
+  private static final String DELETABLE_RECORDS = "deletableRecords";
 
   private final Tab tab;
   private final TabAccess tabAccess;
@@ -197,6 +198,9 @@ public class TabBuilder extends Builder {
 
       json.put("obuiappCanAdd", Boolean.TRUE.equals(tab.isObuiappCanAdd()));
       json.put(TABLE_FULLY_AUDITED, Boolean.TRUE.equals(tab.getTable().isFullyAudited()));
+      // Classic OBViewTab.getDeleteableTable: the toolbar Delete button is disabled for a table that does not
+      // allow deleting. A table without the flag allows it.
+      json.put(DELETABLE_RECORDS, !Boolean.FALSE.equals(tab.getTable().isDeletableRecords()));
       putValueOrNull(json, TabPrintConfig.PRINT_CONFIG, TabPrintConfig.toJSON(tab, this::findKeyColumn));
 
       return json;
