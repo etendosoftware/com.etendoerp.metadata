@@ -68,6 +68,8 @@ abstract class TabBuilderTestBase {
     protected static final String TEST_DESCRIPTION = "Test description";
     protected static final String TEST_HELP = "Test help";
     protected static final String ENTITY_NAME_KEY = "entityName";
+    /** Default sort property every TabBuilder test gets from the mocked {@link TabDefaultSort}. */
+    protected static final String TEST_DEFAULT_SORT_FIELD = "lineNo";
 
     /**
      * Executes a TabBuilder test with common mock setup
@@ -133,6 +135,7 @@ abstract class TabBuilderTestBase {
         try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
                 MockedStatic<KernelUtils> mockedKernelUtils = mockStatic(KernelUtils.class);
                 MockedStatic<TabProcessor> mockedTabProcessor = mockStatic(TabProcessor.class);
+                MockedStatic<TabDefaultSort> mockedDefaultSort = mockStatic(TabDefaultSort.class);
                 MockedConstruction<DataToJsonConverter> ignored = mockConstruction(DataToJsonConverter.class,
                         (mock, context) -> {
                             JSONObject tabJson = new JSONObject();
@@ -142,6 +145,8 @@ abstract class TabBuilderTestBase {
 
             mockedOBContext.when(OBContext::getOBContext).thenReturn(mockContext);
             mockedKernelUtils.when(KernelUtils::getInstance).thenReturn(mockKernelUtils);
+            // TabDefaultSort reads the DAL model; it is covered by TabDefaultSortTest
+            mockedDefaultSort.when(() -> TabDefaultSort.resolve(any(Tab.class))).thenReturn(TEST_DEFAULT_SORT_FIELD);
 
             // Mock both because getFields() might fall back to tab if access is empty
             mockedTabProcessor.when(() -> TabProcessor.getTabFields(any(Tab.class))).thenReturn(tabFields);

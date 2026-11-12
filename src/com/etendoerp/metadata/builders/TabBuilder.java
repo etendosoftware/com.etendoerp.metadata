@@ -196,6 +196,8 @@ public class TabBuilder extends Builder {
       }
 
       json.put("obuiappCanAdd", Boolean.TRUE.equals(tab.isObuiappCanAdd()));
+      // Classic's default grid sort when the tab has no order-by clause (OBViewGridComponent.getSortField)
+      json.put(TabDefaultSort.DEFAULT_SORT_FIELD, TabDefaultSort.resolve(tab));
       json.put(TABLE_FULLY_AUDITED, Boolean.TRUE.equals(tab.getTable().isFullyAudited()));
       putValueOrNull(json, TabPrintConfig.PRINT_CONFIG, TabPrintConfig.toJSON(tab, this::findKeyColumn));
 

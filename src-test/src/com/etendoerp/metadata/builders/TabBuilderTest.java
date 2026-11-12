@@ -751,6 +751,25 @@ class TabBuilderTest extends TabBuilderTestBase {
     }
 
     /**
+     * Tests that the tab JSON carries the Classic default sort property resolved by {@link TabDefaultSort}.
+     *
+     * @throws Exception when mock setup fails
+     */
+    @Test
+    void toJSONEmitsDefaultSortField() throws Exception {
+        TestContext ctx = setupTestContext();
+        setupBasicMocks(ctx.context, ctx.language, ctx.tab, ctx.table, ctx.kernelUtils, List.of());
+
+        executeTabBuilderTest(ctx.context, ctx.kernelUtils, ctx.tab, new JSONObject(), result -> {
+            try {
+                assertEquals(TEST_DEFAULT_SORT_FIELD, result.getString(TabDefaultSort.DEFAULT_SORT_FIELD));
+            } catch (JSONException e) {
+                fail(JSON_EXCEPTION + ": " + e.getMessage());
+            }
+        });
+    }
+
+    /**
      * Tests that {@code obuiappCanAdd} is emitted as {@code false} when
      * {@link Tab#isObuiappCanAdd()} returns {@code Boolean.FALSE}.
      *

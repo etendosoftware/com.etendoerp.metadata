@@ -100,6 +100,7 @@ When the frontend requests metadata for a window, the response includes the full
   - `keyParam`: the classic `inpKeyName`.
 
   Same rules as the classic UI (`OBViewTab.getIconButtons` / `PrintButton`). See the client doc `docs/features/toolbar-print-email/README.md`.
+- `defaultSortField` (`TabDefaultSort`): property the grid is sorted by when the tab has no HQL order-by clause, `""` when it has one or nothing applies. Same rules as the classic UI (`OBViewGridComponent.getSortField`): the **last** view field (in sequence order) with a record sort number, shown in the grid and shorter than 2000 (Classic never updates its lowest sort number, so the last qualifying field wins and that is kept for parity); otherwise the `sequenceNumber` or `lineNo` property of the entity; otherwise the first identifier field. See the client doc `docs/features/grid-default-sort/README.md`.
 
 #### Field Level (`FieldBuilder`, `FieldBuilderWithColumn`, `FieldBuilderWithoutColumn`)
 
