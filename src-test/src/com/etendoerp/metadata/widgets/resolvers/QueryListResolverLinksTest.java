@@ -59,6 +59,8 @@ class QueryListResolverLinksTest {
 
     private static final String HQL = "select p.name as product, p.id as pid from Product p";
     private static final String COLUMNS_PARAM = "product,pid";
+    private static final String REFERENCED_WINDOW_ID = "referencedWindowId";
+    private static final String REFERENCED_TAB_ID = "referencedTabId";
     private static final String LINKS = "links";
     private static final String COLUMNS = "columns";
     private static final String ROWS = "rows";
@@ -142,8 +144,8 @@ class QueryListResolverLinksTest {
 
             JSONObject column = result.getJSONArray(COLUMNS).getJSONObject(0);
             assertEquals(PRODUCT, column.getString("name"));
-            assertEquals(WINDOW_ID, column.getString("referencedWindowId"));
-            assertEquals(TAB_ID, column.getString("referencedTabId"));
+            assertEquals(WINDOW_ID, column.getString(REFERENCED_WINDOW_ID));
+            assertEquals(TAB_ID, column.getString(REFERENCED_TAB_ID));
         });
     }
 
@@ -172,7 +174,7 @@ class QueryListResolverLinksTest {
             JSONObject result = resolver.resolve(ctx(LINK_FOR_PRODUCT));
 
             JSONObject column = result.getJSONArray(COLUMNS).getJSONObject(0);
-            assertFalse(column.has("referencedWindowId"));
+            assertFalse(column.has(REFERENCED_WINDOW_ID));
             assertFalse(result.getJSONArray(ROWS).getJSONObject(0).has("product_id"));
         });
     }
@@ -184,7 +186,7 @@ class QueryListResolverLinksTest {
         withMocks(tabQuery(new Object[] { TAB_ID, WINDOW_ID }), () -> {
             JSONObject column = resolver.resolve(ctx(LINK_FOR_PRODUCT)).getJSONArray(COLUMNS).getJSONObject(0);
 
-            assertFalse(column.has("referencedTabId"));
+            assertFalse(column.has(REFERENCED_TAB_ID));
         });
     }
 
@@ -193,7 +195,7 @@ class QueryListResolverLinksTest {
         withMocks(tabQuery(new Object[] { TAB_ID, WINDOW_ID }), () -> {
             JSONObject result = resolver.resolve(ctx("{not json"));
 
-            assertFalse(result.getJSONArray(COLUMNS).getJSONObject(0).has("referencedWindowId"));
+            assertFalse(result.getJSONArray(COLUMNS).getJSONObject(0).has(REFERENCED_WINDOW_ID));
             assertEquals(1, result.getJSONArray(ROWS).length());
         });
     }
@@ -203,7 +205,7 @@ class QueryListResolverLinksTest {
         withMocks(tabQuery(new Object[] { TAB_ID, WINDOW_ID }), () -> {
             JSONObject result = resolver.resolve(ctx("{\"product\":{\"entity\":\"Product\"}}"));
 
-            assertFalse(result.getJSONArray(COLUMNS).getJSONObject(0).has("referencedWindowId"));
+            assertFalse(result.getJSONArray(COLUMNS).getJSONObject(0).has(REFERENCED_WINDOW_ID));
         });
     }
 
@@ -212,7 +214,7 @@ class QueryListResolverLinksTest {
         withMocks(tabQuery(new Object[] { TAB_ID, WINDOW_ID }), () -> {
             JSONObject result = resolver.resolve(ctx(null));
 
-            assertFalse(result.getJSONArray(COLUMNS).getJSONObject(0).has("referencedWindowId"));
+            assertFalse(result.getJSONArray(COLUMNS).getJSONObject(0).has(REFERENCED_WINDOW_ID));
             assertTrue(result.getJSONArray(ROWS).getJSONObject(0).has(PRODUCT));
         });
     }
