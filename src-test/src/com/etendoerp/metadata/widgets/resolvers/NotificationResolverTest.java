@@ -171,13 +171,14 @@ class NotificationResolverTest {
         Date older = new Date(1_000L);
         Date newer = new Date(2_000L);
         when(itemsQuery.list()).thenReturn(Arrays.<Object>asList(
-            new Object[] { "Old alert", RULE_A, older }, new Object[] { "New alert", RULE_A, newer }));
+            new Object[] { "A1", "Old alert", RULE_A, older }, new Object[] { "A2", "New alert", RULE_A, newer }));
         when(countQuery.uniqueResult()).thenReturn(5L);
 
         JSONObject result = new NotificationResolver().resolve(ctx);
         JSONArray items = result.getJSONArray(ITEMS);
 
         assertEquals(2, items.length());
+        assertEquals("A2", items.getJSONObject(0).getString("id"));
         assertEquals("New alert", items.getJSONObject(0).getString("text"));
         assertEquals(RULE_A + " name", items.getJSONObject(0).getString("title"));
         assertEquals(NotificationResolver.NORMAL_PRIORITY, items.getJSONObject(0).getString("priority"));
@@ -191,7 +192,7 @@ class NotificationResolverTest {
     @Test
     void hidesTheAlertsOfARuleWhoseFilterClauseCannotBeConverted() throws Exception {
         givenRules(rule(RULE_A, null), rule(RULE_B, BROKEN_CLAUSE));
-        when(itemsQuery.list()).thenReturn(Collections.<Object>singletonList(new Object[] { "Alert", RULE_A, null }));
+        when(itemsQuery.list()).thenReturn(Collections.<Object>singletonList(new Object[] { "A1", "Alert", RULE_A, null }));
         when(countQuery.uniqueResult()).thenReturn(1L);
 
         try (MockedConstruction<UsedByLink> ignored = brokenFilterClauses()) {
@@ -228,8 +229,8 @@ class NotificationResolverTest {
     void limitsTheListToTheRequestedRows() throws Exception {
         givenRules(rule(RULE_A, null));
         when(ctx.param(NotificationResolver.PARAM_ROWS)).thenReturn("1");
-        List<Object> rows = Arrays.<Object>asList(new Object[] { "One", RULE_A, new Date(1L) },
-            new Object[] { "Two", RULE_A, new Date(2L) });
+        List<Object> rows = Arrays.<Object>asList(new Object[] { "A1", "One", RULE_A, new Date(1L) },
+            new Object[] { "A2", "Two", RULE_A, new Date(2L) });
         when(itemsQuery.list()).thenReturn(rows);
         when(countQuery.uniqueResult()).thenReturn(2L);
 

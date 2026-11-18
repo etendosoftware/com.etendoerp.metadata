@@ -54,7 +54,7 @@ import com.etendoerp.metadata.widgets.WidgetDataResolver;
  * Classic does, so each clause is converted once. A clause that cannot be converted hides its alerts, like in
  * Classic.
  * <p>
- * Each item carries the alert description ({@code text}), the rule name ({@code title}), its creation time
+ * Each item carries the alert id ({@code id}, to mark it as read), its description ({@code text}), the rule name ({@code title}), its creation time
  * ({@code time}) and {@code priority} "normal" (alerts have no priority).
  */
 public class NotificationResolver implements WidgetDataResolver {
@@ -87,7 +87,7 @@ public class NotificationResolver implements WidgetDataResolver {
         + "   and AD_ORG_ID in :orgs"
         + "   and AD_ALERTRULE_ID in :rules";
 
-    static final String ITEMS_SQL = "select DESCRIPTION, AD_ALERTRULE_ID, CREATED" + ALERTS_WHERE;
+    static final String ITEMS_SQL = "select AD_ALERT_ID, DESCRIPTION, AD_ALERTRULE_ID, CREATED" + ALERTS_WHERE;
     static final String COUNT_SQL = "select count(*)" + ALERTS_WHERE;
     private static final String ORDER_BY = " order by CREATED desc";
     // @formatter:on
@@ -134,7 +134,7 @@ public class NotificationResolver implements WidgetDataResolver {
      * @param obContext context of the current user
      * @return the active rules visible from the current role
      */
-    List<AlertRule> findRules(OBContext obContext) {
+    public List<AlertRule> findRules(OBContext obContext) {
         return OBDal.getInstance()
             .getSession()
             .createQuery(RULES_HQL, AlertRule.class)
@@ -194,14 +194,15 @@ public class NotificationResolver implements WidgetDataResolver {
     }
 
     private static Function<Object[], AlertItem> toItem(Map<String, String> ruleNames) {
-        return row -> new AlertItem(Objects.toString(row[0], NO_FILTER), ruleNames.get(Objects.toString(row[1])),
-            (Date) row[2]);
+        return row -> new AlertItem(Objects.toString(row[0]), Objects.toString(row[1], NO_FILTER),
+            ruleNames.get(Objects.toString(row[2])), (Date) row[3]);
     }
 
     private static JSONObject toJson(List<AlertItem> items, long total) throws JSONException {
         JSONArray array = new JSONArray();
         for (AlertItem item : items) {
-            array.put(new JSONObject().put("text", item.getText())
+            array.put(new JSONObject().put("id", item.getId())
+                .put("text", item.getText())
                 .put("title", item.getRuleName())
                 .put("priority", NORMAL_PRIORITY)
                 .put("time", item.getCreated() == null ? null : item.getCreated().toInstant().toString()));
@@ -227,14 +228,20 @@ public class NotificationResolver implements WidgetDataResolver {
 
     /** One pending alert. */
     static final class AlertItem {
+        private final String id;
         private final String text;
         private final String ruleName;
         private final Date created;
 
-        AlertItem(String text, String ruleName, Date created) {
+        AlertItem(String id, String text, String ruleName, Date created) {
+            this.id = id;
             this.text = text;
             this.ruleName = ruleName;
             this.created = created;
+        }
+
+        String getId() {
+            return id;
         }
 
         String getText() {

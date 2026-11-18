@@ -454,6 +454,19 @@ Add a new widget instance to the dashboard.
 
 Remove a widget. USER-layer records are hard-deleted. SYSTEM/CLIENT records get a USER-layer shadow with `ISVISIBLE=N`.
 
+### POST /meta/dashboard/alerts/acknowledge
+
+Marks pending alerts of the current user as read (status `ACKNOWLEDGED`, the "Acknowledge" of Classic's Alert
+Management). Used by the notifications widget.
+
+```json
+{ "alertIds": ["A1B2...", "C3D4..."] }
+```
+
+Response: `{ "acknowledged": 2 }`. Only alerts in status NEW, of a rule the user receives (directly or through
+their role) and in a readable client and organization are changed; any other id is ignored. Classic's
+`AlertManagementActionHandler` does not check this, so the widget does not call it.
+
 ### PATCH /meta/dashboard/widget/{instanceId}/params
 
 Update widget instance parameters.
