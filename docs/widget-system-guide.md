@@ -146,7 +146,7 @@ SYSTEM (base)  →  CLIENT (override)  →  USER (override)
 | `FAVORITES` | `FavoritesResolver` | `ETMETA_USER_FAVORITE` table | No | User-bookmarked records and windows |
 | `RECENT_DOCS` | `RecentDocsResolver` | Frontend localStorage signal | No | Recently created/modified documents |
 | `RECENTLY_VIEWED` | `RecentlyViewedResolver` | Frontend localStorage signal | No | Recently navigated windows |
-| `NOTIFICATION` | `NotificationResolver` | `AD_Note` table | No | System alerts for current user |
+| `NOTIFICATION` | `NotificationResolver` | `AD_Alert` (NEW alerts of the rules the user or role receives, same rule as the header bell / Classic `AlertActionHandler`) | No | Pending alerts of the current user, with the rule name as title |
 | `STOCK_ALERT` | `StockAlertResolver` | `M_Storage` / `M_Product` | No | Products below minimum stock |
 | `KPI` | `KPIResolver` | `HQL_QUERY` field | Via params | Single numeric metric with trend |
 | `QUERY_LIST` | `QueryListResolver` | `HQL_QUERY` field | Via params | Tabular data from parameterized HQL |
@@ -187,7 +187,7 @@ The module ships with 21 widget class definitions:
 | `favorites` | FAVORITES | Bookmarked workspace elements | 0 |
 | `recent-docs` | RECENT_DOCS | Recently accessed documents | 0 |
 | `recently-viewed` | RECENTLY_VIEWED | Recently viewed windows/entities | 0 |
-| `notifications` | NOTIFICATION | User alerts from AD_Note | 60s |
+| `notifications` | NOTIFICATION | Pending alerts from AD_Alert | 60s |
 
 ### Data Widgets (HQL-based)
 | Name | Type | Description | Refresh |

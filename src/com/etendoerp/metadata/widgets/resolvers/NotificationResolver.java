@@ -17,103 +17,236 @@
 
 package com.etendoerp.metadata.widgets.resolvers;
 
+import static java.util.stream.Collectors.groupingBy;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+import javax.servlet.http.HttpServletRequest;
+
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.codehaus.jettison.json.JSONArray;
+import org.codehaus.jettison.json.JSONException;
+import org.codehaus.jettison.json.JSONObject;
+import org.openbravo.base.secureApp.VariablesSecureApp;
+import org.openbravo.client.kernel.RequestContext;
+import org.openbravo.dal.core.OBContext;
+import org.openbravo.dal.service.OBDal;
+import org.openbravo.erpCommon.utility.UsedByLink;
+import org.openbravo.model.ad.alert.AlertRule;
+
 import com.etendoerp.metadata.widgets.WidgetDataContext;
 import com.etendoerp.metadata.widgets.WidgetDataResolver;
-import org.codehaus.jettison.json.JSONArray;
-import org.codehaus.jettison.json.JSONObject;
-import org.hibernate.query.Query;
-import org.openbravo.dal.service.OBDal;
-
-import java.util.List;
 
 /**
- * Queries AD_Note for the current user's notifications.
- * Priority mapping: 0 = normal, 1 = high, 2 = success.
+ * Lists the pending alerts of the current user: the same alerts the bell of the header counts.
+ * <p>
+ * It follows Classic's {@code AlertActionHandler}: active alert rules whose recipient is the user, or their role
+ * when the recipient has no user, limited to the readable clients and organizations; then the alerts of those
+ * rules still in status NEW, with the filter clause of each rule applied. Rules are grouped by filter clause, as
+ * Classic does, so each clause is converted once. A clause that cannot be converted hides its alerts, like in
+ * Classic.
+ * <p>
+ * Each item carries the alert description ({@code text}), the rule name ({@code title}), its creation time
+ * ({@code time}) and {@code priority} "normal" (alerts have no priority).
  */
 public class NotificationResolver implements WidgetDataResolver {
-    @Override public String getType() { return "NOTIFICATION"; }
 
+    private static final Logger log = LogManager.getLogger(NotificationResolver.class);
+
+    static final String PARAM_ROWS = "rowsNumber";
+    static final int DEFAULT_ROWS = 10;
+    static final String NORMAL_PRIORITY = "normal";
+    private static final String NO_FILTER = "";
+    private static final String KEY_ITEMS = "items";
+    private static final String KEY_TOTAL = "totalCount";
+    private static final String PARAM_CLIENTS = "clients";
+    private static final String PARAM_ORGS = "orgs";
+    private static final String PARAM_RULES = "rules";
+
+    // @formatter:off
+    static final String RULES_HQL =
+          "select distinct(e.alertRule) from ADAlertRecipient e"
+        + " where e.alertRule.active = true"
+        + "   and (e.userContact.id = :userId or (e.userContact.id is null and e.role.id = :roleId))"
+        + "   and e.alertRule.client.id in :clients"
+        + "   and e.alertRule.organization.id in :orgs";
+
+    /** Unaliased, like Classic's count, so the filter clause of a rule can name the AD_ALERT columns. */
+    private static final String ALERTS_WHERE =
+          " from AD_ALERT"
+        + " where COALESCE(STATUS, 'NEW') = 'NEW'"
+        + "   and AD_CLIENT_ID in :clients"
+        + "   and AD_ORG_ID in :orgs"
+        + "   and AD_ALERTRULE_ID in :rules";
+
+    static final String ITEMS_SQL = "select DESCRIPTION, AD_ALERTRULE_ID, CREATED" + ALERTS_WHERE;
+    static final String COUNT_SQL = "select count(*)" + ALERTS_WHERE;
+    private static final String ORDER_BY = " order by CREATED desc";
+    // @formatter:on
+
+    @Override
+    public String getType() {
+        return "NOTIFICATION";
+    }
+
+    /** Alerts are part of the core, so the widget is always available. */
     @Override
     public boolean isAvailable() {
-        try {
-            OBDal.getInstance().getSession()
-                .createQuery("select 1 from AN_Note n where 1=0", Integer.class);
-            return true;
-        } catch (Exception e) {
-            return false;
-        }
+        return true;
     }
-
-    private static final String ITEMS_HQL =
-        "select n.note, n.priority, n.creationDate " +
-        "from AN_Note n where n.userContact.id = :userId " +
-        "and n.isactive = 'Y' order by n.creationDate desc";
-
-    private static final String COUNT_HQL =
-        "select count(n) from AN_Note n where n.userContact.id = :userId and n.isactive = 'Y'";
-
-    private static final String PARAM_USER_ID = "userId";
 
     @Override
-    public JSONObject resolve(WidgetDataContext ctx) throws Exception {
+    public JSONObject resolve(WidgetDataContext ctx) throws JSONException {
+        OBContext obContext = ctx.getObContext();
+        List<AlertRule> rules = findRules(obContext);
+        int limit = parseRows(ctx.param(PARAM_ROWS));
+
+        List<AlertItem> items = new ArrayList<>();
+        long total = 0;
+        Map<String, List<AlertRule>> rulesByFilter = rules.stream()
+            .collect(groupingBy(rule -> Objects.toString(rule.getFilterClause(), NO_FILTER)));
+        for (Map.Entry<String, List<AlertRule>> group : rulesByFilter.entrySet()) {
+            String filterSql = toFilterSql(group.getKey());
+            if (filterSql == null) {
+                continue;
+            }
+            Map<String, String> ruleNames = group.getValue().stream()
+                .collect(Collectors.toMap(AlertRule::getId, AlertRule::getName, (first, second) -> first));
+            items.addAll(fetchAlerts(obContext, ruleNames, filterSql, limit));
+            total += countAlerts(obContext, ruleNames, filterSql);
+        }
+
+        items.sort(Comparator.comparing(AlertItem::getCreated, Comparator.nullsLast(Comparator.reverseOrder())));
+        return toJson(items.subList(0, Math.min(limit, items.size())), total);
+    }
+
+    /**
+     * Alert rules the current user receives, directly or through their role.
+     *
+     * @param obContext context of the current user
+     * @return the active rules visible from the current role
+     */
+    List<AlertRule> findRules(OBContext obContext) {
+        return OBDal.getInstance()
+            .getSession()
+            .createQuery(RULES_HQL, AlertRule.class)
+            .setParameter("userId", obContext.getUser().getId())
+            .setParameter("roleId", obContext.getRole().getId())
+            .setParameterList(PARAM_CLIENTS, readableClients(obContext))
+            .setParameterList(PARAM_ORGS, readableOrganizations(obContext))
+            .list();
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<AlertItem> fetchAlerts(OBContext obContext, Map<String, String> ruleNames, String filterSql,
+        int limit) {
+        List<Object[]> rows = OBDal.getInstance()
+            .getSession()
+            .createNativeQuery(ITEMS_SQL + filterSql + ORDER_BY)
+            .setParameterList(PARAM_CLIENTS, readableClients(obContext))
+            .setParameterList(PARAM_ORGS, readableOrganizations(obContext))
+            .setParameterList(PARAM_RULES, ruleNames.keySet())
+            .setMaxResults(limit)
+            .list();
+        return rows.stream().map(toItem(ruleNames)).collect(Collectors.toList());
+    }
+
+    private long countAlerts(OBContext obContext, Map<String, String> ruleNames, String filterSql) {
+        Number count = (Number) OBDal.getInstance()
+            .getSession()
+            .createNativeQuery(COUNT_SQL + filterSql)
+            .setParameterList(PARAM_CLIENTS, readableClients(obContext))
+            .setParameterList(PARAM_ORGS, readableOrganizations(obContext))
+            .setParameterList(PARAM_RULES, ruleNames.keySet())
+            .uniqueResult();
+        return count == null ? 0L : count.longValue();
+    }
+
+    /**
+     * SQL condition of a rule filter clause, with its context variables resolved as Classic does.
+     *
+     * @param filterClause the filter clause of the rules, empty when they have none
+     * @return the condition to append (empty for no filter), or {@code null} when it cannot be converted
+     */
+    String toFilterSql(String filterClause) {
+        if (filterClause.isEmpty()) {
+            return NO_FILTER;
+        }
         try {
-            return fetchNotifications(ctx);
+            return new UsedByLink().getWhereClause(currentVars(), NO_FILTER, filterClause);
         } catch (Exception e) {
-            // AN_Note may not be mapped if the notifications module is not installed
-            return emptyResult();
+            log.error("Could not convert alert filter clause into SQL: {}", filterClause, e);
+            return null;
         }
     }
 
-    private JSONObject fetchNotifications(WidgetDataContext ctx) throws Exception {
-        String userId = ctx.getObContext().getUser().getId();
-        int limit = parseIntParam(ctx.param("rowsNumber"), 10);
-
-        List<Object[]> rows = executeItemsQuery(userId, limit);
-        Long total = executeCountQuery(userId);
-
-        JSONArray items = buildItemsArray(rows);
-        return new JSONObject().put("items", items).put("totalCount", total != null ? total : 0);
+    private VariablesSecureApp currentVars() {
+        HttpServletRequest request = RequestContext.get().getRequest();
+        return request == null ? null : new VariablesSecureApp(request);
     }
 
-    private List<Object[]> executeItemsQuery(String userId, int limit) {
-        Query<Object[]> q = OBDal.getInstance().getSession()
-                .createQuery(ITEMS_HQL, Object[].class);
-        q.setParameter(PARAM_USER_ID, userId);
-        q.setMaxResults(limit);
-        return q.list();
+    private static Function<Object[], AlertItem> toItem(Map<String, String> ruleNames) {
+        return row -> new AlertItem(Objects.toString(row[0], NO_FILTER), ruleNames.get(Objects.toString(row[1])),
+            (Date) row[2]);
     }
 
-    private Long executeCountQuery(String userId) {
-        Query<Long> countQ = OBDal.getInstance().getSession()
-                .createQuery(COUNT_HQL, Long.class);
-        countQ.setParameter(PARAM_USER_ID, userId);
-        return countQ.uniqueResult();
-    }
-
-    private JSONArray buildItemsArray(List<Object[]> rows) throws Exception {
-        JSONArray items = new JSONArray();
-        for (Object[] row : rows) {
-            items.put(new JSONObject()
-                    .put("text",     row[0])
-                    .put("priority", mapPriority(row[1]))
-                    .put("time",     row[2] != null ? row[2].toString() : null));
+    private static JSONObject toJson(List<AlertItem> items, long total) throws JSONException {
+        JSONArray array = new JSONArray();
+        for (AlertItem item : items) {
+            array.put(new JSONObject().put("text", item.getText())
+                .put("title", item.getRuleName())
+                .put("priority", NORMAL_PRIORITY)
+                .put("time", item.getCreated() == null ? null : item.getCreated().toInstant().toString()));
         }
-        return items;
+        return new JSONObject().put(KEY_ITEMS, array).put(KEY_TOTAL, total);
     }
 
-    private JSONObject emptyResult() throws Exception {
-        return new JSONObject().put("items", new JSONArray()).put("totalCount", 0);
+    private static List<String> readableClients(OBContext obContext) {
+        return List.of(obContext.getReadableClients());
     }
 
-    private String mapPriority(Object raw) {
-        if (raw == null) return "normal";
-        String s = raw.toString();
-        if ("1".equals(s) || "high".equalsIgnoreCase(s)) return "high";
-        if ("2".equals(s) || "success".equalsIgnoreCase(s)) return "success";
-        return "normal";
+    private static List<String> readableOrganizations(OBContext obContext) {
+        return List.of(obContext.getReadableOrganizations());
     }
 
-    private int parseIntParam(String val, int def) {
-        try { return val != null ? Integer.parseInt(val) : def; } catch (Exception e) { return def; }
+    static int parseRows(String value) {
+        try {
+            return value == null ? DEFAULT_ROWS : Integer.parseInt(value);
+        } catch (NumberFormatException e) {
+            return DEFAULT_ROWS;
+        }
+    }
+
+    /** One pending alert. */
+    static final class AlertItem {
+        private final String text;
+        private final String ruleName;
+        private final Date created;
+
+        AlertItem(String text, String ruleName, Date created) {
+            this.text = text;
+            this.ruleName = ruleName;
+            this.created = created;
+        }
+
+        String getText() {
+            return text;
+        }
+
+        String getRuleName() {
+            return ruleName;
+        }
+
+        Date getCreated() {
+            return created;
+        }
     }
 }
