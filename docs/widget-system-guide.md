@@ -146,7 +146,7 @@ SYSTEM (base)  →  CLIENT (override)  →  USER (override)
 | `FAVORITES` | `FavoritesResolver` | `ETMETA_USER_FAVORITE` table | No | User-bookmarked records and windows |
 | `RECENT_DOCS` | `RecentDocsResolver` | Frontend localStorage signal | No | Recently created/modified documents |
 | `RECENTLY_VIEWED` | `RecentlyViewedResolver` | Frontend localStorage signal | No | Recently navigated windows |
-| `NOTIFICATION` | `NotificationResolver` | `AD_Note` table | No | System alerts for current user |
+| `NOTIFICATION` | `NotificationResolver` | `AD_Alert` (NEW alerts of the rules the user or role receives, same rule as the header bell / Classic `AlertActionHandler`) | No | Pending alerts of the current user, with the rule name as title |
 | `STOCK_ALERT` | `StockAlertResolver` | `M_Storage` / `M_Product` | No | Products below minimum stock |
 | `KPI` | `KPIResolver` | `HQL_QUERY` field | Via params | Single numeric metric with trend |
 | `QUERY_LIST` | `QueryListResolver` | `HQL_QUERY` field | Via params | Tabular data from parameterized HQL |
@@ -187,7 +187,7 @@ The module ships with 21 widget class definitions:
 | `favorites` | FAVORITES | Bookmarked workspace elements | 0 |
 | `recent-docs` | RECENT_DOCS | Recently accessed documents | 0 |
 | `recently-viewed` | RECENTLY_VIEWED | Recently viewed windows/entities | 0 |
-| `notifications` | NOTIFICATION | User alerts from AD_Note | 60s |
+| `notifications` | NOTIFICATION | Pending alerts from AD_Alert | 60s |
 
 ### Data Widgets (HQL-based)
 | Name | Type | Description | Refresh |
@@ -453,6 +453,19 @@ Add a new widget instance to the dashboard.
 ### DELETE /meta/dashboard/widget/{instanceId}
 
 Remove a widget. USER-layer records are hard-deleted. SYSTEM/CLIENT records get a USER-layer shadow with `ISVISIBLE=N`.
+
+### POST /meta/dashboard/alerts/acknowledge
+
+Marks pending alerts of the current user as read (status `ACKNOWLEDGED`, the "Acknowledge" of Classic's Alert
+Management). Used by the notifications widget.
+
+```json
+{ "alertIds": ["A1B2...", "C3D4..."] }
+```
+
+Response: `{ "acknowledged": 2 }`. Only alerts in status NEW, of a rule the user receives (directly or through
+their role) and in a readable client and organization are changed; any other id is ignored. Classic's
+`AlertManagementActionHandler` does not check this, so the widget does not call it.
 
 ### PATCH /meta/dashboard/widget/{instanceId}/params
 

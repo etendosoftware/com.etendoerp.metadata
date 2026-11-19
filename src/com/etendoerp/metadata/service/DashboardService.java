@@ -20,6 +20,7 @@ package com.etendoerp.metadata.service;
 import com.etendoerp.metadata.exceptions.InternalServerException;
 import com.etendoerp.metadata.exceptions.NotFoundException;
 import com.etendoerp.metadata.exceptions.UnauthorizedException;
+import com.etendoerp.metadata.widgets.AlertAcknowledger;
 import com.etendoerp.metadata.widgets.DashboardLayoutResolver;
 import com.etendoerp.metadata.widgets.WidgetClassAccessRule;
 import org.codehaus.jettison.json.JSONArray;
@@ -42,6 +43,7 @@ import static com.etendoerp.metadata.utils.Constants.*;
  * PUT    /dashboard/layout        → save position/size/visibility changes
  * POST   /dashboard/widget        → add a new widget instance
  * DELETE /dashboard/widget/{id}   → remove or shadow-hide a widget instance
+ * POST   /dashboard/alerts/acknowledge → mark pending alerts of the current user as read
  */
 public class DashboardService extends MetadataService {
 
@@ -61,6 +63,8 @@ public class DashboardService extends MetadataService {
     private static final String PARAMS = "params";
     private static final String PARAMETERS = "parameters";
     private static final String INVALID_VALUE_FOR_PARAM = "Invalid value for parameter '";
+    private static final String ACKNOWLEDGE_ALERTS_PATH = "/alerts/acknowledge";
+    private static final String ALERT_IDS = "alertIds";
 
     /**
      * Creates a new DashboardService.
@@ -79,7 +83,9 @@ public class DashboardService extends MetadataService {
 
         try {
             OBContext.setAdminMode(true);
-            if (GET.equals(method) && path.endsWith("/layout")) {
+            if (POST.equals(method) && path.endsWith(ACKNOWLEDGE_ALERTS_PATH)) {
+                handleAcknowledgeAlerts();
+            } else if (GET.equals(method) && path.endsWith("/layout")) {
                 handleGetLayout();
             } else if (PUT.equals(method) && path.endsWith("/layout")) {
                 handlePutLayout();
@@ -249,6 +255,22 @@ public class DashboardService extends MetadataService {
         ins.setParameter(PARAMS,   params);
         ins.setParameter("uid",      userId);
         ins.executeUpdate();
+    }
+
+    /**
+     * Marks the given alerts as read. Body: {@code {"alertIds": ["..."]}}; response:
+     * {@code {"acknowledged": n}}. Only alerts the user receives are changed (see {@link AlertAcknowledger}).
+     *
+     * @throws Exception if the body cannot be read or the response written
+     */
+    private void handleAcknowledgeAlerts() throws Exception {
+        JSONArray ids = parseJsonBody().optJSONArray(ALERT_IDS);
+        java.util.List<String> alertIds = new java.util.ArrayList<>();
+        for (int i = 0; ids != null && i < ids.length(); i++) {
+            alertIds.add(ids.getString(i));
+        }
+        int acknowledged = new AlertAcknowledger().acknowledge(alertIds, OBContext.getOBContext());
+        write(new JSONObject().put("acknowledged", acknowledged));
     }
 
     private void handlePostWidget() throws Exception {
