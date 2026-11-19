@@ -17,75 +17,226 @@
 
 package com.etendoerp.metadata.widgets.resolvers;
 
-import com.etendoerp.metadata.widgets.WidgetDataContext;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.startsWith;
+import static org.mockito.Mockito.RETURNS_SELF;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockConstruction;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Date;
+import java.util.List;
+
+import javax.servlet.ServletException;
+
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONObject;
 import org.hibernate.Session;
+import org.hibernate.query.NativeQuery;
 import org.hibernate.query.Query;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
+import org.mockito.MockedConstruction;
 import org.mockito.MockedStatic;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.openbravo.client.kernel.RequestContext;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.dal.service.OBDal;
+import org.openbravo.erpCommon.utility.UsedByLink;
+import org.openbravo.model.ad.access.Role;
 import org.openbravo.model.ad.access.User;
+import org.openbravo.model.ad.alert.AlertRule;
 
-import java.util.Collections;
+import com.etendoerp.metadata.widgets.WidgetDataContext;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.contains;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.mockStatic;
-import static org.mockito.Mockito.when;
-
-@ExtendWith(MockitoExtension.class)
+/**
+ * Tests the alert-based {@link NotificationResolver}: rule lookup, filter clauses, merge, order and limit.
+ */
 class NotificationResolverTest {
-    @Mock OBDal    obDal;
-    @Mock Session  session;
-    @Mock OBContext obContext;
-    @Mock User     mockUser;
 
-    @Test
-    void getTypeReturnsNotification() {
-        assertEquals("NOTIFICATION", new NotificationResolver().getType());
+    private static final String RULE_A = "RULE_A";
+    private static final String RULE_B = "RULE_B";
+    private static final String ITEMS = "items";
+    private static final String TOTAL = "totalCount";
+    private static final String BROKEN_CLAUSE = "AD_ORG_ID = @BROKEN@";
+
+    private MockedStatic<OBDal> dalStatic;
+    private MockedStatic<RequestContext> requestStatic;
+    private Session session;
+    private WidgetDataContext ctx;
+    private NativeQuery<Object> itemsQuery;
+    private NativeQuery<Object> countQuery;
+
+    /**
+     * Mocks the DAL session, the current user and the alert queries.
+     */
+    @SuppressWarnings("unchecked")
+    @BeforeEach
+    void setUp() {
+        session = mock(Session.class);
+        OBDal obDal = mock(OBDal.class);
+        when(obDal.getSession()).thenReturn(session);
+        dalStatic = mockStatic(OBDal.class);
+        dalStatic.when(OBDal::getInstance).thenReturn(obDal);
+
+        RequestContext requestContext = mock(RequestContext.class);
+        requestStatic = mockStatic(RequestContext.class);
+        requestStatic.when(RequestContext::get).thenReturn(requestContext);
+
+        OBContext obContext = mock(OBContext.class);
+        User user = mock(User.class);
+        Role role = mock(Role.class);
+        when(user.getId()).thenReturn("USER");
+        when(role.getId()).thenReturn("ROLE");
+        when(obContext.getUser()).thenReturn(user);
+        when(obContext.getRole()).thenReturn(role);
+        when(obContext.getReadableClients()).thenReturn(new String[] { "0" });
+        when(obContext.getReadableOrganizations()).thenReturn(new String[] { "0" });
+        ctx = mock(WidgetDataContext.class);
+        when(ctx.getObContext()).thenReturn(obContext);
+
+        itemsQuery = mock(NativeQuery.class, RETURNS_SELF);
+        countQuery = mock(NativeQuery.class, RETURNS_SELF);
+        when(session.createNativeQuery(startsWith(NotificationResolver.ITEMS_SQL))).thenReturn(itemsQuery);
+        when(session.createNativeQuery(startsWith(NotificationResolver.COUNT_SQL))).thenReturn(countQuery);
+    }
+
+    /**
+     * Releases the static mocks.
+     */
+    @AfterEach
+    void tearDown() {
+        requestStatic.close();
+        dalStatic.close();
     }
 
     @SuppressWarnings("unchecked")
+    private void givenRules(AlertRule... rules) {
+        Query<AlertRule> rulesQuery = mock(Query.class, RETURNS_SELF);
+        when(rulesQuery.list()).thenReturn(Arrays.asList(rules));
+        when(session.createQuery(eq(NotificationResolver.RULES_HQL), eq(AlertRule.class))).thenReturn(rulesQuery);
+    }
+
+    /** Makes the conversion of {@link #BROKEN_CLAUSE} fail, as a clause with an unknown variable does. */
+    private static MockedConstruction<UsedByLink> brokenFilterClauses() {
+        return mockConstruction(UsedByLink.class, (link, context) -> when(
+            link.getWhereClause(any(), anyString(), eq(BROKEN_CLAUSE))).thenThrow(new ServletException("broken")));
+    }
+
+    private static AlertRule rule(String id, String filterClause) {
+        AlertRule rule = mock(AlertRule.class);
+        when(rule.getId()).thenReturn(id);
+        when(rule.getName()).thenReturn(id + " name");
+        when(rule.getFilterClause()).thenReturn(filterClause);
+        return rule;
+    }
+
     @Test
-    void resolveReturnsMappedItems() throws Exception {
-        WidgetDataContext ctx = mock(WidgetDataContext.class);
-        when(ctx.getObContext()).thenReturn(obContext);
-        when(obContext.getUser()).thenReturn(mockUser);
-        when(mockUser.getId()).thenReturn("user-1");
-        when(ctx.param("rowsNumber")).thenReturn(null);
+    void reportsTheNotificationTypeAndIsAlwaysAvailable() {
+        NotificationResolver resolver = new NotificationResolver();
+        assertEquals("NOTIFICATION", resolver.getType());
+        assertTrue(resolver.isAvailable());
+    }
 
-        Object[] row = { "Se ha calculado los costes", "normal", new java.util.Date() };
+    /**
+     * @throws Exception if the JSON cannot be built
+     */
+    @Test
+    void returnsAnEmptyListWhenTheUserReceivesNoAlertRule() throws Exception {
+        givenRules();
 
-        Query<Object[]> itemsQuery = mock(Query.class);
-        when(itemsQuery.setParameter(anyString(), any())).thenReturn(itemsQuery);
-        when(itemsQuery.setMaxResults(anyInt())).thenReturn(itemsQuery);
-        when(itemsQuery.list()).thenReturn(Collections.singletonList(row));
+        JSONObject result = new NotificationResolver().resolve(ctx);
 
-        Query<Long> countQuery = mock(Query.class);
-        when(countQuery.setParameter(anyString(), any())).thenReturn(countQuery);
-        when(countQuery.uniqueResult()).thenReturn(7L);
+        assertEquals(0, result.getJSONArray(ITEMS).length());
+        assertEquals(0, result.getLong(TOTAL));
+        verify(session, never()).createNativeQuery(anyString());
+    }
 
-        when(session.createQuery(contains("AN_Note"), eq(Object[].class))).thenReturn(itemsQuery);
-        when(session.createQuery(contains("count("), eq(Long.class))).thenReturn(countQuery);
+    /**
+     * @throws Exception if the JSON cannot be built
+     */
+    @Test
+    void listsPendingAlertsWithTheirRuleNameNewestFirst() throws Exception {
+        givenRules(rule(RULE_A, null));
+        Date older = new Date(1_000L);
+        Date newer = new Date(2_000L);
+        when(itemsQuery.list()).thenReturn(Arrays.<Object>asList(
+            new Object[] { "A1", "Old alert", RULE_A, older }, new Object[] { "A2", "New alert", RULE_A, newer }));
+        when(countQuery.uniqueResult()).thenReturn(5L);
 
-        try (MockedStatic<OBDal> dalStatic = mockStatic(OBDal.class)) {
-            dalStatic.when(OBDal::getInstance).thenReturn(obDal);
-            when(obDal.getSession()).thenReturn(session);
+        JSONObject result = new NotificationResolver().resolve(ctx);
+        JSONArray items = result.getJSONArray(ITEMS);
 
+        assertEquals(2, items.length());
+        assertEquals("A2", items.getJSONObject(0).getString("id"));
+        assertEquals("New alert", items.getJSONObject(0).getString("text"));
+        assertEquals(RULE_A + " name", items.getJSONObject(0).getString("title"));
+        assertEquals(NotificationResolver.NORMAL_PRIORITY, items.getJSONObject(0).getString("priority"));
+        assertEquals(newer.toInstant().toString(), items.getJSONObject(0).getString("time"));
+        assertEquals(5, result.getLong(TOTAL));
+    }
+
+    /**
+     * @throws Exception if the JSON cannot be built
+     */
+    @Test
+    void hidesTheAlertsOfARuleWhoseFilterClauseCannotBeConverted() throws Exception {
+        givenRules(rule(RULE_A, null), rule(RULE_B, BROKEN_CLAUSE));
+        when(itemsQuery.list()).thenReturn(Collections.<Object>singletonList(new Object[] { "A1", "Alert", RULE_A, null }));
+        when(countQuery.uniqueResult()).thenReturn(1L);
+
+        try (MockedConstruction<UsedByLink> ignored = brokenFilterClauses()) {
             JSONObject result = new NotificationResolver().resolve(ctx);
-            JSONArray items = result.getJSONArray("items");
-            assertEquals(1, items.length());
-            assertEquals(7, result.getInt("totalCount"));
+
+            assertEquals(1, result.getJSONArray(ITEMS).length());
+            assertEquals(1, result.getLong(TOTAL));
         }
+    }
+
+    @Test
+    void keepsTheRequestedNumberOfRowsOrFallsBackToTheDefault() {
+        assertEquals(3, NotificationResolver.parseRows("3"));
+        assertEquals(NotificationResolver.DEFAULT_ROWS, NotificationResolver.parseRows(null));
+        assertEquals(NotificationResolver.DEFAULT_ROWS, NotificationResolver.parseRows("many"));
+    }
+
+    @Test
+    void addsNoConditionForRulesWithoutFilterClause() {
+        assertEquals("", new NotificationResolver().toFilterSql(""));
+    }
+
+    @Test
+    void returnsNullForAFilterClauseThatCannotBeConverted() {
+        try (MockedConstruction<UsedByLink> ignored = brokenFilterClauses()) {
+            assertNull(new NotificationResolver().toFilterSql(BROKEN_CLAUSE));
+        }
+    }
+
+    /**
+     * @throws Exception if the JSON cannot be built
+     */
+    @Test
+    void limitsTheListToTheRequestedRows() throws Exception {
+        givenRules(rule(RULE_A, null));
+        when(ctx.param(NotificationResolver.PARAM_ROWS)).thenReturn("1");
+        List<Object> rows = Arrays.<Object>asList(new Object[] { "A1", "One", RULE_A, new Date(1L) },
+            new Object[] { "A2", "Two", RULE_A, new Date(2L) });
+        when(itemsQuery.list()).thenReturn(rows);
+        when(countQuery.uniqueResult()).thenReturn(2L);
+
+        JSONObject result = new NotificationResolver().resolve(ctx);
+
+        assertEquals(1, result.getJSONArray(ITEMS).length());
+        assertEquals(2, result.getLong(TOTAL));
     }
 }

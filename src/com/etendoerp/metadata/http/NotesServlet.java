@@ -39,6 +39,7 @@ import org.openbravo.base.exception.OBException;
 import org.openbravo.base.exception.OBSecurityException;
 import org.openbravo.base.model.Entity;
 import org.openbravo.base.model.ModelProvider;
+import org.openbravo.base.model.Property;
 import org.openbravo.base.provider.OBProvider;
 import org.openbravo.base.secureApp.HttpSecureAppServlet;
 import org.openbravo.base.structure.OrganizationEnabled;
@@ -48,6 +49,7 @@ import org.openbravo.dal.security.SecurityChecker;
 import org.openbravo.dal.service.OBCriteria;
 import org.openbravo.dal.service.OBDal;
 import org.openbravo.model.ad.datamodel.Table;
+import org.openbravo.model.common.enterprise.Organization;
 
 /**
  * Servlet to handle notes operations as a REST API endpoint.
@@ -68,6 +70,7 @@ public class NotesServlet extends HttpSecureAppServlet {
     private static final String ERROR_PROCESSING_REQUEST = "Error processing request";
     private static final String ERROR_INVALID_TABLE_ID = "Invalid table ID: ";
     private static final String ERROR_RECORD_NOT_ACCESSIBLE = "Insufficient permissions to access record: ";
+    private static final String ERROR_NOTE_TOO_LONG = "Note exceeds the maximum length of %d characters";
 
     @Override
     public void doGet(HttpServletRequest request, HttpServletResponse response)
@@ -168,9 +171,16 @@ public class NotesServlet extends HttpSecureAppServlet {
             return;
         }
 
-        if (StringUtils.isEmpty(noteContent)) {
+        if (StringUtils.isBlank(noteContent)) {
             sendErrorResponse(response, HttpStatus.SC_BAD_REQUEST,
                     "Missing required parameter: note");
+            return;
+        }
+
+        int maxLength = getNoteMaxLength();
+        if (maxLength > 0 && noteContent.length() > maxLength) {
+            sendErrorResponse(response, HttpStatus.SC_BAD_REQUEST,
+                    String.format(ERROR_NOTE_TOO_LONG, maxLength));
             return;
         }
 
@@ -345,7 +355,7 @@ public class NotesServlet extends HttpSecureAppServlet {
             note.setActive(true);
 
             note.setClient(OBContext.getOBContext().getCurrentClient());
-            note.setOrganization(OBContext.getOBContext().getCurrentOrganization());
+            note.setOrganization(resolveNoteOrganization(table.getId(), recordId));
 
             OBDal.getInstance().save(note);
             OBDal.getInstance().flush();
@@ -356,6 +366,57 @@ public class NotesServlet extends HttpSecureAppServlet {
         } finally {
             OBContext.restorePreviousMode();
         }
+    }
+
+    /**
+     * Resolves the organization a new note is stored with. Like the classic notes section, the note
+     * takes the organization of the record it is attached to (the record itself when it is an
+     * organization), so it follows the record instead of the organization of the session. The
+     * session organization is the fallback when the table has no runtime entity, the record cannot
+     * be found or it has no organization.
+     *
+     * @param tableId
+     *            the AD_Table_ID of the record
+     * @param recordId
+     *            the id of the record the note is attached to
+     * @return the organization of the note
+     */
+    private Organization resolveNoteOrganization(String tableId, String recordId) {
+        Organization sessionOrganization = OBContext.getOBContext().getCurrentOrganization();
+        Entity entity = ModelProvider.getInstance().getEntityByTableId(tableId);
+        if (entity == null) {
+            return sessionOrganization;
+        }
+
+        Object currentRecord = OBDal.getInstance().get(entity.getMappingClass(), recordId);
+        if (currentRecord instanceof Organization) {
+            return (Organization) currentRecord;
+        }
+        if (currentRecord instanceof OrganizationEnabled) {
+            Organization recordOrganization = ((OrganizationEnabled) currentRecord).getOrganization();
+            if (recordOrganization != null) {
+                return recordOrganization;
+            }
+        }
+        return sessionOrganization;
+    }
+
+    /**
+     * Returns the maximum length of a note, as defined in the application dictionary for the note
+     * column (the same limit the classic notes form enforces).
+     *
+     * @return the maximum number of characters of a note, or 0 when the model does not define it
+     */
+    private int getNoteMaxLength() {
+        Entity noteEntity = ModelProvider.getInstance().getEntity(Note.ENTITY_NAME, false);
+        if (noteEntity == null) {
+            return 0;
+        }
+        Property noteProperty = noteEntity.getProperty(Note.PROPERTY_NOTE, false);
+        if (noteProperty == null) {
+            return 0;
+        }
+        return noteProperty.getFieldLength();
     }
 
     /**
