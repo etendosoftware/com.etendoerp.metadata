@@ -147,6 +147,8 @@ public class Constants {
     public static final String LOGIN_PATH = "/login";
     public static final String LOGIN_DEFAULTS_PATH = "/login-defaults";
     public static final String LOGIN_GUARD_PATH = "/login-guard";
+    /** System configuration the login screen applies before the user logs in (ForcedLoginURL). */
+    public static final String LOGIN_CONFIG_PATH = "/login-config";
     public static final String LOGIN_SESSION_PATH = "/login-session";
 
     // Audit Fields
