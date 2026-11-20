@@ -54,8 +54,10 @@ import org.openbravo.dal.service.OBDal;
 
 import com.etendoerp.metadata.auth.LoginDefaultsResolver;
 import com.etendoerp.metadata.auth.LoginSessionRegistry;
+import com.etendoerp.metadata.auth.StoreServerAccess;
 import com.etendoerp.metadata.auth.Utils;
 import com.etendoerp.metadata.data.AuthData;
+import com.etendoerp.metadata.exceptions.UnauthorizedException;
 import com.etendoerp.metadata.exceptions.UnprocessableContentException;
 
 @ExtendWith(MockitoExtension.class)
@@ -498,7 +500,8 @@ class SSOServiceTest {
              MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class);
              MockedStatic<Utils> utilsStatic = mockStatic(Utils.class);
              MockedStatic<LoginDefaultsResolver> resolverStatic = mockStatic(LoginDefaultsResolver.class);
-             MockedStatic<LoginSessionRegistry> registryStatic = mockStatic(LoginSessionRegistry.class)) {
+             MockedStatic<LoginSessionRegistry> registryStatic = mockStatic(LoginSessionRegistry.class);
+             MockedStatic<StoreServerAccess> storeStatic = mockStatic(StoreServerAccess.class)) {
             mockProperties(providerStatic, propsWithAuthType(MIDDLEWARE_TYPE));
             OBCriteria criteria = mockOBDalCriteria(obDalStatic);
             // Like Classic's SSO login, the successful session is recorded without a lock check
@@ -543,6 +546,40 @@ class SSOServiceTest {
                 .thenThrow(new UnprocessableContentException("No valid login defaults"));
 
             assertEquals(INTERNAL_ERROR_CODE, spyExecuteAndParse().getString(ERROR_KEY));
+            utilsStatic.verify(() -> Utils.generateToken(any(), any()), never());
+        }
+    }
+
+    /**
+     * On a store server restricted to System Administrator, the single sign-on login of a user whose default
+     * role is another one is refused with the classic message and no token is issued.
+     *
+     * @throws Exception if the service fails or the response cannot be parsed
+     */
+    @SuppressWarnings({ "rawtypes" })
+    @Test
+    void callbackRefusedOnARestrictedStoreServer() throws Exception {
+        responseWriter = new StringWriter();
+        when(response.getWriter()).thenReturn(new PrintWriter(responseWriter));
+        setupRequest(SSO_CALLBACK_PATH, "POST");
+        setRequestBody(FAKE_JWT_BODY);
+        try (MockedStatic<OBPropertiesProvider> providerStatic = mockStatic(OBPropertiesProvider.class);
+             MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
+             MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class);
+             MockedStatic<Utils> utilsStatic = mockStatic(Utils.class);
+             MockedStatic<LoginDefaultsResolver> resolverStatic = mockStatic(LoginDefaultsResolver.class);
+             MockedStatic<StoreServerAccess> storeStatic = mockStatic(StoreServerAccess.class)) {
+            mockProperties(providerStatic, propsWithAuthType(MIDDLEWARE_TYPE));
+            OBCriteria criteria = mockOBDalCriteria(obDalStatic);
+            ETRXTokenUser mockTokenUser = mock(ETRXTokenUser.class);
+            User mockUser = mock(User.class);
+            when(mockUser.getId()).thenReturn(SSO_USER_ID);
+            when(mockTokenUser.getUserForToken()).thenReturn(mockUser);
+            when(criteria.uniqueResult()).thenReturn(mockTokenUser);
+            storeStatic.when(() -> StoreServerAccess.checkLogin(SSO_USER_ID))
+                .thenThrow(new UnauthorizedException("Only System Administrator can access the ERP"));
+
+            assertEquals("access_restricted", spyExecuteAndParse().getString(ERROR_KEY));
             utilsStatic.verify(() -> Utils.generateToken(any(), any()), never());
         }
     }

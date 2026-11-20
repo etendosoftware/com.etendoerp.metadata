@@ -58,6 +58,8 @@ public abstract class AbstractProfileServiceTest {
     protected MockedStatic<OBContext> obContextMock;
     protected MockedStatic<OBDal> obDalMock;
     protected MockedStatic<com.etendoerp.metadata.auth.Utils> authUtilsMock;
+    /** No store server restriction unless a test stubs it (it needs the CDI container otherwise). */
+    protected MockedStatic<com.etendoerp.metadata.auth.StoreServerAccess> storeServerAccessMock;
 
     /**
      * Initializes the {@code OBContext}/{@code OBDal}/{@code auth.Utils} static mocks shared by
@@ -68,6 +70,7 @@ public abstract class AbstractProfileServiceTest {
         obContextMock = mockStatic(OBContext.class);
         obDalMock = mockStatic(OBDal.class);
         authUtilsMock = mockStatic(com.etendoerp.metadata.auth.Utils.class);
+        storeServerAccessMock = mockStatic(com.etendoerp.metadata.auth.StoreServerAccess.class);
 
         obContextMock.when(OBContext::getOBContext).thenReturn(obContext);
         obDalMock.when(OBDal::getInstance).thenReturn(obDal);
@@ -78,6 +81,7 @@ public abstract class AbstractProfileServiceTest {
      */
     @After
     public void tearDownProfileServiceMocks() {
+        storeServerAccessMock.close();
         authUtilsMock.close();
         obDalMock.close();
         obContextMock.close();

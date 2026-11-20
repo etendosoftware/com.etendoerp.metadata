@@ -80,7 +80,7 @@ public final class LoginAttemptGuard {
    * {@code LOCKED_USER_MSG} span two lines, so the text is read unescaped and its whitespace is
    * collapsed into single spaces.
    */
-  private static String readMessage(ConnectionProvider connection, String messageKey) {
+  static String readMessage(ConnectionProvider connection, String messageKey) {
     String message = Utility.messageBD(connection, messageKey, resolveLanguage(), false);
     return StringUtils.normalizeSpace(message);
   }
