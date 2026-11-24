@@ -206,7 +206,7 @@ public class PreferencesService extends MetadataService {
                 .createQuery(org.openbravo.model.ad.domain.List.class,
                         "as l where l.reference.id = :reference and l.searchKey = :property")
                 .setNamedParameter("reference", PROPERTY_LIST_REFERENCE_ID)
-                .setNamedParameter("property", property)
+                .setNamedParameter(PROPERTY, property)
                 .count() > 0;
     }
 

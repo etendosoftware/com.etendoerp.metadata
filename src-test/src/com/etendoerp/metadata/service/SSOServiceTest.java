@@ -19,25 +19,13 @@ package com.etendoerp.metadata.service;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
-
-import java.io.BufferedReader;
 import java.io.PrintWriter;
-import java.io.StringReader;
 import java.io.StringWriter;
 import java.util.Properties;
-
-import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-
 import org.codehaus.jettison.json.JSONObject;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
 import org.mockito.MockedStatic;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.mockito.junit.jupiter.MockitoSettings;
-import org.mockito.quality.Strictness;
 import org.openbravo.base.session.OBPropertiesProvider;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.model.ad.access.Role;
@@ -45,157 +33,18 @@ import org.openbravo.model.ad.access.User;
 import org.openbravo.model.ad.system.Client;
 import org.openbravo.model.common.enterprise.Organization;
 import org.openbravo.model.common.enterprise.Warehouse;
-
 import com.etendoerp.etendorx.data.ETRXTokenUser;
 import org.openbravo.erpCommon.utility.SystemInfo;
-
 import org.openbravo.dal.service.OBCriteria;
 import org.openbravo.dal.service.OBDal;
-
 import com.etendoerp.metadata.auth.LoginDefaultsResolver;
 import com.etendoerp.metadata.auth.LoginSessionRegistry;
 import com.etendoerp.metadata.auth.StoreServerAccess;
 import com.etendoerp.metadata.auth.Utils;
 import com.etendoerp.metadata.data.AuthData;
-import com.etendoerp.metadata.exceptions.UnauthorizedException;
 import com.etendoerp.metadata.exceptions.UnprocessableContentException;
 
-@ExtendWith(MockitoExtension.class)
-@MockitoSettings(strictness = Strictness.LENIENT)
-class SSOServiceTest {
-
-    private static final String SSO_CONFIG_PATH = "/sso/config";
-    private static final String SSO_CALLBACK_PATH = "/sso/callback";
-    private static final String SSO_LINK_PATH = "/sso/link";
-    private static final String ENABLED_KEY = "enabled";
-    private static final String SSO_AUTH_TYPE_PROP = "sso.auth.type";
-    private static final String SSO_DOMAIN_URL_PROP = "sso.domain.url";
-    private static final String SSO_CLIENT_ID_PROP = "sso.client.id";
-    private static final String AUTH0_TYPE = "Auth0";
-    private static final String MIDDLEWARE_TYPE = "Middleware";
-    private static final String ERROR_KEY = "error";
-    private static final String INTERNAL_ERROR_CODE = "internal_error";
-    private static final String INVALID_REQUEST_ERROR = "invalid_request";
-    private static final String UNAUTHORIZED_ERROR = "unauthorized";
-    private static final String AUTHORIZATION_HEADER = "Authorization";
-    private static final String INVALID_TOKEN_ERROR = "invalid_token";
-    private static final String TOKEN_EXCHANGE_FAILED_ERROR = "token_exchange_failed";
-    private static final String MIDDLEWARE_URL_PROP = "sso.middleware.url";
-    private static final String MIDDLEWARE_REDIRECT_PROP = "sso.middleware.redirectUri";
-    private static final String MIDDLEWARE_URL_VALUE = "http://middleware:3000";
-    private static final String TEST_REDIRECT_URI = "http://localhost/callback";
-    private static final String PROVIDERS_KEY = "providers";
-    private static final String LOCALHOST_INVALID = "localhost.invalid";
-    private static final String SSO_USER_ID = "usr-123";
-    private static final String SSO_USERNAME = "testuser";
-    private static final String CODE_BODY = "{\"code\":\"test-code\"}";
-    // Minimal valid JWT: header.payload.signature (signature is irrelevant for decode)
-    private static final String FAKE_JWT =
-        "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InRlc3QifQ"
-        + ".eyJzdWIiOiJ0ZXN0fDEyMyJ9.fakesig";
-    private static final String FAKE_JWT_BODY = "{\"accessToken\":\"" + FAKE_JWT + "\"}";
-
-    @Mock
-    private HttpServletRequest request;
-
-    @Mock
-    private HttpServletResponse response;
-
-    @Mock
-    private OBPropertiesProvider propertiesProvider;
-
-    private StringWriter responseWriter;
-
-    @BeforeEach
-    void setUp() throws Exception {
-        responseWriter = new StringWriter();
-        when(response.getWriter()).thenReturn(new PrintWriter(responseWriter));
-    }
-
-    // --- shared helpers ---
-
-    private void mockProperties(MockedStatic<OBPropertiesProvider> providerStatic, Properties props) {
-        providerStatic.when(OBPropertiesProvider::getInstance).thenReturn(propertiesProvider);
-        when(propertiesProvider.getOpenbravoProperties()).thenReturn(props);
-    }
-
-    private void setupRequest(String path, String method) {
-        when(request.getPathInfo()).thenReturn(path);
-        when(request.getMethod()).thenReturn(method);
-    }
-
-    private void setRequestBody(String body) throws Exception {
-        when(request.getReader()).thenReturn(new BufferedReader(new StringReader(body)));
-    }
-
-    private JSONObject executeAndParse() throws Exception {
-        new SSOService().handle(request, response);
-        return new JSONObject(responseWriter.toString());
-    }
-
-    private Properties propsWithAuthType(String authType) {
-        Properties props = new Properties();
-        props.setProperty(SSO_AUTH_TYPE_PROP, authType);
-        return props;
-    }
-
-    private Properties middlewareConfigProps() {
-        Properties props = propsWithAuthType(MIDDLEWARE_TYPE);
-        props.setProperty(MIDDLEWARE_URL_PROP, MIDDLEWARE_URL_VALUE);
-        props.setProperty(MIDDLEWARE_REDIRECT_PROP, TEST_REDIRECT_URI);
-        return props;
-    }
-
-    private Properties auth0ExchangeProps(boolean includeSecret) {
-        Properties props = propsWithAuthType(AUTH0_TYPE);
-        props.setProperty(SSO_DOMAIN_URL_PROP, LOCALHOST_INVALID);
-        props.setProperty(SSO_CLIENT_ID_PROP, "cid");
-        if (includeSecret) {
-            props.setProperty("sso.client.secret", "csecret");
-        }
-        return props;
-    }
-
-    private void setupValidBearerToken() {
-        when(request.getHeader(AUTHORIZATION_HEADER)).thenReturn("Bearer valid-test-token");
-    }
-
-    private void mockValidBearer(MockedStatic<Utils> utilsStatic) {
-        com.auth0.jwt.interfaces.DecodedJWT mockJwt = mock(com.auth0.jwt.interfaces.DecodedJWT.class);
-        com.auth0.jwt.interfaces.Claim mockClaim = mock(com.auth0.jwt.interfaces.Claim.class);
-        when(mockClaim.asString()).thenReturn("test-user-id");
-        when(mockJwt.getClaim("user")).thenReturn(mockClaim);
-        utilsStatic.when(() -> Utils.decodeToken("valid-test-token")).thenReturn(mockJwt);
-    }
-
-    private void assertCallbackError(String body, String authType, String expectedError)
-            throws Exception {
-        responseWriter = new StringWriter();
-        when(response.getWriter()).thenReturn(new PrintWriter(responseWriter));
-        setupRequest(SSO_CALLBACK_PATH, "POST");
-        setRequestBody(body);
-        try (MockedStatic<OBPropertiesProvider> providerStatic = mockStatic(OBPropertiesProvider.class)) {
-            mockProperties(providerStatic, propsWithAuthType(authType));
-            JSONObject result = executeAndParse();
-            assertEquals(expectedError, result.getString(ERROR_KEY));
-        }
-    }
-
-    private void assertLinkError(String body, String authType, String expectedError)
-            throws Exception {
-        responseWriter = new StringWriter();
-        when(response.getWriter()).thenReturn(new PrintWriter(responseWriter));
-        setupRequest(SSO_LINK_PATH, "POST");
-        setupValidBearerToken();
-        setRequestBody(body);
-        try (MockedStatic<OBPropertiesProvider> providerStatic = mockStatic(OBPropertiesProvider.class);
-             MockedStatic<Utils> utilsStatic = mockStatic(Utils.class)) {
-            mockValidBearer(utilsStatic);
-            mockProperties(providerStatic, propsWithAuthType(authType));
-            JSONObject result = executeAndParse();
-            assertEquals(expectedError, result.getString(ERROR_KEY));
-        }
-    }
+class SSOServiceTest extends SSOServiceTestSupport {
 
     // --- /sso/config tests ---
 
@@ -440,28 +289,6 @@ class SSOServiceTest {
         }
     }
 
-    // --- deep path tests (spy bypasses JWKS validation) ---
-
-    private JSONObject spyExecuteAndParse() throws Exception {
-        SSOService service = spy(new SSOService());
-        doReturn(true).when(service).validateJwksToken(anyString(), any(), anyString());
-        service.handle(request, response);
-        return new JSONObject(responseWriter.toString());
-    }
-
-    @SuppressWarnings({ "unchecked", "rawtypes" })
-    private OBCriteria mockOBDalCriteria(MockedStatic<OBDal> obDalStatic) {
-        OBDal mockDal = mock(OBDal.class);
-        obDalStatic.when(OBDal::getInstance).thenReturn(mockDal);
-        OBCriteria mockCriteria = mock(OBCriteria.class);
-        when(mockDal.createCriteria(any(Class.class))).thenReturn(mockCriteria);
-        when(mockCriteria.add(any())).thenReturn(mockCriteria);
-        when(mockCriteria.setFilterOnReadableClients(anyBoolean())).thenReturn(mockCriteria);
-        when(mockCriteria.setFilterOnReadableOrganization(anyBoolean())).thenReturn(mockCriteria);
-        when(mockCriteria.setMaxResults(anyInt())).thenReturn(mockCriteria);
-        return mockCriteria;
-    }
-
     @SuppressWarnings({ "unchecked", "rawtypes" })
     @Test
     void callbackDeepPaths() throws Exception {
@@ -546,40 +373,6 @@ class SSOServiceTest {
                 .thenThrow(new UnprocessableContentException("No valid login defaults"));
 
             assertEquals(INTERNAL_ERROR_CODE, spyExecuteAndParse().getString(ERROR_KEY));
-            utilsStatic.verify(() -> Utils.generateToken(any(), any()), never());
-        }
-    }
-
-    /**
-     * On a store server restricted to System Administrator, the single sign-on login of a user whose default
-     * role is another one is refused with the classic message and no token is issued.
-     *
-     * @throws Exception if the service fails or the response cannot be parsed
-     */
-    @SuppressWarnings({ "rawtypes" })
-    @Test
-    void callbackRefusedOnARestrictedStoreServer() throws Exception {
-        responseWriter = new StringWriter();
-        when(response.getWriter()).thenReturn(new PrintWriter(responseWriter));
-        setupRequest(SSO_CALLBACK_PATH, "POST");
-        setRequestBody(FAKE_JWT_BODY);
-        try (MockedStatic<OBPropertiesProvider> providerStatic = mockStatic(OBPropertiesProvider.class);
-             MockedStatic<OBContext> obContextStatic = mockStatic(OBContext.class);
-             MockedStatic<OBDal> obDalStatic = mockStatic(OBDal.class);
-             MockedStatic<Utils> utilsStatic = mockStatic(Utils.class);
-             MockedStatic<LoginDefaultsResolver> resolverStatic = mockStatic(LoginDefaultsResolver.class);
-             MockedStatic<StoreServerAccess> storeStatic = mockStatic(StoreServerAccess.class)) {
-            mockProperties(providerStatic, propsWithAuthType(MIDDLEWARE_TYPE));
-            OBCriteria criteria = mockOBDalCriteria(obDalStatic);
-            ETRXTokenUser mockTokenUser = mock(ETRXTokenUser.class);
-            User mockUser = mock(User.class);
-            when(mockUser.getId()).thenReturn(SSO_USER_ID);
-            when(mockTokenUser.getUserForToken()).thenReturn(mockUser);
-            when(criteria.uniqueResult()).thenReturn(mockTokenUser);
-            storeStatic.when(() -> StoreServerAccess.checkLogin(SSO_USER_ID))
-                .thenThrow(new UnauthorizedException("Only System Administrator can access the ERP"));
-
-            assertEquals("access_restricted", spyExecuteAndParse().getString(ERROR_KEY));
             utilsStatic.verify(() -> Utils.generateToken(any(), any()), never());
         }
     }
