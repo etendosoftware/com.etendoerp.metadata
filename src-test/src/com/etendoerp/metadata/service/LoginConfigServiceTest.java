@@ -17,9 +17,13 @@
 package com.etendoerp.metadata.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
@@ -29,15 +33,19 @@ import java.io.StringWriter;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedConstruction;
 import org.mockito.MockedStatic;
 import org.mockito.MockedStatic.Verification;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.erpCommon.businessUtility.Preferences;
 import org.openbravo.erpCommon.utility.PropertyException;
+
+import com.etendoerp.metadata.exceptions.InternalServerException;
 
 /**
  * Tests {@link LoginConfigService}: the System-level {@code ForcedLoginURL} the login screen applies.
@@ -116,5 +124,20 @@ class LoginConfigServiceTest {
         new LoginConfigService(mock(HttpServletRequest.class), response).process();
 
         assertEquals(FORCED_URL, new JSONObject(body.toString()).getString(LoginConfigService.FORCED_LOGIN_URL));
+    }
+
+    /**
+     * An answer that cannot be built is reported as an internal error.
+     */
+    @Test
+    void processFailsWhenTheAnswerCannotBeBuilt() {
+        stubForcedLoginUrl(FORCED_URL);
+        LoginConfigService service = new LoginConfigService(mock(HttpServletRequest.class),
+                mock(HttpServletResponse.class));
+
+        try (MockedConstruction<JSONObject> ignored = mockConstruction(JSONObject.class,
+                (json, context) -> when(json.put(anyString(), (Object) any())).thenThrow(new JSONException("broken")))) {
+            assertThrows(InternalServerException.class, service::process);
+        }
     }
 }

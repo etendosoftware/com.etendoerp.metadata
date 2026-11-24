@@ -27,6 +27,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
+import javax.servlet.ServletException;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,6 +49,10 @@ class StoreServerAccessTest {
 
     private static final String USER_ID = "user-1";
     private static final String OTHER_ROLE_ID = "role-1";
+    /** Value of RestrictErpAccessInStoreServer that restricts the access. */
+    private static final String YES = "Y";
+    /** Role the login asks for: none, the default role of the user decides. */
+    private static final String NO_REQUESTED_ROLE = "";
     private static final String RESTRICTED_TEXT = "Only System Administrator can access the ERP";
 
     private MockedStatic<WeldUtils> weld;
@@ -97,13 +103,13 @@ class StoreServerAccessTest {
      */
     @Test
     void isErpAccessRestrictedOnlyOnARestrictedStoreServer() {
-        givenServer(true, "Y");
+        givenServer(true, YES);
         assertTrue(StoreServerAccess.isErpAccessRestricted());
 
         givenServer(true, "N");
         assertFalse(StoreServerAccess.isErpAccessRestricted());
 
-        givenServer(false, "Y");
+        givenServer(false, YES);
         assertFalse(StoreServerAccess.isErpAccessRestricted());
     }
 
@@ -112,7 +118,7 @@ class StoreServerAccessTest {
      */
     @Test
     void checkRoleAcceptsOnlySystemAdministratorWhenRestricted() {
-        givenServer(true, "Y");
+        givenServer(true, YES);
 
         assertDoesNotThrow(() -> StoreServerAccess.checkRole(StoreServerAccess.SYSTEM_ADMIN_ROLE_ID));
         UnauthorizedException refusal = assertThrows(UnauthorizedException.class,
@@ -125,7 +131,7 @@ class StoreServerAccessTest {
      */
     @Test
     void checkRoleAcceptsAnyRoleWithoutTheRestriction() {
-        givenServer(false, "Y");
+        givenServer(false, YES);
 
         assertDoesNotThrow(() -> StoreServerAccess.checkRole(OTHER_ROLE_ID));
     }
@@ -135,10 +141,35 @@ class StoreServerAccessTest {
      */
     @Test
     void checkLoginUsesTheDefaultRoleOfTheUser() {
-        givenServer(true, "Y");
+        givenServer(true, YES);
         RoleDefaults defaults = new RoleDefaults();
         defaults.role = OTHER_ROLE_ID;
-        loginUtils.when(() -> LoginUtils.getLoginDefaults(eq(USER_ID), eq(""), any())).thenReturn(defaults);
+        loginUtils.when(() -> LoginUtils.getLoginDefaults(eq(USER_ID), eq(NO_REQUESTED_ROLE), any())).thenReturn(defaults);
+
+        assertThrows(UnauthorizedException.class, () -> StoreServerAccess.checkLogin(USER_ID));
+    }
+
+    /**
+     * On a restricted store server a user whose default role is System Administrator logs in.
+     */
+    @Test
+    void checkLoginAcceptsADefaultRoleOfSystemAdministrator() {
+        givenServer(true, YES);
+        RoleDefaults defaults = new RoleDefaults();
+        defaults.role = StoreServerAccess.SYSTEM_ADMIN_ROLE_ID;
+        loginUtils.when(() -> LoginUtils.getLoginDefaults(eq(USER_ID), eq(NO_REQUESTED_ROLE), any())).thenReturn(defaults);
+
+        assertDoesNotThrow(() -> StoreServerAccess.checkLogin(USER_ID));
+    }
+
+    /**
+     * When the login defaults of the user cannot be read, no role is allowed on a restricted store server.
+     */
+    @Test
+    void checkLoginRefusesAUserWithoutReadableDefaults() {
+        givenServer(true, YES);
+        loginUtils.when(() -> LoginUtils.getLoginDefaults(eq(USER_ID), eq(NO_REQUESTED_ROLE), any()))
+                .thenThrow(new ServletException("no defaults"));
 
         assertThrows(UnauthorizedException.class, () -> StoreServerAccess.checkLogin(USER_ID));
     }
@@ -148,7 +179,7 @@ class StoreServerAccessTest {
      */
     @Test
     void checkLoginDoesNothingWithoutTheRestriction() {
-        givenServer(false, "Y");
+        givenServer(false, YES);
 
         assertDoesNotThrow(() -> StoreServerAccess.checkLogin(USER_ID));
         loginUtils.verifyNoInteractions();
