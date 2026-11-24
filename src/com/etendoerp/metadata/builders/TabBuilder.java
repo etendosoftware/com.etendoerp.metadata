@@ -151,6 +151,8 @@ public class TabBuilder extends Builder {
       JSONObject json = converter.toJsonObject(tab, DataResolvingMode.FULL_TRANSLATABLE);
 
       json.put("filter", tab.getFilterClause());
+      // Classic message over a grid filtered by its implicit or transactional filter (OBViewGridComponent)
+      json.put("implicitFilterMessage", ImplicitFilterMessage.build(tab));
       json.put("displayLogic", tab.getDisplayLogic());
 
       String displayLogic = tab.getDisplayLogic();

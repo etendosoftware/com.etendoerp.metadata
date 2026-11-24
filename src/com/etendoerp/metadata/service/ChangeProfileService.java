@@ -31,10 +31,12 @@ import org.openbravo.model.ad.system.Client;
 import org.openbravo.model.common.enterprise.Organization;
 import org.openbravo.model.common.enterprise.Warehouse;
 
+import com.etendoerp.metadata.auth.StoreServerAccess;
 import com.etendoerp.metadata.auth.Utils;
 import com.etendoerp.metadata.data.AuthData;
 import com.etendoerp.metadata.exceptions.InternalServerException;
 import com.etendoerp.metadata.exceptions.MethodNotAllowedException;
+import com.etendoerp.metadata.exceptions.UnauthorizedException;
 import com.etendoerp.metadata.exceptions.UnprocessableContentException;
 
 /**
@@ -78,6 +80,8 @@ public class ChangeProfileService extends MetadataService {
             User user = OBDal.getInstance().get(User.class, OBContext.getOBContext().getUser().getId());
 
             Role role = resolveRole(body);
+            // Classic RestrictErpAccessInStoreServer: only System Administrator on a restricted store server
+            StoreServerAccess.checkRole(role.getId());
             Organization organization = ProfileRequestUtils.resolveOrganization(body, ORGANIZATION);
             Warehouse warehouse = ProfileRequestUtils.resolveWarehouse(body, WAREHOUSE);
             Client client = role.getClient();
@@ -86,7 +90,7 @@ public class ChangeProfileService extends MetadataService {
             String token = Utils.generateToken(authData, null);
 
             write(new JSONObject().put(TOKEN, token));
-        } catch (UnprocessableContentException e) {
+        } catch (UnprocessableContentException | UnauthorizedException e) {
             throw e;
         } catch (Exception e) {
             logger.error("Error changing profile: {}", e.getMessage(), e);

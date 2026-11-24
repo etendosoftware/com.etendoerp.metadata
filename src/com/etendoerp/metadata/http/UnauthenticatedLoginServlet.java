@@ -48,7 +48,8 @@ import com.etendoerp.metadata.utils.Constants;
  * @see com.etendoerp.metadata.service.LoginGuardService
  */
 @WebServlet(urlPatterns = { UnauthenticatedLoginServlet.META_SERVLET_PATH + Constants.LOGIN_PATH,
-        UnauthenticatedLoginServlet.META_SERVLET_PATH + Constants.LOGIN_GUARD_PATH })
+        UnauthenticatedLoginServlet.META_SERVLET_PATH + Constants.LOGIN_GUARD_PATH,
+        UnauthenticatedLoginServlet.META_SERVLET_PATH + Constants.LOGIN_CONFIG_PATH })
 public class UnauthenticatedLoginServlet extends HttpServlet {
     private static final long serialVersionUID = 1L;
     private static final String SWS_SERVLET_PATH = "/sws";

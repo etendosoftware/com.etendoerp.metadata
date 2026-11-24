@@ -18,8 +18,15 @@ package com.etendoerp.metadata.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
@@ -28,17 +35,23 @@ import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.Consumer;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.MockedConstruction;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.openbravo.dal.core.OBContext;
+import org.openbravo.dal.service.OBDal;
+import org.openbravo.dal.service.OBQuery;
+import org.openbravo.database.SessionInfo;
 import org.openbravo.erpCommon.businessUtility.Preferences;
 import org.openbravo.model.ad.access.Role;
 import org.openbravo.model.ad.access.User;
@@ -46,6 +59,10 @@ import org.openbravo.model.ad.domain.Preference;
 import org.openbravo.model.ad.system.Client;
 import org.openbravo.model.ad.ui.Window;
 import org.openbravo.model.common.enterprise.Organization;
+
+import com.etendoerp.metadata.exceptions.InternalServerException;
+import com.etendoerp.metadata.exceptions.UnprocessableContentException;
+import com.etendoerp.metadata.utils.Utils;
 
 /**
  * Unit tests for PreferencesService focusing on preference retrieval and processing.
@@ -72,6 +89,8 @@ class PreferencesServiceTest {
     private static final String PROPERTY_NAME = "property1";
     private static final String WINDOW_ID = "WINDOW_ID";
     private static final String SCOPED_ATTRIBUTE_KEY = ATTRIBUTE_NAME + "_" + WINDOW_ID;
+    private static final String LIST_PROPERTY = "OBUIAPP_ShowImplicitFilterMsg";
+    private static final String NO = "N";
 
     @BeforeEach
     void setUp() {
@@ -88,6 +107,21 @@ class PreferencesServiceTest {
      * @throws Exception if the response writer cannot be stubbed
      */
     private void stubServiceCollaborators() throws Exception {
+        stubContextCollaborators();
+
+        when(mockContext.getUser().getId()).thenReturn(USER_ID);
+        when(mockContext.getCurrentClient().getId()).thenReturn(CLIENT_ID);
+        when(mockContext.getCurrentOrganization().getId()).thenReturn(ORG_ID);
+        when(mockContext.getRole().getId()).thenReturn(ROLE_ID);
+    }
+
+    /**
+     * Stubs the response writer and the OBContext user, client, organization and role, without their ids,
+     * which only the read of the preferences uses.
+     *
+     * @throws Exception if the response writer cannot be stubbed
+     */
+    private void stubContextCollaborators() throws Exception {
         when(mockResponse.getWriter()).thenReturn(new PrintWriter(responseWriter));
 
         mockContext = mock(OBContext.class);
@@ -100,11 +134,6 @@ class PreferencesServiceTest {
         when(mockContext.getCurrentClient()).thenReturn(mockClient);
         when(mockContext.getCurrentOrganization()).thenReturn(mockOrg);
         when(mockContext.getRole()).thenReturn(mockRole);
-
-        when(mockUser.getId()).thenReturn(USER_ID);
-        when(mockClient.getId()).thenReturn(CLIENT_ID);
-        when(mockOrg.getId()).thenReturn(ORG_ID);
-        when(mockRole.getId()).thenReturn(ROLE_ID);
     }
 
     /**
@@ -249,5 +278,184 @@ class PreferencesServiceTest {
         when(mockWindow.getId()).thenReturn(WINDOW_ID);
 
         assertEquals(SCOPED_ATTRIBUTE_KEY, PreferencesService.buildPreferenceKey(ATTRIBUTE_NAME, mockWindow));
+    }
+
+    /**
+     * Makes the Property List query answer {@code count} matching values for any property.
+     *
+     * @param obDal the mocked OBDal instance
+     * @param count how many list values the query finds
+     */
+    @SuppressWarnings("unchecked")
+    private void stubPropertyListQuery(OBDal obDal, int count) {
+        OBQuery<org.openbravo.model.ad.domain.List> query = mock(OBQuery.class);
+        when(obDal.createQuery(eq(org.openbravo.model.ad.domain.List.class), anyString())).thenReturn(query);
+        when(query.setNamedParameter(anyString(), any())).thenReturn(query);
+        when(query.count()).thenReturn(count);
+    }
+
+    /**
+     * Builds a request body for the write endpoint.
+     *
+     * @param property the property to store
+     * @param value the value to store
+     * @param windowId the window to scope it to, or {@code null} for a global preference
+     * @return the body
+     * @throws Exception if the body cannot be built
+     */
+    private JSONObject writeBody(String property, String value, String windowId) throws Exception {
+        JSONObject body = new JSONObject().put(PreferencesService.PROPERTY, property).put(PreferencesService.VALUE, value);
+        if (windowId != null) {
+            body.put(PreferencesService.WINDOW_ID, windowId);
+        }
+        return body;
+    }
+
+    /**
+     * Runs a POST of {@code body} with the collaborators of the write mocked.
+     *
+     * @param body the request body
+     * @param obDal the OBDal instance the service reads the property list and the window from
+     * @param check what the test verifies on the mocked preference store, while the mocks are open
+     * @throws Exception if the service fails
+     */
+    private void runPost(JSONObject body, OBDal obDal, Consumer<MockedStatic<Preferences>> check) throws Exception {
+        when(mockRequest.getMethod()).thenReturn(PreferencesService.POST_METHOD);
+        try (MockedStatic<OBContext> mockedOBContext = mockStatic(OBContext.class);
+             MockedStatic<OBDal> mockedOBDal = mockStatic(OBDal.class);
+             MockedStatic<Utils> mockedUtils = mockStatic(Utils.class);
+             MockedStatic<SessionInfo> ignored = mockStatic(SessionInfo.class);
+             MockedStatic<Preferences> mockedPreferences = mockStatic(Preferences.class)) {
+
+            mockedOBContext.when(OBContext::getOBContext).thenReturn(mockContext);
+            mockedOBDal.when(OBDal::getInstance).thenReturn(obDal);
+            mockedUtils.when(() -> Utils.getRequestData(mockRequest)).thenReturn(body);
+
+            new PreferencesService(mockRequest, mockResponse).process();
+
+            check.accept(mockedPreferences);
+        }
+    }
+
+    /**
+     * A POST stores the Property List preference for the current client, organization, user and role, in
+     * the window of the body, and answers what it stored.
+     *
+     * @throws Exception if the service fails or the response cannot be parsed
+     */
+    @Test
+    void processPostStoresListPropertyForCurrentUser() throws Exception {
+        stubContextCollaborators();
+        OBDal obDal = mock(OBDal.class);
+        Window window = mock(Window.class);
+        stubPropertyListQuery(obDal, 1);
+        when(obDal.get(Window.class, WINDOW_ID)).thenReturn(window);
+
+        runPost(writeBody(LIST_PROPERTY, NO, WINDOW_ID), obDal,
+                mockedPreferences -> mockedPreferences.verify(() -> Preferences.setPreferenceValue(LIST_PROPERTY, NO,
+                        true, mockContext.getCurrentClient(), mockContext.getCurrentOrganization(),
+                        mockContext.getUser(), mockContext.getRole(), window, null)));
+
+        JSONObject result = new JSONObject(responseWriter.toString());
+        assertEquals(LIST_PROPERTY, result.getString(PreferencesService.PROPERTY));
+        assertEquals(NO, result.getString(PreferencesService.VALUE));
+    }
+
+    /**
+     * An answer that cannot be built after storing the preference is reported as an internal error.
+     *
+     * @throws Exception if the request body cannot be built
+     */
+    @Test
+    void processPostFailsWhenTheAnswerCannotBeBuilt() throws Exception {
+        mockContext = mock(OBContext.class);
+        OBDal obDal = mock(OBDal.class);
+        stubPropertyListQuery(obDal, 1);
+        JSONObject body = writeBody(LIST_PROPERTY, NO, null);
+
+        try (MockedConstruction<JSONObject> ignored = mockConstruction(JSONObject.class,
+                (json, context) -> when(json.put(anyString(), (Object) any())).thenThrow(new JSONException("broken")))) {
+            assertThrows(InternalServerException.class, () -> runPost(body, obDal, mockedPreferences -> { }));
+        }
+    }
+
+    /**
+     * A property outside the Property List is refused, so the endpoint cannot write free attributes.
+     */
+    @Test
+    void readPropertyRejectsPropertyOutsideTheList() {
+        OBDal obDal = mock(OBDal.class);
+        stubPropertyListQuery(obDal, 0);
+
+        try (MockedStatic<OBDal> mockedOBDal = mockStatic(OBDal.class)) {
+            mockedOBDal.when(OBDal::getInstance).thenReturn(obDal);
+            JSONObject body = new JSONObject();
+
+            assertThrows(UnprocessableContentException.class, () -> PreferencesService.readProperty(
+                    body.put(PreferencesService.PROPERTY, "ShowAcct")));
+        }
+    }
+
+    /**
+     * A body without a property is refused before querying the Property List.
+     */
+    @Test
+    void readPropertyRejectsMissingProperty() {
+        JSONObject body = new JSONObject();
+
+        assertThrows(UnprocessableContentException.class, () -> PreferencesService.readProperty(body));
+    }
+
+    /**
+     * Without a window id the preference is global.
+     */
+    @Test
+    void readWindowReturnsNullWithoutWindowId() {
+        assertNull(PreferencesService.readWindow(new JSONObject()));
+    }
+
+    /**
+     * A window id that does not exist is refused instead of storing a global preference.
+     */
+    @Test
+    void readWindowRejectsUnknownWindow() {
+        OBDal obDal = mock(OBDal.class);
+        when(obDal.get(Window.class, WINDOW_ID)).thenReturn(null);
+
+        try (MockedStatic<OBDal> mockedOBDal = mockStatic(OBDal.class)) {
+            mockedOBDal.when(OBDal::getInstance).thenReturn(obDal);
+
+            assertThrows(UnprocessableContentException.class,
+                    () -> PreferencesService.readWindow(writeBody(LIST_PROPERTY, NO, WINDOW_ID)));
+        }
+    }
+
+    /**
+     * An existing window id scopes the preference to that window.
+     *
+     * @throws Exception if the body cannot be built
+     */
+    @Test
+    void readWindowReturnsTheWindow() throws Exception {
+        OBDal obDal = mock(OBDal.class);
+        Window window = mock(Window.class);
+        when(obDal.get(Window.class, WINDOW_ID)).thenReturn(window);
+
+        try (MockedStatic<OBDal> mockedOBDal = mockStatic(OBDal.class)) {
+            mockedOBDal.when(OBDal::getInstance).thenReturn(obDal);
+
+            assertSame(window, PreferencesService.readWindow(writeBody(LIST_PROPERTY, NO, WINDOW_ID)));
+        }
+    }
+
+    /**
+     * The value is cleaned as the classic handler does: no line breaks and no surrounding quotes.
+     */
+    @Test
+    void cleanValueDropsLineBreaksAndSurroundingQuotes() {
+        assertEquals(NO, PreferencesService.cleanValue("\"N\""));
+        assertEquals("AB", PreferencesService.cleanValue("A\nB"));
+        assertEquals("\"", PreferencesService.cleanValue("\""));
+        assertEquals("\"N", PreferencesService.cleanValue("\"N"));
     }
 }

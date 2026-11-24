@@ -26,6 +26,7 @@ import org.codehaus.jettison.json.JSONObject;
 import org.openbravo.dal.core.OBContext;
 
 import com.etendoerp.metadata.auth.LoginAttemptGuard;
+import com.etendoerp.metadata.auth.StoreServerAccess;
 import com.etendoerp.metadata.exceptions.InternalServerException;
 import com.etendoerp.metadata.exceptions.MethodNotAllowedException;
 import com.etendoerp.metadata.exceptions.UnauthorizedException;
@@ -66,7 +67,10 @@ public class LoginGuardService extends MetadataService {
             JSONObject body = com.etendoerp.metadata.utils.Utils.getRequestData(getRequest());
             LoginCredentials credentials = LoginCredentials.from(body);
 
-            LoginAttemptGuard.authenticate(getRequest(), credentials.getUsername(), credentials.getPassword());
+            String userId = LoginAttemptGuard.authenticate(getRequest(), credentials.getUsername(),
+                    credentials.getPassword());
+            // Classic RestrictErpAccessInStoreServer: only System Administrator on a restricted store server
+            StoreServerAccess.checkLogin(userId);
             write(new JSONObject());
         } catch (UnauthorizedException | UnprocessableContentException e) {
             throw e;

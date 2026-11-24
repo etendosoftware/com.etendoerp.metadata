@@ -57,8 +57,10 @@ import com.etendoerp.etendorx.auth.JwkRSAKeyProvider;
 import com.etendoerp.etendorx.data.ETRXTokenUser;
 import com.etendoerp.metadata.auth.LoginDefaultsResolver;
 import com.etendoerp.metadata.auth.LoginSessionRegistry;
+import com.etendoerp.metadata.auth.StoreServerAccess;
 import com.etendoerp.metadata.auth.Utils;
 import com.etendoerp.metadata.data.AuthData;
+import com.etendoerp.metadata.exceptions.UnauthorizedException;
 
 /**
  * Handles SSO authentication for the new UI.
@@ -80,6 +82,7 @@ public class SSOService {
     private static final String AUTH0 = "Auth0";
     private static final String INTERNAL_ERROR = "internal_error";
     private static final String INVALID_REQUEST = "invalid_request";
+    private static final String ACCESS_RESTRICTED = "access_restricted";
     private static final String REDIRECT_URI_KEY = "redirectUri";
     private static final String[][] MIDDLEWARE_PROVIDERS = {
         { "google-oauth2", "google" },
@@ -235,6 +238,8 @@ public class SSOService {
 
             User user = tokenUser.getUserForToken();
             AuthData authData = LoginDefaultsResolver.resolve(user);
+            // Classic RestrictErpAccessInStoreServer: only System Administrator on a restricted store server
+            StoreServerAccess.checkLogin(user.getId());
 
             String token = Utils.generateToken(authData, null);
             // Classic's SSO login records a successful session without checking the user lock
@@ -248,6 +253,8 @@ public class SSOService {
             result.put(LoginSessionRegistry.SESSION_ID, sessionId);
             writeJson(response, HttpServletResponse.SC_OK, result);
 
+        } catch (UnauthorizedException e) {
+            writeJson(response, HttpServletResponse.SC_UNAUTHORIZED, errorJson(ACCESS_RESTRICTED, e.getMessage()));
         } catch (Exception e) {
             log.error("SSO callback error", e);
             writeJson(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,

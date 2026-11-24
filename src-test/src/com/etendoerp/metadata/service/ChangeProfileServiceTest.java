@@ -46,6 +46,7 @@ import com.etendoerp.metadata.exceptions.UnprocessableContentException;
 public class ChangeProfileServiceTest extends AbstractProfileServiceTest {
     private static final String USER_ID = "user-1";
     private static final String ROLE_ID = "role-1";
+    private static final String RESTRICTED_MESSAGE = "Only System Administrator can access the ERP";
 
     @Mock
     private User contextUser;
@@ -172,5 +173,30 @@ public class ChangeProfileServiceTest extends AbstractProfileServiceTest {
         ChangeProfileService service = new ChangeProfileService(mockRequest, mockResponse);
         assertProcessThrowsUnprocessable(service,
                 "Expected UnprocessableContentException for an unresolvable warehouse id");
+    }
+
+    /**
+     * On a store server restricted to System Administrator, a change to another role is refused with the
+     * classic message (RestrictErpAccessInStoreServer).
+     *
+     * @throws Exception if the request body cannot be read
+     */
+    @Test
+    public void testProcessRestrictedStoreServerRefusesTheRole() throws Exception {
+        when(mockRequest.getMethod()).thenReturn("POST");
+        setRequestBody("{\"role\":\"role-1\"}");
+        Role mockRole = mock(Role.class);
+        when(mockRole.getId()).thenReturn(ROLE_ID);
+        when(obDal.get(Role.class, ROLE_ID)).thenReturn(mockRole);
+        when(mockRole.getClient()).thenReturn(mock(Client.class));
+        storeServerAccessMock.when(() -> com.etendoerp.metadata.auth.StoreServerAccess.checkRole(ROLE_ID))
+            .thenThrow(new com.etendoerp.metadata.exceptions.UnauthorizedException(RESTRICTED_MESSAGE));
+
+        try {
+            new ChangeProfileService(mockRequest, mockResponse).process();
+            fail("Expected UnauthorizedException");
+        } catch (com.etendoerp.metadata.exceptions.UnauthorizedException expected) {
+            org.junit.Assert.assertEquals(RESTRICTED_MESSAGE, expected.getMessage());
+        }
     }
 }

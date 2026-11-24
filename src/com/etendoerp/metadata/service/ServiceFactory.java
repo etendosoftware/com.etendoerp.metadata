@@ -66,6 +66,7 @@ public final class ServiceFactory {
         EXACT_MATCH_SERVICES.put(LOGIN_PATH, LoginService::new);
         EXACT_MATCH_SERVICES.put(LOGIN_DEFAULTS_PATH, LoginDefaultsService::new);
         EXACT_MATCH_SERVICES.put(LOGIN_GUARD_PATH, LoginGuardService::new);
+        EXACT_MATCH_SERVICES.put(LOGIN_CONFIG_PATH, LoginConfigService::new);
         EXACT_MATCH_SERVICES.put(LOGIN_SESSION_PATH, LoginSessionService::new);
         EXACT_MATCH_SERVICES.put(LOGOUT_PATH, LogoutService::new);
         EXACT_MATCH_SERVICES.put(RECENT_DOCUMENTS_PATH, RecentDocumentsService::new);

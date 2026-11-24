@@ -48,6 +48,8 @@ public class LoginGuardServiceTest extends AbstractProfileServiceTest {
     private static final String PASSWORD = "test-password"; // NOSONAR - fake value, only used to stub a mocked LoginAttemptGuard call
     private static final String CREDENTIALS_BODY = "{\"username\":\"test-user\",\"password\":\"test-password\"}";
     private static final String POST_METHOD = "POST";
+    private static final String GUARDED_USER = "user-1";
+    private static final String RESTRICTED_MESSAGE = "Only System Administrator can access the ERP";
 
     private MockedStatic<LoginAttemptGuard> guardMock;
 
@@ -104,7 +106,7 @@ public class LoginGuardServiceTest extends AbstractProfileServiceTest {
     @Test
     public void testProcessAcceptedCredentialsWritesEmptyObject() throws Exception {
         StringWriter stringWriter = stubGuardRequest();
-        guardMock.when(() -> LoginAttemptGuard.authenticate(mockRequest, USERNAME, PASSWORD)).thenReturn("user-1");
+        guardMock.when(() -> LoginAttemptGuard.authenticate(mockRequest, USERNAME, PASSWORD)).thenReturn(GUARDED_USER);
 
         new LoginGuardService(mockRequest, mockResponse).process();
 
@@ -156,5 +158,26 @@ public class LoginGuardServiceTest extends AbstractProfileServiceTest {
         StringWriter stringWriter = new StringWriter();
         when(mockResponse.getWriter()).thenReturn(new PrintWriter(stringWriter));
         return stringWriter;
+    }
+
+    /**
+     * On a store server restricted to System Administrator, a user whose default role is another one is
+     * refused with the classic message (RestrictErpAccessInStoreServer).
+     *
+     * @throws Exception if the request body cannot be read
+     */
+    @Test
+    public void testProcessRestrictedStoreServerRefusesTheLogin() throws Exception {
+        stubGuardRequest();
+        guardMock.when(() -> LoginAttemptGuard.authenticate(mockRequest, USERNAME, PASSWORD)).thenReturn(GUARDED_USER);
+        storeServerAccessMock.when(() -> com.etendoerp.metadata.auth.StoreServerAccess.checkLogin(GUARDED_USER))
+                .thenThrow(new UnauthorizedException(RESTRICTED_MESSAGE));
+
+        try {
+            new LoginGuardService(mockRequest, mockResponse).process();
+            fail("Expected UnauthorizedException");
+        } catch (UnauthorizedException expected) {
+            assertEquals(RESTRICTED_MESSAGE, expected.getMessage());
+        }
     }
 }
