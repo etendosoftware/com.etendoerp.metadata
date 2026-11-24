@@ -330,6 +330,10 @@ This module defines three AD windows:
 - CRUD for saved views (filter/sort/column configurations per tab)
 - Stored in `ETMETA_SAVEDVIEW`
 - Supports default view per user
+- `GET ?tab=<id>&isdefault=true` resolves the effective default view of one tab (USER > ROLE > ORGANIZATION >
+  CLIENT > SYSTEM); `GET ?window=<id>&isdefault=true` returns the effective default of every tab of a window in
+  one query (same visibility and precedence), as the classic window settings return the personalization of all
+  the tabs at once. The new UI requests it when a window opens, so each grid loads once, already with its view
 - `GRIDCONFIGURATION` is an opaque JSON string for the server; the new UI also stores column widths, pinning and the window layout in it (see the client docs, `docs/features/saved-views/README.md`)
 
 ### Login Defaults (`LoginDefaultsService` / `LoginDefaultsResolver`)
