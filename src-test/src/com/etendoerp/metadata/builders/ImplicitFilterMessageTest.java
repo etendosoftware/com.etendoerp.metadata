@@ -20,18 +20,16 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
-
-import java.util.Collections;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 import org.openbravo.base.secureApp.VariablesSecureApp;
-import org.openbravo.client.application.window.OBViewUtil;
 import org.openbravo.client.kernel.RequestContext;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.erpCommon.utility.Utility;
@@ -55,7 +53,8 @@ class ImplicitFilterMessageTest {
 
     private MockedStatic<Utility> utility;
     private MockedStatic<OBContext> obContext;
-    private MockedStatic<OBViewUtil> viewUtil;
+    /** Real methods except the translated filter name: OBViewUtil reads the database when it is loaded. */
+    private MockedStatic<ImplicitFilterMessage> filterMessage;
     private MockedStatic<RequestContext> requestContext;
 
     /**
@@ -65,7 +64,7 @@ class ImplicitFilterMessageTest {
     void setUp() {
         utility = mockStatic(Utility.class);
         obContext = mockStatic(OBContext.class);
-        viewUtil = mockStatic(OBViewUtil.class);
+        filterMessage = mockStatic(ImplicitFilterMessage.class, CALLS_REAL_METHODS);
         requestContext = mockStatic(RequestContext.class);
 
         OBContext context = mock(OBContext.class);
@@ -87,7 +86,7 @@ class ImplicitFilterMessageTest {
     void tearDown() {
         utility.close();
         obContext.close();
-        viewUtil.close();
+        filterMessage.close();
         requestContext.close();
     }
 
@@ -114,8 +113,7 @@ class ImplicitFilterMessageTest {
         when(tab.getTabLevel()).thenReturn(level);
         when(tab.getHqlfilterclause()).thenReturn(hqlFilter);
         when(tab.getFilterName()).thenReturn(filterName);
-        when(tab.getADTabTrlList()).thenReturn(Collections.emptyList());
-        viewUtil.when(() -> OBViewUtil.getLabel(any(), any(), eq(Tab.PROPERTY_FILTERNAME))).thenReturn(filterName);
+        filterMessage.when(() -> ImplicitFilterMessage.translatedFilterName(tab)).thenReturn(filterName);
         return tab;
     }
 

@@ -75,9 +75,20 @@ public final class ImplicitFilterMessage {
         }
         String description = message(IMPLICIT_FILTER);
         if (tab.getFilterName() != null) {
-            description += "<i>(" + OBViewUtil.getLabel(tab, tab.getADTabTrlList(), Tab.PROPERTY_FILTERNAME) + ")</i>";
+            description += "<i>(" + translatedFilterName(tab) + ")</i>";
         }
         return description;
+    }
+
+    /**
+     * The filter name of the tab in the language of the session, as classic shows it. {@code OBViewUtil} also
+     * reads the translations of a tab cached outside the current DAL session.
+     *
+     * @param tab the tab with a filter name
+     * @return the translated filter name, or the filter name of the tab without a translation
+     */
+    static String translatedFilterName(Tab tab) {
+        return OBViewUtil.getLabel(tab, tab.getADTabTrlList(), Tab.PROPERTY_FILTERNAME);
     }
 
     private static String joinFilters(String first, String second) {
