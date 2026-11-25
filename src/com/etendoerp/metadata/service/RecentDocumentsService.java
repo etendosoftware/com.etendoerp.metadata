@@ -20,7 +20,9 @@ package com.etendoerp.metadata.service;
 import com.etendoerp.metadata.data.RecentDocument;
 import com.etendoerp.metadata.exceptions.InternalServerException;
 import com.etendoerp.metadata.exceptions.NotFoundException;
+import com.etendoerp.metadata.exceptions.UnprocessableContentException;
 import com.etendoerp.metadata.utils.RecentDocumentsQueries;
+import org.apache.commons.lang3.StringUtils;
 import org.codehaus.jettison.json.JSONObject;
 import org.hibernate.query.Query;
 import org.openbravo.base.provider.OBProvider;
@@ -38,10 +40,11 @@ import java.util.Date;
 import java.util.List;
 
 /**
- * Handles GET/POST /meta/recent-documents
+ * Handles GET/POST/DELETE /meta/recent-documents
  *
  * GET  -> {"items": [{"recordId","identifier","windowId","windowTitle","tabId","tabLevel","viewedAt"}, ...]}
  * POST body: {"windowId","tabId","recordId","identifier","tabLevel"} -> {"status": "ok"}
+ * DELETE ?tabId=..&recordId=.. -> {"status": "removed"} (a document whose record no longer exists)
  *
  * Tracks the records a user opens in form view, per user + role, capped at MAX_RECENT_DOCUMENTS
  * and filtered to windows the current role still has access to (AD_Window_Access).
@@ -68,6 +71,13 @@ public class RecentDocumentsService extends MetadataService {
 
     private static final String DELETE_BY_IDS_HQL = "delete from etmeta_Recent_Document rd where rd.id in (:ids)";
 
+    private static final String DELETE_DOCUMENT_HQL =
+        "delete from etmeta_Recent_Document rd " +
+        "where rd.userContact.id = :userId and rd.role.id = :roleId " +
+        "and rd.tab.id = :tabId and rd.recordID = :recordId";
+
+    private static final String STATUS = "status";
+
     /**
      * Creates a new RecentDocumentsService for the given request/response pair.
      *
@@ -92,10 +102,12 @@ public class RecentDocumentsService extends MetadataService {
             } else if ("POST".equalsIgnoreCase(method)) {
                 JSONObject body = new JSONObject(readBody());
                 write(track(userId, roleId, body));
+            } else if ("DELETE".equalsIgnoreCase(method)) {
+                write(remove(userId, roleId));
             } else {
                 throw new NotFoundException();
             }
-        } catch (IOException | NotFoundException e) {
+        } catch (IOException | NotFoundException | UnprocessableContentException e) {
             throw e;
         } catch (Exception e) {
             throw new InternalServerException(e.getMessage(), e);
@@ -149,7 +161,35 @@ public class RecentDocumentsService extends MetadataService {
 
         trim(userId, roleId);
 
-        return new JSONObject().put("status", "ok");
+        return new JSONObject().put(STATUS, "ok");
+    }
+
+    /**
+     * Removes a document of this user + role from the list, e.g. because its record was deleted.
+     *
+     * @param userId the current user
+     * @param roleId the current role
+     * @return {"status": "removed"}
+     * @throws UnprocessableContentException when the tabId or recordId request parameter is missing
+     * @throws Exception when the response cannot be built
+     */
+    private JSONObject remove(String userId, String roleId) throws Exception {
+        String tabId = getRequest().getParameter(TAB_ID);
+        String recordId = getRequest().getParameter(RECORD_ID);
+        if (StringUtils.isBlank(tabId) || StringUtils.isBlank(recordId)) {
+            throw new UnprocessableContentException("tabId and recordId are required");
+        }
+
+        OBDal.getInstance().getSession()
+                .createQuery(DELETE_DOCUMENT_HQL)
+                .setParameter(USER_ID, userId)
+                .setParameter(ROLE_ID, roleId)
+                .setParameter(TAB_ID, tabId)
+                .setParameter(RECORD_ID, recordId)
+                .executeUpdate();
+        OBDal.getInstance().flush();
+
+        return new JSONObject().put(STATUS, "removed");
     }
 
     /** Keeps only the MAX_RECENT_DOCUMENTS most recently viewed rows for this user + role. */
