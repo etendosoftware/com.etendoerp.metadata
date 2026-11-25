@@ -24,7 +24,6 @@ import org.openbravo.dal.core.OBContext;
 import org.openbravo.service.web.WebService;
 
 import com.etendoerp.metadata.auth.TokenRevocationStore;
-import com.etendoerp.metadata.exceptions.UnauthorizedException;
 import com.etendoerp.metadata.service.ServiceFactory;
 import com.etendoerp.metadata.utils.Constants;
 import com.etendoerp.metadata.utils.PasswordExpirationUtils;
@@ -65,7 +64,7 @@ public abstract class BaseWebService implements WebService {
     /**
      * Handles HTTP GET requests by delegating to the process method.
      *
-     * @throws Exception if the password is expired or the request processing fails
+     * @throws Exception if the request processing fails
      */
     @Override
     public void doGet(String path, HttpServletRequest request, HttpServletResponse response)
@@ -76,7 +75,7 @@ public abstract class BaseWebService implements WebService {
     /**
      * Handles HTTP POST requests by delegating to the process method.
      *
-     * @throws Exception if the password is expired or the request processing fails
+     * @throws Exception if the request processing fails
      */
     @Override
     public void doPost(String path, HttpServletRequest request, HttpServletResponse response)
@@ -87,7 +86,7 @@ public abstract class BaseWebService implements WebService {
     /**
      * Handles HTTP DELETE requests by delegating to the process method.
      *
-     * @throws Exception if the password is expired or the request processing fails
+     * @throws Exception if the request processing fails
      */
     @Override
     public void doDelete(String path, HttpServletRequest request, HttpServletResponse response)
@@ -98,7 +97,7 @@ public abstract class BaseWebService implements WebService {
     /**
      * Handles HTTP PUT requests by delegating to the process method.
      *
-     * @throws Exception if the password is expired or the request processing fails
+     * @throws Exception if the request processing fails
      */
     @Override
     public void doPut(String path, HttpServletRequest request, HttpServletResponse response)
@@ -109,7 +108,7 @@ public abstract class BaseWebService implements WebService {
     /**
      * Handles HTTP PATCH requests by delegating to the process method.
      *
-     * @throws Exception if the password is expired or the request processing fails
+     * @throws Exception if the request processing fails
      */
     public void doPatch(String path, HttpServletRequest request, HttpServletResponse response)
             throws Exception {
@@ -122,23 +121,39 @@ public abstract class BaseWebService implements WebService {
      *
      * @param request  the HTTP request
      * @param response the HTTP response
-     * @throws Exception if the password is expired or the request processing fails
+     * @throws Exception if the request processing fails
      */
     private void dispatch(HttpServletRequest request, HttpServletResponse response) throws Exception {
-        if (isTokenRevoked(request)) {
-            Utils.writeJsonErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "Token has been revoked");
+        String rejection = resolveRejection(request);
+        if (rejection != null) {
+            Utils.writeJsonErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, rejection);
             return;
         }
-        rejectIfPasswordExpired(request);
         process(request, response);
     }
 
     /**
-     * Checks the caller's raw token hash against {@link TokenRevocationStore}. Deliberately does
-     * <b>not</b> throw {@code UnauthorizedException} on a hit - an exception thrown from here
-     * (before {@link #process}) never reaches this module's own exception-to-status mapping (see
-     * the design spec, "Why not throw UnauthorizedException") - the caller must write the 401
-     * response itself and return without calling {@link #process}.
+     * Resolves why the request must be rejected with a 401, if it must. Both guards write the 401
+     * themselves instead of throwing: an exception thrown before {@link #process} never reaches this
+     * module's own exception-to-status mapping, and the Secure Web Services servlet turns it into a
+     * 500 (see the design spec, "Why not throw UnauthorizedException"). A 500 would not tell the new
+     * UI that the session can no longer be used.
+     *
+     * @param request the HTTP request
+     * @return the error to answer with, or {@code null} when the request can be processed
+     */
+    private String resolveRejection(HttpServletRequest request) {
+        if (isTokenRevoked(request)) {
+            return Constants.TOKEN_REVOKED_ERROR;
+        }
+        if (isPasswordExpired(request)) {
+            return Constants.PASSWORD_EXPIRED_ERROR;
+        }
+        return null;
+    }
+
+    /**
+     * Checks the caller's raw token hash against {@link TokenRevocationStore}.
      * <p>
      * No JWT decode/verify happens here - that already happened upstream in
      * {@code SecureWebServiceServlet} before this request ever reached this class. Only the raw
@@ -153,22 +168,19 @@ public abstract class BaseWebService implements WebService {
     }
 
     /**
-     * Rejects the request when the authenticated user must change an expired password, unless the
-     * requested path is one of the bootstrap endpoints the client needs to render the mandatory
-     * password-change screen (see {@link Constants#PASSWORD_EXPIRED_ALLOWED_PATHS}).
+     * Tells whether the authenticated user must change an expired password before using this
+     * request, which is never the case for the bootstrap endpoints the client needs to render the
+     * mandatory password-change screen (see {@link Constants#PASSWORD_EXPIRED_ALLOWED_PATHS}).
      *
      * @param request the HTTP request being served
-     * @throws UnauthorizedException if the password is expired and the path is not allowed
+     * @return {@code true} if the password is expired and the path is not allowed
      */
-    private void rejectIfPasswordExpired(HttpServletRequest request) {
+    private boolean isPasswordExpired(HttpServletRequest request) {
         if (Constants.PASSWORD_EXPIRED_ALLOWED_PATHS.contains(ServiceFactory.normalizePath(request))) {
-            return;
+            return false;
         }
 
         OBContext context = OBContext.getOBContext();
-
-        if (context != null && PasswordExpirationUtils.isExpired(context.getUser())) {
-            throw new UnauthorizedException(Constants.PASSWORD_EXPIRED_ERROR);
-        }
+        return context != null && PasswordExpirationUtils.isExpired(context.getUser());
     }
 }
