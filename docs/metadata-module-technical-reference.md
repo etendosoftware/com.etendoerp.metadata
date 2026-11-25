@@ -370,6 +370,26 @@ The Classic login protections, applied to the New UI login (`/sws/login` only ch
 
 See the client's `docs/features/login-logout/README.md`.
 
+### Authentication Answers (`BaseWebService` / `BearerTokenGuardFilter`)
+
+The New UI closes its session only on a `401`, so an unusable token must answer `401` on every service
+it calls, and a missing permission must not:
+
+- `/sws/*` requests are authenticated by the Secure Web Services servlet, which already answers `401`
+  for a missing, malformed, badly signed or expired token.
+- `BaseWebService.dispatch` writes a JSON `401` itself for a revoked token (`TOKEN_REVOKED_ERROR`) and for
+  an expired password (`PASSWORD_EXPIRED_ERROR`). Throwing instead would reach the Secure Web Services
+  servlet's `catch (Throwable)` and become a `500`.
+- `BearerTokenGuardFilter` (`@WebFilter` on `/attachments/*`, `/notes/*`,
+  `/org.openbravo.service.datasource/*` and `/org.openbravo.client.kernel/*`) answers a JSON `401` when a
+  request carries a Bearer token that the token decoder rejects (`INVALID_TOKEN_ERROR`) or that was
+  revoked. Without it, the Classic authentication manager turns a bad token into a `500` or an empty
+  `200`. Requests without a Bearer header (Classic itself) are never checked.
+- A role without access to a window, or not allowed to manage a shared saved view, gets
+  `ForbiddenException` (`403`), not `401`.
+
+See the client's `docs/features/session-error-handling/README.md`.
+
 ### Grid Configuration (`GridConfigurationService`)
 - Durable, per-user grid column configuration of the new UI (visibility, order, width, pinning), the equivalent of classic `OBUIAPP_GridConfiguration`
 - Stored as one `AD_Preference` per user and window, attribute `ETMETA_GridConfiguration` (a property of its own: the classic value is a SmartClient view state with a different format). Visible at the current client and user, with no organization or role, so it follows the user across roles
