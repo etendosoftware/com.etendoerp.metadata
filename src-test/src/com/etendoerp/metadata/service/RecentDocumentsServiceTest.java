@@ -20,6 +20,7 @@ package com.etendoerp.metadata.service;
 import com.etendoerp.metadata.data.RecentDocument;
 import com.etendoerp.metadata.exceptions.InternalServerException;
 import com.etendoerp.metadata.exceptions.NotFoundException;
+import com.etendoerp.metadata.exceptions.UnprocessableContentException;
 import org.hibernate.query.Query;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -67,6 +68,7 @@ class RecentDocumentsServiceTest extends AbstractMockedContextTest {
     private static final String TAB_ID = "tab-001";
     private static final String RECORD_ID = "record-001";
     private static final String IDENTIFIER_VALUE = "SO-001";
+    private static final String METHOD_DELETE = "DELETE";
     private static final String TRACK_BODY = "{\"windowId\":\"" + WINDOW_ID + "\",\"tabId\":\"" + TAB_ID
             + "\",\"recordId\":\"" + RECORD_ID + "\",\"identifier\":\"" + IDENTIFIER_VALUE + "\",\"tabLevel\":0}";
 
@@ -123,10 +125,69 @@ class RecentDocumentsServiceTest extends AbstractMockedContextTest {
         return deleteQuery;
     }
 
+    /**
+     * Prepares a DELETE request with the given tab and record parameters.
+     *
+     * @param tabId the tabId request parameter, or null to leave it out
+     * @param recordId the recordId request parameter, or null to leave it out
+     */
+    private void setupDeleteRequest(String tabId, String recordId) {
+        when(request.getMethod()).thenReturn(METHOD_DELETE);
+        when(request.getParameter("tabId")).thenReturn(tabId);
+        when(request.getParameter("recordId")).thenReturn(recordId);
+    }
+
+    /**
+     * DELETE removes the document of the current user and role for the given tab and record.
+     *
+     * @throws Exception if the mocked context cannot be set up or the request fails
+     */
+    @Test
+    void deleteRemovesTheDocumentOfTheCurrentUserAndRole() throws Exception {
+        runWithRecentDocumentsContext(() -> {
+            setupDeleteRequest(TAB_ID, RECORD_ID);
+            Query<Object> deleteQuery = setupDeleteByIdsQuery();
+            when(deleteQuery.setParameter(anyString(), anyString())).thenReturn(deleteQuery);
+
+            RecentDocumentsService svc = new RecentDocumentsService(request, response);
+            svc.process();
+
+            verify(deleteQuery).setParameter("userId", USER_ID);
+            verify(deleteQuery).setParameter("roleId", ROLE_ID);
+            verify(deleteQuery).setParameter("tabId", TAB_ID);
+            verify(deleteQuery).setParameter("recordId", RECORD_ID);
+            verify(deleteQuery).executeUpdate();
+            verify(obDal).flush();
+            assertTrue(responseCapture.toString().contains("removed"));
+        });
+    }
+
+    /**
+     * DELETE without the record to remove is rejected and deletes nothing.
+     *
+     * @throws Exception if the mocked context cannot be set up
+     */
+    @Test
+    void deleteWithoutRecordIdIsRejected() throws Exception {
+        runWithRecentDocumentsContext(() -> {
+            setupDeleteRequest(TAB_ID, null);
+
+            RecentDocumentsService svc = new RecentDocumentsService(request, response);
+
+            assertThrows(UnprocessableContentException.class, svc::process);
+            verify(session, never()).createQuery(any(String.class));
+        });
+    }
+
+    /**
+     * An HTTP method the service does not handle answers not found.
+     *
+     * @throws Exception if the mocked context cannot be set up
+     */
     @Test
     void processThrowsNotFoundForUnsupportedMethod() throws Exception {
         runWithRecentDocumentsContext(() -> {
-            when(request.getMethod()).thenReturn("DELETE");
+            when(request.getMethod()).thenReturn("PUT");
             RecentDocumentsService svc = new RecentDocumentsService(request, response);
             assertThrows(NotFoundException.class, svc::process);
         });

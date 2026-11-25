@@ -40,7 +40,9 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 
 import static com.etendoerp.metadata.utils.Constants.SAVED_VIEW_PATH;
@@ -66,6 +68,7 @@ public class SavedViewService extends MetadataService {
     private static final String FIELD_STATUS = "status";
     private static final String FIELD_RESPONSE = "response";
     private static final String FIELD_TAB = "tab";
+    private static final String FIELD_WINDOW = "window";
     private static final String FIELD_USER = "user";
     private static final String FIELD_ROLE = "role";
     private static final String FIELD_ORGANIZATION = "organization";
@@ -77,6 +80,11 @@ public class SavedViewService extends MetadataService {
     private static final String SCOPE_ORGANIZATION = "ORGANIZATION";
     private static final String SCOPE_CLIENT = "CLIENT";
     private static final String SCOPE_SYSTEM = "SYSTEM";
+
+    /** Scopes from the most to the least specific: the first one that has a default view wins. */
+    private static final List<String> DEFAULT_VIEW_PRECEDENCE = List.of(SCOPE_USER, SCOPE_ROLE,
+        SCOPE_ORGANIZATION, SCOPE_CLIENT, SCOPE_SYSTEM);
+    private static final String TAB_ALIAS = "savedViewTab";
 
     /** Etendo's standard id for the System client / "*" (all) organization. */
     private static final String SYSTEM_ID = "0";
@@ -144,6 +152,10 @@ public class SavedViewService extends MetadataService {
                 data.put(toJSON(effective, ctx));
             }
             write(wrapList(data));
+            return;
+        }
+
+        if (writeWindowDefaults(wantsDefault, ctx)) {
             return;
         }
 
@@ -422,6 +434,53 @@ public class SavedViewService extends MetadataService {
             crit.add(Restrictions.eq(SavedView.PROPERTY_ORGANIZATION + ".id", SYSTEM_ID));
             crit.add(Restrictions.eq(SavedView.PROPERTY_CLIENT + ".id", SYSTEM_ID));
         });
+    }
+
+    /**
+     * Answers a {@code ?window=<id>&isdefault=true} request with the effective default view of every tab
+     * of the window.
+     *
+     * @return false when the request asks for something else, which is then answered as before
+     */
+    private boolean writeWindowDefaults(boolean wantsDefault, OBContext ctx) throws Exception {
+        String windowId = getRequest().getParameter(FIELD_WINDOW);
+        if (!wantsDefault || windowId == null || windowId.isEmpty()) {
+            return false;
+        }
+        write(wrapList(resolveWindowDefaults(windowId, ctx)));
+        return true;
+    }
+
+    /**
+     * Resolves the effective default view of every tab of a window in a single query, as the classic
+     * window settings return the personalization of all the tabs at once. Each tab keeps its most
+     * specific visible default (same precedence and visibility as {@link #resolveEffectiveDefault}).
+     */
+    private JSONArray resolveWindowDefaults(String windowId, OBContext ctx) throws Exception {
+        OBCriteria<SavedView> crit = OBDal.getInstance().createCriteria(SavedView.class);
+        crit.createAlias(SavedView.PROPERTY_TAB, TAB_ALIAS);
+        crit.add(Restrictions.eq(TAB_ALIAS + "." + Tab.PROPERTY_WINDOW + ".id", windowId));
+        crit.add(Restrictions.eq(SavedView.PROPERTY_ISDEFAULT, true));
+        crit.add(Restrictions.eq(SavedView.PROPERTY_ACTIVE, true));
+        crit.add(buildVisibilityRestriction(ctx));
+
+        Map<String, SavedView> defaultsByTab = new LinkedHashMap<>();
+        for (SavedView view : crit.list()) {
+            defaultsByTab.merge(view.getTab().getId(), view, this::mostSpecificView);
+        }
+
+        JSONArray data = new JSONArray();
+        for (SavedView view : defaultsByTab.values()) {
+            data.put(toJSON(view, ctx));
+        }
+        return data;
+    }
+
+    /** The view whose scope comes first in {@link #DEFAULT_VIEW_PRECEDENCE}; the current one on a tie. */
+    private SavedView mostSpecificView(SavedView current, SavedView candidate) {
+        int currentRank = DEFAULT_VIEW_PRECEDENCE.indexOf(deriveScope(current));
+        int candidateRank = DEFAULT_VIEW_PRECEDENCE.indexOf(deriveScope(candidate));
+        return candidateRank < currentRank ? candidate : current;
     }
 
     private SavedView findDefault(String tabId, Consumer<OBCriteria<SavedView>> scopeFilter) {
