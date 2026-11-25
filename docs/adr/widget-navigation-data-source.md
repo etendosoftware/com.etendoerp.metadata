@@ -57,6 +57,10 @@ Server-side tracking of individually viewed records is now implemented:
      "tabLevel","viewedAt"}, ...]}`, ordered by `VIEWED_AT DESC`, filtered to windows the
      current role still has `AD_Window_Access` for (so a document is hidden again once the
      role's access to its window is revoked).
+   - `DELETE ?tabId=…&recordId=…` (added by ETP-6431) removes that document of the current user +
+     role, e.g. once the UI finds that its record was deleted; it answers `{"status":"removed"}`
+     and rejects a request without both parameters (422). The UI shows
+     `ETMETA_RecordNoLongerExists` and does not open the record.
 
 3. **`RecentDocsResolver`** now queries `ETMETA_RECENT_DOCUMENT` the same way, so the
    `RECENT_DOCS` dashboard widget and the dedicated endpoint stay consistent (mirrors how
