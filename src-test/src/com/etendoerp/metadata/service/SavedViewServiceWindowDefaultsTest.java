@@ -139,7 +139,8 @@ public class SavedViewServiceWindowDefaultsTest extends AbstractSavedViewService
     @Test
     public void testWindowDefaultsIgnoreALessSpecificViewFoundLater() throws IOException, JSONException {
         givenWindowRequest(TRUE);
-        when(mockCriteria.list()).thenReturn(Arrays.asList(mockView, roleView(ROLE_VIEW_ID, mockTab)));
+        SavedView laterRoleView = roleView(ROLE_VIEW_ID, mockTab);
+        when(mockCriteria.list()).thenReturn(Arrays.asList(mockView, laterRoleView));
 
         assertEquals(Collections.singletonList(VIEW_ID), processAndReadViewIds());
     }
@@ -153,7 +154,8 @@ public class SavedViewServiceWindowDefaultsTest extends AbstractSavedViewService
     @Test
     public void testWindowDefaultsKeepTheFirstViewOnATie() throws IOException, JSONException {
         givenWindowRequest(TRUE);
-        when(mockCriteria.list()).thenReturn(Arrays.asList(mockView, userView(SECOND_USER_VIEW_ID, mockTab)));
+        SavedView secondUserView = userView(SECOND_USER_VIEW_ID, mockTab);
+        when(mockCriteria.list()).thenReturn(Arrays.asList(mockView, secondUserView));
 
         assertEquals(Collections.singletonList(VIEW_ID), processAndReadViewIds());
     }
@@ -182,7 +184,8 @@ public class SavedViewServiceWindowDefaultsTest extends AbstractSavedViewService
     @Test
     public void testWindowParameterIgnoredWithoutIsDefault() throws IOException, JSONException {
         givenWindowRequest(null);
-        when(mockCriteria.list()).thenReturn(Arrays.asList(mockView, roleView(ROLE_VIEW_ID, mockTab)));
+        SavedView headerRoleView = roleView(ROLE_VIEW_ID, mockTab);
+        when(mockCriteria.list()).thenReturn(Arrays.asList(mockView, headerRoleView));
 
         assertEquals(Arrays.asList(VIEW_ID, ROLE_VIEW_ID), processAndReadViewIds());
         verify(mockCriteria, never()).createAlias(anyString(), anyString());
