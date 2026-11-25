@@ -381,7 +381,8 @@ it calls, and a missing permission must not:
   an expired password (`PASSWORD_EXPIRED_ERROR`). Throwing instead would reach the Secure Web Services
   servlet's `catch (Throwable)` and become a `500`.
 - `BearerTokenGuardFilter` (`@WebFilter` on `/attachments/*`, `/notes/*`,
-  `/org.openbravo.service.datasource/*` and `/org.openbravo.client.kernel/*`) answers a JSON `401` when a
+  `/org.openbravo.service.datasource/*`, `/org.openbravo.client.kernel/*` and `/utility/*`, the last one for the
+  image servlets and `ReferencedLink`) answers a JSON `401` when a
   request carries a Bearer token that the token decoder rejects (`INVALID_TOKEN_ERROR`) or that was
   revoked. Without it, the Classic authentication manager turns a bad token into a `500` or an empty
   `200`. Requests without a Bearer header (Classic itself) are never checked.

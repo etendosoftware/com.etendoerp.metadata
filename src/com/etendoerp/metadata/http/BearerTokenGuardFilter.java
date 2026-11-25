@@ -44,7 +44,9 @@ import com.etendoerp.metadata.utils.Utils;
  * <p>The new UI calls these servlets with the Bearer token of its session. They authenticate it
  * through the Classic authentication manager, which turns an unusable token into a 500 or into an
  * empty 200, never into a 401 — so the new UI could not tell an invalid session from a server
- * error. The {@code /sws/*} services already answer 401 on their own and are not mapped here.</p>
+ * error. The {@code /sws/*} services already answer 401 on their own and are not mapped here.
+ * {@code /utility/*} covers the image servlets ({@code ShowImage}, {@code ImageInfoBLOB}) and
+ * {@code ReferencedLink}, which the new UI also calls with its Bearer token.</p>
  *
  * <p>Only requests that carry an {@code Authorization: Bearer} header are checked. Classic itself
  * authenticates with the session cookie and never sends one, so it is not affected. A token that
@@ -52,7 +54,7 @@ import com.etendoerp.metadata.utils.Utils;
  * plus the revocation check that those servlets never applied.</p>
  */
 @WebFilter(urlPatterns = { "/attachments/*", "/notes/*", "/org.openbravo.service.datasource/*",
-        "/org.openbravo.client.kernel/*" })
+        "/org.openbravo.client.kernel/*", "/utility/*" })
 public class BearerTokenGuardFilter implements Filter {
 
     private static final Logger log4j = LogManager.getLogger(BearerTokenGuardFilter.class);
