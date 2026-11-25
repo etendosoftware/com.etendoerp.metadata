@@ -40,8 +40,8 @@ import org.openbravo.model.ad.system.Client;
 import org.openbravo.model.common.enterprise.Organization;
 
 import com.etendoerp.metadata.data.SavedView;
+import com.etendoerp.metadata.exceptions.ForbiddenException;
 import com.etendoerp.metadata.exceptions.NotFoundException;
-import com.etendoerp.metadata.exceptions.UnauthorizedException;
 import com.etendoerp.metadata.exceptions.UnprocessableContentException;
 
 /**
@@ -299,7 +299,7 @@ public class SavedViewServiceScopeCoverageTest extends AbstractSavedViewServiceT
      *
      * @throws IOException if an I/O error occurs during processing
      */
-    @Test(expected = UnauthorizedException.class)
+    @Test(expected = ForbiddenException.class)
     public void testHandlePostSharedScopeRejectedWhenUserLevelIsNull() throws IOException {
         when(mockOBContext.getUserLevel()).thenReturn(null);
         givenPostRequest(JSON_NAME_PREFIX + VIEW_NAME + "\",\"scope\":\"CLIENT\"}");
@@ -392,7 +392,7 @@ public class SavedViewServiceScopeCoverageTest extends AbstractSavedViewServiceT
      *
      * @throws IOException if an I/O error occurs during processing
      */
-    @Test(expected = UnauthorizedException.class)
+    @Test(expected = ForbiddenException.class)
     public void testHandleDeleteSystemViewRejectedForClientAdmin() throws IOException {
         givenNoOwnerNoRole();
         givenViewOrganizationId(SYSTEM_ID);
