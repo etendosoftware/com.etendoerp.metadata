@@ -155,9 +155,7 @@ public class SavedViewService extends MetadataService {
             return;
         }
 
-        String windowId = getRequest().getParameter(FIELD_WINDOW);
-        if (wantsDefault && windowId != null && !windowId.isEmpty()) {
-            write(wrapList(resolveWindowDefaults(windowId, ctx)));
+        if (writeWindowDefaults(wantsDefault, ctx)) {
             return;
         }
 
@@ -436,6 +434,21 @@ public class SavedViewService extends MetadataService {
             crit.add(Restrictions.eq(SavedView.PROPERTY_ORGANIZATION + ".id", SYSTEM_ID));
             crit.add(Restrictions.eq(SavedView.PROPERTY_CLIENT + ".id", SYSTEM_ID));
         });
+    }
+
+    /**
+     * Answers a {@code ?window=<id>&isdefault=true} request with the effective default view of every tab
+     * of the window.
+     *
+     * @return false when the request asks for something else, which is then answered as before
+     */
+    private boolean writeWindowDefaults(boolean wantsDefault, OBContext ctx) throws Exception {
+        String windowId = getRequest().getParameter(FIELD_WINDOW);
+        if (!wantsDefault || windowId == null || windowId.isEmpty()) {
+            return false;
+        }
+        write(wrapList(resolveWindowDefaults(windowId, ctx)));
+        return true;
     }
 
     /**
