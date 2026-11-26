@@ -18,9 +18,9 @@
 package com.etendoerp.metadata.service;
 
 import com.etendoerp.metadata.data.SavedView;
+import com.etendoerp.metadata.exceptions.ForbiddenException;
 import com.etendoerp.metadata.exceptions.MethodNotAllowedException;
 import com.etendoerp.metadata.exceptions.NotFoundException;
-import com.etendoerp.metadata.exceptions.UnauthorizedException;
 import com.etendoerp.metadata.exceptions.UnprocessableContentException;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONObject;
@@ -181,7 +181,7 @@ public class SavedViewService extends MetadataService {
 
         String scope = body.optString(FIELD_SCOPE, SCOPE_USER).toUpperCase();
         if (!canManageScope(scope, ctx.getUserLevel())) {
-            throw new UnauthorizedException("Not authorized to create a " + scope + "-scoped view");
+            throw new ForbiddenException("Not authorized to create a " + scope + "-scoped view");
         }
 
         SavedView view = OBProvider.getInstance().get(SavedView.class);
@@ -355,7 +355,7 @@ public class SavedViewService extends MetadataService {
         }
         String scope = deriveScope(view);
         if (!canManageScope(scope, ctx.getUserLevel())) {
-            throw new UnauthorizedException("Not authorized to modify this " + scope + "-scoped view");
+            throw new ForbiddenException("Not authorized to modify this " + scope + "-scoped view");
         }
     }
 

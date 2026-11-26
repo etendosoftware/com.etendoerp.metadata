@@ -72,8 +72,8 @@ import org.openbravo.model.ad.ui.Window;
 import org.openbravo.service.db.DalConnectionProvider;
 import org.openbravo.service.json.DataToJsonConverter;
 
+import com.etendoerp.metadata.exceptions.ForbiddenException;
 import com.etendoerp.metadata.exceptions.NotFoundException;
-import com.etendoerp.metadata.exceptions.UnauthorizedException;
 
 /**
  * Unit tests for WindowBuilder using pure mocking approach.
@@ -288,15 +288,15 @@ class WindowBuilderTest {
   }
 
   /**
-   * Tests that the toJSON method throws UnauthorizedException when the user does not have access to the window.
+   * Tests that the toJSON method throws ForbiddenException when the user does not have access to the window.
    * It mocks the OBDal to return a WindowAccess object that indicates no access for the current role.
    */
   @Test
-  void toJSONWithUnauthorizedRoleThrowsUnauthorizedException() {
+  void toJSONWithUnauthorizedRoleThrowsForbiddenException() {
     setupWindowAccess(true, false);
     WindowBuilder windowBuilder = createWindowBuilder();
     
-    UnauthorizedException exception = assertThrows(UnauthorizedException.class, 
+    ForbiddenException exception = assertThrows(ForbiddenException.class, 
         () -> executeToJSON(windowBuilder));
     
     assertTrue(exception.getMessage().contains(ROLE_NAME));

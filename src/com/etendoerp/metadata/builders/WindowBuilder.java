@@ -38,8 +38,8 @@ import org.openbravo.service.json.DataResolvingMode;
 
 import org.openbravo.dal.core.OBContext;
 import com.etendoerp.metadata.cache.ADCacheProvider;
+import com.etendoerp.metadata.exceptions.ForbiddenException;
 import com.etendoerp.metadata.exceptions.NotFoundException;
-import com.etendoerp.metadata.exceptions.UnauthorizedException;
 import com.etendoerp.metadata.utils.Constants;
 
 /**
@@ -80,7 +80,7 @@ public class WindowBuilder extends Builder {
                     .uniqueResult() != null;
 
             if (!windowExistsForSomeRole) {
-                throw new UnauthorizedException("Role " + role.getName() + " is not authorized for window " + id);
+                throw new ForbiddenException("Role " + role.getName() + " is not authorized for window " + id);
             }
 
             // Role has no explicit access configured: signal implicit read-only access

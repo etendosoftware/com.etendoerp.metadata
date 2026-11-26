@@ -37,8 +37,8 @@ import org.openbravo.model.ad.ui.Tab;
 import org.openbravo.model.common.enterprise.Organization;
 
 import com.etendoerp.metadata.data.SavedView;
+import com.etendoerp.metadata.exceptions.ForbiddenException;
 import com.etendoerp.metadata.exceptions.NotFoundException;
-import com.etendoerp.metadata.exceptions.UnauthorizedException;
 
 /**
  * Unit tests for {@link SavedViewService}'s scope precedence resolution and scope write
@@ -196,7 +196,7 @@ public class SavedViewServiceScopeTest extends AbstractSavedViewServiceTest {
      *
      * @throws IOException if an I/O error occurs during processing
      */
-    @Test(expected = UnauthorizedException.class)
+    @Test(expected = ForbiddenException.class)
     public void testHandlePostRoleScopeRejectedForRegularUser() throws IOException {
         givenPostRequest(JSON_NAME_PREFIX + VIEW_NAME + "\",\"scope\":\"ROLE\"}");
 
@@ -249,7 +249,7 @@ public class SavedViewServiceScopeTest extends AbstractSavedViewServiceTest {
      *
      * @throws IOException if an I/O error occurs during processing
      */
-    @Test(expected = UnauthorizedException.class)
+    @Test(expected = ForbiddenException.class)
     public void testHandlePostSystemScopeRejectedForClientAdmin() throws IOException {
         when(mockOBContext.getUserLevel()).thenReturn("CO");
         givenPostRequest(JSON_NAME_PREFIX + VIEW_NAME + "\",\"scope\":\"SYSTEM\"}");
@@ -262,7 +262,7 @@ public class SavedViewServiceScopeTest extends AbstractSavedViewServiceTest {
      *
      * @throws IOException if an I/O error occurs during processing
      */
-    @Test(expected = UnauthorizedException.class)
+    @Test(expected = ForbiddenException.class)
     public void testHandlePutSharedRoleViewRejectedForNonOwnerRegularUser() throws IOException {
         givenSharedRoleView();
         when(mockRequest.getMethod()).thenReturn(PUT);
@@ -296,7 +296,7 @@ public class SavedViewServiceScopeTest extends AbstractSavedViewServiceTest {
      *
      * @throws IOException if an I/O error occurs during processing
      */
-    @Test(expected = UnauthorizedException.class)
+    @Test(expected = ForbiddenException.class)
     public void testHandleDeleteSharedRoleViewRejectedForNonOwnerRegularUser() throws IOException {
         givenSharedRoleView();
         when(mockRequest.getMethod()).thenReturn(DELETE);

@@ -57,6 +57,10 @@ public class Constants {
      * to tell this rejection apart from a generic session failure, so it must not be turned into prose.
      */
     public static final String PASSWORD_EXPIRED_ERROR = "PasswordExpired";
+    /** Error returned with a 401 when the caller's token was revoked through {@code /logout}. */
+    public static final String TOKEN_REVOKED_ERROR = "Token has been revoked";
+    /** Error returned with a 401 when the caller's token is malformed, badly signed or expired. */
+    public static final String INVALID_TOKEN_ERROR = "Invalid or expired token";
     public static final String SSO_PATH = "/sso/";
     public static final boolean DEFAULT_CHECKON_SAVE = true;
     public static final boolean DEFAULT_EDITABLE_FIELD = true;

@@ -16,13 +16,15 @@
  */
 package com.etendoerp.metadata.http;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+
+import java.io.PrintWriter;
+import java.io.StringWriter;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -39,7 +41,6 @@ import org.mockito.quality.Strictness;
 import org.openbravo.dal.core.OBContext;
 import org.openbravo.model.ad.access.User;
 
-import com.etendoerp.metadata.exceptions.UnauthorizedException;
 import com.etendoerp.metadata.utils.Constants;
 import com.etendoerp.metadata.utils.PasswordExpirationUtils;
 
@@ -70,6 +71,7 @@ class BaseWebServiceGuardTest {
   private MockedStatic<PasswordExpirationUtils> expirationStatic;
   private MockedStatic<com.etendoerp.metadata.auth.TokenRevocationStore> revocationStatic;
   private TestWebService service;
+  private StringWriter body;
 
   /**
    * Minimal {@link BaseWebService} implementation that only records whether the guard let the
@@ -89,8 +91,10 @@ class BaseWebServiceGuardTest {
   }
 
   @BeforeEach
-  void setUp() {
+  void setUp() throws Exception {
     service = new TestWebService();
+    body = new StringWriter();
+    when(response.getWriter()).thenReturn(new PrintWriter(body));
     obContextStatic = mockStatic(OBContext.class);
     expirationStatic = mockStatic(PasswordExpirationUtils.class);
     revocationStatic = mockStatic(com.etendoerp.metadata.auth.TokenRevocationStore.class);
@@ -120,6 +124,19 @@ class BaseWebServiceGuardTest {
   }
 
   /**
+   * Asserts that the request was answered with a JSON 401 carrying the given error and never
+   * reached the actual processing.
+   *
+   * @param error         the error expected in the response body
+   * @param expectedCalls how many requests were expected to be rejected
+   */
+  private void assertRejectedWith(String error, int expectedCalls) {
+    verify(response, times(expectedCalls)).setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+    assertTrue(body.toString().contains(error), "Response body must carry " + error);
+    assertFalse(service.wasProcessed());
+  }
+
+  /**
    * Verifies that a regular data request is served when the password is valid.
    *
    * @throws Exception if the service dispatch fails
@@ -134,18 +151,20 @@ class BaseWebServiceGuardTest {
   }
 
   /**
-   * Verifies that a data request is rejected with an unauthorized error when the password is expired,
-   * and that the underlying service is never executed.
+   * Verifies that a data request is answered with a JSON 401 carrying the expired-password code
+   * when the password is expired, and that the underlying service is never executed. The 401 is
+   * written directly: a thrown exception would reach the Secure Web Services servlet and become a
+   * 500, which the new UI cannot tell apart from a server error.
+   *
+   * @throws Exception if the service dispatch fails
    */
   @Test
-  void testExpiredPasswordBlocksProcessing() {
+  void testExpiredPasswordBlocksProcessing() throws Exception {
     given(BLOCKED_PATH, true);
 
-    UnauthorizedException exception = assertThrows(UnauthorizedException.class,
-        () -> service.doGet("", request, response));
+    service.doGet("", request, response);
 
-    assertEquals(Constants.PASSWORD_EXPIRED_ERROR, exception.getMessage());
-    assertFalse(service.wasProcessed());
+    assertRejectedWith(Constants.PASSWORD_EXPIRED_ERROR, 1);
   }
 
   /**
@@ -214,13 +233,16 @@ class BaseWebServiceGuardTest {
   /**
    * Verifies that forwarded requests, which carry the forward prefix and therefore never match the
    * allowlist, are blocked while the password is expired.
+   *
+   * @throws Exception if the service dispatch fails
    */
   @Test
-  void testForwardedRequestIsBlockedWhileExpired() {
+  void testForwardedRequestIsBlockedWhileExpired() throws Exception {
     given("/com.etendoerp.metadata.forward/org.openbravo.service.datasource/Order", true);
 
-    assertThrows(UnauthorizedException.class, () -> service.doGet("", request, response));
-    assertFalse(service.wasProcessed());
+    service.doGet("", request, response);
+
+    assertRejectedWith(Constants.PASSWORD_EXPIRED_ERROR, 1);
   }
 
   /**
@@ -241,16 +263,19 @@ class BaseWebServiceGuardTest {
 
   /**
    * Verifies that the guard is applied to every HTTP verb, not only to GET.
+   *
+   * @throws Exception if the service dispatch fails
    */
   @Test
-  void testEveryVerbIsGuarded() {
+  void testEveryVerbIsGuarded() throws Exception {
     given(BLOCKED_PATH, true);
 
-    assertThrows(UnauthorizedException.class, () -> service.doPost("", request, response));
-    assertThrows(UnauthorizedException.class, () -> service.doPut("", request, response));
-    assertThrows(UnauthorizedException.class, () -> service.doDelete("", request, response));
-    assertThrows(UnauthorizedException.class, () -> service.doPatch("", request, response));
-    assertFalse(service.wasProcessed());
+    service.doPost("", request, response);
+    service.doPut("", request, response);
+    service.doDelete("", request, response);
+    service.doPatch("", request, response);
+
+    assertRejectedWith(Constants.PASSWORD_EXPIRED_ERROR, 4);
   }
 
   /**
@@ -275,6 +300,8 @@ class BaseWebServiceGuardTest {
    * response is set to 401 directly (not thrown as an exception the caller has to catch) - see
    * the design spec for why a thrown UnauthorizedException from this call site would not
    * actually produce a 401 in production.
+   *
+   * @throws Exception if the service dispatch fails
    */
   @Test
   void testRevokedTokenBlocksProcessingAndWrites401() throws Exception {
@@ -288,14 +315,9 @@ class BaseWebServiceGuardTest {
       revocationStatic.when(() -> com.etendoerp.metadata.auth.TokenRevocationStore.isRevoked("revoked-token"))
           .thenReturn(true);
 
-      java.io.StringWriter body = new java.io.StringWriter();
-      when(response.getWriter()).thenReturn(new java.io.PrintWriter(body));
-
       service.doGet("", request, response);
-
-      verify(response).setStatus(HttpServletResponse.SC_UNAUTHORIZED);
     }
-    assertFalse(service.wasProcessed());
+    assertRejectedWith(Constants.TOKEN_REVOKED_ERROR, 1);
   }
 
   /**
