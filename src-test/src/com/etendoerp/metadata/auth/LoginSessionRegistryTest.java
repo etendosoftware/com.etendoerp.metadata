@@ -60,6 +60,7 @@ public class LoginSessionRegistryTest {
     private static final String SESSION_ID = "session-1";
     private static final String SERVER_URL = "http://localhost:8080";
     private static final String SYSTEM_ID = "0";
+    private static final String DB_UNAVAILABLE = "DB unavailable";
 
     @Mock
     private HttpServletRequest request;
@@ -162,7 +163,7 @@ public class LoginSessionRegistryTest {
     @Test
     public void testRegisterSaveFailureReturnsNull() {
         try (MockedConstruction<SessionLogin> construction = mockConstruction(SessionLogin.class,
-            (mock, context) -> doThrow(new ServletException("DB unavailable")).when(mock).save())) {
+            (mock, context) -> doThrow(new ServletException(DB_UNAVAILABLE)).when(mock).save())) {
             assertNull(LoginSessionRegistry.register(request, USERNAME, USER_ID, LoginSessionRegistry.SUCCESS_STATUS));
         }
     }
@@ -178,6 +179,8 @@ public class LoginSessionRegistryTest {
 
         verify(session).setSessionActive(false);
         verify(obDal).flush();
+        // Written by Classic in the System client: read without the client and organization check
+        obContextMock.verify(() -> OBContext.setAdminMode(false));
     }
 
     /**
@@ -216,16 +219,32 @@ public class LoginSessionRegistryTest {
     }
 
     /**
-     * A database failure is swallowed: logout must never fail because of the registry.
+     * A database failure is swallowed, and the session is taken out of the transaction so its
+     * pending change cannot fail again on commit and undo the token revocation of the logout.
      */
     @Test
     public void testCloseSwallowsDatabaseFailure() {
         Session session = stubSessionCreatedBy(USER_ID);
-        doThrow(new IllegalStateException("DB unavailable")).when(obDal).flush();
+        org.hibernate.Session hibernateSession = mock(org.hibernate.Session.class);
+        when(obDal.getSession()).thenReturn(hibernateSession);
+        doThrow(new IllegalStateException(DB_UNAVAILABLE)).when(obDal).flush();
 
         LoginSessionRegistry.close(SESSION_ID, USER_ID);
 
         verify(session).setSessionActive(false);
+        verify(hibernateSession).evict(session);
+    }
+
+    /**
+     * A failure before the session is read leaves nothing to take out of the transaction.
+     */
+    @Test
+    public void testCloseFailureBeforeReadingTheSessionDiscardsNothing() {
+        doThrow(new IllegalStateException(DB_UNAVAILABLE)).when(obDal).get(Session.class, SESSION_ID);
+
+        LoginSessionRegistry.close(SESSION_ID, USER_ID);
+
+        verify(obDal, never()).getSession();
     }
 
     /**

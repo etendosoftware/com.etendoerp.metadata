@@ -99,7 +99,10 @@ public final class LoginSessionRegistry {
    * ends. A session that does not exist or belongs to another user is left untouched, so a caller
    * can only close its own sessions.
    * <p>
-   * Best-effort: logout must never fail because of the registry.
+   * Best-effort: logout must never fail because of the registry. The session is written by Classic's
+   * {@code SessionLogin} in the System client, so it is read without the client and organization
+   * check; and a session that could not be closed is taken out of the transaction, so the failure
+   * never undoes the rest of the logout (the token revocation done in the same request).
    *
    * @param sessionId the {@code AD_Session_ID} to close
    * @param userId    the id of the user closing it
@@ -109,9 +112,10 @@ public final class LoginSessionRegistry {
       return;
     }
 
+    Session session = null;
     try {
-      OBContext.setAdminMode(true);
-      Session session = OBDal.getInstance().get(Session.class, sessionId);
+      OBContext.setAdminMode(false);
+      session = OBDal.getInstance().get(Session.class, sessionId);
       if (!isOwnedBy(session, userId)) {
         log.warn("Session {} not closed: it does not belong to the current user", sessionId);
         return;
@@ -121,8 +125,21 @@ public final class LoginSessionRegistry {
       OBDal.getInstance().flush();
     } catch (Exception e) {
       log.warn("Could not close session {}", sessionId, e);
+      discardChanges(session);
     } finally {
       OBContext.restorePreviousMode();
+    }
+  }
+
+  /**
+   * Leaves a session whose close failed out of the transaction, so its pending change is not
+   * flushed again (and fails again) when the request commits.
+   *
+   * @param session the session that could not be closed, or {@code null} if it was never read
+   */
+  private static void discardChanges(Session session) {
+    if (session != null) {
+      OBDal.getInstance().getSession().evict(session);
     }
   }
 
